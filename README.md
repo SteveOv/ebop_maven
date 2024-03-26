@@ -1,2 +1,1 @@
-# ebop-maven
-EBOP Model stArting Value Estimation Neural network
+# EBOP Model Automatic input Value Estimation Neural network
