@@ -1,0 +1,8 @@
+[project]
+name = "ebop_maven"
+version = "0.0.1-alpha"
+description = "EBOP Model Automatic input Value Estimation Neural network"
+
+[build-system]
+requires = ["setuptools >= 61.0.0"]
+build-backend = "setuptools.build_meta"
