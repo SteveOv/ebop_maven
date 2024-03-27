@@ -1,6 +1,6 @@
 [project]
 name = "ebop_maven"
-version = "0.0.1-alpha"
+version = "0.0.1"
 description = "EBOP Model Automatic input Value Estimation Neural network"
 
 [build-system]
