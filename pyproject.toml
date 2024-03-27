@@ -2,7 +2,7 @@
 name = "ebop_maven"
 version = "0.0.1"
 description = "EBOP Model Automatic input Value Estimation Neural network"
-requires-python >= 3.8
+requires-python = ">=3.8"
 dependencies = [
     "numpy",
     "pandas",
