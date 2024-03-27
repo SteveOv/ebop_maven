@@ -22,11 +22,7 @@ dependencies = [
 
 [build-system]
 requires = ["setuptools >= 61.0.0", "wheel"]
-build-backend = "setuptools.build_meta"
+build-backend = ["setuptools", "setuptools-scm"]
 
 [tool.setuptools]
 include-package-data = true
-
-[tool.setuptools.packages.find]
-namespaces = true
-where = ["ebop_maven"]
