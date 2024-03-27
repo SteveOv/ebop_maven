@@ -1,6 +1,6 @@
 """ Disposable module to test GitHub release and install process. """
+from .libs import functions
 
 def do_something():
     """ Does something. """
-    print("Test: hello world")
-    return 2112
+    return functions.add(2111, 1)
