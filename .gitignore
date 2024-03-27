@@ -160,3 +160,6 @@ cython_debug/
 #.idea/
 
 .vscode/
+
+# These are my private helper modules for ad-hoc execution.
+_run*.py
