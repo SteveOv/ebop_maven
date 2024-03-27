@@ -4,33 +4,13 @@ channels:
   - defaults
 dependencies:
   - python=3.8
-  - numpy=1.19
-  - pandas=1.4
-  - pathlib
-  - scipy=1.7
-  - matplotlib=3.4
-  - astropy=5.1
-  - lightkurve=2.4
-  - numba
-  - scikit-learn=1.0
 
-  # For jupyter notebook support
-  - ipykernel
-  - ipympl
-  - jupyter
-
-  # TensorFlow requirements: this is the least troublesome combination I have
-  # found that does everything I have so far needed. This is common across
-  # the various deb* projects.
-  #   conda/pip
-  #     Python 3.8
-  #     TF 2.6 / Keras 2.6
-  #     CUDNN for TensorFlow/Keras 2.6 to see & use Nvidia GPUs
+  # optional CUDNN for TensorFlow/Keras 2.6+ to see & use my Nvidia GPU
   - cudnn=8.1
+
   - pip
   - pip:
-    - tensorflow~=2.6.0
-    - keras~=2.6.0
+    - -r requirements.txt
 variables:
   JKTEBOP_DIR: ~/jktebop43
   TF_CPP_MIN_LOG_LEVEL: 2         # Suppress TF info/warn messages
