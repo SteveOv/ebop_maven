@@ -1,0 +1,158 @@
+J/A+A/618/A20      Limb-darkening for TESS, Kepler, Corot, MOST   (Claret, 2018)
+================================================================================
+A new method to compute limb-darkening coefficients for stellar atmosphere
+models with spherical symmetry: the space missions TESS, Kepler, Corot, and
+MOST.
+    Claret A.
+   <Astron. Astrophys. 618, A20 (2018)>
+   =2018A&A...618A..20C        (SIMBAD/NED BibCode)
+================================================================================
+ADC_Keywords: Models, atmosphere ; Photometry
+Keywords: binaries: eclipsing - stars: atmospheres - planetary systems
+
+Abstract:
+    One of the biggest problems we can encounter while dealing with the
+    limb-darkening coefficients for stellar atmospheric models with
+    spherical symmetry is the difficulty of adjusting both the limb and
+    the central parts simultaneously. In particular, the regions near the
+    drop-offs are not well reproduced for most models, depending on Teff,
+    log g, or wavelength. Even if the law with four terms is used, these
+    disagreements still persist. Here we introduce a new method that
+    considerably improves the description of both the limb and the central
+    parts and that will allow users to test models of stellar atmospheres
+    with spherical symmetry more accurately in environments such as
+    exoplanetary transits, eclipsing binaries, etc.
+
+Description:
+    The method introduced here is simple. Instead of considering all the
+    {mu} points in the adjustment, as is traditional, we consider only
+    the points until the drop-off ({mu}_cri-) of each model. From this
+    point, we impose a condition I({mu})/I(1)=0. All calculations were
+    performed by adopting the least-squares method.
+
+    The resulting coefficients using this new method reproduce the
+    intensity distribution of the PHOENIX spherical models (COND and
+    DRIFT) quite well for the photometric systems of the space missions
+    TESS, KEPLER, COROT, and MOST. The calculations cover the following
+    ranges of local gravity and effective temperatures: 2.5<=logg<=6.0 and
+    1500K<=Teff<=12000K. The new spherical coefficients can easily be
+    adapted to the most commonly used light curve synthesis codes.
+
+File Summary:
+--------------------------------------------------------------------------------
+ FileName      Lrecl  Records   Explanations
+--------------------------------------------------------------------------------
+ReadMe            80        .   This file
+table2.dat        87      112   a_1,a_2,a_3,a_4 LDCs, FSM, Eq. 1
+                                 PHOENIX-DRIFT models, solar metallicity,
+                                 v.tu=2 km/s for TESS
+table3.dat        87      574   a_1,a_2,a_3,a_4 LDCs, FSM, Eq. 1
+                                 PHOENIX-COND models, solar metallicity,
+                                 v.tu=2 km/s for TESS
+table4.dat        68      112   a,b quadratic LDCs, FSM, Eq. 2
+                                 PHOENIX-DRIFT models, solar metallicity,
+                                 v.tu=2 km/s for TESS
+table5.dat        68      574   a,b quadratic LDCs, FSM, Eq. 2
+                                 PHOENIX-COND models, solar metallicity,
+                                 v.tu=2 km/s for TESS
+table6.dat        87      112   a_1,a_2,a_3,a_4 LDCs, FSM, Eq. 1
+                                 PHOENIX-DRIFT models, solar metallicity,
+                                 v.tu=2 km/s for KEPLER
+table7.dat        87      574   a_1,a_2,a_3,a_4 LDCs, FSM, Eq. 1
+                                 PHOENIX-COND models, solar metallicity,
+                                 v.tu=2 km/s for KEPLER
+table8.dat        68      112   a,b quadratic LDCs, FSM, Eq. 2
+                                 PHOENIX-DRIFT models, solar metallicity,
+                                 v.tu=2 km/s for KEPLER
+table9.dat        68      574   a,b quadratic LDCs, FSM, Eq. 2
+                                 PHOENIX-COND models, solar metallicity,
+                                 v.tu=2 km/s for KEPLER
+table10.dat       87      112   a_1,a_2,a_3,a_4 LDCs, FSM, Eq. 1
+                                 PHOENIX-DRIFT models, solar metallicity,
+                                 v.tu=2 km/s for COROT
+table11.dat       87      574   a_1,a_2,a_3,a_4 LDCs, FSM, Eq. 1
+                                 PHOENIX-COND models, solar metallicity,
+                                 v.tu=2 km/s for COROT
+table12.dat       68      112   a,b quadratic LDCs, FSM, Eq. 2
+                                 PHOENIX-DRIFT models, solar metallicity,
+                                 v.tu=2 km/s for COROT
+table13.dat       68      574   a,b quadratic LDCs, FSM, Eq. 2
+                                 PHOENIX-COND models, solar metallicity,
+                                 v.tu=2 km/s for COROT
+table14.dat       87      112   a_1,a_2,a_3,a_4 LDCs, FSM, Eq. 1
+                                 PHOENIX-DRIFT models, solar metallicity,
+                                 v.tu=2 km/s for MOST
+table15.dat       87      574   a_1,a_2,a_3,a_4 LDCs, FSM, Eq. 1
+                                 PHOENIX-COND models, solar metallicity,
+                                 v.tu=2 km/s for MOST
+table16.dat       68      112   a,b quadratic LDCs, FSM, Eq. 2
+                                 PHOENIX-DRIFT models, solar metallicity,
+                                 v.tu=2 km/s for MOST
+table17.dat       68      574   a,b quadratic LDCs, FSM, Eq. 2
+                                 PHOENIX-COND models, solar metallicity,
+                                 v.tu=2 km/s for MOST
+--------------------------------------------------------------------------------
+
+See also:
+ J/A+A/363/1081 : Non-linear limb-darkening law for LTE models (Claret, 2000)
+ J/A+A/529/A75  : Limb-darkening coefficients (Claret+, 2011)
+ J/A+A/546/A14  : Limb-darkening for CoRoT, Kepler, Spitzer (Claret+, 2012)
+ J/A+A/600/A30  : Limb-darkening for TESS satellite (Claret, 2017)
+
+Byte-by-byte Description of file: table[2367].dat table1[0145].dat
+--------------------------------------------------------------------------------
+   Bytes Format Units   Label  Explanations
+--------------------------------------------------------------------------------
+   1-  5  F5.2  cm/s+2  logg   [2.5/6.0] Surface gravity
+   7- 12  F6.0  K       Teff   [1500/12000] Effective temperature
+  14- 17  F4.1  [-]     Z      [0] Metallicity (log[M/H])
+  19- 22  F4.1  ---     L/HP   [2] Mixing-length parameter
+  24- 31  F8.4  ---     a1     Eq. 1 spherical linear limb darkening coefficient
+                                a1 (FSM) (1)
+  33- 41  F9.4  ---     a2     Eq. 1 spherical linear limb darkening coefficient
+                                a2 (FSM) (1)
+  43- 50  F8.4  ---     a3     Eq. 1 spherical linear limb darkening coefficient
+                                a3 (FSM) (1)
+  52- 59  F8.4  ---     a4     Eq. 1 spherical linear limb darkening coefficient
+                                a4 (FSM) (1)
+  61- 68  F8.4  ---     mu     MU_CRI_ parameter (FSM)
+  70- 77  F8.4  ---     chi2   SQRT(CHI2Q) (FSM)
+  79- 80  A2    ---     Mod    [PD PC] Model name (G1)
+  82- 87  A6    ---     Sys    System (TESS, KEPLER, COROT or MOST)
+--------------------------------------------------------------------------------
+Note (1): Eq. 1 : Non-linear law
+   I({mu})/I(1) = 1 - a1*(1-{mu}^0.5^) - a2*(1-{mu})
+                                       - a3*(1-{mu}^1.5^) - a4*(1-{mu}^2^)
+--------------------------------------------------------------------------------
+
+Byte-by-byte Description of file: table[4589].dat table1[2367].dat
+--------------------------------------------------------------------------------
+   Bytes Format Units   Label   Explanations
+--------------------------------------------------------------------------------
+   1-  5  F5.2  cm/s+2  logg    [2.5/6.0] Surface gravity
+   7- 12  F6.0  K       Teff    [1500/12000] Effective temperature
+  14- 17  F4.1  [-]     Z       [0] Metallicity (log[M/H])
+  19- 22  F4.1  ---     L/HP    [2] Mixing-length parameter
+  24- 31  F8.4  ---     a       Eq.2 spherical linear limb darkening coefficient
+                                 a (FSM) (2)
+  33- 40  F8.4  ---     b       Eq.2 spherical linear limb darkening coefficient
+                                 b (FSM) (2)
+  42- 49  F8.4  ---     mu      MU_CRI_ parameter (FSM)
+  51- 58  F8.4  ---     chi2    SQRT(CHI2Q) (FSM)
+  60- 61  A2    ---     Mod    [PD PC] Model name (G1)
+  63- 68  A6    ---     Sys    System (TESS, KEPLER, COROT or MOST)
+--------------------------------------------------------------------------------
+Note (2): Eq. 2 : Quadratic law    I({mu})/I(1) = 1-a(1-{mu})-b(1-{mu})^2^
+--------------------------------------------------------------------------------
+
+Global notes:
+Note (G1): Models as follows:
+      PD = PHOENIX-DRIFT
+      PC = PHOENIX-COND
+--------------------------------------------------------------------------------
+
+Acknowledgements:
+    Antonio Claret, claret(at)iaa.es
+
+================================================================================
+(End)                                        Patricia Vannier [CDS]  17-May-2018
