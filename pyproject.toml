@@ -2,6 +2,23 @@
 name = "ebop_maven"
 version = "0.0.1"
 description = "EBOP Model Automatic input Value Estimation Neural network"
+requires-python >= 3.8
+dependencies = [
+    "numpy",
+    "pandas",
+    "pathlib",
+    "scipy",
+    "matplotlib",
+    "astropy>=5.1",
+    "lightkurve>=2.4",
+    "numba",
+    "scikit-learn>=1.0",
+    "ipykernel",
+    "ipympl",
+    "jupyter",
+    "tensorflow>=2.6.0",
+    "keras>=2.6.0"
+]
 
 [build-system]
 requires = ["setuptools >= 40.6.0", "wheel"]
