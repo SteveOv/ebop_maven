@@ -21,8 +21,8 @@ dependencies = [
 ]
 
 [build-system]
-requires = ["setuptools >= 61.0.0", "wheel"]
-build-backend = ["setuptools", "setuptools-scm"]
+requires = ["setuptools >= 61.0.0", "setuptools-scm", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 include-package-data = true
