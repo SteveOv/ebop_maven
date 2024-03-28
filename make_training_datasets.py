@@ -3,10 +3,10 @@ import os
 from pathlib import Path
 from contextlib import redirect_stdout
 
-from ebop_maven import trainsets
+from ebop_maven import trainsets, datasets
 from ebop_maven.libs.tee import Tee
 
-datasets_dir = Path("./datasets")
+datasets_root = Path("./datasets")
 
 # Tell the libraries where the JKTEBOP executable lives.
 # The conda yaml based env sets this but it's not set for venvs.
@@ -59,13 +59,29 @@ if not "JKTEBOP_DIR" in os.environ:
 
 # The formal-trainset will be used for training the final model
 # First we create the readable csv trainset from random parameter distributions.
-trainset_dir = datasets_dir / "formal-trainset"
+trainset_dir = datasets_root / "formal-trainset"
 trainset_dir.mkdir(parents=True, exist_ok=True)
 with redirect_stdout(Tee(open(trainset_dir/"trainset.log", "w", encoding="utf8"))):
-    trainsets.write_trainset_from_distributions(100000, 10, trainset_dir, verbose=True)
+    trainsets.write_trainset_from_distributions(instance_count=100000,
+                                                file_count=10,
+                                                output_dir=trainset_dir,
+                                                verbose=True)
 
 trainsets.plot_trainset_histograms(trainset_dir, trainset_dir / "histogram_full.png", cols=3)
 trainsets.plot_trainset_histograms(trainset_dir, trainset_dir / "histogram_main.eps", cols=2,
                                     params=["rA_plus_rB", "k", "inc", "J", "ecosw", "esinw"])
 
-# TODO: make the tensorflow dataset from the trainset
+# Make the tensorflow dataset from the trainset
+dataset_dir = trainset_dir / "1024" / "wm-0.75"
+dataset_dir.mkdir(parents=True, exist_ok=True)
+RESUME = False
+with redirect_stdout(Tee(open(dataset_dir/"dataset.log", "a" if RESUME else "w", encoding="utf8"))):
+    datasets.make_dataset_files(trainset_files=trainset_dir.glob("trainset*.csv"),
+                                output_dir=dataset_dir,
+                                valid_ratio=0.1,
+                                test_ratio=0.1,
+                                wrap_model=0.75,
+                                resume=RESUME,
+                                pool_size=1,
+                                verbose=True,
+                                simulate=False)
