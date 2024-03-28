@@ -304,6 +304,7 @@ def generate_instances_from_models(z: float,
     :mission: the observation mission the mimic
     :models: the source of stellar model data
     :label: to include in messages
+    :verbose: whether to print verbose progress/diagnostic messages
     :returns: a generator over the dictionaries, one per system
     """
     usable_counter = generated_counter = 0

@@ -22,7 +22,8 @@ if not "JKTEBOP_DIR" in os.environ:
 #     instances (the trainset). This is useful during training/hyperparameter tuning
 #     by allow what's in a dataset to be varied (e.g. phase shift of the lightcurves)
 #   - tfrecord files are not easily readable so the csv files are useful for
-#     access to the original parameters of an instance
+#     access to the original parameters of an instance. You could consider the
+#     dataset as the compiled output with the trainset being the source
 #   - it's a convenient break in the process
 #
 # Trainsets
@@ -63,4 +64,4 @@ trainset_dir.mkdir(parents=True, exist_ok=True)
 with redirect_stdout(Tee(open(trainset_dir/"trainset.log", "w", encoding="utf8"))):
     trainsets.write_trainset_from_distributions(100000, 10, trainset_dir, verbose=True)
 
-# TODO: generate the tensorflow dataset from the trainset
+# TODO: make the tensorflow dataset from the trainset
