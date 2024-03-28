@@ -64,4 +64,8 @@ trainset_dir.mkdir(parents=True, exist_ok=True)
 with redirect_stdout(Tee(open(trainset_dir/"trainset.log", "w", encoding="utf8"))):
     trainsets.write_trainset_from_distributions(100000, 10, trainset_dir, verbose=True)
 
+trainsets.plot_trainset_histograms(trainset_dir, trainset_dir / "histogram_full.png", cols=3)
+trainsets.plot_trainset_histograms(trainset_dir, trainset_dir / "histogram_main.eps", cols=2,
+                                    params=["rA_plus_rB", "k", "inc", "J", "ecosw", "esinw"])
+
 # TODO: make the tensorflow dataset from the trainset

@@ -1,5 +1,5 @@
 """
-Generates a synthetic trainset based on parameter distribution functions
+Functions for generating binary system instances and writing their parameters to trainset csv files.
 """
 # We use some ucase variable names as they match the equivalent symbol
 # pylint: disable=invalid-name
@@ -9,11 +9,13 @@ from pathlib import Path
 from inspect import getsourcefile
 from timeit import default_timer
 from datetime import timedelta
-from itertools import product
+from itertools import product, zip_longest
 import json
 import random
+import math
 
 import numpy as np
+import matplotlib.pyplot as plt
 import astropy.units as u
 
 from .libs import param_sets, orbital, limb_darkening
@@ -26,6 +28,23 @@ _this_dir = Path(getsourcefile(lambda:0)).parent
 _def_limb_darkening_params = {"LDA": "quad", "LDB": "quad",
                               "LDA1": 0.25,  "LDB1": 0.25,
                               "LDA2": 0.22,  "LDB2": 0.22 }
+
+# The full set of parameters available for histograms, their #bins and plot labels
+histogram_params = {
+    "rA_plus_rB":   (100, r"$r_{A}+r_{B}$"),
+    "k":            (100, r"$k$"),
+    "inc":          (100, r"$i~(^{\circ})$"),
+    "qphot":        (100, r"$q_{phot}$"),
+    #"L3":           (100, r"$L_3$"), # currently always zero
+    "e":            (100, r"$e$"),
+    "omega":        (100, r"$\omega~(^{\circ})$"),
+    "J":            (100, r"$J$"),
+    "ecosw":        (100, r"$e\,\cos{\omega}$"),
+    "esinw":        (100, r"$e\,\sin{\omega}$"),
+    "rA":           (100, r"$r_A$"),
+    "rB":           (100, r"$r_B$"),
+    "bP":           (100, r"$b_{prim}$")
+}
 
 def write_trainset_from_distributions(instance_count: int,
                                       file_count: int,
@@ -381,6 +400,56 @@ def generate_instances_from_models(z: float,
                 if verbose and usable_counter % 100 == 0:
                     print(f"{label}: Generated {usable_counter:,} usable",
                         f"instances from {generated_counter:,} distinct configurations.")
+
+
+def plot_trainset_histograms(trainset_dir: Path,
+                             plot_file: Path=None,
+                             params: List[str]=None,
+                             cols: int=3,
+                             verbose: bool=True):
+    """
+    Saves histogram plots to a single figure on a grid of axes. The params will
+    be plotted in the order they are listed, scanning from left to right and down.
+
+    :trainset_dir: the directory containing the trainset csv files
+    :plot_file: the directory to save the plots. If none, they're saved with the trainset
+    :parameters: the list of parameters to plot, or the full list if None.
+    See the histogram_parameters attribute for the full list
+    :cols: the width of the axes grid (the rows automatically adjust)
+    :verbose: whether to print verbose progress/diagnostic messages
+    """
+    if not params:
+        param_specs = histogram_params
+    else:
+        param_specs = { p: histogram_params[p] for p in params if p in histogram_params }
+    csvs = sorted(trainset_dir.glob("trainset*.csv"))
+
+    if param_specs and csvs:
+        size = 3
+        rows = math.ceil(len(param_specs) / cols)
+        _, axes = plt.subplots(rows, cols, sharey="all",
+                               figsize=(cols*size, rows*size), constrained_layout=True)
+        if verbose:
+            print(f"Plotting histograms in a {cols}x{rows} grid for:", ", ".join(param_specs))
+
+        for (ax, field) in zip_longest(axes.flatten(), param_specs):
+            if field:
+                bins, label = param_specs[field]
+                data = [row.get(field, None) for row in param_sets.read_param_sets_from_csvs(csvs)]
+                if verbose:
+                    print(f"Plotting histogram for {len(data):,} {field} values.")
+                ax.hist(data, bins=bins)
+                ax.set_xlabel(label)
+                ax.tick_params(axis="both", which="both", direction="in",
+                               top=True, bottom=True, left=True, right=True)
+            else:
+                ax.axis("off") # remove the unused ax
+
+        if verbose:
+            print("Saving histogram plot to", plot_file)
+        plot_file.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(plot_file, dpi=100) # dpi is ignored for vector formats
+        plt.close()
 
 
 def _calculate_file_splits(instance_count: int, file_count: int) -> List[int]:
