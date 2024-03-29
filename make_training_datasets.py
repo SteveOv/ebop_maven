@@ -88,11 +88,13 @@ with redirect_stdout(Tee(open(dataset_dir/"dataset.log", "a" if RESUME else "w",
 
 # Make the formal test dataset
 input_targets_files = Path(".") / "config" / "formal-test-dataset.json"
-formal_testset_dir = Path(".") / "datasets/formal-test-dataset"
-datasets.make_formal_test_dataset(input_file=input_targets_files,
-                                  output_dir=formal_testset_dir,
-                                  fits_cache_dir=Path(".") / "cache",
-                                  target_names=None,
-                                  wrap_model=0.75,
-                                  verbose=True,
-                                  simulate=False)
+formal_testset_dir = Path(".") / "datasets/formal-test-dataset/1024/wm-0.75"
+formal_testset_dir.mkdir(parents=True, exist_ok=True)
+with redirect_stdout(Tee(open(formal_testset_dir/"dataset.log", "w", encoding="utf8"))):
+    datasets.make_formal_test_dataset(input_file=input_targets_files,
+                                      output_dir=formal_testset_dir,
+                                      fits_cache_dir=Path(".") / "cache",
+                                      target_names=None,
+                                      wrap_model=0.75,
+                                      verbose=True,
+                                      simulate=False)
