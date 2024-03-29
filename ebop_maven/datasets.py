@@ -48,6 +48,7 @@ def make_dataset_files(trainset_files: Iterator[Path],
     :verbose: whether to print verbose progress/diagnostic messages
     :simulate: whether to simulate the process, skipping only file/directory actions
     """
+    start_time = default_timer()
     trainset_files = sorted(trainset_files)
     train_ratio = 1 - valid_ratio - test_ratio
     if verbose:
@@ -65,9 +66,6 @@ The random seed to use for selections:  {seed}\n""")
         if simulate:
             print("Simulate requested so no files will be written.\n")
 
-    if verbose:
-        start_time = default_timer()
-
     # args for each make_dataset_file call as required by process_pool starmap
     iter_params = (
     (f, output_dir, valid_ratio, test_ratio, wrap_model, interp_kind, resume, seed, verbose, simulate) # pylint: disable=line-too-long
@@ -82,8 +80,8 @@ The random seed to use for selections:  {seed}\n""")
         with Pool(min(pool_size, len(trainset_files))) as pool:
             pool.starmap(make_dataset_file, iter_params)
 
-    if verbose:
-        print(f"\nFinished. The time taken was {timedelta(0, round(default_timer()-start_time))}.")
+    print(f"\nFinished making the dataset for {len(iter_params)} trainset file(s) to {output_dir}")
+    print(f"The time taken was {timedelta(0, round(default_timer()-start_time))}.")
 
 
 def make_dataset_file(trainset_file: Path,
