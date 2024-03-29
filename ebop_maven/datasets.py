@@ -8,12 +8,16 @@ import traceback
 from timeit import default_timer
 from datetime import timedelta
 from multiprocessing import Pool
+import json
+import re
 
 import numpy as np
 from scipy.interpolate import interp1d
+import astropy.units as u
+import lightkurve as lk
 import tensorflow as tf
 
-from .libs import param_sets, jktebop, lightcurve, deb_example
+from .libs import param_sets, jktebop, orbital, lightcurve, deb_example
 
 
 def make_dataset_files(trainset_files: Iterator[Path],
@@ -222,3 +226,157 @@ def make_dataset_file(trainset_file: Path,
             subset_file.unlink(missing_ok=True)
         if verbose:
             print(msg)
+
+
+def make_formal_test_dataset(input_file: Path,
+                             output_dir: Path,
+                             fits_cache_dir: Path,
+                             target_names: Iterator[str]=None,
+                             wrap_model: float=0.75,
+                             verbose: bool=True,
+                             simulate: bool=True):
+    """
+    This will 
+    """
+    # pylint: disable=invalid-name
+    start_time = default_timer()
+    fits_cache_dir = fits_cache_dir if fits_cache_dir else output_dir
+
+    if verbose:
+        print(f"""
+Build formal test dataset based on downloaded lightcurves from TESS targets.
+----------------------------------------------------------------------------
+The input configuration files is:   {input_file}
+Output dataset will be written to:  {output_dir}
+Downloaded fits are cached in:      {fits_cache_dir}
+Selected targets are:               {', '.join(target_names) if target_names else 'all'}
+Models will be wrapped above phase: {wrap_model}\n""")
+        if simulate:
+            print("Simulate requested so no dataset will be written, however fits are cached.\n")
+
+    with open(input_file, mode="r", encoding="utf8") as f:
+        targets = json.load(f)
+        if target_names:
+            targets = { name: targets[name] for name in target_names if name in targets }
+
+    output_file = output_dir / f"{input_file.stem}.tfrecord"
+    if not simulate:
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+        ds_options = tf.io.TFRecordOptions(compression_type=None)
+        ds = tf.io.TFRecordWriter(f"{output_file}", ds_options)
+
+    try:
+        inst_counter = 0
+        for target_counter, (target, config) in enumerate(targets.items(), start=1):
+            if verbose:
+                print(f"\nProcessing target {target_counter} of {len(targets)}: {target}")
+
+            sectors = [int(s) for s in config["sectors"].keys() if s.isdigit()]
+            mission = config.get("mission", "TESS")
+            author = config.get("author", "SPOC")
+            exptime = config.get("exptime", "short")
+            def_qual_bitmask = config.get("quality_bitmask", "default")
+            def_flux_col = config.get("flux_column", "sap_flux")
+
+            # Get the Lightcurves that match the search criteria. Will attempt
+            # to service the request from previously downloaded fits if present.
+            fits_dir = fits_cache_dir / re.sub(r'[^\w\d-]', '_', target.lower())
+            lcs = lightcurve.find_lightcurves(target, fits_dir, sectors, mission, author, exptime,
+                                              def_flux_col, def_qual_bitmask, verbose=verbose)
+            for lc in lcs:
+                sector = lc.meta["SECTOR"]
+                exptime = lc.meta["FRAMETIM"] * lc.meta["NUM_FRM"] * u.s
+                lc_id = f"{target}[{sector:0>4}]"
+
+                # Sector config is the target config with sector overrides. This
+                # allows setting config and labels at the target level and/or at
+                # the sector level, with any sector level values taking precedence.
+                sector_cfg = { **config.copy(), **config["sectors"][f"{sector}"] }
+                sector_cfg.pop("sectors", None)
+                labels = sector_cfg["labels"] # Mandatory, so error if missing
+
+                # May need to reopen the LC to change its flux col or quality bitmask from target
+                # default. Not found a way of reading and changing both these on an open LC.
+                flux = sector_cfg.get("flux_column", None) or def_flux_col
+                qual_bitmask = sector_cfg.get("quality_bitmask", None) or def_qual_bitmask
+                if qual_bitmask != def_qual_bitmask or flux != def_flux_col:
+                    lc = lk.read(lc.filename, flux_column=flux, quality_bitmask=qual_bitmask)
+                    if verbose:
+                        print(f"{lc_id}: Re-read LC to use {flux} & quality_bitmask={qual_bitmask}")
+
+                # Masking, binning, detrending and setting up delta-mag columns
+                mask_time_ranges = sector_cfg.get("quality_masks", None) or []
+                lc = lightcurve.apply_quality_masks(lc, mask_time_ranges, verbose)
+
+                time_bin_seconds = (sector_cfg.get("bin_time", None) or 0) * u.s
+                if time_bin_seconds > 0 * u.s:
+                    lightcurve.bin_lightcurve(lc, time_bin_seconds, verbose)
+
+                if verbose:
+                    print(f"{lc_id}: Creating delta mags, then subtracting a detrending polynomial")
+                lightcurve.append_magnitude_columns(lc, "delta_mag", "delta_mag_err")
+                lc["delta_mag"] -= lightcurve.fit_polynomial(lc.time,
+                                                    lc["delta_mag"],
+                                                    config.get("detrend_order", None) or 2,
+                                                    config.get("detrend_iterations", None) or 2,
+                                                    config.get("detrend_sigma_clip", None) or 1.0,
+                                                    verbose)
+
+                # For the formal testset we expect the ephemeris to be in the config
+                period = sector_cfg.get("period", None) * u.d
+                pe = lightcurve.to_lc_time(sector_cfg.get("primary_epoch", None), lc)
+                if verbose:
+                    print(f"{lc_id}: Primary epoch {pe.format} {pe} & period {period} from config")
+
+                # Phase folding the light-curve
+                if verbose:
+                    pivot_msg = ""
+                    if 0 < wrap_model < 1.:
+                        pivot_msg = f"Phase data beyond phase {wrap_model} will be wrapped."
+                    print(f"{lc_id}: Creating a normalized, phase-folded light-curve.", pivot_msg)
+                wrap_model = u.Quantity(wrap_model)
+                fold_lc = lc.fold(period, pe, wrap_phase=wrap_model, normalize_phase=True)
+
+                # Now get the interpolated & folded delta-mags data we need for the ML model
+                lc_phase_bins = deb_example.description["lc"].shape[0]
+                if verbose:
+                    print(f"{lc_id}: Generating {lc_phase_bins} bin light-curve feature.")
+                _, mags = lightcurve.get_reduced_folded_lc(fold_lc, lc_phase_bins, wrap_model, True)
+
+                # omega & ecc are not used as labels but we need them for phiS and impact params
+                ecosw, esinw = labels["ecosw"], labels["esinw"]
+                omega = sector_cfg.get("omega", None) \
+                    or np.rad2deg(np.arctan(np.divide(esinw, ecosw))) if ecosw else 0
+                ecc = np.divide(ecosw, np.cos(np.deg2rad(omega))) if ecosw else 0
+
+                # May need to calculate the primary impact parameter label as it's rarely published.
+                bP = labels.get("bP", None)
+                if bP is None:
+                    rA = np.divide(labels["rA_plus_rB"], np.add(1, labels["k"]))
+                    labels["bP"] = orbital.impact_parameter(rA, labels["inc"] * u.deg, ecc, None,
+                                                            esinw, orbital.EclipseType.PRIMARY)
+                    if verbose:
+                        print(f"{lc_id}: No impact parameter (bP) supplied;",
+                                f"calculated rA = {rA} and then bP = {labels['bP']}")
+
+                # Now assembly the extra features needed: phiS (phase secondary) and dS_over_dP
+                extra_features = {
+                    "phiS": lightcurve.expected_secondary_phase(labels["ecosw"], ecc),
+                    "dS_over_dP": lightcurve.expected_ratio_of_eclipse_duration(labels["esinw"])
+                }
+
+                # Serialize the labels, folded mags (lc) & extra_features as a deb_example and write
+                if not simulate:
+                    if verbose:
+                        print(f"{lc_id}: Saving serialized instance to dataset:", output_file)
+                    ds.write(deb_example.serialize(lc_id, labels, mags, extra_features))
+                elif verbose:
+                    print(f"{lc_id}: Simulated saving serialized instance to dataset:", output_file)
+                inst_counter += 1
+    finally:
+        if ds:
+            ds.close()
+
+    action = "Finished " + ("simulating the saving of" if simulate else "saving")
+    print(f"\n{action} {inst_counter} instance(s) from {len(targets)} target(s) to", output_file)
+    print(f"The time taken was {timedelta(0, round(default_timer()-start_time))}.")
