@@ -82,7 +82,7 @@ with redirect_stdout(Tee(open(dataset_dir/"dataset.log", "a" if RESUME else "w",
                                 test_ratio=0.1,
                                 wrap_model=0.75,
                                 resume=RESUME,
-                                pool_size=1,
+                                max_workers=4,
                                 verbose=True,
                                 simulate=False)
 
