@@ -27,7 +27,7 @@ def make_dataset_files(trainset_files: Iterator[Path],
                        wrap_model: float=0.75,
                        interp_kind: str="cubic",
                        resume: bool=False,
-                       pool_size: int=1,
+                       max_workers: int=1,
                        seed: float=42,
                        verbose: bool=True,
                        simulate: bool=True):
@@ -48,24 +48,26 @@ def make_dataset_files(trainset_files: Iterator[Path],
     :wrap_model: phases above this value are rolled to the start of the lightcurve models
     :interp_kind: the kind of interpolation used to reduce the the lightcurve models
     :resume: whether we are to attempt to resume from a previous "make"
+    :max_workers: maximum number of files to process concurrently
     :seed: the seed ensures random selection of subsets are repeatable
     :verbose: whether to print verbose progress/diagnostic messages
     :simulate: whether to simulate the process, skipping only file/directory actions
     """
     start_time = default_timer()
     trainset_files = sorted(trainset_files)
+    file_count = len(trainset_files)
     train_ratio = 1 - valid_ratio - test_ratio
     if verbose:
         print(f"""
 Build training datasets from testset csvs.
 ------------------------------------------
-The number of input trainset files is:  {len(trainset_files)}
+The number of input trainset files is:  {file_count}
 Output dataset directory:               {output_dir}
 Resume previous job is set to:          {'on' if resume else 'off'}
 Models will be wrapped above phase:     {wrap_model}
 Training : Validation : Test ratio is:  {train_ratio:.2f} : {valid_ratio:.2f} : {test_ratio:.2f}
 The model interpolation kind is:        {interp_kind}
-The maximum concurrent workers:         {pool_size}
+The maximum concurrent workers:         {max_workers}
 The random seed to use for selections:  {seed}\n""")
         if simulate:
             print("Simulate requested so no files will be written.\n")
@@ -76,15 +78,16 @@ The random seed to use for selections:  {seed}\n""")
         for f in trainset_files
     )
 
-    if len(trainset_files) == 1 or pool_size is None or pool_size <= 1:
+    max_workers = min(file_count, max_workers or 1)
+    if max_workers <= 1:
         # We could use a pool of 1, but keep execution on the interactive proc
         for params in iter_params:
             make_dataset_file(*params)
     else:
-        with Pool(min(pool_size, len(trainset_files))) as pool:
+        with Pool(max_workers) as pool:
             pool.starmap(make_dataset_file, iter_params)
 
-    print(f"\nFinished making the dataset for {len(iter_params)} trainset file(s) to {output_dir}")
+    print(f"\nFinished making the dataset for {file_count} trainset file(s) to {output_dir}")
     print(f"The time taken was {timedelta(0, round(default_timer()-start_time))}.")
 
 
