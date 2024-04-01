@@ -1,5 +1,5 @@
 """
-Functions for building TensorFlow datasets from trainsets.
+Functions for building TensorFlow datasets.
 """
 from typing import Iterator
 from pathlib import Path
@@ -239,7 +239,51 @@ def make_formal_test_dataset(input_file: Path,
                              verbose: bool=True,
                              simulate: bool=True) -> Path:
     """
-    This will 
+    This creates a dataset based on real systems; their TESS light curve data with derived features
+    & labels from published works. The information required to carry this out is supplied as a json
+    file in the input_file argument. The following example shows one target from the input file and
+    the tags that are used in this function. Not all tags are mandatory; mission defaults to "TESS",
+    author to "SPOC", exptime to "short", "quality_bitmask" to "default", "flux_column" to
+    "sap_flux", ecc and omega are assumed to be zero if omitted. bP will be calculated from other
+    values if omitted.
+
+    Example config:
+    {
+        "V436 Per": {
+            "mission": "TESS" | "HLPSP",
+            "author": "SPOC" | "TESS-SPOC",
+            "exptime": "long" | "short" | "fast" | int (s),
+            "sectors": {
+                "18": {
+                    "quality_bitmask": "hardest" | "hard" | "default",
+                    "flux_column": "sap_flux" | "pdcsap_flux",
+                    "primary_epoch": 1813.201149,
+                    "period": 25.935953,
+                    "ecc": 0.3835,
+                    "omega": 109.56,
+                    "labels": {
+                        "rA_plus_rB": 0.08015,
+                        "k": 1.097,
+                        "bP": 0.59,
+                        "inc": 87.951,
+                        "ecosw": -0.12838,
+                        "esinw": 0.3614,
+                        "J": 1.041,
+                        "L3": -0.003
+                    }
+                }
+            }
+        }
+    }
+
+    :input_file: the input json file containing the parameters for one or more targets
+    :output_dir: the directory to write the output dataset tfrecord file
+    :fits_cache_dir: the parent directory under which to cache downloaded fits files
+    :target_names: a list of targets to select from input_file, or None for all
+    :wrap_model: phases above this value are rolled to the start of the lightcurve model
+    :verbose: whether to print verbose progress/diagnostic messages
+    :simulate: whether to simulate the process, skipping only file/directory actions
+    :returns: the Path of the newly created dataset file
     """
     # pylint: disable=invalid-name
     start_time = default_timer()
