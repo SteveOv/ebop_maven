@@ -323,7 +323,7 @@ Models will be wrapped above phase: {wrap_model}\n""")
                                                     config.get("detrend_order", None) or 2,
                                                     config.get("detrend_iterations", None) or 2,
                                                     config.get("detrend_sigma_clip", None) or 1.0,
-                                                    verbose)
+                                                    verbose=verbose)
 
                 # For the formal testset we expect the ephemeris to be in the config
                 period = sector_cfg.get("period", None) * u.d
