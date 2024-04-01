@@ -1,5 +1,6 @@
 
 from typing import Dict, List
+from pathlib import Path
 
 import numpy as np
 import tensorflow as tf
@@ -51,13 +52,13 @@ def serialize(identifier: str,
                         + f"{description['lc'].shape[0]}")
 
     features = {
-        "id": _bytes_feature(identifier),
+        "id": _to_bytes_feature(identifier),
         # Labels - will raise KeyError if an expected label is not given
-        **{ k: _float_feature(labels[k]) for k in label_names },
+        **{ k: _to_float_feature(labels[k]) for k in label_names },
         # Light-curve model feature
-        "lc" : _float_feature(light_curve_model),
+        "lc" : _to_float_feature(light_curve_model),
         # Extra features, will fall back on default value where not given
-        **{ k: _float_feature(extra_features.get(k, d))
+        **{ k: _to_float_feature(extra_features.get(k, d))
                     for k, d in extra_features_and_defaults.items()},
     }
 
@@ -90,10 +91,30 @@ def map_parse_deb_example(record_bytes):
     return ((lc_feature, ext_features), labels)
 
 
+def inspect_dataset(dataset_file: Path, identifiers: List[str]=None):
+    """
+    Utility/diagnostics function which will parse a saved dataset file yielding
+    each row that matches the passed list of ids (or every row if ids is None).
+    The rows will be yielded in the order in which they appear in the datafile.
+
+    :dataset_file: the full file path of the dataset file to read
+    :identifiers: optional list of ids to yield, or all ids if None
+    """
+    for raw_record in tf.data.TFRecordDataset([dataset_file]):
+        # We know the id is encoded as a utf8 str in a bytes feature
+        example = tf.io.parse_single_example(raw_record, description)
+        identifier = example["id"].numpy().decode(encoding="utf8")
+        if not identifiers or identifier in identifiers:
+            labels = { k: example[k].numpy() for k in label_names }
+            lc = example["lc"].numpy()
+            ext_features = { k: example[k].numpy() for k in extra_features_and_defaults }
+            yield (identifier, labels, lc, ext_features)
+
+
 #
 #   Helpers based on https://www.tensorflow.org/tutorials/load_data/tfrecord
 #
-def _bytes_feature(value) -> tf.train.Feature:
+def _to_bytes_feature(value) -> tf.train.Feature:
     """
     Encodes the passed value to a BytesList in a TensorFlow feature.
 
@@ -107,7 +128,7 @@ def _bytes_feature(value) -> tf.train.Feature:
         value = bytes(value, encoding="utf8")
     return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
 
-def _float_feature(value) -> tf.train.Feature:
+def _to_float_feature(value) -> tf.train.Feature:
     """
     Encodes the passed value to a FloatList in a TensorFlow feature.
 

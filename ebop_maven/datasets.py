@@ -237,7 +237,7 @@ def make_formal_test_dataset(input_file: Path,
                              target_names: Iterator[str]=None,
                              wrap_model: float=0.75,
                              verbose: bool=True,
-                             simulate: bool=True):
+                             simulate: bool=True) -> Path:
     """
     This will 
     """
@@ -383,3 +383,4 @@ Models will be wrapped above phase: {wrap_model}\n""")
     action = "Finished " + ("simulating the saving of" if simulate else "saving")
     print(f"\n{action} {inst_counter} instance(s) from {len(targets)} target(s) to", output_file)
     print(f"The time taken was {timedelta(0, round(default_timer()-start_time))}.")
+    return output_file
