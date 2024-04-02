@@ -100,7 +100,7 @@ def inspect_dataset(dataset_file: Path, identifiers: List[str]=None):
     :dataset_file: the full file path of the dataset file to read
     :identifiers: optional list of ids to yield, or all ids if None
     """
-    for raw_record in tf.data.TFRecordDataset([dataset_file]):
+    for raw_record in tf.data.TFRecordDataset([dataset_file], compression_type=None):
         # We know the id is encoded as a utf8 str in a bytes feature
         example = tf.io.parse_single_example(raw_record, description)
         identifier = example["id"].numpy().decode(encoding="utf8")

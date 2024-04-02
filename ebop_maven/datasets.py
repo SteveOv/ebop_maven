@@ -1,7 +1,7 @@
 """
 Functions for building TensorFlow datasets.
 """
-from typing import Iterator
+from typing import Iterator, Dict
 from pathlib import Path
 import random
 import traceback
@@ -14,11 +14,13 @@ import re
 import numpy as np
 from scipy.interpolate import interp1d
 import astropy.units as u
-import lightkurve as lk
+from lightkurve import LightCurve
 import tensorflow as tf
 
 from .libs import param_sets, jktebop, orbital, lightcurve, deb_example
 
+# Common options used when writing a dataset file
+_ds_options = tf.io.TFRecordOptions(compression_type=None)
 
 def make_dataset_files(trainset_files: Iterator[Path],
                        output_dir: Path,
@@ -218,7 +220,7 @@ def make_dataset_file(trainset_file: Path,
             # indices. which are then re-sorted so the rows is written in the original order.
             subset_slice = slice(subset_slice_start, subset_slice_start + subset_count)
             subset_file.parent.mkdir(parents=True, exist_ok=True)
-            with tf.io.TFRecordWriter(f"{subset_file}") as ds:
+            with tf.io.TFRecordWriter(f"{subset_file}", _ds_options) as ds:
                 for sorted_ix in sorted(row_indices[subset_slice]):
                     ds.write(rows[sorted_ix])
             subset_slice_start = subset_slice.stop
@@ -231,7 +233,7 @@ def make_dataset_file(trainset_file: Path,
             print(msg)
 
 
-def make_formal_test_dataset(input_file: Path,
+def make_formal_test_dataset(config_file: Path,
                              output_dir: Path,
                              fits_cache_dir: Path,
                              target_names: Iterator[str]=None,
@@ -293,7 +295,7 @@ def make_formal_test_dataset(input_file: Path,
         print(f"""
 Build formal test dataset based on downloaded lightcurves from TESS targets.
 ----------------------------------------------------------------------------
-The input configuration files is:   {input_file}
+The input configuration files is:   {config_file}
 Output dataset will be written to:  {output_dir}
 Downloaded fits are cached in:      {fits_cache_dir}
 Selected targets are:               {', '.join(target_names) if target_names else 'all'}
@@ -301,93 +303,48 @@ Models will be wrapped above phase: {wrap_model}\n""")
         if simulate:
             print("Simulate requested so no dataset will be written, however fits are cached.\n")
 
-    with open(input_file, mode="r", encoding="utf8") as f:
+    with open(config_file, mode="r", encoding="utf8") as f:
         targets = json.load(f)
         if target_names:
             targets = { name: targets[name] for name in target_names if name in targets }
 
-    output_file = output_dir / f"{input_file.stem}.tfrecord"
+    output_file = output_dir / f"{config_file.stem}.tfrecord"
     if not simulate:
         output_file.parent.mkdir(parents=True, exist_ok=True)
-        ds_options = tf.io.TFRecordOptions(compression_type=None)
-        ds = tf.io.TFRecordWriter(f"{output_file}", ds_options)
+        ds = tf.io.TFRecordWriter(f"{output_file}", _ds_options)
 
     try:
         inst_counter = 0
-        for target_counter, (target, config) in enumerate(targets.items(), start=1):
+        for target_counter, (target, target_cfg) in enumerate(targets.items(), start=1):
             if verbose:
                 print(f"\nProcessing target {target_counter} of {len(targets)}: {target}")
 
-            sectors = [int(s) for s in config["sectors"].keys() if s.isdigit()]
-            mission = config.get("mission", "TESS")
-            author = config.get("author", "SPOC")
-            exptime = config.get("exptime", "short")
-            def_qual_bitmask = config.get("quality_bitmask", "default")
-            def_flux_col = config.get("flux_column", "sap_flux")
-
-            # Get the Lightcurves that match the search criteria. Will attempt
-            # to service the request from previously downloaded fits if present.
             fits_dir = fits_cache_dir / re.sub(r'[^\w\d-]', '_', target.lower())
-            lcs = lightcurve.find_lightcurves(target, fits_dir, sectors, mission, author, exptime,
-                                              def_flux_col, def_qual_bitmask, verbose=verbose)
-            for lc in lcs:
-                sector = lc.meta["SECTOR"]
-                exptime = lc.meta["FRAMETIM"] * lc.meta["NUM_FRM"] * u.s
+            for sector in [int(s) for s in target_cfg["sectors"].keys() if s.isdigit()]:
                 lc_id = f"{target}[{sector:0>4}]"
+                sector_cfg = _sector_config_from_target(sector, target_cfg)
 
-                # Sector config is the target config with sector overrides. This
-                # allows setting config and labels at the target level and/or at
-                # the sector level, with any sector level values taking precedence.
-                sector_cfg = { **config.copy(), **config["sectors"][f"{sector}"] }
-                sector_cfg.pop("sectors", None)
-                labels = sector_cfg["labels"] # Mandatory, so error if missing
+                # These are mandatory, so error if missing
+                labels = sector_cfg["labels"]
+                period = sector_cfg["period"] * u.d
+                pe = sector_cfg["primary_epoch"]
 
-                # May need to reopen the LC to change its flux col or quality bitmask from target
-                # default. Not found a way of reading and changing both these on an open LC.
-                flux = sector_cfg.get("flux_column", None) or def_flux_col
-                qual_bitmask = sector_cfg.get("quality_bitmask", None) or def_qual_bitmask
-                if qual_bitmask != def_qual_bitmask or flux != def_flux_col:
-                    lc = lk.read(lc.filename, flux_column=flux, quality_bitmask=qual_bitmask)
-                    if verbose:
-                        print(f"{lc_id}: Re-read LC to use {flux} & quality_bitmask={qual_bitmask}")
-
-                # Masking, binning, detrending and setting up delta-mag columns
-                mask_time_ranges = sector_cfg.get("quality_masks", None) or []
-                lc = lightcurve.apply_quality_masks(lc, mask_time_ranges, verbose)
-
-                time_bin_seconds = (sector_cfg.get("bin_time", None) or 0) * u.s
-                if time_bin_seconds > 0 * u.s:
-                    lightcurve.bin_lightcurve(lc, time_bin_seconds, verbose)
-
-                if verbose:
-                    print(f"{lc_id}: Creating delta mags, then subtracting a detrending polynomial")
-                lightcurve.append_magnitude_columns(lc, "delta_mag", "delta_mag_err")
-                lc["delta_mag"] -= lightcurve.fit_polynomial(lc.time,
-                                                    lc["delta_mag"],
-                                                    config.get("detrend_order", None) or 2,
-                                                    config.get("detrend_iterations", None) or 2,
-                                                    config.get("detrend_sigma_clip", None) or 1.0,
-                                                    verbose=verbose)
-
-                # For the formal testset we expect the ephemeris to be in the config
-                period = sector_cfg.get("period", None) * u.d
-                pe = lightcurve.to_lc_time(sector_cfg.get("primary_epoch", None), lc)
-                if verbose:
-                    print(f"{lc_id}: Primary epoch {pe.format} {pe} & period {period} from config")
+                # Get the Lightcurve that matches the target & sector criteria and preprocess it.
+                # Will attempt to service the request from previously downloaded fits if present.
+                lc = _prepare_lc_for_target_sector(target, sector, sector_cfg, fits_dir, verbose)
+                pe = lightcurve.to_lc_time(pe, lc)
 
                 # Phase folding the light-curve
                 if verbose:
-                    pivot_msg = ""
-                    if 0 < wrap_model < 1.:
-                        pivot_msg = f"Phase data beyond phase {wrap_model} will be wrapped."
-                    print(f"{lc_id}: Creating a normalized, phase-folded light-curve.", pivot_msg)
+                    print(f"{lc_id}: Creating a phase normalized, folded light-curve about",
+                          f"{pe.format} {pe} & {period}. Phases above {wrap_model} wrapped.")
                 wrap_model = u.Quantity(wrap_model)
                 fold_lc = lc.fold(period, pe, wrap_phase=wrap_model, normalize_phase=True)
 
                 # Now get the interpolated & folded delta-mags data we need for the ML model
                 lc_phase_bins = deb_example.description["lc"].shape[0]
                 if verbose:
-                    print(f"{lc_id}: Generating {lc_phase_bins} bin light-curve feature.")
+                    print(f"{lc_id}: Generating a {lc_phase_bins} bin model feature.")
                 _, mags = lightcurve.get_reduced_folded_lc(fold_lc, lc_phase_bins, wrap_model, True)
 
                 # omega & ecc are not used as labels but we need them for phiS and impact params
@@ -406,7 +363,7 @@ Models will be wrapped above phase: {wrap_model}\n""")
                         print(f"{lc_id}: No impact parameter (bP) supplied;",
                                 f"calculated rA = {rA} and then bP = {labels['bP']}")
 
-                # Now assembly the extra features needed: phiS (phase secondary) and dS_over_dP
+                # Now assemble the extra features needed: phiS (phase secondary) and dS_over_dP
                 extra_features = {
                     "phiS": lightcurve.expected_secondary_phase(labels["ecosw"], ecc),
                     "dS_over_dP": lightcurve.expected_ratio_of_eclipse_duration(labels["esinw"])
@@ -428,3 +385,53 @@ Models will be wrapped above phase: {wrap_model}\n""")
     print(f"\n{action} {inst_counter} instance(s) from {len(targets)} target(s) to", output_file)
     print(f"The time taken was {timedelta(0, round(default_timer()-start_time))}.")
     return output_file
+
+
+def _sector_config_from_target(sector: int, target_cfg: Dict[str, any]) -> Dict[str, any]:
+    """
+    Get the sector specific config from the passed target config. The sector config
+    is the target config overlaid with the sector config so the sector provides overrides.
+    """
+    sector_cfg = {
+        **target_cfg.copy(),
+        **target_cfg["sectors"][f"{sector}"]
+    }
+    sector_cfg.pop("sectors", None)
+    return sector_cfg
+
+
+def _prepare_lc_for_target_sector(target: str,
+                                  sector: int,
+                                  config: Dict[str, any],
+                                  fits_dir: Path,
+                                  verbose: bool=True) -> LightCurve:
+    """
+    Will find and load the requested target/sector lightcurve then mask, bin and
+    append the rectified delta_mag and delta_mag_err columns. It will read the
+    information required for these steps from the passed sector config.
+    """
+    lc = lightcurve.find_lightcurves(target,
+                                     fits_dir,
+                                     [sector],
+                                     config.get("mission", "TESS"),
+                                     config.get("author", "SPOC"),
+                                     config.get("exptime", "short"),
+                                     config.get("flux_column", "sap_flux"),
+                                     config.get("quality_bitmask", "default"),
+                                     verbose=verbose)[0]
+
+    mask_time_ranges = config.get("quality_masks", None) or []
+    lc = lightcurve.apply_quality_masks(lc, mask_time_ranges, verbose)
+
+    time_bin_seconds = (config.get("bin_time", None) or 0) * u.s
+    if time_bin_seconds > 0 * u.s:
+        lightcurve.bin_lightcurve(lc, time_bin_seconds, verbose)
+
+    lightcurve.append_magnitude_columns(lc, "delta_mag", "delta_mag_err")
+    lc["delta_mag"] -= lightcurve.fit_polynomial(lc.time,
+                                                 lc["delta_mag"],
+                                                 config.get("detrend_order", 2),
+                                                 config.get("detrend_iterations", 2),
+                                                 config.get("detrend_sigma_clip", 1.0),
+                                                 verbose=verbose)
+    return lc
