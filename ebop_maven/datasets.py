@@ -411,6 +411,58 @@ def inspect_dataset(dataset_files: Union[Path, Iterator[Path]],
             yield (identifier, labels, lc, ext_features)
 
 
+def plot_dataset_instance_model_feature(dataset_files: Union[Path, Iterator[Path]],
+                                        identifier: str,
+                                        output: Union[Path, Axes],
+                                        wrap_phase: float=0.75):
+    """
+    Utility function to produce a plot of the requested dataset instance's model feature
+
+    :dataset_files: the set of dataset files to parse
+    :identifier: the identifier of the instance
+    :output: where to send the plot. Either a Path to save to or an existing axes
+    :wrap_phase: where the model was wrapped
+    """
+    # If the output is a path then we need to set up a plot and axes which we'll
+    # save to the output file, otherwise we'll plot to it as axes
+    if isinstance(output, Path):
+        fig = plt.figure(figsize=(6, 4), constrained_layout=True, dpi=100)
+        ax = fig.add_subplot(111)
+    else:
+        ax = output
+        output = None
+
+    # Will error if nothing found
+    instance = next(inspect_dataset(dataset_files, [identifier]), None)
+    if not instance:
+        raise KeyError(f"No match on identifier '{identifier}'")
+
+    # Only the mags are stored in the dataset. Infer the x/phase data
+    (_, _, model_feature, _) = instance
+    phases = np.linspace(wrap_phase-1, wrap_phase, len(model_feature))
+    ax.scatter(x=phases, y=model_feature, marker=".", s=0.25)
+
+    # We'll rely on the caller to config the output if it's an Axes
+    if output:
+        ax.invert_yaxis()
+        ax.set_xlabel("Phase")
+        ax.set_ylabel("Relative magnitude (mag)")
+
+        ymin, ymax = ax.get_ylim()
+        ax.vlines([0.0, 0.5], ymin, ymax, linestyles="--", color="k", lw=.5, alpha=.25)
+
+        x_ticks = [0.0, 0.5]
+        ax.set_xticks(x_ticks, minor=False)
+        ax.set_xticklabels(x_ticks)
+        start = round(min(phases), 1)
+        ax.set_xticks(np.arange(start, start + 1.0 if start < 0.0 else 1.1, 0.1), minor=True)
+        ax.tick_params(axis="both", which="both", direction="in",
+                       top=True, bottom=True, left=True, right=True)
+
+        fig.savefig(output)
+        plt.close()
+
+
 def _sector_config_from_target(sector: int, target_cfg: Dict[str, any]) -> Dict[str, any]:
     """
     Get the sector specific config from the passed target config. The sector config
