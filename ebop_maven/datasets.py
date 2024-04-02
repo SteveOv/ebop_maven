@@ -1,7 +1,7 @@
 """
 Functions for building TensorFlow datasets.
 """
-from typing import Iterator, Dict, List
+from typing import Iterator, Dict, List, Union
 from pathlib import Path
 import random
 import traceback
@@ -12,6 +12,8 @@ import json
 import re
 
 import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.axes import Axes
 from scipy.interpolate import interp1d
 import astropy.units as u
 from lightkurve import LightCurve
@@ -173,11 +175,6 @@ def make_dataset_file(trainset_file: Path,
                 # issue was caused by passing "bad" params to JKTEBOP which is why it's not repeated
                 print(f"{label}[{sys_params['id']}]: Replacing NaN/Inf in processed LC.")
                 np.nan_to_num(x=model_data[1], copy=False)
-
-            # TODO
-            # if args.plot_model:
-            #     plot_file_name = drop_parent / f"{param_csv.stem}-plots/{sys_params['id']}.png"
-            #     plot_model(plot_file_name, model_data)
 
             # These are the extra features used for predictions alongside the LC.
             extra_features = {
@@ -387,17 +384,23 @@ Models will be wrapped above phase: {wrap_phase}\n""")
     return output_file
 
 
-def inspect_dataset(dataset_file: Path,
+def inspect_dataset(dataset_files: Union[Path, Iterator[Path]],
                     identifiers: List[str]=None):
     """
-    Utility/diagnostics function which will parse a saved dataset file yielding
-    each row that matches the passed list of ids (or every row if ids is None).
-    The rows will be yielded in the order in which they appear in the datafile.
+    Utility/diagnostics function which will parse a saved dataset yielding each
+    row that matches the passed list of ids (or every row if ids is None). The
+    rows are yielded in the order in which they appear in the sorted tfrecords.
 
-    :dataset_file: the full file path of the dataset file to read
+    :dataset_files: the set of dataset files to parse
     :identifiers: optional list of ids to yield, or all ids if None
     """
-    for raw_record in tf.data.TFRecordDataset([dataset_file], _ds_options.compression_type):
+
+    if isinstance(dataset_files, Path):
+        dataset_files = [f"{dataset_files.resolve()}"]
+    else:
+        dataset_files = [f"{f.resolve()}" for f in sorted(dataset_files)]
+
+    for raw_record in tf.data.TFRecordDataset(dataset_files, _ds_options.compression_type):
         # We know the id is encoded as a utf8 str in a bytes feature
         example = tf.io.parse_single_example(raw_record, deb_example.description)
         identifier = example["id"].numpy().decode(encoding="utf8")
