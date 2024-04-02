@@ -1,7 +1,7 @@
 """
 Functions for building TensorFlow datasets.
 """
-from typing import Iterator, Dict
+from typing import Iterator, Dict, List
 from pathlib import Path
 import random
 import traceback
@@ -385,6 +385,27 @@ Models will be wrapped above phase: {wrap_model}\n""")
     print(f"\n{action} {inst_counter} instance(s) from {len(targets)} target(s) to", output_file)
     print(f"The time taken was {timedelta(0, round(default_timer()-start_time))}.")
     return output_file
+
+
+def inspect_dataset(dataset_file: Path,
+                    identifiers: List[str]=None):
+    """
+    Utility/diagnostics function which will parse a saved dataset file yielding
+    each row that matches the passed list of ids (or every row if ids is None).
+    The rows will be yielded in the order in which they appear in the datafile.
+
+    :dataset_file: the full file path of the dataset file to read
+    :identifiers: optional list of ids to yield, or all ids if None
+    """
+    for raw_record in tf.data.TFRecordDataset([dataset_file], _ds_options.compression_type):
+        # We know the id is encoded as a utf8 str in a bytes feature
+        example = tf.io.parse_single_example(raw_record, deb_example.description)
+        identifier = example["id"].numpy().decode(encoding="utf8")
+        if not identifiers or identifier in identifiers:
+            labels = { k: example[k].numpy() for k in deb_example.label_names }
+            lc = example["lc"].numpy()
+            ext_features = { k: example[k].numpy() for k in deb_example.extra_features_and_defaults}
+            yield (identifier, labels, lc, ext_features)
 
 
 def _sector_config_from_target(sector: int, target_cfg: Dict[str, any]) -> Dict[str, any]:

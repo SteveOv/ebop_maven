@@ -101,6 +101,6 @@ with redirect_stdout(Tee(open(formal_testset_dir/"dataset.log", "w", encoding="u
                                                             simulate=False)
 
     # Review the dataset we have just written
-    for (identifier, labels, lc, ext_features) in deb_example.inspect_dataset(formal_testset_file):
+    for (identifier, labels, lc, ext_features) in datasets.inspect_dataset(formal_testset_file):
         row = { **labels, "min(lc)": min(lc), "max(lc)": max(lc), **ext_features }
         print(f"{identifier:>15s}: {', '.join(f'{k}: {v:7.3f}' for k, v in row.items())}")
