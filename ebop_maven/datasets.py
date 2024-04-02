@@ -318,7 +318,7 @@ Models will be wrapped above phase: {wrap_phase}\n""")
 
             fits_dir = fits_cache_dir / re.sub(r'[^\w\d-]', '_', target.lower())
             for sector in [int(s) for s in target_cfg["sectors"].keys() if s.isdigit()]:
-                lc_id = f"{target}[{sector:0>4}]"
+                lc_id = f"{target}/{sector:0>4}"
                 sector_cfg = _sector_config_from_target(sector, target_cfg)
 
                 # These are mandatory, so error if missing

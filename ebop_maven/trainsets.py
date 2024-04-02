@@ -86,7 +86,7 @@ The random seed to use for selections:  {seed}\n""")
     np.random.seed(seed)
     for ix, file_inst_count in enumerate(_calculate_file_splits(instance_count, file_count), 1):
         out_file = output_dir / f"trainset{ix:03d}.csv"
-        psets = [*generate_instances_from_distributions(file_inst_count, out_file.name, verbose)]
+        psets = [*generate_instances_from_distributions(file_inst_count, out_file.stem, verbose)]
         if verbose:
             print(f"{'Simulated s' if simulate else 'S'}aving {len(psets)} inst(s) to {out_file}")
         if not simulate:
@@ -107,6 +107,7 @@ def generate_instances_from_distributions(instance_count: int, label: str, verbo
     """
     generated_counter = 0
     usable_counter = 0
+    set_id = label.replace("trainset", "")
 
     while usable_counter < instance_count:
         # These are the "label" params for which we have defined distributions
@@ -142,7 +143,7 @@ def generate_instances_from_distributions(instance_count: int, label: str, verbo
         # Create the pset dictionary.
         generated_counter += 1
         pset = {
-            "id":           f"{generated_counter:06d}",
+            "id":           f"{set_id}/{generated_counter:06d}",
 
             # Basic system params for generating the model light-curve
             # The keys (& those for LD below) are those expected by make_dateset
@@ -258,7 +259,7 @@ The random seed to use when selections: {seed}\n""")
                    "write a trainset csv for each pair by varying their configuration.")
         for ix, (z, y, ima, imb, age) in enumerate(stellar_psets, start=1):
             out_file = output_dir / f"trainset{ix:03d}.csv"
-            label = out_file.name
+            label = out_file.stem
             psets = [*generate_instances_from_models(z, y, ima, imb, age,
                                                      pspace["period"],
                                                      pspace["inc"],
@@ -327,6 +328,7 @@ def generate_instances_from_models(z: float,
     :returns: a generator over the dictionaries, one per system
     """
     usable_counter = generated_counter = 0
+    set_id = label.replace("trainset", "")
 
     MA, RA, T_eff_A, LA, loggA = models.lookup_stellar_parameters(z, y, init_MA, age)
     MB, RB, T_eff_B, LB, loggB = models.lookup_stellar_parameters(z, y, init_MB, age)
@@ -361,7 +363,7 @@ def generate_instances_from_models(z: float,
             imp_prm = orbital.impact_parameter(rA, inc, ecc, None, esinw, orbital.EclipseType.BOTH)
 
             pset = {
-                "id":           f"{generated_counter:06d}",
+                "id":           f"{set_id}/{generated_counter:06d}",
 
                 # Basic system params for generating the model light-curve
                 # The keys (& those for LD below) are those expected by make_dateset
