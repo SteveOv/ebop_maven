@@ -13,5 +13,10 @@ ipykernel
 ipympl
 jupyter
 
-tensorflow>=2.6.0
-keras>=2.6.0
+# TensorFlow/Keras support.
+# Very sensitive to version so don't let it update to latest; fixing at 2.6.*
+tensorflow==2.6.*
+tensorflow-estimator==2.6.*
+tensorboard==2.6.*
+keras==2.6.*
+keras-preprocessing

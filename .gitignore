@@ -167,3 +167,6 @@ _run*.py
 # Datasets are bulky but recreatable
 datasets/
 cache/
+
+# Models are bulky but recreatable
+models/
