@@ -5,9 +5,9 @@ from contextlib import redirect_stdout
 
 from ebop_maven import trainsets, datasets
 from ebop_maven.libs.tee import Tee
-from ebop_maven.libs import deb_example
 
 datasets_root = Path("./datasets")
+WRAP_PHASE = 0.75
 
 # Tell the libraries where the JKTEBOP executable lives.
 # The conda yaml based env sets this but it's not set for venvs.
@@ -73,7 +73,7 @@ trainsets.plot_trainset_histograms(trainset_dir, trainset_dir / "histogram_main.
                                     params=["rA_plus_rB", "k", "inc", "J", "ecosw", "esinw"])
 
 # Make the tensorflow dataset from the trainset
-dataset_dir = trainset_dir / "1024" / "wm-0.75"
+dataset_dir = trainset_dir / "1024" / f"wm-{WRAP_PHASE}"
 dataset_dir.mkdir(parents=True, exist_ok=True)
 RESUME = False
 with redirect_stdout(Tee(open(dataset_dir/"dataset.log", "a" if RESUME else "w", encoding="utf8"))):
@@ -81,7 +81,7 @@ with redirect_stdout(Tee(open(dataset_dir/"dataset.log", "a" if RESUME else "w",
                                 output_dir=dataset_dir,
                                 valid_ratio=0.1,
                                 test_ratio=0.1,
-                                wrap_model=0.75,
+                                wrap_phase=WRAP_PHASE,
                                 resume=RESUME,
                                 max_workers=4,
                                 verbose=True,
@@ -89,14 +89,14 @@ with redirect_stdout(Tee(open(dataset_dir/"dataset.log", "a" if RESUME else "w",
 
 # Make the formal test dataset
 input_targets_files = Path(".") / "config" / "formal-test-dataset.json"
-formal_testset_dir = Path(".") / "datasets/formal-test-dataset/1024/wm-0.75"
+formal_testset_dir = Path(".") / f"datasets/formal-test-dataset/1024/wm-{WRAP_PHASE}"
 formal_testset_dir.mkdir(parents=True, exist_ok=True)
 with redirect_stdout(Tee(open(formal_testset_dir/"dataset.log", "w", encoding="utf8"))):
     formal_testset_file = datasets.make_formal_test_dataset(config_file=input_targets_files,
                                                             output_dir=formal_testset_dir,
                                                             fits_cache_dir=Path(".") / "cache",
                                                             target_names=None,
-                                                            wrap_model=0.75,
+                                                            wrap_phase=WRAP_PHASE,
                                                             verbose=True,
                                                             simulate=False)
 

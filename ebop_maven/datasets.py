@@ -26,7 +26,7 @@ def make_dataset_files(trainset_files: Iterator[Path],
                        output_dir: Path,
                        valid_ratio: float=0.,
                        test_ratio: float=0,
-                       wrap_model: float=0.75,
+                       wrap_phase: float=0.75,
                        interp_kind: str="cubic",
                        resume: bool=False,
                        max_workers: int=1,
@@ -47,7 +47,7 @@ def make_dataset_files(trainset_files: Iterator[Path],
     :output_dir: the parent directory for the dataset files, if None the same as the input
     :valid_ratio: proportion of rows to be written to the validation files
     :test_ratio: proportion of rows to be written to the testing files
-    :wrap_model: phases above this value are rolled to the start of the lightcurve models
+    :wrap_phase: phases above this value are rolled to the start of the lightcurve models
     :interp_kind: the kind of interpolation used to reduce the the lightcurve models
     :resume: whether we are to attempt to resume from a previous "make"
     :max_workers: maximum number of files to process concurrently
@@ -66,7 +66,7 @@ Build training datasets from testset csvs.
 The number of input trainset files is:  {file_count}
 Output dataset directory:               {output_dir}
 Resume previous job is set to:          {'on' if resume else 'off'}
-Models will be wrapped above phase:     {wrap_model}
+Model feature wrapped above phase:      {wrap_phase}
 Training : Validation : Test ratio is:  {train_ratio:.2f} : {valid_ratio:.2f} : {test_ratio:.2f}
 The model interpolation kind is:        {interp_kind}
 The maximum concurrent workers:         {max_workers}
@@ -76,7 +76,7 @@ The random seed to use for selections:  {seed}\n""")
 
     # args for each make_dataset_file call as required by process_pool starmap
     iter_params = (
-    (f, output_dir, valid_ratio, test_ratio, wrap_model, interp_kind, resume, seed, verbose, simulate) # pylint: disable=line-too-long
+    (f, output_dir, valid_ratio, test_ratio, wrap_phase, interp_kind, resume, seed, verbose, simulate) # pylint: disable=line-too-long
         for f in trainset_files
     )
 
@@ -97,7 +97,7 @@ def make_dataset_file(trainset_file: Path,
                       output_dir: Path=None,
                       valid_ratio: float=0.,
                       test_ratio: float=0.,
-                      wrap_model: float=0.75,
+                      wrap_phase: float=0.75,
                       interp_kind: str="cubic",
                       resume: bool=False,
                       seed: float=42,
@@ -117,7 +117,7 @@ def make_dataset_file(trainset_file: Path,
     :output_dir: the parent directory for the dataset files, if None the same as the input
     :valid_ratio: proportion of rows to be written to the validation file
     :test_ratio: proportion of rows to be written to the testing file
-    :wrap_model: phases above this value are rolled to the start of the lightcurve model
+    :wrap_phase: phases above this value are rolled to the start of the lightcurve model
     :interp_kind: the kind of interpolation used to sample the the lightcurve model
     :resume: whether we are to attempt to resume from a previous "make"
     :seed: the seed ensures random selection of subsets are repeatable
@@ -160,8 +160,8 @@ def make_dataset_file(trainset_file: Path,
                 del new_phases
 
             # Optionally wrap the model so we move where the phases appear, by rolling the data
-            if wrap_model and wrap_model != 0.:
-                model_data[0, model_data[0] > wrap_model] -= 1.
+            if wrap_phase and 0 < wrap_phase < 1:
+                model_data[0, model_data[0] > wrap_phase] -= 1.
                 shift = model_data.shape[1] - np.argmin(model_data[0])
                 model_data = np.roll(model_data, shift, axis=1)
 
@@ -237,7 +237,7 @@ def make_formal_test_dataset(config_file: Path,
                              output_dir: Path,
                              fits_cache_dir: Path,
                              target_names: Iterator[str]=None,
-                             wrap_model: float=0.75,
+                             wrap_phase: float=0.75,
                              verbose: bool=True,
                              simulate: bool=True) -> Path:
     """
@@ -282,7 +282,7 @@ def make_formal_test_dataset(config_file: Path,
     :output_dir: the directory to write the output dataset tfrecord file
     :fits_cache_dir: the parent directory under which to cache downloaded fits files
     :target_names: a list of targets to select from input_file, or None for all
-    :wrap_model: phases above this value are rolled to the start of the lightcurve model
+    :wrap_phase: phases above this value are rolled to the start of the lightcurve model
     :verbose: whether to print verbose progress/diagnostic messages
     :simulate: whether to simulate the process, skipping only file/directory actions
     :returns: the Path of the newly created dataset file
@@ -299,7 +299,7 @@ The input configuration files is:   {config_file}
 Output dataset will be written to:  {output_dir}
 Downloaded fits are cached in:      {fits_cache_dir}
 Selected targets are:               {', '.join(target_names) if target_names else 'all'}
-Models will be wrapped above phase: {wrap_model}\n""")
+Models will be wrapped above phase: {wrap_phase}\n""")
         if simulate:
             print("Simulate requested so no dataset will be written, however fits are cached.\n")
 
@@ -337,15 +337,15 @@ Models will be wrapped above phase: {wrap_model}\n""")
                 # Phase folding the light-curve
                 if verbose:
                     print(f"{lc_id}: Creating a phase normalized, folded light-curve about",
-                          f"{pe.format} {pe} & {period}. Phases above {wrap_model} wrapped.")
-                wrap_model = u.Quantity(wrap_model)
-                fold_lc = lc.fold(period, pe, wrap_phase=wrap_model, normalize_phase=True)
+                          f"{pe.format} {pe} & {period}. Phases above {wrap_phase} wrapped.")
+                wrap_phase = u.Quantity(wrap_phase)
+                fold_lc = lc.fold(period, pe, wrap_phase=wrap_phase, normalize_phase=True)
 
                 # Now get the interpolated & folded delta-mags data we need for the ML model
                 lc_phase_bins = deb_example.description["lc"].shape[0]
                 if verbose:
                     print(f"{lc_id}: Generating a {lc_phase_bins} bin model feature.")
-                _, mags = lightcurve.get_reduced_folded_lc(fold_lc, lc_phase_bins, wrap_model, True)
+                _, mags = lightcurve.get_reduced_folded_lc(fold_lc, lc_phase_bins, wrap_phase, True)
 
                 # omega & ecc are not used as labels but we need them for phiS and impact params
                 ecosw, esinw = labels["ecosw"], labels["esinw"]
