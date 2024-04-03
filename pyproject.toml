@@ -16,8 +16,10 @@ dependencies = [
     "ipykernel",
     "ipympl",
     "jupyter",
-    "tensorflow>=2.6.0",
-    "keras>=2.6.0"
+    "tensorflow==2.6.*",
+    "tensorflow-estimator==2.6.*",
+    "keras==2.6.*",
+    "keras-preprocessing"
 ]
 
 [build-system]
