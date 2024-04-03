@@ -103,7 +103,7 @@ class Estimator(ABC):
         # Extract the lc_features into an ndarray of shape(#insts, #bins, 1) as expected by the
         # ML model. This will throw a KeyError if the mandatory lc item is missing in any instance.
         inst_count = instances.shape[0]
-        lc_features = np.array([inst.pop("lc") for inst in instances])
+        lc_features = np.array([inst["lc"] for inst in instances])
         if lc_features.shape == (inst_count, self.lc_feature_bins, 1):
             pass
         elif lc_features.shape == (inst_count, self.lc_feature_bins, ):

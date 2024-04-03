@@ -9,7 +9,7 @@ from ebop_maven.estimator import Estimator
 from ebop_maven.tensorflow_models import load_model
 from ebop_maven.libs import deb_example
 
-class TestTensorFlowEstimator(unittest.TestCase):
+class TestEstimator(unittest.TestCase):
     """ Unit tests for the TensorFlowEstimator base class. """
     # Tests for tf.DataSet support are in test_tensorflow_estimator_dataset
     _this_dir = Path(getsourcefile(lambda:0)).parent
