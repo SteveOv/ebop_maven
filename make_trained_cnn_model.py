@@ -17,7 +17,7 @@ from keras.utils import plot_model
 
 from ebop_maven import tensorflow_models
 from ebop_maven.libs import deb_example
-
+import model_testing
 
 LC_WRAP_PHASE = 0.75            # Control the shape and default roll of LC feature
 LC_BINS = deb_example.description["lc"].shape[0]
@@ -236,6 +236,6 @@ print(f"\nSaved model '{MODEL_NAME}' to: {model_save_file}")
 # -----------------------------------------------------------
 # Tests the newly saved model, within an Estimator, against a dataset of real systems.
 # -----------------------------------------------------------
-# print("\n *** Running formal test against real data ***")
-# FORMAL_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-# test_estimator(model_save_file, FORMAL_TESTSET_DIR, FORMAL_RESULTS_DIR)
+print("\n *** Running formal test against real data ***")
+FORMAL_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+model_testing.test_with_estimator(model_save_file, FORMAL_TESTSET_DIR, FORMAL_RESULTS_DIR)
