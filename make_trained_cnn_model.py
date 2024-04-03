@@ -11,7 +11,9 @@ import matplotlib.pyplot as plt
 
 import tensorflow as tf
 import tensorboard
-from keras import models, layers, optimizers, callbacks
+import keras
+from keras import models, layers, initializers, optimizers, callbacks, metrics
+from keras.utils import plot_model
 
 from ebop_maven import tensorflow_models
 from ebop_maven.libs import deb_example
@@ -31,7 +33,7 @@ VALIDSET_DIR = DATASET_DIR / "validation"
 TESTSET_DIR = DATASET_DIR / "testing"
 MODEL_FILE_NAME = "cnn_ext_model"
 MODEL_NAME = "CNN-Ext-Estimator-New"
-SAVE_DIR = Path(".") / "models/"
+SAVE_DIR = Path(".") / "drop/"
 PLOTS_DIR = SAVE_DIR / "plots"
 
 # Formal testset is a currated set of test systems for formal testing across models.
@@ -51,8 +53,8 @@ np.random.seed(SEED)
 python_random.seed(SEED)
 tf.random.set_seed(SEED)
 
-LOSS = ["mae"] * len(deb_example.label_names)
-METRICS = [["mse"]]
+LOSS = ["mae"]
+METRICS = ["mse"]
 PADDING = "same"
 
 # ReLU is widely used default for CNN/DNNs.
@@ -65,14 +67,14 @@ DNN_ACTIVATE = layers.LeakyReLU()
 KERNEL_INITIALIZER = "he_uniform"
 
 # Decay will reduce learning rate ever more slowly over time (see Learning Rate/Power Scheduling)
-OPTIMIZER = optimizers.nadam_v2.Nadam(learning_rate=5e-4, decay=1e-4)
+OPTIMIZER = optimizers.Nadam(learning_rate=5e-4, decay=1e-4)
 
 # Regularization: fraction of DNN neurons to drop on each training step
 DROPOUT_RATE=0.5
 
 print(f"""tensorflow v{tf.__version__}
 tensorboard v{tensorboard.__version__}
-keras v{tf.keras.__version__}""")
+keras v{keras.__version__}""")
 
 if ENFORCE_REPEATABILITY:
     # Extreme, but it stops TensorFlow/Keras from using (even seeing) the GPU.
@@ -157,7 +159,7 @@ dnn = tensorflow_models.hidden_layers(dnn, NUMBER_FULL_HIDDEN_LAYERS, units=256,
 # consistently gives a small, but significant improvement to the trained loss.
 dnn = tensorflow_models.hidden_layers(dnn, 1, 128, kernel_initializer=KERNEL_INITIALIZER,
                                       activation=DNN_ACTIVATE, dropout_rate=0,
-                                      name_prefix=("Taper", None))
+                                      name_prefix=("Taper-", None))
 
 # Sets up the output predicted values
 dnn = layers.Dense(len(deb_example.label_names), activation="linear", name="Output")(dnn)
@@ -165,10 +167,16 @@ dnn = layers.Dense(len(deb_example.label_names), activation="linear", name="Outp
 model = models.Model(inputs=[lc_input, ext_input], outputs=dnn, name=MODEL_NAME)
 model.summary()
 
-# TODO: need to get compatible pydot & graphviz version to install through pip
-# PLOTS_DIR.mkdir(parents=True, exist_ok=True)
-# plot_model(model, to_file=f"./models/saves/plots/{MODEL_FILE_NAME}.png",
-#            show_shapes=True, show_layer_names=True, dpi=300)
+try:
+    # Can only get this working specific pydot (1.4) & graphviz (8.0) conda packages.
+    # With pip I can't get graphviz beyond 0.2.0 which leads to pydot errors here.
+    # At least with the try block I can degrade gracefully.
+    PLOTS_DIR.mkdir(parents=True, exist_ok=True)
+    plot_model(model, to_file=PLOTS_DIR / f"{MODEL_FILE_NAME}.png",
+               show_layer_names=True, show_shapes=True, show_layer_activations=True,
+               show_dtype=False, show_trainable=False, rankdir="LR", dpi=300)
+except ImportError:
+    print("Unable to plot_model() without pydot and/or graphviz.")
 
 
 # -----------------------------------------------------------
@@ -199,10 +207,7 @@ try:
     history = model.fit(x = datasets[0],    # pylint: disable=invalid-name
                         epochs = TRAINING_EPOCHS,
                         callbacks = CALLBACKS,
-                        validation_data = datasets[1],
-                        max_queue_size = 50,
-                        use_multiprocessing = True,
-                        workers = 2)
+                        validation_data = datasets[1])
     # Plot the learning curves
     pd.DataFrame(history.history).plot(figsize=(8, 5))
     PLOTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -213,24 +218,24 @@ except tf.errors.InvalidArgumentError as exc:
         raise tf.errors.InvalidArgumentError(exc.node_def, exc.op, msg, exc.args) from exc
 
 print(f"\nEvaluating the model on {counts[2]} test instances.")
-model.evaluate(datasets[2], use_multiprocessing=True, verbose=1)
+model.evaluate(datasets[2], verbose=1)
 
 # Save the newly trained model
-model_save_file = SAVE_DIR / f"{MODEL_FILE_NAME}.h5"
-custom_attrs = {
-    "training_dataset": TRAINSET_NAME,
-    "training_instances": counts[0],
-    "training_cuda_devices": tf.config.experimental.list_physical_devices('GPU'),
-    "lc_training_noise": LC_TRAINING_NOISE,
-    "lc_training_roll": LC_TRAINING_ROLL,
-    "lc_wrap_phase": LC_WRAP_PHASE,
-}
-tensorflow_models.save_model(model_save_file, model, custom_attrs)
+model_save_file = SAVE_DIR / f"{MODEL_FILE_NAME}.keras"
+# custom_attrs = {
+#     "training_dataset": TRAINSET_NAME,
+#     "training_instances": counts[0],
+#     "training_cuda_devices": tf.config.experimental.list_physical_devices('GPU'),
+#     "lc_training_noise": LC_TRAINING_NOISE,
+#     "lc_training_roll": LC_TRAINING_ROLL,
+#     "lc_wrap_phase": LC_WRAP_PHASE,
+# }
+tensorflow_models.save_model(model_save_file, model)
 print(f"\nSaved model '{MODEL_NAME}' to: {model_save_file}")
 
 # -----------------------------------------------------------
 # Tests the newly saved model, within an Estimator, against a dataset of real systems.
 # -----------------------------------------------------------
-print("\n *** Running formal test against real data ***")
-FORMAL_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-#test_estimator(model_save_file, FORMAL_TESTSET_DIR, FORMAL_RESULTS_DIR)
+# print("\n *** Running formal test against real data ***")
+# FORMAL_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+# test_estimator(model_save_file, FORMAL_TESTSET_DIR, FORMAL_RESULTS_DIR)

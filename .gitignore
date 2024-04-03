@@ -161,12 +161,13 @@ cython_debug/
 
 .vscode/
 
+# venv
+.ebop_maven/
+
 # These are my private helper modules for ad-hoc execution.
 _run*.py
 
 # Datasets are bulky but recreatable
 datasets/
 cache/
-
-# Models are bulky but recreatable
-models/
+drop/

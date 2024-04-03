@@ -1,14 +1,11 @@
 """ Contains functions for building ML models """
-from typing import Union, List, Dict, Tuple, Callable
-from datetime import datetime
+from typing import Union, List, Tuple, Callable
 from pathlib import Path
 
 import tensorflow as tf
-from tensorflow.keras import models
-from keras import layers, callbacks, backend
-from keras.utils import control_flow_util
+from tensorflow.python.keras.utils import control_flow_util # pylint: disable=no-name-in-module
+from keras import layers, callbacks, models, saving
 
-import h5py
 
 def conv1d_layers(previous_layer: layers.Layer,
                   num_layers: int=1,
@@ -74,6 +71,7 @@ def hidden_layers(previous_layer: layers.Layer,
     if not isinstance(dropout_rate, List):
         dropout_rate = [dropout_rate] * num_layers
 
+    # Expected failure if any list isn't num_layers long
     for ix in range(num_layers):
         previous_layer = layers.Dense(units[ix],
                                       activation=activation[ix],
@@ -86,61 +84,38 @@ def hidden_layers(previous_layer: layers.Layer,
 
 
 def save_model(file_name: Path,
-               model: models.Model,
-               custom_attribs: dict = None,
-               overwrite: bool = True,
-               include_optimizer: bool = True):
+               model: models.Model):
     """
-    Save the Model and accompanying metadata to the indicated file
+    Save the Model, overwriting existing, to the indicated file
+
+    TODO: try to regain the functionality of saving arbitrary metadata with the model
 
     :file_name: the file name of the file to save to - will be overwritten
     :model: the model to save
-    :custom_attribs: additional attribs as a dictionay of name/value pairs
-    :overwrite: whether to overwrite an existing model or not
-    :include_optimizer: whether to include the model's optimizer state too
     """
     file_name.parent.mkdir(parents=True, exist_ok=True)
-    with h5py.File(file_name, mode='w') as f:
-        models.save_model(model, f, overwrite, include_optimizer, "h5")
-        if custom_attribs is not None:
-            for k, v in custom_attribs.items():
-                f.attrs[k] = v
-        if "created_timestamp" not in f.attrs:
-            f.attrs["created_timestamp"] = f"{datetime.now():%Y-%m-%d %H:%M:%S%z}"
+    models.save_model(model, file_name, overwrite=True)
 
 
-def load_model(file_name: Path,
-               include_attrs: bool = False) \
-                    -> Union[models.Model, Tuple[models.Model, Dict]]:
+def load_model(file_name: Path) -> models.Model:
     """
-    Loads the Model and optionally a dictionary of persisted model attributes.
+    Loads the Model and while handling the need to register the custom objects.
+
+    TODO: try to regain the functionality of loading saved metadata from the model
+
+    :file_name: the saved model file to load
     """
-    with h5py.File(file_name, mode="r") as f:
-        attributes = dict(f.attrs) if include_attrs else None
-        model = models.load_model(f, custom_objects={
-            "R2_score": R2_score,
-            "Roll1D": Roll1D,
-        })
-    return (model, attributes) if include_attrs else model
+    return models.load_model(file_name,
+                             custom_objects={
+                                 "Roll1D": Roll1D,
+                                 # I shouldn't *have* to do this; fails to deserialize otherwise!
+                                 "ReLU": layers.ReLU,
+                                 "LeakyReLU": layers.LeakyReLU
+                            })
 
 
-def R2_score(y, y_pred): # pylint: disable=invalid-name
-    """
-    Custom metric tf function to calculate the R^2 score.
-    The metrics.R2Score aka "r2_score" added to tf.keras after version 2.6.
-    This name chosen so as not to clash with official metric.
-
-    R^2 = 1 - [ ∑(y-y_pred)^2 / ∑(y-mean(y))^2 ]
-    
-    :y: the label values
-    :y_pred: the predicted values
-    """
-    residual = tf.reduce_sum(tf.square(tf.subtract(y, y_pred)))
-    total = tf.reduce_sum(tf.square(tf.subtract(y, tf.reduce_mean(y, axis=0))))
-    return tf.subtract(1.0, tf.divide(residual, total))
-
-
-class Roll1D(layers.Layer):
+@saving.register_keras_serializable()
+class Roll1D(layers.Layer): # pylint: disable=abstract-method
     """
     Layer which rolls 1D input data by a fixed amount of steps controlled by
     the roll_by attribute. Negative value for roll_by will indicate a 'left'
@@ -154,13 +129,10 @@ class Roll1D(layers.Layer):
         :roll_by: the number of datapoints to roll the data by -
         negative indicates to the left 'left' & positive to the 'right'.
         """
-        self.roll_by = roll_by
         super().__init__(**kwargs)
+        self.roll_by = roll_by
 
-    def call(self, inputs, training=None): # pylint: disable=arguments-differ
-        if training is None:
-            training = backend.learning_phase()
-
+    def call(self, inputs, training=False): # pylint: disable=arguments-differ
         if self.roll_by == 0 or not training:
             return inputs
 
@@ -180,20 +152,19 @@ class Roll1D(layers.Layer):
         outputs.set_shape(original_shape)
         return outputs
 
-    def compute_output_shape(self, input_shape):
-        return input_shape
-
     def get_config(self):
-        config = { 'roll_by': self.roll_by, }
-        base_config = super().get_config()
-        return dict(list(base_config.items()) + list(config.items()))
+        return { **super().get_config(), "roll_by": self.roll_by }
+
+    @classmethod
+    def from_config(cls, config):
+        return cls(**config)
 
 
 # pylint: disable=too-many-arguments
 class LayerLambdaCallback(callbacks.Callback):
     """ 
     Callback for creating simple, custom callbacks on-the-fly.
-    Similar to the Keras LambdaCallback class except here the anonymouse
+    Similar to the Keras LambdaCallback class except here the anonymous
     functions also have a reference to a model layer supplied when initialized.
 
     This callback is constructed with anonymous functions that will be called

@@ -3,10 +3,14 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - python=3.8
+  - python>=3.9
 
-  # optional CUDNN for TensorFlow/Keras 2.6+ to see & use my Nvidia GPU
+  # optional CUDNN for TensorFlow/Keras to see & use my Nvidia GPU
   - cudnn=8.1
+
+  # support for keras.utils.plot_model()
+  - pydot=1.4
+  - graphviz=8.0
 
   - pip
   - pip:
