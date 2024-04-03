@@ -23,8 +23,8 @@ Then to set up the required packages in the environment run:
 ```sh
 $ pip install -r requirements.txt
 ```
-
-Finally, there is support for installing ebop_maven into other environments as a pip package, however this pre-release functionality and subject to failures and/or change.  Simply run:
+#### The ebop_maven package
+Finally there is support for installing ebop_maven into other environments as a pip package, however this is still very much "subject to change/failure".  Simply run:
 ```sh
 $ pip install git+https://github.com/SteveOv/ebop_maven
 ```
