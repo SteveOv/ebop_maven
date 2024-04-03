@@ -376,7 +376,13 @@ def generate_instances_from_models(z: float,
                 "J":            J,
                 "L3":           L3,
 
-                **_def_limb_darkening_params,
+                # System specific LD algo/coeffs for the generation of model light-curve
+                "LDA":          LD_ALGO,
+                "LDB":          LD_ALGO,
+                "LDA1":         ld_coeffs_A[0],
+                "LDB1":         ld_coeffs_B[0],
+                "LDA2":         ld_coeffs_A[1],
+                "LDB2":         ld_coeffs_B[1],
 
                 # Further params for potential use as labels/features
                 "rA":           rA,
