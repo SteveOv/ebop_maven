@@ -48,13 +48,13 @@ def test_with_estimator(model: Union[Model, Path],
     ds_formal_test = ds_formal_test.map(deb_example.create_map_func()).batch(test_count)
 
     # Don't iterate over the dataset; it's easier if we work with all the data
-    (test_lcs, test_feats), lbls = next(ds_formal_test.take(test_count).as_numpy_iterator())
+    (test_mags, test_feats), lbls = next(ds_formal_test.take(test_count).as_numpy_iterator())
 
     # The features arrive in a tuple (array[shape(#inst, #bin, 1)], array[shape(#inst, #feat, 1)])
-    # We need them in the input format for the Estimatory [{"lc":.. , "feat1": ... }]
+    # We need them in the input format for the Estimatory [{"mags":.. , "feat1": ... }]
     fn = [*deb_example.extra_features_and_defaults.keys()]
     instance_features = [
-        { "lc": tl, **{n: f[0] for (n, f) in zip(fn, tf)} } for tl, tf in zip(test_lcs, test_feats)
+        { "mags": tm, **{n:f[0] for (n,f) in zip(fn,tf)} } for tm, tf in zip(test_mags, test_feats)
     ]
 
     # Get the details of the labels we're to report on.

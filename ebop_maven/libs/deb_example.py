@@ -1,4 +1,6 @@
-
+"""
+Functions for reading and writing to deb_example encoded TensorFlow datasets
+"""
 from typing import Dict, List, Callable
 
 import numpy as np
@@ -7,7 +9,9 @@ import tensorflow as tf
 label_scales = [1., 1., 1., 1., 1., 0.01, 1., 1.]
 label_names = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "inc", "bP", "L3"]
 label_predict_cols = label_names + [f"{f}_sigma" for f in label_names]
-lc_len = 1024
+
+mags_bins = 1024        # pylint: disable=invalid-name
+mags_key = "mags"       # pylint: disable=invalid-name
 
 # Python 3.7+ language spec ensures dictionary order is preserved
 # Extra features other than the light-curve used for predictions
@@ -26,7 +30,7 @@ description = {
                         for k in label_names },
 
     # Complex features: phase folded light-curve
-    "lc": tf.io.FixedLenFeature((lc_len,), tf.float32, [0.] * lc_len),
+    mags_key: tf.io.FixedLenFeature((mags_bins,), tf.float32, [0.] * mags_bins),
 
     # Extra features are expected to have a single float value each
     **{ k: tf.io.FixedLenFeature([], tf.float32, default_value=v)
@@ -35,7 +39,7 @@ description = {
 
 def serialize(identifier: str,
               labels: Dict[str, float],
-              light_curve_model: List[float],
+              mags_feature: List[float],
               extra_features: Dict[str, float]) -> bytearray:
     """
     Encode the requested test instance data to a TF Example protobuf.
@@ -46,16 +50,15 @@ def serialize(identifier: str,
     :extra_features: single value features associated with the light-curve
     :returns: a bytearray containing the serialized data
     """
-    if len(light_curve_model) != description["lc"].shape[0]:
-        raise ValueError("Expect light_curve_model to have length " \
-                        + f"{description['lc'].shape[0]}")
+    if len(mags_feature) != description[mags_key].shape[0]:
+        raise ValueError(f"Expect model mags to have {description[mags_key].shape[0]} bins")
 
     features = {
         "id": _to_bytes_feature(identifier),
         # Labels - will raise KeyError if an expected label is not given
         **{ k: _to_float_feature(labels[k]) for k in label_names },
-        # Light-curve model feature
-        "lc" : _to_float_feature(light_curve_model),
+        # Model magnitudes feature
+        mags_key : _to_float_feature(mags_feature),
         # Extra features, will fall back on default value where not given
         **{ k: _to_float_feature(extra_features.get(k, d))
                     for k, d in extra_features_and_defaults.items()},
@@ -86,24 +89,24 @@ def create_map_func(noise_stddev: Callable[[], float] = None,
     negative values roll to the left and positive values to the right
     :returns: the configured map function
     """
-    # Define the map function with the two, optional perturbing actions on the lc
+    # Define the map function with the two, optional perturbing actions on the mags feature
     def map_func(record_bytes):
         example = tf.io.parse_single_example(record_bytes, description)
 
-        # Need to adjust the LC slightly to get it into a shape for the model
-        # so basically a change from (#datapoints,) to (#datapoints, 1)
-        lc_feature = tf.reshape(example["lc"], shape=(description["lc"].shape[0], 1))
+        # Need to adjust the model mags slightly to get it into a shape for the model
+        # so basically a change from (#bins,) to (#bins, 1)
+        mags_feature = tf.reshape(example[mags_key], shape=(description[mags_key].shape[0], 1))
 
-        # Apply any perturbations
+        # Apply any perturbations to the model mags
         if noise_stddev:
             stddev = noise_stddev()
             if stddev != 0.:
-                lc_feature += tf.random.normal(lc_feature.shape, stddev=stddev)
+                mags_feature += tf.random.normal(mags_feature.shape, stddev=stddev)
 
         if roll_steps:
             roll_by = roll_steps()
             if roll_by != 0:
-                lc_feature = tf.roll(lc_feature, [roll_by], axis=[0])
+                mags_feature = tf.roll(mags_feature, [roll_by], axis=[0])
 
         # The Extra features: ignore unknown fields and use default if not found
         ext_features = [example.get(k, d) for k, d in extra_features_and_defaults.items()]
@@ -111,7 +114,7 @@ def create_map_func(noise_stddev: Callable[[], float] = None,
 
         # Copy labels in the expected order & apply any scaling
         labels = [example[k] * s for k, s in zip(label_names, label_scales)]
-        return ((lc_feature, ext_features), labels)
+        return ((mags_feature, ext_features), labels)
     return map_func
 
 

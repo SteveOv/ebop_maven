@@ -1,8 +1,8 @@
 """
 Functions for generating binary system instances and writing their parameters to trainset csv files.
 """
-# We use some ucase variable names as they match the equivalent symbol
-# pylint: disable=invalid-name
+# Use ucase variable names where they match the equivalent symbol and pylint can't find units alias
+# pylint: disable=invalid-name, no-member
 
 from typing import Dict, List, Iterable
 from pathlib import Path
@@ -36,7 +36,7 @@ histogram_params = {
     "inc":          (100, r"$i~(^{\circ})$"),
     "qphot":        (100, r"$q_{phot}$"),
     #"L3":           (100, r"$L_3$"), # currently always zero
-    "e":            (100, r"$e$"),
+    "ecc":          (100, r"$e$"),
     "omega":        (100, r"$\omega~(^{\circ})$"),
     "J":            (100, r"$J$"),
     "ecosw":        (100, r"$e\,\cos{\omega}$"),
@@ -161,7 +161,7 @@ def generate_instances_from_distributions(instance_count: int, label: str, verbo
             # Further params for potential use as labels/features
             "rA":           rA,
             "rB":           rB,
-            "e":            ecc,
+            "ecc":          ecc,
             "omega":        omega.to(u.deg).value,
             "bP":           imp_prm[0],
             "bS":           imp_prm[1],                      
@@ -343,6 +343,7 @@ def generate_instances_from_models(z: float,
     ld_coeffs_B = limb_darkening.lookup_tess_pow2_ld_coeffs(loggB, max(T_eff_B, 3500 * u.K))
 
     if verbose:
+        # pylint: disable=line-too-long
         print(f"""
 {label}:
     Star A: M={MA:.3f}, R={RA:.3f}, T_eff={T_eff_A:.1f}, L={LA:.3f}, log(g)={loggA:.3f}, LD({LD_ALGO})={ld_coeffs_A}
@@ -387,7 +388,7 @@ def generate_instances_from_models(z: float,
                 # Further params for potential use as labels/features
                 "rA":           rA,
                 "rB":           rB,
-                "e":            ecc,
+                "ecc":          ecc,
                 "omega":        omega.to(u.deg).value,
                 "bP":           imp_prm[0],
                 "bS":           imp_prm[1],

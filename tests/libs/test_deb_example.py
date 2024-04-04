@@ -16,11 +16,9 @@ class Test_deb_example(unittest.TestCase):
     def test_create_map_func_default_behaviour(self):
         """ Test that the resulting map_func accurately deserializes a deb_example """
         with self.__class__.lock:
-            lc_bins = deb_example.lc_len
-
             # Set up a feature (light-curve) amd labels and with tracable values
             input_labels = { k: v for v, k in enumerate(deb_example.label_names) }
-            input_lc_feature = np.arange(lc_bins)
+            input_lc_feature = np.arange(deb_example.mags_bins)
             input_ext_features = { "phiS": 0.6, "dS_over_dP": 0.96 }
             deb = deb_example.serialize("t1", input_labels, input_lc_feature, input_ext_features)
 
@@ -51,11 +49,9 @@ class Test_deb_example(unittest.TestCase):
     def test_create_map_func_with_roll(self):
         """ Tests the created map_func's roll functionality """
         with self.__class__.lock:
-            lc_bins = deb_example.lc_len
-
             # Set up a feature (light-curve) amd labels and with tracable values
             input_labels = { k: v for v, k in enumerate(deb_example.label_names) }
-            input_lc_feature = np.arange(lc_bins) # looks like [0, 1, 2, 3, 4, 5, ...]
+            input_lc_feature = np.arange(deb_example.mags_bins) # looks like [0, 1, 2, 3, 4, 5, ...]
             deb = deb_example.serialize("t1", input_labels, input_lc_feature, {})
 
             for roll_by in [-5, 0, 5]:
@@ -72,11 +68,9 @@ class Test_deb_example(unittest.TestCase):
     def test_create_map_func_with_noise(self):
         """ Tests the created map_func's roll functionality """
         with self.__class__.lock:
-            lc_bins = deb_example.lc_len
-
             # Set up a feature (light-curve) amd labels and with tracable values
             input_labels = { k: v for v, k in enumerate(deb_example.label_names) }
-            input_lc_feature = [1] * lc_bins # all the same, so stddev==0
+            input_lc_feature = [1] * deb_example.mags_bins # all the same, so stddev==0
             deb = deb_example.serialize("t1", input_labels, input_lc_feature, {})
 
             # Execute a graph instance of the map_func (with roll) to mimic a Dateset pipeline.
@@ -91,11 +85,9 @@ class Test_deb_example(unittest.TestCase):
     def test_create_map_func_with_random_roll(self):
         """ Tests implementing a random roll_steps func via create_map_func() """
         with self.__class__.lock:
-            lc_bins = deb_example.lc_len
-
             # Set up a feature (light-curve) amd labels and with tracable values
             input_labels = { k: v for v, k in enumerate(deb_example.label_names) }
-            input_lc_feature = np.arange(lc_bins) # looks like [0, 1, 2, 3, 4, 5, ...]
+            input_lc_feature = np.arange(deb_example.mags_bins) # looks like [0, 1, 2, 3, 4, 5, ...]
             deb = deb_example.serialize("t1", input_labels, input_lc_feature, {})
 
             def random_roll():

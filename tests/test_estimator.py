@@ -56,19 +56,19 @@ class TestEstimator(unittest.TestCase):
         # only lc is mandatory
         self.assertRaises(KeyError, estimator.predict, [{ "dS_over_dP": 1, "phiS": 0.5 }])
         # Nothing else is
-        instances = [{ "lc": [0.5] * estimator.lc_feature_bins }]
+        instances = [{ "mags": [0.5] * estimator.mags_feature_bins }]
         estimator.predict(instances)
 
     def test_predict_incorrect_sized_instance_lc_bins(self):
         """ Tests predict(incorrect size lc item) gives ValueError """
         estimator = Estimator(self._default_model_file)
-        instances = [{"lc": [0.5] * (estimator.lc_feature_bins+1) }]
+        instances = [{"mags": [0.5] * (estimator.mags_feature_bins+1) }]
         self.assertRaises(ValueError, estimator.predict, instances)
 
     def test_predict_instances_as_single_dict(self):
         """ Tests predict({ instance items }) handles dict and makes single prediction """
         estimator = Estimator(self._default_model_file)
-        instances = { "lc": [0.5] * estimator.lc_feature_bins, "dS_over_dP": 1, "phiS": 0.5 }
+        instances = { "mags": [0.5] * estimator.mags_feature_bins, "dS_over_dP": 1, "phiS": 0.5 }
         result = estimator.predict(instances)
         self.assertEqual(len(result), 1)
 
@@ -76,8 +76,8 @@ class TestEstimator(unittest.TestCase):
         """ Tests predict([{ instance items }]) makes correct number of predictions """
         estimator = Estimator(self._default_model_file)
         instances = [
-            { "lc": [0.5] * estimator.lc_feature_bins, "dS_over_dP": 1, "phiS": 0.5 },
-            { "lc": [0.25] * estimator.lc_feature_bins, "dS_over_dP": 1, "phiS": 0.5 }
+            { "mags": [0.5] * estimator.mags_feature_bins, "dS_over_dP": 1, "phiS": 0.5 },
+            { "mags": [0.25] * estimator.mags_feature_bins, "dS_over_dP": 1, "phiS": 0.5 }
         ]
         result = estimator.predict(instances)
         self.assertEqual(len(result), len(instances))
@@ -86,8 +86,8 @@ class TestEstimator(unittest.TestCase):
         """ Tests predict([{ instance items }]) makes correct number of predictions """
         estimator = Estimator(self._default_model_file)
         instances = np.array([
-            { "lc": [0.5] * estimator.lc_feature_bins, "dS_over_dP": 1, "phiS": 0.5 },
-            { "lc": [0.25] * estimator.lc_feature_bins, "dS_over_dP": 1, "phiS": 0.5 }
+            { "mags": [0.5] * estimator.mags_feature_bins, "dS_over_dP": 1, "phiS": 0.5 },
+            { "mags": [0.25] * estimator.mags_feature_bins, "dS_over_dP": 1, "phiS": 0.5 }
         ])
         result = estimator.predict(instances)
         self.assertEqual(len(result), len(instances))
@@ -95,14 +95,14 @@ class TestEstimator(unittest.TestCase):
     def test_predict_no_mc_dropout(self):
         """ Tests predict({ instance items }) without MC Dropout -> expect all sigmas==0 """
         estimator = Estimator(self._default_model_file, 1)
-        instances = { "lc": [0.5] * estimator.lc_feature_bins, "dS_over_dP": 1, "phiS": 0.5 }
+        instances = { "mags": [0.5] * estimator.mags_feature_bins, "dS_over_dP": 1, "phiS": 0.5 }
         result = estimator.predict(instances)
         self.assertTrue(all(result[0][c]==0 for c in deb_example.label_predict_cols if c.endswith("_sigma")))
 
     def test_predict_with_mc_dropout(self):
         """ Tests predict({ instance items }) with MC Dropout -> expect some sigmas!=0 """
         estimator = Estimator(self._default_model_file, 100)
-        instances = { "lc": [0.5] * estimator.lc_feature_bins, "dS_over_dP": 1, "phiS": 0.5 }
+        instances = { "mags": [0.5] * estimator.mags_feature_bins, "dS_over_dP": 1, "phiS": 0.5 }
         result = estimator.predict(instances)
         self.assertTrue(any(result[0][c]!=0 for c in deb_example.label_predict_cols if c.endswith("_sigma")))
 
