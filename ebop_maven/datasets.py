@@ -350,7 +350,8 @@ Models will be wrapped above phase: {wrap_phase}\n""")
                 ecosw, esinw = labels["ecosw"], labels["esinw"]
                 omega = sector_cfg.get("omega", None) \
                     or np.rad2deg(np.arctan(np.divide(esinw, ecosw))) if ecosw else 0
-                ecc = np.divide(ecosw, np.cos(np.deg2rad(omega))) if ecosw else 0
+                ecc = sector_cfg.get("ecc", None) \
+                    or np.divide(ecosw, np.cos(np.deg2rad(omega))) if ecosw else 0
 
                 # May need to calculate the primary impact parameter label as it's rarely published.
                 bP = labels.get("bP", None)
