@@ -353,6 +353,11 @@ Models will be wrapped above phase: {wrap_phase}\n""")
                 ecc = sector_cfg.get("ecc", None) \
                     or np.divide(ecosw, np.cos(np.deg2rad(omega))) if ecosw else 0
 
+                # May need to calculate sini and cosi if not present
+                inc_rad = np.deg2rad(labels["inc"])
+                labels.setdefault("sini", np.sin(inc_rad))
+                labels.setdefault("cosi", np.cos(inc_rad))
+
                 # May need to calculate the primary impact parameter label as it's rarely published.
                 bP = labels.get("bP", None)
                 if bP is None:
