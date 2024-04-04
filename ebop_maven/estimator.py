@@ -57,7 +57,7 @@ class Estimator(ABC):
         return self._model.name
 
     @property
-    def lc_feature_bins(self) -> int:
+    def mags_feature_bins(self) -> int:
         """ The expected number of bins in each phase folded input mags feature """
         return self._model.input_shape[0][1]
 
@@ -81,7 +81,7 @@ class Estimator(ABC):
         in the form of a List of dicts.
 
         [
-            { "lc": List[float] * mags_bins, "phiS": float, "dS_over_dP": float },
+            { "mags": List[float] * mags_bins, "phiS": float, "dS_over_dP": float },
         ]
         
         :instances: list of dicts, one for each instance to predict
@@ -100,17 +100,17 @@ class Estimator(ABC):
         else:
             raise TypeError(f"Expected instances as a list of dicts but got {type(instances)}.")
 
-        # Extract the lc_features into an ndarray of shape(#insts, #bins, 1) as expected by the
-        # ML model. This will throw a KeyError if the mandatory lc item is missing in any instance.
+        # Extract the mags_features into an ndarray of shape(#insts, #bins, 1) as expected by the
+        # ML model. This will throw a KeyError if the mandatory mags item is missing in any instance
         inst_count = instances.shape[0]
-        lc_features = np.array([inst["lc"] for inst in instances])
-        if lc_features.shape == (inst_count, self.lc_feature_bins, 1):
+        mags_features = np.array([inst["mags"] for inst in instances])
+        if mags_features.shape == (inst_count, self.mags_feature_bins, 1):
             pass
-        elif lc_features.shape == (inst_count, self.lc_feature_bins, ):
-            lc_features = lc_features[:, :, np.newaxis]
+        elif mags_features.shape == (inst_count, self.mags_feature_bins, ):
+            mags_features = mags_features[:, :, np.newaxis]
         else:
-            raise ValueError("Expected the list of lc features to be of shape " +
-                            f"(#insts, {self.lc_feature_bins}, 1) but got {lc_features.shape}")
+            raise ValueError("Expected the list of mags features to be of shape " +
+                            f"(#insts, {self.mags_feature_bins}, 1) but got {mags_features.shape}")
 
         # We need the extra_features values in an ndarray of shape (#insts, #extra_features, 1)
         # in the correct order. Read the expected features from the input dicts, falling back
@@ -119,7 +119,7 @@ class Estimator(ABC):
         extra_values = [[inst_dict.get(k, df) for k, df in efd.items()] for inst_dict in instances]
         extra_values = np.array(extra_values).reshape((inst_count, len(efd), 1))
 
-        # Now check that number of lc and feature rows (#insts) match up
+        # Now check that number of mags and feature rows (#insts) match up
         if inst_count != extra_values.shape[0]:
             raise ValueError("Mismatched number of mags_features and extra_features: " +
                             f"{inst_count} != {extra_values.shape[0]}")
@@ -128,7 +128,7 @@ class Estimator(ABC):
         # each prediction is with a statistically unique subset of the model's net: the MC Dropout
         # algorithm. Stacked predictions are output in shape (#iterations, #insts, #labels)
         stkd_prds = np.stack([
-            self._model((lc_features, extra_values), training=is_mc)
+            self._model((mags_features, extra_values), training=is_mc)
             for _ in range(self._iterations)
         ])
 

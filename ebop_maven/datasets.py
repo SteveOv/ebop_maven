@@ -129,7 +129,7 @@ def make_dataset_file(trainset_file: Path,
     label = trainset_file.stem
     output_dir = trainset_file.parent if output_dir is None else output_dir
     this_seed = f"{trainset_file.name}/{seed}"
-    model_size = deb_example.description["lc"].shape[0]
+    model_size = deb_example.mags_bins
 
     # Work out the subsets & files now, before generating, to see if we can skip on resume
     subsets = ["training", "validation", "testing"]
@@ -184,7 +184,7 @@ def make_dataset_file(trainset_file: Path,
 
             rows.append(deb_example.serialize(identifier = sys_params["id"],
                                               labels = sys_params,
-                                              light_curve_model = model_data[1],
+                                              mags_feature = model_data[1],
                                               extra_features = extra_features))
 
             if verbose and counter % 100 == 0:
@@ -305,10 +305,10 @@ Models will be wrapped above phase: {wrap_phase}\n""")
         if target_names:
             targets = { name: targets[name] for name in target_names if name in targets }
 
-    output_file = output_dir / f"{config_file.stem}.tfrecord"
+    out_file = output_dir / f"{config_file.stem}.tfrecord"
     if not simulate:
-        output_file.parent.mkdir(parents=True, exist_ok=True)
-        ds = tf.io.TFRecordWriter(f"{output_file}", _ds_options)
+        out_file.parent.mkdir(parents=True, exist_ok=True)
+        ds = tf.io.TFRecordWriter(f"{out_file}", _ds_options)
 
     try:
         inst_counter = 0
@@ -318,7 +318,7 @@ Models will be wrapped above phase: {wrap_phase}\n""")
 
             fits_dir = fits_cache_dir / re.sub(r'[^\w\d-]', '_', target.lower())
             for sector in [int(s) for s in target_cfg["sectors"].keys() if s.isdigit()]:
-                lc_id = f"{target}/{sector:0>4}"
+                inst_id = f"{target}/{sector:0>4}"
                 sector_cfg = _sector_config_from_target(sector, target_cfg)
 
                 # These are mandatory, so error if missing
@@ -333,16 +333,16 @@ Models will be wrapped above phase: {wrap_phase}\n""")
 
                 # Phase folding the light-curve
                 if verbose:
-                    print(f"{lc_id}: Creating a phase normalized, folded light-curve about",
+                    print(f"{inst_id}: Creating a phase normalized, folded light-curve about",
                           f"{pe.format} {pe} & {period}. Phases above {wrap_phase} wrapped.")
                 wrap_phase = u.Quantity(wrap_phase)
                 fold_lc = lc.fold(period, pe, wrap_phase=wrap_phase, normalize_phase=True)
 
                 # Now get the interpolated & folded delta-mags data we need for the ML model
-                lc_phase_bins = deb_example.description["lc"].shape[0]
+                mags_bins = deb_example.mags_bins
                 if verbose:
-                    print(f"{lc_id}: Generating a {lc_phase_bins} bin model feature.")
-                _, mags = lightcurve.get_reduced_folded_lc(fold_lc, lc_phase_bins, wrap_phase, True)
+                    print(f"{inst_id}: Generating a {mags_bins} bin model feature.")
+                _, mags = lightcurve.get_reduced_folded_lc(fold_lc, mags_bins, wrap_phase, True)
 
                 # omega & ecc are not used as labels but we need them for phiS and impact params
                 ecosw, esinw = labels["ecosw"], labels["esinw"]
@@ -357,7 +357,7 @@ Models will be wrapped above phase: {wrap_phase}\n""")
                     labels["bP"] = orbital.impact_parameter(rA, labels["inc"] * u.deg, ecc, None,
                                                             esinw, orbital.EclipseType.PRIMARY)
                     if verbose:
-                        print(f"{lc_id}: No impact parameter (bP) supplied;",
+                        print(f"{inst_id}: No impact parameter (bP) supplied;",
                                 f"calculated rA = {rA} and then bP = {labels['bP']}")
 
                 # Now assemble the extra features needed: phiS (phase secondary) and dS_over_dP
@@ -369,19 +369,19 @@ Models will be wrapped above phase: {wrap_phase}\n""")
                 # Serialize the labels, folded mags (lc) & extra_features as a deb_example and write
                 if not simulate:
                     if verbose:
-                        print(f"{lc_id}: Saving serialized instance to dataset:", output_file)
-                    ds.write(deb_example.serialize(lc_id, labels, mags, extra_features))
+                        print(f"{inst_id}: Saving serialized instance to dataset:", out_file)
+                    ds.write(deb_example.serialize(inst_id, labels, mags, extra_features))
                 elif verbose:
-                    print(f"{lc_id}: Simulated saving serialized instance to dataset:", output_file)
+                    print(f"{inst_id}: Simulated saving serialized instance to dataset:", out_file)
                 inst_counter += 1
     finally:
         if ds:
             ds.close()
 
     action = "Finished " + ("simulating the saving of" if simulate else "saving")
-    print(f"\n{action} {inst_counter} instance(s) from {len(targets)} target(s) to", output_file)
+    print(f"\n{action} {inst_counter} instance(s) from {len(targets)} target(s) to", out_file)
     print(f"The time taken was {timedelta(0, round(default_timer()-start_time))}.")
-    return output_file
+    return out_file
 
 
 def inspect_dataset(dataset_files: Union[Path, Iterator[Path]],
@@ -406,9 +406,9 @@ def inspect_dataset(dataset_files: Union[Path, Iterator[Path]],
         identifier = example["id"].numpy().decode(encoding="utf8")
         if not identifiers or identifier in identifiers:
             labels = { k: example[k].numpy() for k in deb_example.label_names }
-            lc = example["lc"].numpy()
+            mags = example["mags"].numpy()
             ext_features = { k: example[k].numpy() for k in deb_example.extra_features_and_defaults}
-            yield (identifier, labels, lc, ext_features)
+            yield (identifier, labels, mags, ext_features)
 
 
 def plot_dataset_instance_model_feature(dataset_files: Union[Path, Iterator[Path]],

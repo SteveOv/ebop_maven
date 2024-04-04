@@ -19,14 +19,11 @@ from ebop_maven import modelling
 from ebop_maven.libs import deb_example
 import model_testing
 
-LC_WRAP_PHASE = 0.75            # Control the shape and default roll of LC feature
-LC_BINS = deb_example.description["lc"].shape[0]
-# These control the data augmentation layers early in the LC/CNN branch of the model
-LC_TRAINING_NOISE = True        # Best to use this on a "un-noised" dataset
-LC_TRAINING_ROLL = False
+MAGS_WRAP_PHASE = 0.75          # Control the shape and default roll of Mags feature
+MAGS_BINS = deb_example.mags_bins
 
 # We can now specify paths to train/val/test datasets separately for greater flexibility.
-TRAINSET_NAME = f"formal-trainset/{LC_BINS}/wm-{LC_WRAP_PHASE}"
+TRAINSET_NAME = f"formal-trainset/{MAGS_BINS}/wm-{MAGS_WRAP_PHASE}"
 DATASET_DIR = Path(".") / "datasets" / TRAINSET_NAME
 TRAINSET_DIR = DATASET_DIR / "training"
 VALIDSET_DIR = DATASET_DIR / "validation"
@@ -38,7 +35,7 @@ PLOTS_DIR = SAVE_DIR / "plots"
 
 # Formal testset is a currated set of test systems for formal testing across models.
 # It's the dataset used for the testing and reports of test_estimator.
-FORMAL_TESTSET_DIR = Path(".") / "datasets" / f"formal-test-dataset/{LC_BINS}/wm-{LC_WRAP_PHASE}/"
+FORMAL_TESTSET_DIR = Path(".") / f"datasets/formal-test-dataset/{MAGS_BINS}/wm-{MAGS_WRAP_PHASE}/"
 FORMAL_RESULTS_DIR = SAVE_DIR / "results" / MODEL_NAME / TRAINSET_NAME
 
 NUMBER_FULL_HIDDEN_LAYERS = 2   # Number of full width hidden layers (with associated dropout)
@@ -123,7 +120,7 @@ for ds_ix, (label, set_dir) in enumerate([("training", TRAINSET_DIR),
 print("\nDefining the multiple-input/output CNN model.")
 
 # Input for the Light-curve (Timeseries data) via a CNN.
-cnn = lc_input = layers.Input(shape=(LC_BINS, 1), name="LC-Input")
+cnn = mags_input = layers.Input(shape=(MAGS_BINS, 1), name="Mags-Input")
 
 # 1D conv layers re-dimension each LS instances from 1d timeseries #bins long
 # into 2D [timeseries, features] of dimension [8, 64]
@@ -135,7 +132,7 @@ cnn = modelling.append_conv1d_layers(cnn, num_layers=3, filters=64, kernel_size=
 # Input for the Extra features
 ext_input = layers.Input(shape=(len(deb_example.extra_features_and_defaults), 1), name="Ext-Input")
 
-# # Combine the separate input paths for the LC & EXT Features to the DNN
+# # Combine the separate input paths for the Mags & Extra Features to the DNN
 dnn = modelling.append_concatenate_layer((cnn, ext_input), name="DNN-Input")
 
 # The Dropout layers are a regularization mechanism (they combat overfitting).
@@ -156,7 +153,7 @@ dnn = modelling.append_hidden_layers(dnn, 1, 128, kernel_initializer=KERNEL_INIT
 
 # Sets up the output predicted values
 dnn = modelling.append_output_layer(dnn, len(deb_example.label_names))
-model = models.Model(inputs=[lc_input, ext_input], outputs=dnn, name=MODEL_NAME)
+model = models.Model(inputs=[mags_input, ext_input], outputs=dnn, name=MODEL_NAME)
 model.summary()
 
 try:
@@ -178,7 +175,7 @@ print("Building the model.")
 model.compile(loss=LOSS, optimizer=OPTIMIZER, metrics=METRICS)
 
 CALLBACKS = [
-    # To use tensorboard make sure deblcest conda env is active then run
+    # To use tensorboard make sure the containing conda env is active then run
     # $ tensorboard --port 6006 --logdir ./logs
     # Then start a browser and head to http://localhost:6006
     #callbacks.TensorBoard(log_dir="./logs", write_graph=True, write_images=True),
@@ -198,8 +195,8 @@ try:
     PLOTS_DIR.mkdir(parents=True, exist_ok=True)
     plt.savefig(PLOTS_DIR / f"{MODEL_FILE_NAME}_learning_curves.png", dpi=300)
 except tf.errors.InvalidArgumentError as exc:
-    if "lc" in exc.message and "Can't parse serialized Example" in exc.message:
-        msg = exc.message + "\n*** Probable cause: incompatible serialized lc length. ***"
+    if ("lc" in exc.message or "mags" in exc.message) and "Can't parse serialized" in exc.message:
+        msg = exc.message + "\n*** Probable cause: incompatible serialized mags feature length. ***"
         raise tf.errors.InvalidArgumentError(exc.node_def, exc.op, msg, exc.args) from exc
 
 print(f"\nEvaluating the model on {counts[2]} test instances.")
@@ -211,9 +208,7 @@ model_save_file = SAVE_DIR / f"{MODEL_FILE_NAME}.keras"
 #     "training_dataset": TRAINSET_NAME,
 #     "training_instances": counts[0],
 #     "training_cuda_devices": tf.config.experimental.list_physical_devices('GPU'),
-#     "lc_training_noise": LC_TRAINING_NOISE,
-#     "lc_training_roll": LC_TRAINING_ROLL,
-#     "lc_wrap_phase": LC_WRAP_PHASE,
+#     "mags_wrap_phase": MAGS_WRAP_PHASE,
 # }
 modelling.save_model(model_save_file, model)
 print(f"\nSaved model '{MODEL_NAME}' to: {model_save_file}")
