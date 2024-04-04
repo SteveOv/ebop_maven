@@ -34,6 +34,8 @@ histogram_params = {
     "rA_plus_rB":   (100, r"$r_{A}+r_{B}$"),
     "k":            (100, r"$k$"),
     "inc":          (100, r"$i~(^{\circ})$"),
+    "sini":         (100, r"$\sin{i}$"),
+    "cosi":         (100, r"$\cos{i}$"),
     "qphot":        (100, r"$q_{phot}$"),
     #"L3":           (100, r"$L_3$"), # currently always zero
     "ecc":          (100, r"$e$"),
@@ -133,6 +135,7 @@ def generate_instances_from_distributions(instance_count: int, label: str, verbo
         omega       = np.random.uniform(low=0., high=360.) * u.deg
 
         # Now we can calculate the derived values
+        inc_rad     = inc.to(u.rad).value
         omega_rad   = omega.to(u.rad).value
         esinw       = ecc * np.sin(omega_rad)
         ecosw       = ecc * np.cos(omega_rad)
@@ -159,6 +162,8 @@ def generate_instances_from_distributions(instance_count: int, label: str, verbo
             **_def_limb_darkening_params,
 
             # Further params for potential use as labels/features
+            "sini":         np.sin(inc_rad),
+            "cosi":         np.cos(inc_rad),
             "rA":           rA,
             "rB":           rB,
             "ecc":          ecc,
@@ -358,6 +363,7 @@ def generate_instances_from_models(z: float,
             a = orbital.semi_major_axis(MA, MB, P)
             rA = (RA.to(u.solRad) / a.to(u.solRad)).value
             rB = (RB.to(u.solRad) / a.to(u.solRad)).value
+            inc_rad = inc.to(u.rad).value
             omega_rad = omega.to(u.rad).value
             esinw = ecc * np.sin(omega_rad)
             ecosw = ecc * np.cos(omega_rad)
@@ -386,6 +392,8 @@ def generate_instances_from_models(z: float,
                 "LDB2":         ld_coeffs_B[1],
 
                 # Further params for potential use as labels/features
+                "sini":         np.sin(inc_rad),
+                "cosi":         np.cos(inc_rad),
                 "rA":           rA,
                 "rB":           rB,
                 "ecc":          ecc,
