@@ -1,25 +1,22 @@
-""" Contains functions for building ML models """
-from typing import Union, List, Tuple, Callable
+""" Contains functions for building and persisting ML models """
+from typing import Union, List, Tuple, Iterable
 from pathlib import Path
 
-import tensorflow as tf
-from tensorflow.python.keras.utils import control_flow_util # pylint: disable=no-name-in-module
-from keras import layers, callbacks, models, saving
+from keras import layers, models
 
-
-def conv1d_layers(previous_layer: layers.Layer,
-                  num_layers: int=1,
-                  filters: Union[int, List[int]]=64,
-                  kernel_size: Union[int, List[int]]=8,
-                  strides: Union[int, List[int]]=2,
-                  padding: Union[str, List[str]]="same",
-                  activation: Union[any, List[any]]="ReLU",
-                  name_prefix: str="CNN-"):
+def append_conv1d_layers(previous_layer: layers.Layer,
+                         num_layers: int=1,
+                         filters: Union[int, List[int]]=64,
+                         kernel_size: Union[int, List[int]]=8,
+                         strides: Union[int, List[int]]=2,
+                         padding: Union[str, List[str]]="same",
+                         activation: Union[any, List[any]]="ReLU",
+                         name_prefix: str="CNN-"):
     """
-    Create and append the requested Conv1D layers.
+    Appends the requested set of Conv1D layers.
     
     The filters, kernel_size, strides, padding and activation arguments can be
-    a List of values, one per layer, or a single values used for each layer.
+    a List of values, one per layer, or a single values used for every layer.
     
     :previous_layer: the existing layer to append to
     :num_layers: number of Conv1D layers to create
@@ -29,6 +26,7 @@ def conv1d_layers(previous_layer: layers.Layer,
     :padding: the padding value of each layer
     :activation: the activation value of each layer
     :name_prefix: the text to prefix the indexed layer name
+    :returns: the final new layer appended
     """
     if not isinstance(filters, List):
         filters = [filters] * num_layers
@@ -52,15 +50,42 @@ def conv1d_layers(previous_layer: layers.Layer,
     return previous_layer
 
 
-def hidden_layers(previous_layer: layers.Layer,
-                  num_layers: int=1,
-                  units: Union[int, List[int]]=256,
-                  activation: Union[any, List[any]]=None,
-                  kernel_initializer: Union[str, List[str]]="glorot_uniform",
-                  dropout_rate: Union[float, List[float]]=0,
-                  name_prefix: Tuple[str, str]=("Hidden-", "Dropout-")) -> layers.Layer:
+def append_concatenate_layer(previous_layers: Iterable[layers.Layer],
+                             axis: int = -1,
+                             name: str = "Concatenate") -> layers.Layer:
     """
-    Creates a set of hidden Dense layers with optional accompanying Dropout layers.
+    Appends a new concatenate layer which flattens and joins previous_layers
+
+    :previous_layers: the existing layers to concatenate
+    :axis: the axis along which to concatenate (defaults to the last axis)
+    :name: the name to give the Concatenate layer
+    :returns: the newly created Concatenate layer
+    """
+    return layers.Concatenate(axis, name=name) \
+                ([layers.Flatten(name=f"Flat-{ix}")(pl) for (ix, pl) in enumerate(previous_layers)])
+
+
+def append_hidden_layers(previous_layer: layers.Layer,
+                         num_layers: int=1,
+                         units: Union[int, List[int]]=256,
+                         activation: Union[any, List[any]]=None,
+                         kernel_initializer: Union[str, List[str]]="glorot_uniform",
+                         dropout_rate: Union[float, List[float]]=0,
+                         name_prefix: Tuple[str, str]=("Hidden-", "Dropout-")) -> layers.Layer:
+    """
+    Appends the requested set of hidden Dense layers with optional accompanying Dropout layers.
+
+    The units, activation, kernel_initializer and dropout_rate arguments can be
+    a List of values, one per layer, or a single values used for every layer.
+    
+    :previous_layer: the existing layer to append to
+    :num_layers: number of Dense+Dropout layer pairs to append
+    :units: the number of neurons in new each layer
+    :activation: the activation function for each new layer
+    :kernel_initializer: the initializer for each new layer
+    :dropout_rate: the fraction of the units to drop for each layer. No dropout layer when set to 0
+    :name_prefix: the text to prefix the indexed layer name
+    :returns: the final new layer appended
     """
     if not isinstance(units, List):
         units = [units] * num_layers
@@ -81,6 +106,17 @@ def hidden_layers(previous_layer: layers.Layer,
             previous_layer = layers.Dropout(dropout_rate[ix],
                                             name=f"{name_prefix[1]}{ix}")(previous_layer)
     return previous_layer
+
+
+def append_output_layer(previous_layer: layers.Layer, units: int):
+    """
+    Appends a new Output layer with the linear activation
+
+    :previous_layer: the existing layer to append to
+    :name: the name to give the layer
+    :returns: the newly created output layer
+    """
+    return layers.Dense(units, activation="linear", name="Output")(previous_layer)
 
 
 def save_model(file_name: Path,

@@ -7,7 +7,7 @@ from abc import ABC
 import numpy as np
 from keras.models import Model
 
-from . import tensorflow_models
+from . import modelling
 from .libs import deb_example
 
 class Estimator(ABC):
@@ -34,7 +34,7 @@ class Estimator(ABC):
             if not model.exists():
                 raise ValueError(f"Model file '{model}' not found.")
             print(f"{self.__class__.__name__} loading model file '{model}'...")
-            self._model = tensorflow_models.load_model(model)
+            self._model = modelling.load_model(model)
 
             create_ts = self._attrs.get(self._ATTR_CREATE_TS, None) or None
             if create_ts:

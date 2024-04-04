@@ -15,7 +15,7 @@ import keras
 from keras import models, layers, initializers, optimizers, callbacks, metrics
 from keras.utils import plot_model
 
-from ebop_maven import tensorflow_models
+from ebop_maven import modelling
 from ebop_maven.libs import deb_example
 import model_testing
 
@@ -127,38 +127,35 @@ cnn = lc_input = layers.Input(shape=(LC_BINS, 1), name="LC-Input")
 
 # 1D conv layers re-dimension each LS instances from 1d timeseries #bins long
 # into 2D [timeseries, features] of dimension [8, 64]
-cnn = tensorflow_models.conv1d_layers(cnn, num_layers=2, filters=64, kernel_size=8, strides=4,
-                                    padding=PADDING, activation=CNN_ACTIVATE, name_prefix="CNN-1.")
-cnn = tensorflow_models.conv1d_layers(cnn, num_layers=3, filters=64, kernel_size=4, strides=2,
-                                    padding=PADDING, activation=CNN_ACTIVATE, name_prefix="CNN-2.")
+cnn = modelling.append_conv1d_layers(cnn, num_layers=2, filters=64, kernel_size=8, strides=4,
+                                     padding=PADDING, activation=CNN_ACTIVATE, name_prefix="CNN-1.")
+cnn = modelling.append_conv1d_layers(cnn, num_layers=3, filters=64, kernel_size=4, strides=2,
+                                     padding=PADDING, activation=CNN_ACTIVATE, name_prefix="CNN-2.")
 
 # Input for the Extra features
 ext_input = layers.Input(shape=(len(deb_example.extra_features_and_defaults), 1), name="Ext-Input")
 
-# Combine the separate input paths for the LC (RNN/LSTM) & EXT Features to the DNN
-dnn = layers.Concatenate(axis=1, name="DNN-Combined-Input")([
-            layers.Flatten(name="LC-Reshape")(cnn),
-            layers.Flatten(name="Ext-Reshape")(ext_input)])
+# # Combine the separate input paths for the LC & EXT Features to the DNN
+dnn = modelling.append_concatenate_layer((cnn, ext_input), name="DNN-Input")
 
 # The Dropout layers are a regularization mechanism (they combat overfitting).
 # They randomly "drop" (set to 0) the ratio of inputs each training iteration.
 # Note: undermines any comparison of training & validation loss
 #       as validation results are calculated w/o dropout
-dnn = tensorflow_models.hidden_layers(dnn, NUMBER_FULL_HIDDEN_LAYERS, units=256,
-                                      kernel_initializer=KERNEL_INITIALIZER,
-                                      activation=DNN_ACTIVATE,
-                                      dropout_rate=DROPOUT_RATE,
-                                      name_prefix=("Hidden-", "Dropout-"))
+dnn = modelling.append_hidden_layers(dnn, NUMBER_FULL_HIDDEN_LAYERS, units=256,
+                                     kernel_initializer=KERNEL_INITIALIZER,
+                                     activation=DNN_ACTIVATE,
+                                     dropout_rate=DROPOUT_RATE,
+                                     name_prefix=("Hidden-", "Dropout-"))
 
 # "Buffer" between the DNN+Dropout and the output layer; this non-dropout NN layer
 # consistently gives a small, but significant improvement to the trained loss.
-dnn = tensorflow_models.hidden_layers(dnn, 1, 128, kernel_initializer=KERNEL_INITIALIZER,
-                                      activation=DNN_ACTIVATE, dropout_rate=0,
-                                      name_prefix=("Taper-", None))
+dnn = modelling.append_hidden_layers(dnn, 1, 128, kernel_initializer=KERNEL_INITIALIZER,
+                                     activation=DNN_ACTIVATE, dropout_rate=0,
+                                     name_prefix=("Taper-", None))
 
 # Sets up the output predicted values
-dnn = layers.Dense(len(deb_example.label_names), activation="linear", name="Output")(dnn)
-
+dnn = modelling.append_output_layer(dnn, len(deb_example.label_names))
 model = models.Model(inputs=[lc_input, ext_input], outputs=dnn, name=MODEL_NAME)
 model.summary()
 
@@ -218,7 +215,7 @@ model_save_file = SAVE_DIR / f"{MODEL_FILE_NAME}.keras"
 #     "lc_training_roll": LC_TRAINING_ROLL,
 #     "lc_wrap_phase": LC_WRAP_PHASE,
 # }
-tensorflow_models.save_model(model_save_file, model)
+modelling.save_model(model_save_file, model)
 print(f"\nSaved model '{MODEL_NAME}' to: {model_save_file}")
 
 # -----------------------------------------------------------

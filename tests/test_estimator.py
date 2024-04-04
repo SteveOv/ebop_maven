@@ -6,7 +6,7 @@ import unittest
 import numpy as np
 
 from ebop_maven.estimator import Estimator
-from ebop_maven.tensorflow_models import load_model
+from ebop_maven.modelling import load_model
 from ebop_maven.libs import deb_example
 
 class TestEstimator(unittest.TestCase):
