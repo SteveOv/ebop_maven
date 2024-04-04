@@ -1,6 +1,5 @@
 
-from typing import Dict, List
-from pathlib import Path
+from typing import Dict, List, Callable
 
 import numpy as np
 import tensorflow as tf
@@ -66,29 +65,54 @@ def serialize(identifier: str,
     return example.SerializeToString()
 
 
-def map_parse_deb_example(record_bytes):
-    """ 
-    Used by TFRecordDataset().map() to deserialize the passed raw tfrecord
-    row into the phase folded light-curve feature and accompanying labels
-    (via a deb TF Example protobuf).
-
-    :record_bytes: the raw byte string data of the tfrecord row
-    :returns: ((lc_feature, extra_features), labels) as
-    ((shape[#datapoints, 1], shape[#features, 1]), shape[#labels])
+def create_map_func(noise_stddev: Callable[[], float] = None,
+                    roll_steps: Callable[[], int] = None) -> Callable:
     """
-    example = tf.io.parse_single_example(record_bytes, description)
+    Configures and returns a dataset map function for deb_examples. The map function
+    is used by TFRecordDataset().map() to deserialize each raw tfrecord row into the
+    corresponding features and labels required for model training or testing.
+    
+    In addition to deserializing the rows, the map function supports the option of
+    perturbing the output magnitudes feature by adding Gaussian noise and/or rolling
+    the bins left or right. These options are configured by supplying functions which
+    set their stddev or roll values respectively (otherwise they do nothing). Note,
+    these will be running within the context of a graph so you should use tf.functions
+    if you want to do anything beyond setting a fixed value. For example:
 
-    # Need to adjust the LC slightly to get it into a shape for the model
-    # so basically a change from (#datapoints,) to (#datapoints, 1)
-    lc_feature = tf.reshape(example["lc"], shape=(description["lc"].shape[0], 1))
+    roll_steps = lambda: tf.random.uniform([], -3, 4, tf.int32)
 
-    # The Extra features: ignore unknown fields and use default if not found
-    ext_features = [example.get(k, d) for k, d in extra_features_and_defaults.items()]
-    ext_features = tf.reshape(ext_features, shape=(len(ext_features), 1))
+    :noise_stddev: a function which returns the stddev of the Gaussian noise to add
+    :roll_steps: a function which returns the number of steps to roll the mag data,
+    negative values roll to the left and positive values to the right
+    :returns: the configured map function
+    """
+    # Define the map function with the two, optional perturbing actions on the lc
+    def map_func(record_bytes):
+        example = tf.io.parse_single_example(record_bytes, description)
 
-    # Copy labels in the expected order & apply any scaling
-    labels = [example[k] * s for k, s in zip(label_names, label_scales)]
-    return ((lc_feature, ext_features), labels)
+        # Need to adjust the LC slightly to get it into a shape for the model
+        # so basically a change from (#datapoints,) to (#datapoints, 1)
+        lc_feature = tf.reshape(example["lc"], shape=(description["lc"].shape[0], 1))
+
+        # Apply any perturbations
+        if noise_stddev:
+            stddev = noise_stddev()
+            if stddev != 0.:
+                lc_feature += tf.random.normal(lc_feature.shape, stddev=stddev)
+
+        if roll_steps:
+            roll_by = roll_steps()
+            if roll_by != 0:
+                lc_feature = tf.roll(lc_feature, [roll_by], axis=[0])
+
+        # The Extra features: ignore unknown fields and use default if not found
+        ext_features = [example.get(k, d) for k, d in extra_features_and_defaults.items()]
+        ext_features = tf.reshape(ext_features, shape=(len(ext_features), 1))
+
+        # Copy labels in the expected order & apply any scaling
+        labels = [example[k] * s for k, s in zip(label_names, label_scales)]
+        return ((lc_feature, ext_features), labels)
+    return map_func
 
 
 #

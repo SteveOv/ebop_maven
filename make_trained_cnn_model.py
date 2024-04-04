@@ -92,6 +92,8 @@ print("Picking up training/validation/test datasets.")
 datasets = [tf.data.TFRecordDataset] * 3
 counts = [int] * 3
 batch_size, buffer_size = 0, 0
+map_func = deb_example.create_map_func(noise_stddev=lambda: 0.005,
+                                       roll_steps=lambda: tf.random.uniform([], -9, 10, tf.int32))
 for ds_ix, (label, set_dir) in enumerate([("training", TRAINSET_DIR),
                                           ("valiation", VALIDSET_DIR),
                                           ("testing", TESTSET_DIR)]):
@@ -108,11 +110,11 @@ for ds_ix, (label, set_dir) in enumerate([("training", TRAINSET_DIR),
         buffer_size = min(MAX_BUFFER_SIZE, counts[0])
         datasets[ds_ix] = datasets[ds_ix] \
                             .shuffle(buffer_size, SEED, reshuffle_each_iteration=True) \
-                                .map(deb_example.map_parse_deb_example) \
+                                .map(map_func) \
                                     .batch(batch_size) \
                                         .prefetch(1)
     else:
-        datasets[ds_ix] = datasets[ds_ix].map(deb_example.map_parse_deb_example).batch(batch_size)
+        datasets[ds_ix] = datasets[ds_ix].map(map_func).batch(batch_size)
 
 
 # -----------------------------------------------------------
@@ -122,13 +124,6 @@ print("\nDefining the multiple-input/output CNN model.")
 
 # Input for the Light-curve (Timeseries data) via a CNN.
 cnn = lc_input = layers.Input(shape=(LC_BINS, 1), name="LC-Input")
-
-# Input LC augmentations; Gaussian noise and roll/rotate (misaligned eclipses).
-# Set these up to have no effect, even when training is on, so that they
-# will not affect MC Dropout style predictions. During real training we can
-# use callbacks to set and/or vary the scale of the effect.
-cnn = layers.GaussianNoise(stddev=0, name="Training-Noise")(cnn)
-cnn = tensorflow_models.Roll1D(roll_by=0, name="Training-Roll")(cnn)
 
 # 1D conv layers re-dimension each LS instances from 1d timeseries #bins long
 # into 2D [timeseries, features] of dimension [8, 64]
@@ -193,13 +188,6 @@ CALLBACKS = [
     callbacks.EarlyStopping("val_loss", restore_best_weights=True,
                             patience=EARLY_STOPPING_PATIENCE, verbose=1)
 ]
-
-if LC_TRAINING_NOISE:
-    CALLBACKS += [tensorflow_models.SetLayerAttribute(model.get_layer("Training-Noise"), "stddev",
-                                                  on_train_begin=lambda: 0.005)]
-if LC_TRAINING_ROLL:
-    CALLBACKS += [tensorflow_models.SetLayerAttribute(model.get_layer("Training-Roll"), "roll_by",
-                                                  on_batch_begin=lambda: np.random.randint(-3, 4))]
 
 print(f"\nTraining the model on {counts[0]} training and {counts[1]} validation",
       f"instances, with a further {counts[2]} instances held back for test.")

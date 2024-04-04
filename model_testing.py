@@ -45,7 +45,7 @@ def test_with_estimator(model: Union[Model, Path],
     test_count = ds_formal_test.reduce(0, lambda count, _: count+1).numpy()
 
     print(f"Found {len(tfrecord_files)} tfrecord file(s) containing {test_count} instances.")
-    ds_formal_test = ds_formal_test.map(deb_example.map_parse_deb_example).batch(test_count)
+    ds_formal_test = ds_formal_test.map(deb_example.create_map_func()).batch(test_count)
 
     # Don't iterate over the dataset; it's easier if we work with all the data
     (test_lcs, test_feats), lbls = next(ds_formal_test.take(test_count).as_numpy_iterator())
