@@ -16,7 +16,7 @@ _this_dir = Path(getsourcefile(lambda:0)).parent
 _task2_template_file = _this_dir / "data/jktebop/task2.in.template"
 _task3_template_file = _this_dir / "data/jktebop/task3.in.template"
 _jktebop_directory = \
-    Path(os.environ.get("JKTEBOP_DIR", "~/jktebop43")).expanduser().absolute()
+    Path(os.environ.get("JKTEBOP_DIR", "~/jktebop/")).expanduser().absolute()
 
 
 def generate_model_light_curve(file_prefix: str, **params) -> np.ndarray:

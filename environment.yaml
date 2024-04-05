@@ -16,5 +16,5 @@ dependencies:
   - pip:
     - -r requirements.txt
 variables:
-  JKTEBOP_DIR: ~/jktebop43
+  JKTEBOP_DIR: ~/jktebop/
   TF_CPP_MIN_LOG_LEVEL: 2         # Suppress TF info/warn messages

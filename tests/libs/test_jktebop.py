@@ -53,13 +53,13 @@ class Testjktebop(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """ Make sure JKTEBOP_DIR is corrected up as tests may modify it. """
-        jktebop._jktebop_directory = Path(os.environ.get("JKTEBOP_DIR", "~/jktebop43")).expanduser().absolute()
+        jktebop._jktebop_directory = Path(os.environ.get("JKTEBOP_DIR", "~/jktebop/")).expanduser().absolute()
         return super().setUpClass()
 
     @classmethod
     def tearDownClass(cls):
         """ Make sure JKTEBOP_DIR is corrected up as tests may modify it. """
-        jktebop._jktebop_directory = Path(os.environ.get("JKTEBOP_DIR", "~/jktebop43")).expanduser().absolute()
+        jktebop._jktebop_directory = Path(os.environ.get("JKTEBOP_DIR", "~/jktebop/")).expanduser().absolute()
         return super().tearDownClass()
 
 
@@ -89,7 +89,7 @@ class Testjktebop(unittest.TestCase):
         params = self._task2_params.copy()
         jktebop._jktebop_directory = Path.home()
         self.assertRaises(FileNotFoundError, generate_model_light_curve, self._prefix, **params)
-        jktebop._jktebop_directory = Path(os.environ.get("JKTEBOP_DIR", "~/jktebop43")).expanduser().absolute()
+        jktebop._jktebop_directory = Path(os.environ.get("JKTEBOP_DIR", "~/jktebop")).expanduser().absolute()
 
     def test_generate_model_light_curve_valid_params_only(self):
         """ Test generate_model_light_curve(all necessary params) generates model """

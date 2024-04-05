@@ -14,7 +14,7 @@ datasets_root = Path("./datasets")
 # Tell the libraries where the JKTEBOP executable lives.
 # The conda yaml based env sets this but it's not set for venvs.
 if not "JKTEBOP_DIR" in os.environ:
-    os.environ["JKTEBOP_DIR"] = "~/jktebop43"
+    os.environ["JKTEBOP_DIR"] = "~/jktebop/"
 
 # Creating a training dataset is a two step process;
 #   1. create a set of trainset csv files

@@ -13,7 +13,7 @@ You will need to activate the environment whenever you wish to run any of these 
 $ conda activate ebop_maven
 ```
 #### JKTEBOP
-These codes have a dependency on the JKTEBOP tool for generating and fitting lightcurves. The installation media and build instructions can be found [here](https://www.astro.keele.ac.uk/jkt/codes/jktebop.html). The `JKTEBOP_DIR` environment variable, used to be locate the executable at runtime, is set to `~/jktebop43/` in the ebop_maven conda env (TODO: change to non version specific). This will need to match the location where JKTEBOP resides.
+These codes have a dependency on the JKTEBOP tool for generating and fitting lightcurves. The installation media and build instructions can be found [here](https://www.astro.keele.ac.uk/jkt/codes/jktebop.html). The `JKTEBOP_DIR` environment variable, used by ebop_maven to be locate the executable at runtime, is set to `~/jktebop/` in the ebop_maven conda env. This will need to match the location where JKTEBOP has been set up.
 
 #### Alternative, venv installation
 If you prefer not to use a conda environment, the following venv setup works although I haven't tested it as thoroughly. Again, from this directory run the following to create and activate a .ebop_maven env;
