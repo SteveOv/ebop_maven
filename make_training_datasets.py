@@ -7,6 +7,8 @@ from ebop_maven import trainsets, datasets
 from ebop_maven.libs import deb_example
 from ebop_maven.libs.tee import Tee
 
+RESUME = False
+config_dir = Path("./config")
 datasets_root = Path("./datasets")
 
 # Tell the libraries where the JKTEBOP executable lives.
@@ -47,53 +49,85 @@ if not "JKTEBOP_DIR" in os.environ:
 #
 # Datasets
 # --------
-# A dataset builds on a trainset, primarily with the addition of a folded,
+# A dataset builds on a trainset, primarily with the addition of a folded, binned
 # model lightcurve. These are written to a set of TensorFlow tfrecord files
 # which mirror the csv files of the trainset. Within the tfrecord files, each
 # "row" holds the data for an instance and consists of;
 #   - features (which the ML model learns to interpret)
-#       - the folded lightcurve
-#       - additional single feature values which augment the ligthcurve
+#       - the folded lightcurve (now in a variety of configurations)
+#       - additional single feature values which augment the lightcurve
 #   - labels (the ground truth used in the training process)
 #       - these are the values we want the ML model to predict
 #
 
-# The formal-trainset will be used for training the final model
-# First we create the readable csv trainset from random parameter distributions.
-trainset_dir = datasets_root / "formal-trainset"
-trainset_dir.mkdir(parents=True, exist_ok=True)
-with redirect_stdout(Tee(open(trainset_dir/"trainset.log", "w", encoding="utf8"))):
+
+# ------------------------------------------------------------------------------
+# The formal training dataset based on sampling parameter distributions
+# ------------------------------------------------------------------------------
+dataset_dir = datasets_root / "formal-training-dataset"
+dataset_dir.mkdir(parents=True, exist_ok=True)
+with redirect_stdout(Tee(open(dataset_dir / "trainset.log", "w", encoding="utf8"))):
     trainsets.write_trainset_from_distributions(instance_count=100000,
                                                 file_count=10,
-                                                output_dir=trainset_dir,
+                                                output_dir=dataset_dir,
                                                 verbose=True)
 
-trainsets.plot_trainset_histograms(trainset_dir, trainset_dir / "histogram_full.png", cols=3)
-trainsets.plot_trainset_histograms(trainset_dir, trainset_dir / "histogram_main.eps", cols=2,
+trainsets.plot_trainset_histograms(dataset_dir, dataset_dir / "histogram_full.png", cols=3)
+trainsets.plot_trainset_histograms(dataset_dir, dataset_dir / "histogram_main.eps", cols=2,
                                     params=["rA_plus_rB", "k", "inc", "J", "ecosw", "esinw"])
 
-# Make the tensorflow dataset from the trainset
-dataset_dir = trainset_dir / "1024" / f"wm-{WRAP_PHASE}"
-dataset_dir.mkdir(parents=True, exist_ok=True)
-RESUME = False
 with redirect_stdout(Tee(open(dataset_dir/"dataset.log", "a" if RESUME else "w", encoding="utf8"))):
-    datasets.make_dataset_files(trainset_files=trainset_dir.glob("trainset*.csv"),
+    datasets.make_dataset_files(trainset_files=dataset_dir.glob("trainset*.csv"),
                                 output_dir=dataset_dir,
                                 valid_ratio=0.1,
                                 test_ratio=0.1,
-                                wrap_phase=WRAP_PHASE,
                                 resume=RESUME,
-                                max_workers=4,
+                                max_workers=8,
                                 verbose=True,
                                 simulate=False)
 
-# Make the formal test dataset
-input_targets_files = Path(".") / "config" / "formal-test-dataset.json"
-formal_testset_dir = Path(".") / "datasets" / "formal-test-dataset"
-formal_testset_dir.mkdir(parents=True, exist_ok=True)
-with redirect_stdout(Tee(open(formal_testset_dir/"dataset.log", "w", encoding="utf8"))):
-    formal_testset_file = datasets.make_formal_test_dataset(config_file=input_targets_files,
-                                                            output_dir=formal_testset_dir,
+
+# ------------------------------------------------------------------------------
+# A second testing dataset based on MIST models and a configured parameter space
+# ------------------------------------------------------------------------------
+pspace_config_file = config_dir / "synthetic-mist-tess-dataset.json"
+dataset_dir = datasets_root / "synthetic-mist-tess-dataset"
+dataset_dir.mkdir(parents=True, exist_ok=True)
+with redirect_stdout(Tee(open(dataset_dir / "trainset.log", "w", encoding="utf8"))):
+    trainsets.write_trainset_from_models(pspace_file=pspace_config_file,
+                                         output_dir=dataset_dir,
+                                         mission_name="TESS",
+                                         models_name="MIST",
+                                         drop_ratio=0.5,
+                                         verbose=True,
+                                         simulate=False)
+
+trainsets.plot_trainset_histograms(dataset_dir, dataset_dir / "histogram_full.png", cols=3)
+trainsets.plot_trainset_histograms(dataset_dir, dataset_dir / "histogram_main.eps", cols=2,
+                                    params=["rA_plus_rB", "k", "inc", "J", "ecosw", "esinw"])
+
+with redirect_stdout(Tee(open(dataset_dir/"dataset.log", "a" if RESUME else "w", encoding="utf8"))):
+    datasets.make_dataset_files(trainset_files=dataset_dir.glob("trainset*.csv"),
+                                output_dir=dataset_dir,
+                                valid_ratio=0.,
+                                test_ratio=0.,
+                                resume=RESUME,
+                                max_workers=8,
+                                verbose=True,
+                                simulate=False)
+
+
+# ------------------------------------------------------------------------------
+# The final, formal test dataset based on real TESS lightcurves of known systems
+# ------------------------------------------------------------------------------
+targets_config_file = config_dir / "formal-test-dataset.json"
+dataset_dir = datasets_root / "formal-test-dataset"
+dataset_dir.mkdir(parents=True, exist_ok=True)
+with redirect_stdout(Tee(open(dataset_dir / "dataset.log", "w", encoding="utf8"))):
+    # Process differs from that with synthetic data. We have a config file with MAST search params
+    # & labels (from published works). Build the dataset directly by downloading fits & folding LCs.
+    formal_testset_file = datasets.make_formal_test_dataset(config_file=targets_config_file,
+                                                            output_dir=dataset_dir,
                                                             fits_cache_dir=Path(".") / "cache",
                                                             target_names=None,
                                                             verbose=True,

@@ -1,0 +1,14 @@
+{
+    "description": "A set of synthetic eclipsing systems, from 0.4 to 6.4 solMass and solar metallicity, based on TESS photometry and MIST models.",
+    "notes": "",
+    "pspace": {
+        "Z": [0.0143],
+        "initial_mass": [0.4, 0.6, 0.8, 1.0, 1.2, 1.5, 1.8, 2.1, 2.4, 2.8, 3.2, 3.6, 4.0, 4.4, 4.8, 5.2, 5.8, 6.4],
+        "count_lower_MB_masses": 5,
+        "period": [1.0, 2.0, 3.0, 4.0, 5.0, 7.5, 10.0, 15.0, 20.0, 28.0],
+        "inc": [90.0, 89.0, 88, 87, 86, 85, 84, 83, 82, 81, 80, 79, 78, 77, 76, 75, 74, 73, 72, 71, 70],
+        "ecc": [0.0, 0.1, 0.3, 0.5],
+        "omega": [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330],
+        "L3": [0.0]
+    }
+}

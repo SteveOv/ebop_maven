@@ -23,7 +23,7 @@ MAGS_WRAP_PHASE = 0.75          # Control the shape and default roll of Mags fea
 MAGS_BINS = deb_example.mags_bins
 
 # We can now specify paths to train/val/test datasets separately for greater flexibility.
-TRAINSET_NAME = "formal-trainset/"
+TRAINSET_NAME = "formal-training-dataset/"
 DATASET_DIR = Path(".") / "datasets" / TRAINSET_NAME
 TRAINSET_DIR = DATASET_DIR / "training"
 VALIDSET_DIR = DATASET_DIR / "validation"
@@ -39,7 +39,7 @@ FORMAL_TESTSET_DIR = Path(".") / "datasets/formal-test-dataset/"
 FORMAL_RESULTS_DIR = SAVE_DIR / f"results/{MODEL_NAME}/{TRAINSET_NAME}/{deb_example.pub_mags_key}/"
 
 NUMBER_FULL_HIDDEN_LAYERS = 2   # Number of full width hidden layers (with associated dropout)
-TRAINING_EPOCHS = 10           # Set high if we're using early stopping
+TRAINING_EPOCHS = 100           # Set high if we're using early stopping
 BATCH_FRACTION = 0.001          # larger -> quicker training per epoch but more to converge
 MAX_BUFFER_SIZE = 20000000      # Size of Dataset shuffle buffer (in instances)
 EARLY_STOPPING_PATIENCE = 7     # Number of epochs w/o improvement before stopping

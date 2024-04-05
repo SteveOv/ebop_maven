@@ -16,6 +16,7 @@ from keras.models import Model
 from ebop_maven.libs import deb_example
 from ebop_maven.libs.tee import Tee
 from ebop_maven.estimator import Estimator
+from ebop_maven import modelling
 
 def test_with_estimator(model: Union[Model, Path],
                         test_dataset_dir: Path,
@@ -189,10 +190,8 @@ def test_with_estimator(model: Union[Model, Path],
             plt.close()
 
 if __name__ == "__main__":
-    MODEL_FILE_NAME = "cnn_ext_model"
-    test_with_estimator(model=Path(f"./drop/{MODEL_FILE_NAME}.keras"),
-                        test_dataset_dir= Path("./datasets/formal-test-dataset/1024/wm-0.75/"),
-                        results_dir=None,
-                        plot_results=True,
-                        echo_results=False,
-                        excluded_labels=[])
+    TRAINSET_NAME = "formal-training-dataset"   # Assume the usual training set
+    the_model = modelling.load_model(Path("./drop/cnn_ext_model.keras"))
+    testset_dir = Path("./datasets/formal-test-dataset")
+    out_dir = Path(f"./drop/results/{the_model.name}/{TRAINSET_NAME}/{deb_example.pub_mags_key}")
+    test_with_estimator(the_model, testset_dir, out_dir, plot_results=True, excluded_labels=[])
