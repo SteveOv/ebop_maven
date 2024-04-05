@@ -30,7 +30,6 @@ def make_dataset_files(trainset_files: Iterator[Path],
                        output_dir: Path,
                        valid_ratio: float=0.,
                        test_ratio: float=0,
-                       wrap_phase: float=0.75,
                        interp_kind: str="cubic",
                        resume: bool=False,
                        max_workers: int=1,
@@ -51,7 +50,6 @@ def make_dataset_files(trainset_files: Iterator[Path],
     :output_dir: the parent directory for the dataset files, if None the same as the input
     :valid_ratio: proportion of rows to be written to the validation files
     :test_ratio: proportion of rows to be written to the testing files
-    :wrap_phase: phases above this value are rolled to the start of the lightcurve models
     :interp_kind: the kind of interpolation used to reduce the the lightcurve models
     :resume: whether we are to attempt to resume from a previous "make"
     :max_workers: maximum number of files to process concurrently
@@ -70,7 +68,6 @@ Build training datasets from testset csvs.
 The number of input trainset files is:  {file_count}
 Output dataset directory:               {output_dir}
 Resume previous job is set to:          {'on' if resume else 'off'}
-Model feature wrapped above phase:      {wrap_phase}
 Training : Validation : Test ratio is:  {train_ratio:.2f} : {valid_ratio:.2f} : {test_ratio:.2f}
 The model interpolation kind is:        {interp_kind}
 The maximum concurrent workers:         {max_workers}
@@ -80,7 +77,7 @@ The random seed to use for selections:  {seed}\n""")
 
     # args for each make_dataset_file call as required by process_pool starmap
     iter_params = (
-    (f, output_dir, valid_ratio, test_ratio, wrap_phase, interp_kind, resume, seed, verbose, simulate) # pylint: disable=line-too-long
+    (f, output_dir, valid_ratio, test_ratio, interp_kind, resume, seed, verbose, simulate)
         for f in trainset_files
     )
 
@@ -101,7 +98,6 @@ def make_dataset_file(trainset_file: Path,
                       output_dir: Path=None,
                       valid_ratio: float=0.,
                       test_ratio: float=0.,
-                      wrap_phase: float=0.75,
                       interp_kind: str="cubic",
                       resume: bool=False,
                       seed: float=42,
@@ -121,7 +117,6 @@ def make_dataset_file(trainset_file: Path,
     :output_dir: the parent directory for the dataset files, if None the same as the input
     :valid_ratio: proportion of rows to be written to the validation file
     :test_ratio: proportion of rows to be written to the testing file
-    :wrap_phase: phases above this value are rolled to the start of the lightcurve model
     :interp_kind: the kind of interpolation used to sample the the lightcurve model
     :resume: whether we are to attempt to resume from a previous "make"
     :seed: the seed ensures random selection of subsets are repeatable
@@ -131,7 +126,6 @@ def make_dataset_file(trainset_file: Path,
     label = trainset_file.stem
     output_dir = trainset_file.parent if output_dir is None else output_dir
     this_seed = f"{trainset_file.name}/{seed}"
-    model_size = deb_example.mags_bins
 
     # Work out the subsets & files now, before generating, to see if we can skip on resume
     subsets = ["training", "validation", "testing"]
@@ -147,54 +141,51 @@ def make_dataset_file(trainset_file: Path,
     # would be to create & shuffle the index and open the subset output files in advance, then write
     # the rows as we go. However, for that to work we need to know the total row count in advance.
     rows = []
-    for counter, sys_params in enumerate(param_sets.read_param_sets_from_csv(trainset_file), 1):
-        sys_params.setdefault("gravA", 0.)
-        sys_params.setdefault("gravB", 0.)
-        sys_params.setdefault("reflA", -100)
-        sys_params.setdefault("reflB", -100)
+    for counter, params in enumerate(param_sets.read_param_sets_from_csv(trainset_file), 1):
+        params.setdefault("gravA", 0.)
+        params.setdefault("gravB", 0.)
+        params.setdefault("reflA", -100)
+        params.setdefault("reflB", -100)
 
         try:
             # model_data's shape is (2, rows) with phase in [0, :] and mags in [1, :]
-            model_data = jktebop.generate_model_light_curve("trainset_", **sys_params)
-            if model_size is not None and model_data.shape[1] != model_size: # Resize?
-                interpolator = interp1d(model_data[0], model_data[1], kind=interp_kind)
-                # Ensure we don't waste a row on a phase 1.0 value already covered by the 0.0 value
-                new_phases = np.linspace(0., 1., model_size + 1)[:-1]
-                model_data = np.array([new_phases, interpolator(new_phases)], dtype=np.double)
-                del new_phases
-
-            # Optionally wrap the model so we move where the phases appear, by rolling the data
-            if wrap_phase and 0 < wrap_phase < 1:
-                model_data[0, model_data[0] > wrap_phase] -= 1.
-                shift = model_data.shape[1] - np.argmin(model_data[0])
-                model_data = np.roll(model_data, shift, axis=1)
-
+            model_data = jktebop.generate_model_light_curve("trainset_", **params)
             if np.isnan(np.min(model_data[1])):
                 # Checking for a Heisenbug where a model is somehow assigned NaN for at least 1 mag
                 # value, subsequently causing training to fail. Adding mitigation/error reporting
                 # seems to stop it happening despite the same source params, args and seed being
                 # used. I'll leave this in place to report if it ever happens again. I think the
                 # issue was caused by passing "bad" params to JKTEBOP which is why it's not repeated
-                print(f"{label}[{sys_params['id']}]: Replacing NaN/Inf in processed LC.")
+                print(f"{label}[{params['id']}]: Replacing NaN/Inf in processed LC.")
                 np.nan_to_num(x=model_data[1], copy=False)
+
+            # We apply and store various supported configs of bins and wrap phase
+            interpolator = interp1d(model_data[0], model_data[1], kind=interp_kind)
+            mags_features = {}
+            for mag_name, (mags_bins, wrap_phase) in deb_example.stored_mags_features.items():
+                # Ensure we don't waste a row on a phase 1.0 value already covered by phase 0.0
+                new_phases = np.linspace(0., 1., mags_bins + 1)[:-1]
+                bin_model_data = np.array([new_phases, interpolator(new_phases)], dtype=np.double)
+                if wrap_phase and 0 < wrap_phase < 1:
+                    bin_model_data[0, bin_model_data[0] > wrap_phase] -= 1.
+                    shift = bin_model_data.shape[1] - np.argmin(bin_model_data[0])
+                    bin_model_data = np.roll(bin_model_data, shift, axis=1)
+                mags_features[mag_name] = bin_model_data[1]
 
             # These are the extra features used for predictions alongside the LC.
             extra_features = {
-                "phiS": lightcurve.expected_secondary_phase(sys_params["ecosw"], sys_params["ecc"]),
-                "dS_over_dP": lightcurve.expected_ratio_of_eclipse_duration(sys_params["esinw"]),
+                "phiS": lightcurve.expected_secondary_phase(params["ecosw"], params["ecc"]),
+                "dS_over_dP": lightcurve.expected_ratio_of_eclipse_duration(params["esinw"]),
             }
 
-            rows.append(deb_example.serialize(identifier = sys_params["id"],
-                                              labels = sys_params,
-                                              mags_feature = model_data[1],
-                                              extra_features = extra_features))
+            rows.append(deb_example.serialize(params["id"], params, mags_features, extra_features))
 
             if verbose and counter % 100 == 0:
                 print(f"{label}: Processed {counter} instances.")
 
         except Exception as exc: # pylint: disable=broad-exception-caught
             traceback.print_exc(exc)
-            print(f"{label}: Skipping instance {counter} which caused exc: {sys_params}")
+            print(f"{label}: Skipping instance {counter} which caused exc: {params}")
 
     rows_total = len(rows)
     if verbose:
@@ -236,7 +227,6 @@ def make_formal_test_dataset(config_file: Path,
                              output_dir: Path,
                              fits_cache_dir: Path,
                              target_names: Iterator[str]=None,
-                             wrap_phase: float=0.75,
                              verbose: bool=True,
                              simulate: bool=True) -> Path:
     """
@@ -281,7 +271,6 @@ def make_formal_test_dataset(config_file: Path,
     :output_dir: the directory to write the output dataset tfrecord file
     :fits_cache_dir: the parent directory under which to cache downloaded fits files
     :target_names: a list of targets to select from input_file, or None for all
-    :wrap_phase: phases above this value are rolled to the start of the lightcurve model
     :verbose: whether to print verbose progress/diagnostic messages
     :simulate: whether to simulate the process, skipping only file/directory actions
     :returns: the Path of the newly created dataset file
@@ -289,6 +278,7 @@ def make_formal_test_dataset(config_file: Path,
     # pylint: disable=invalid-name
     start_time = default_timer()
     fits_cache_dir = fits_cache_dir if fits_cache_dir else output_dir
+    smooth_fit = False
 
     if verbose:
         print(f"""
@@ -297,8 +287,7 @@ Build formal test dataset based on downloaded lightcurves from TESS targets.
 The input configuration files is:   {config_file}
 Output dataset will be written to:  {output_dir}
 Downloaded fits are cached in:      {fits_cache_dir}
-Selected targets are:               {', '.join(target_names) if target_names else 'all'}
-Models will be wrapped above phase: {wrap_phase}\n""")
+Selected targets are:               {', '.join(target_names) if target_names else 'all'}\n""")
         if simulate:
             print("Simulate requested so no dataset will be written, however fits are cached.\n")
 
@@ -333,18 +322,18 @@ Models will be wrapped above phase: {wrap_phase}\n""")
                 lc = _prepare_lc_for_target_sector(target, sector, sector_cfg, fits_dir, verbose)
                 pe = lightcurve.to_lc_time(pe, lc)
 
-                # Phase folding the light-curve
+                # Produce multiple mags set (varying #bins & wrap phase) available for serialization
                 if verbose:
-                    print(f"{inst_id}: Creating a phase normalized, folded light-curve about",
-                          f"{pe.format} {pe} & {period}. Phases above {wrap_phase} wrapped.")
-                wrap_phase = u.Quantity(wrap_phase)
-                fold_lc = lc.fold(period, pe, wrap_phase=wrap_phase, normalize_phase=True)
-
-                # Now get the interpolated & folded delta-mags data we need for the ML model
-                mags_bins = deb_example.mags_bins
-                if verbose:
-                    print(f"{inst_id}: Generating a {mags_bins} bin model feature.")
-                _, mags = lightcurve.get_reduced_folded_lc(fold_lc, mags_bins, wrap_phase, True)
+                    print(f"{inst_id}: Creating phase normalized, folded lightcurves about",
+                          f"{pe.format} {pe} & {period}.")
+                mags_features = {}
+                for mag_name, (mags_bins, wrap_phase) in deb_example.stored_mags_features.items():
+                    # Phase folding the light-curve, then interpolate for the mags features
+                    wrap_phase = u.Quantity(wrap_phase)
+                    fold_lc = lc.fold(period, pe, wrap_phase=wrap_phase, normalize_phase=True)
+                    _, mags = lightcurve.get_reduced_folded_lc(fold_lc, mags_bins, wrap_phase,
+                                                                smooth_fit=smooth_fit)
+                    mags_features[mag_name] = mags
 
                 # omega & ecc are not used as labels but we need them for phiS and impact params
                 ecosw, esinw = labels["ecosw"], labels["esinw"]
@@ -378,7 +367,7 @@ Models will be wrapped above phase: {wrap_phase}\n""")
                 if not simulate:
                     if verbose:
                         print(f"{inst_id}: Saving serialized instance to dataset:", out_file)
-                    ds.write(deb_example.serialize(inst_id, labels, mags, extra_features))
+                    ds.write(deb_example.serialize(inst_id, labels, mags_features, extra_features))
                 elif verbose:
                     print(f"{inst_id}: Simulated saving serialized instance to dataset:", out_file)
                 inst_counter += 1
@@ -414,7 +403,7 @@ def inspect_dataset(dataset_files: Union[Path, Iterator[Path]],
         identifier = example["id"].numpy().decode(encoding="utf8")
         if not identifiers or identifier in identifiers:
             labels = { k: example[k].numpy() for k in deb_example.label_names }
-            mags = example["mags"].numpy()
+            mags = {k: example[k].numpy() for k in deb_example.stored_mags_features }
             ext_features = { k: example[k].numpy() for k in deb_example.extra_features_and_defaults}
             yield (identifier, labels, mags, ext_features)
 

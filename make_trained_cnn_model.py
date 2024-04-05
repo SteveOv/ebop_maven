@@ -23,7 +23,7 @@ MAGS_WRAP_PHASE = 0.75          # Control the shape and default roll of Mags fea
 MAGS_BINS = deb_example.mags_bins
 
 # We can now specify paths to train/val/test datasets separately for greater flexibility.
-TRAINSET_NAME = f"formal-trainset/{MAGS_BINS}/wm-{MAGS_WRAP_PHASE}"
+TRAINSET_NAME = "formal-trainset/"
 DATASET_DIR = Path(".") / "datasets" / TRAINSET_NAME
 TRAINSET_DIR = DATASET_DIR / "training"
 VALIDSET_DIR = DATASET_DIR / "validation"
@@ -35,8 +35,8 @@ PLOTS_DIR = SAVE_DIR / "plots"
 
 # Formal testset is a currated set of test systems for formal testing across models.
 # It's the dataset used for the testing and reports of test_estimator.
-FORMAL_TESTSET_DIR = Path(".") / f"datasets/formal-test-dataset/{MAGS_BINS}/wm-{MAGS_WRAP_PHASE}/"
-FORMAL_RESULTS_DIR = SAVE_DIR / "results" / MODEL_NAME / TRAINSET_NAME
+FORMAL_TESTSET_DIR = Path(".") / "datasets/formal-test-dataset/"
+FORMAL_RESULTS_DIR = SAVE_DIR / f"results/{MODEL_NAME}/{TRAINSET_NAME}/{deb_example.pub_mags_key}/"
 
 NUMBER_FULL_HIDDEN_LAYERS = 2   # Number of full width hidden layers (with associated dropout)
 TRAINING_EPOCHS = 10           # Set high if we're using early stopping

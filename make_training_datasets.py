@@ -4,10 +4,10 @@ from pathlib import Path
 from contextlib import redirect_stdout
 
 from ebop_maven import trainsets, datasets
+from ebop_maven.libs import deb_example
 from ebop_maven.libs.tee import Tee
 
 datasets_root = Path("./datasets")
-WRAP_PHASE = 0.75
 
 # Tell the libraries where the JKTEBOP executable lives.
 # The conda yaml based env sets this but it's not set for venvs.
@@ -89,18 +89,20 @@ with redirect_stdout(Tee(open(dataset_dir/"dataset.log", "a" if RESUME else "w",
 
 # Make the formal test dataset
 input_targets_files = Path(".") / "config" / "formal-test-dataset.json"
-formal_testset_dir = Path(".") / f"datasets/formal-test-dataset/1024/wm-{WRAP_PHASE}"
+formal_testset_dir = Path(".") / "datasets" / "formal-test-dataset"
 formal_testset_dir.mkdir(parents=True, exist_ok=True)
 with redirect_stdout(Tee(open(formal_testset_dir/"dataset.log", "w", encoding="utf8"))):
     formal_testset_file = datasets.make_formal_test_dataset(config_file=input_targets_files,
                                                             output_dir=formal_testset_dir,
                                                             fits_cache_dir=Path(".") / "cache",
                                                             target_names=None,
-                                                            wrap_phase=WRAP_PHASE,
                                                             verbose=True,
                                                             simulate=False)
 
     # Review the dataset we have just written
     for (identifier, labels, mags, ext_features) in datasets.inspect_dataset(formal_testset_file):
-        row = { **labels, "min(mags)": min(mags), "max(mags)": max(mags), **ext_features }
-        print(f"{identifier:>15s}: {', '.join(f'{k}: {v:7.3f}' for k, v in row.items())}")
+        row = { **labels, **ext_features }
+        print(f"{identifier:>15s}: {', '.join(f'{k}={v:6.3f}' for k, v in row.items())}")
+        pmags = mags[deb_example.pub_mags_key]
+        print(f"{' '*15}: {deb_example.pub_mags_key} (min,max)={min(pmags):6.3f}, {max(pmags):.3f}",
+              f"(from: { ', '.join(k for k, v in mags.items() if len(v))})")

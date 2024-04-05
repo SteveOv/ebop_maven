@@ -10,8 +10,15 @@ label_scales = [1., 1., 1., 1., 1., 0.01, 1., 1.]
 label_names = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "inc", "bP", "L3"]
 label_predict_cols = label_names + [f"{f}_sigma" for f in label_names]
 
-mags_bins = 1024        # pylint: disable=invalid-name
-mags_key = "mags"       # pylint: disable=invalid-name
+# We can store multiple configuration of the mags feature but we can publish only one.
+stored_mags_features = {
+    "mags_1024_0.75": (1024, 0.75),
+    "mags_1024_1.0": (1024, 1.0),
+    "mags_2048_0.75": (2048, 0.75),
+    "mags_2048_1.0": (2048, 1.0)
+}
+pub_mags_key = "mags_1024_0.75"                         # pylint: disable=invalid-name
+(mags_bins, _) = stored_mags_features[pub_mags_key]     # pylint: disable=invalid-name
 
 # Python 3.7+ language spec ensures dictionary order is preserved
 # Extra features other than the light-curve used for predictions
@@ -29,8 +36,9 @@ description = {
     **{ k: tf.io.FixedLenFeature([], tf.float32, default_value=0.)
                         for k in label_names },
 
-    # Complex features: phase folded light-curve
-    mags_key: tf.io.FixedLenFeature((mags_bins,), tf.float32, [0.] * mags_bins),
+    # Complex features: multiple configs of the phase folded light-curve mags
+    **{ k: tf.io.FixedLenFeature((bins,), tf.float32, [0.] * bins)
+                        for (k, (bins, _)) in stored_mags_features.items() },
 
     # Extra features are expected to have a single float value each
     **{ k: tf.io.FixedLenFeature([], tf.float32, default_value=v)
@@ -39,26 +47,30 @@ description = {
 
 def serialize(identifier: str,
               labels: Dict[str, float],
-              mags_feature: List[float],
+              mags_features: Dict[str, List[float]],
               extra_features: Dict[str, float]) -> bytearray:
     """
     Encode the requested test instance data to a TF Example protobuf.
 
     :identifier: unique id of the instance
     :labels: the training labels
-    :light_curve_model: the phase folded time series magnitude data
+    :mags_features: the various configurations of phase folded time series magnitude data
     :extra_features: single value features associated with the light-curve
     :returns: a bytearray containing the serialized data
     """
-    if len(mags_feature) != description[mags_key].shape[0]:
-        raise ValueError(f"Expect model mags to have {description[mags_key].shape[0]} bins")
+    if pub_mags_key not in mags_features:
+        raise ValueError(f"The published {pub_mags_key} item found in mags_features.")
 
     features = {
         "id": _to_bytes_feature(identifier),
+
         # Labels - will raise KeyError if an expected label is not given
         **{ k: _to_float_feature(labels[k]) for k in label_names },
-        # Model magnitudes feature
-        mags_key : _to_float_feature(mags_feature),
+
+        # Various supported configurations of the magnitudes feature. Will error if bins wrong?
+        ** { k: _to_float_feature(v)
+                    for (k, v) in mags_features.items() if k in stored_mags_features },
+
         # Extra features, will fall back on default value where not given
         **{ k: _to_float_feature(extra_features.get(k, d))
                     for k, d in extra_features_and_defaults.items()},
@@ -95,7 +107,7 @@ def create_map_func(noise_stddev: Callable[[], float] = None,
 
         # Need to adjust the model mags slightly to get it into a shape for the model
         # so basically a change from (#bins,) to (#bins, 1)
-        mags_feature = tf.reshape(example[mags_key], shape=(description[mags_key].shape[0], 1))
+        mags_feature = tf.reshape(example[pub_mags_key], shape=(mags_bins, 1))
 
         # Apply any perturbations to the model mags
         if noise_stddev:
