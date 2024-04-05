@@ -12,7 +12,10 @@ You will need to activate the environment whenever you wish to run any of these 
 ```sh
 $ conda activate ebop_maven
 ```
-#### Alternative installation
+#### JKTEBOP
+These codes have a dependency on the JKTEBOP tool for generating and fitting lightcurves. The installation media and build instructions can be found [here](https://www.astro.keele.ac.uk/jkt/codes/jktebop.html). The `JKTEBOP_DIR` environment variable, used to be locate the executable at runtime, is set to `~/jktebop43/` in the ebop_maven conda env (TODO: change to non version specific). This will need to match the location where JKTEBOP resides.
+
+#### Alternative, venv installation
 If you prefer not to use a conda environment, the following venv setup works although I haven't tested it as thoroughly. Again, from this directory run the following to create and activate a .ebop_maven env;
 ```sh
 $ python -m venv .ebop_maven
@@ -28,6 +31,21 @@ Finally there is support for installing ebop_maven into other environments as a 
 ```sh
 $ pip install git+https://github.com/SteveOv/ebop_maven
 ```
-
 ## Usage
-TODO
+
+#### Generation of training and testing datasets
+The first step is to generate the datasets which will be used to train and test the machine learning model. These are built by running the command below:
+```sh
+$ python make_training_datasets.py
+```
+This module will write three datasets under the ./datasets directory:
+- **formal-training-dataset** : a synthetic dataset built by randomly sampling distributions of JKTEBOP model parameters
+    - currently this generates 100,000 instances split on the ratios 8:1:1 between training, validation and testing
+    - the base parameters sampled are $r_A+r_B$, $k$, $i$, $J$, $q_{phot}$, $e$ and $\omega$ ($L_3$ under revirew)
+- **synthetic-mist-tess-dataset** : a synthetic dataset built from a grid of physical parameters
+    - the file ./config/synthetic-mist-tess-dataset.json gives the grid of base physical parameters; $M_{init}$, $P$, $i$, $e$, $\omega$ ($L_3$ under review)
+    - metallicity is fixed at 0.143 and system age is calculated to be mid to late M-S of the more massive component
+    - MIST stellar models are used to fully characterise each instance sufficient to generate synthetic lightcurves with JKTEBOP
+- **formal-test-dataset** : a set of real, well characterized systems from [DEBCAT](https://www.astro.keele.ac.uk/jkt/debcat/)
+    - selection criteria being the availability of _TESS_ lightcurves, suitability for fitting with JKTEBOP and a published characterization from which parameters can be taken
+    - the file ./config/formal-test-dataset.json contains the search criteria and labels for each target
