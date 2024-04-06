@@ -14,7 +14,10 @@ ipympl
 jupyter
 
 # TensorFlow/Keras support.
-tensorflow
+# The [and-cuda] includes support for CUDA GPUs and removes the need for separate install of cudnn
+# There is a known issue with tensorflow 2.16.1 not seeing GPUs and a work-around can be found at
+# https://github.com/tensorflow/tensorflow/issues/63362#issuecomment-2016019354
+tensorflow[and-cuda]
 tensorflow-estimator
 tensorboard
 keras
