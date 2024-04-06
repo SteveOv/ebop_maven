@@ -5,8 +5,9 @@ channels:
 dependencies:
   - python>=3.9
 
-  # optional CUDNN for TensorFlow/Keras to see & use my Nvidia GPU
-  - cudnn=8.1
+  # optional CUDNN for TensorFlow/Keras to see & use Nvidia GPU
+  # see https://www.tensorflow.org/install/source#gpu for compatibility list
+  - cudnn
 
   # support for keras.utils.plot_model()
   - pydot=1.4
