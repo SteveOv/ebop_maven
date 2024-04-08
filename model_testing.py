@@ -10,7 +10,6 @@ import math
 import matplotlib.pyplot as plt
 
 import numpy as np
-import tensorflow as tf
 from keras.models import Model
 
 from ebop_maven.libs import deb_example
@@ -42,17 +41,12 @@ def test_with_estimator(model: Union[Model, Path],
     if len(tfrecord_files) == 0:
         raise IndexError("No dataset files found")
 
-    ds_formal_test = tf.data.TFRecordDataset(tfrecord_files)
-    test_count = ds_formal_test.reduce(0, lambda count, _: count+1).numpy()
-
-    print(f"Found {len(tfrecord_files)} tfrecord file(s) containing {test_count} instances.")
-    ds_formal_test = ds_formal_test.map(deb_example.create_map_func()).batch(test_count)
-
-    # Don't iterate over the dataset; it's easier if we work with all the data
-    (test_mags, test_feats), lbls = next(ds_formal_test.take(test_count).as_numpy_iterator())
+    # Don't iterate over the dataset; it's easier if we work with all the data (via a single batch)
+    (ds_formal_test, inst_count) = deb_example.create_dataset_pipeline(tfrecord_files, 10000)
+    (test_mags, test_feats), lbls = next(ds_formal_test.take(inst_count).as_numpy_iterator())
 
     # The features arrive in a tuple (array[shape(#inst, #bin, 1)], array[shape(#inst, #feat, 1)])
-    # We need them in the input format for the Estimatory [{"mags":.. , "feat1": ... }]
+    # We need them in the input format for the Estimator [{"mags":.. , "feat1": ... }]
     fn = [*deb_example.extra_features_and_defaults.keys()]
     instance_features = [
         { "mags": tm, **{n:f[0] for (n,f) in zip(fn,tf)} } for tm, tf in zip(test_mags, test_feats)
@@ -72,7 +66,7 @@ def test_with_estimator(model: Union[Model, Path],
     # Run the predictions twice; with and without using MC Dropout enabled.
     for iterations, suffix in [(1, "nonmc"), (1000, "mc")]:
         # Make our prediction which will return [#inst, {}]
-        print(f"\nUsing an Estimator to make predictions on {test_count} formal test instances.")
+        print(f"\nUsing an Estimator to make predictions on {inst_count} formal test instances.")
         estimator = Estimator(model, iterations)
         # training_set = estimator.attrs.get("training_dataset", "unkown")
         # print(f"The model was trained on the '{training_set}' training set")

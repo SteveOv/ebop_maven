@@ -1,7 +1,7 @@
 """
 Functions for reading and writing to deb_example encoded TensorFlow datasets
 """
-from typing import Dict, List, Callable
+from typing import Dict, List, Tuple, Callable, Iterable
 
 import numpy as np
 import tensorflow as tf
@@ -128,6 +128,51 @@ def create_map_func(noise_stddev: Callable[[], float] = None,
         labels = [example[k] * s for k, s in zip(label_names, label_scales)]
         return ((mags_feature, ext_features), labels)
     return map_func
+
+
+def create_dataset_pipeline(dataset_files: Iterable[str],
+                            batch_size: float=100,
+                            map_func: Callable=create_map_func(),
+                            shuffle: bool=False,
+                            reshuffle_each_iteration: bool=False,
+                            max_buffer_size: int=1000000,
+                            prefetch: int=0,
+                            seed: int=42) -> Tuple[tf.data.TFRecordDataset, int]:
+    """
+    Creates the requested TFRecordDataset pipeline.
+
+    :dataset_files: the source tfrecord dataset files.
+    :batch_size: the relative size of each batch. May be set to 0 (no batch, effectively all rows),
+    <1 (this fraction of all rows) or >=1 this size (will be rounded)
+    :map_func: the map function to use to deserialize each row
+    :shuffle: whether to include a shuffle step in the pipeline
+    :reshuffle_each_iteration: whether the shuffle step suffles on each epoch
+    :max_buffer_size: the maximum size of the shuffle buffer
+    :prefetch: the number of prefetch operations to perform
+    :seed: seed for any random behaviour
+    :returns: a tuple of (dataset pipeline, row count)
+    """
+    # Read through once to get the total number of records
+    ds = tf.data.TFRecordDataset(list(dataset_files), num_parallel_reads=100)
+    row_count = ds.reduce(0, lambda count, _: count+1).numpy()
+
+    # Now build the full pipeline
+    if shuffle or reshuffle_each_iteration:
+        buffer_size = min(row_count, max_buffer_size)
+        ds = ds.shuffle(buffer_size, seed, reshuffle_each_iteration=reshuffle_each_iteration)
+
+    ds = ds.map(map_func)
+
+    if batch_size:
+        if batch_size < 1:
+            batch_size = int(np.ceil(row_count * batch_size))
+        else:
+            batch_size = min(row_count, int(batch_size))
+        ds = ds.batch(batch_size, drop_remainder=True)
+
+    if prefetch:
+        ds = ds.prefetch(prefetch)
+    return (ds, row_count)
 
 
 #

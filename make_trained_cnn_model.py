@@ -79,31 +79,23 @@ print(f"Found {len(tf.config.list_physical_devices('GPU'))} GPU(s)\n")
 print("Picking up training/validation/test datasets.")
 datasets = [tf.data.TFRecordDataset] * 3
 counts = [int] * 3
-batch_size, buffer_size = 0, 0
 map_func = deb_example.create_map_func(noise_stddev=lambda: 0.005,
                                        roll_steps=lambda: tf.random.uniform([], -9, 10, tf.int32))
 for ds_ix, (label, set_dir) in enumerate([("training", TRAINSET_DIR),
                                           ("valiation", VALIDSET_DIR),
                                           ("testing", TESTSET_DIR)]):
-    # Don't set up any mappings/shuffle/batch yet as we want to count the contents first
     files = list(set_dir.glob("**/*.tfrecord"))
-    datasets[ds_ix] = tf.data.TFRecordDataset(files, num_parallel_reads=100)
-    counts[ds_ix] = datasets[ds_ix].reduce(0, lambda count, _: count+1).numpy()
-    print(f"Found {counts[ds_ix]:,} {label} instances spread over",
-          f"{len(files)} tfrecord dataset file(s) within '{set_dir}'.")
-
-    # Now, having counted them, we can set up the full dataset pipelines
     if ds_ix == 0:
-        batch_size = round(counts[0] * BATCH_FRACTION)
-        buffer_size = min(MAX_BUFFER_SIZE, counts[0])
-        datasets[ds_ix] = datasets[ds_ix] \
-                            .shuffle(buffer_size, SEED, reshuffle_each_iteration=True) \
-                                .map(map_func) \
-                                    .batch(batch_size) \
-                                        .prefetch(1)
+        (datasets[ds_ix], counts[ds_ix]) = \
+            deb_example.create_dataset_pipeline(files, BATCH_FRACTION, map_func,
+                                                shuffle=True, reshuffle_each_iteration=True,
+                                                max_buffer_size=MAX_BUFFER_SIZE,
+                                                prefetch=1, seed=SEED)
     else:
-        datasets[ds_ix] = datasets[ds_ix].map(map_func).batch(batch_size)
-
+        (datasets[ds_ix], counts[ds_ix]) = \
+            deb_example.create_dataset_pipeline(files, BATCH_FRACTION, map_func)
+    print(f"Found {counts[ds_ix]:,} {label} instances spread over",
+          f"{len(files)} tfrecord file(s) within '{set_dir}'.")
 
 # -----------------------------------------------------------
 # Define the model
