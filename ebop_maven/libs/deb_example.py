@@ -168,7 +168,8 @@ def create_dataset_pipeline(dataset_files: Iterable[str],
             batch_size = int(np.ceil(row_count * batch_size))
         else:
             batch_size = min(row_count, int(batch_size))
-        ds = ds.batch(batch_size, drop_remainder=True)
+        if batch_size:
+            ds = ds.batch(batch_size, drop_remainder=True)
 
     if prefetch:
         ds = ds.prefetch(prefetch)
