@@ -63,8 +63,7 @@ DNN_ACTIVATE = layers.LeakyReLU()
 # For the dense layers: "glorot_uniform" (def) "he_normal", "he_uniform" (he_ goes well with ReLU)
 KERNEL_INITIALIZER = "he_uniform"
 
-# Decay will reduce learning rate ever more slowly over time (see Learning Rate/Power Scheduling)
-OPTIMIZER = optimizers.Nadam(learning_rate=5e-4, decay=1e-4)
+OPTIMIZER = optimizers.Nadam(learning_rate=5e-4)
 
 # Regularization: fraction of DNN neurons to drop on each training step
 DROPOUT_RATE=0.5
