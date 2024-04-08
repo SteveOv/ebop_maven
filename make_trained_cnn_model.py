@@ -12,15 +12,15 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 import tensorboard
 import keras
-from keras import models, layers, initializers, optimizers, callbacks, metrics
+from keras import layers, initializers, optimizers, callbacks, metrics
 from keras.utils import plot_model
 
 from ebop_maven import modelling
 from ebop_maven.libs import deb_example
 import model_testing
 
-MAGS_WRAP_PHASE = 0.75          # Control the shape and default roll of Mags feature
 MAGS_BINS = deb_example.mags_bins
+NUM_EXT_INPUTS = len(deb_example.extra_features_and_defaults)
 
 # We can now specify paths to train/val/test datasets separately for greater flexibility.
 TRAINSET_NAME = "formal-training-dataset/"
@@ -38,40 +38,33 @@ PLOTS_DIR = SAVE_DIR / "plots"
 FORMAL_TESTSET_DIR = Path(".") / "datasets/formal-test-dataset/"
 FORMAL_RESULTS_DIR = SAVE_DIR / f"results/{MODEL_NAME}/{TRAINSET_NAME}/{deb_example.pub_mags_key}/"
 
-NUMBER_FULL_HIDDEN_LAYERS = 2   # Number of full width hidden layers (with associated dropout)
 TRAINING_EPOCHS = 100           # Set high if we're using early stopping
 BATCH_FRACTION = 0.001          # larger -> quicker training per epoch but more to converge
 MAX_BUFFER_SIZE = 20000000      # Size of Dataset shuffle buffer (in instances)
 EARLY_STOPPING_PATIENCE = 7     # Number of epochs w/o improvement before stopping
-
 ENFORCE_REPEATABILITY = True    # If true, avoid GPU/CUDA cores for repeatable results
 SEED = 42                       # Standard random seed ensures repeatable randomization
 np.random.seed(SEED)
 python_random.seed(SEED)
 tf.random.set_seed(SEED)
 
+OPTIMIZER = optimizers.Nadam(learning_rate=5e-4)
 LOSS = ["mae"]
 METRICS = ["mse"]
-PADDING = "same"
 
 # ReLU is widely used default for CNN/DNNs.
 # Otherwise, may need to specify each layer separately as dims different.
 # LeakyReLU addresses issue of dead neurons & PReLU similar but trains alpha param
-CNN_ACTIVATE = layers.ReLU()
-DNN_ACTIVATE = layers.LeakyReLU()
+CNN_PADDING = "same"
+CNN_ACTIVATE = "relu"
+DNN_ACTIVATE = "leaky_relu"
 
 # For the dense layers: "glorot_uniform" (def) "he_normal", "he_uniform" (he_ goes well with ReLU)
-KERNEL_INITIALIZER = "he_uniform"
+DNN_INITIALIZER = "he_uniform"
+DNN_NUM_FULL_LAYERS = 2
+DNN_DROPOUT_RATE=0.5
 
-OPTIMIZER = optimizers.Nadam(learning_rate=5e-4)
-
-# Regularization: fraction of DNN neurons to drop on each training step
-DROPOUT_RATE=0.5
-
-print(f"""tensorflow v{tf.__version__}
-tensorboard v{tensorboard.__version__}
-keras v{keras.__version__}""")
-
+print("\n".join(f"{lib.__name__} v{lib.__version__}" for lib in [tf, tensorboard, keras]))
 if ENFORCE_REPEATABILITY:
     # Extreme, but it stops TensorFlow/Keras from using (even seeing) the GPU.
     # Slows training down massively (by 3-4 times) but should avoid GPU memory
@@ -117,41 +110,32 @@ for ds_ix, (label, set_dir) in enumerate([("training", TRAINSET_DIR),
 # -----------------------------------------------------------
 print("\nDefining the multiple-input/output CNN model.")
 
-# Input for the Light-curve (Timeseries data) via a CNN.
-cnn = mags_input = layers.Input(shape=(MAGS_BINS, 1), name="Mags-Input")
+def build_cnn_layers(tensor):
+    """
+    re-dimension each instance's Mags from 1d [#bins, 1] to 2D [bins, features] of dimension [8, 64]
+    """
+    tensor = modelling.conv1d_layers(tensor, 2, 64, 8, 4, CNN_PADDING, CNN_ACTIVATE, "CNN-1.")
+    tensor = modelling.conv1d_layers(tensor, 3, 64, 4, 2, CNN_PADDING, CNN_ACTIVATE, "CNN-2.")
+    return tensor
 
-# 1D conv layers re-dimension each LS instances from 1d timeseries #bins long
-# into 2D [timeseries, features] of dimension [8, 64]
-cnn = modelling.append_conv1d_layers(cnn, num_layers=2, filters=64, kernel_size=8, strides=4,
-                                     padding=PADDING, activation=CNN_ACTIVATE, name_prefix="CNN-1.")
-cnn = modelling.append_conv1d_layers(cnn, num_layers=3, filters=64, kernel_size=4, strides=2,
-                                     padding=PADDING, activation=CNN_ACTIVATE, name_prefix="CNN-2.")
+def build_dnn_layers(tensor):
+    """
+    The Dropout layers randomly "drop" (set to 0) the ratio of inputs each training iteration.
+    Note: undermines comparison of training & validation loss as validation results w/o dropout
+    """
+    tensor = modelling.hidden_layers(tensor, DNN_NUM_FULL_LAYERS, 256, DNN_INITIALIZER,
+                                     DNN_ACTIVATE, DNN_DROPOUT_RATE, ("Hidden-", "Dropout-"))
+    # "Buffer" between the DNN+Dropout and the output layer; this non-dropout NN layer
+    # consistently gives a small, but significant improvement to the trained loss.
+    tensor = modelling.hidden_layers(tensor, 1, 128, DNN_INITIALIZER, DNN_ACTIVATE, 0, ("Taper-", ))
+    return tensor
 
-# Input for the Extra features
-ext_input = layers.Input(shape=(len(deb_example.extra_features_and_defaults), 1), name="Ext-Input")
-
-# # Combine the separate input paths for the Mags & Extra Features to the DNN
-dnn = modelling.append_concatenate_layer((cnn, ext_input), name="DNN-Input")
-
-# The Dropout layers are a regularization mechanism (they combat overfitting).
-# They randomly "drop" (set to 0) the ratio of inputs each training iteration.
-# Note: undermines any comparison of training & validation loss
-#       as validation results are calculated w/o dropout
-dnn = modelling.append_hidden_layers(dnn, NUMBER_FULL_HIDDEN_LAYERS, units=256,
-                                     kernel_initializer=KERNEL_INITIALIZER,
-                                     activation=DNN_ACTIVATE,
-                                     dropout_rate=DROPOUT_RATE,
-                                     name_prefix=("Hidden-", "Dropout-"))
-
-# "Buffer" between the DNN+Dropout and the output layer; this non-dropout NN layer
-# consistently gives a small, but significant improvement to the trained loss.
-dnn = modelling.append_hidden_layers(dnn, 1, 128, kernel_initializer=KERNEL_INITIALIZER,
-                                     activation=DNN_ACTIVATE, dropout_rate=0,
-                                     name_prefix=("Taper-", None))
-
-# Sets up the output predicted values
-dnn = modelling.append_output_layer(dnn, len(deb_example.label_names))
-model = models.Model(inputs=[mags_input, ext_input], outputs=dnn, name=MODEL_NAME)
+model = modelling.build_lc_ext_model(
+    mags_input=layers.Input(shape=(MAGS_BINS, 1), name="Mags-Input"),
+    ext_input=layers.Input(shape=(NUM_EXT_INPUTS, 1), name="Ext-Input"),
+    build_mags_layers=build_cnn_layers,
+    build_dnn_layers=build_dnn_layers,
+    name=MODEL_NAME)
 model.summary()
 
 try:

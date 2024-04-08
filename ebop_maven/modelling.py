@@ -1,24 +1,25 @@
 """ Contains functions for building and persisting ML models """
-from typing import Union, List, Tuple, Iterable
+from typing import Union, List, Tuple, Callable
 from pathlib import Path
 
-from keras import layers, models
+from keras import layers, models, KerasTensor
 
-def append_conv1d_layers(previous_layer: layers.Layer,
-                         num_layers: int=1,
-                         filters: Union[int, List[int]]=64,
-                         kernel_size: Union[int, List[int]]=8,
-                         strides: Union[int, List[int]]=2,
-                         padding: Union[str, List[str]]="same",
-                         activation: Union[any, List[any]]="ReLU",
-                         name_prefix: str="CNN-"):
+from .libs import deb_example
+
+def conv1d_layers(last_tensor: KerasTensor,
+                  num_layers: int=1,
+                  filters: Union[int, List[int]]=64,
+                  kernel_size: Union[int, List[int]]=8,
+                  strides: Union[int, List[int]]=2,
+                  padding: Union[str, List[str]]="same",
+                  activation: Union[any, List[any]]="ReLU",
+                  name_prefix: str="CNN-") -> KerasTensor:
     """
-    Appends the requested set of Conv1D layers.
+    Builds the requested set of Conv1D layers, returning the output tensor of the last layer built.
+    The filters, kernel_size, strides, padding and activation arguments can be a List of values,
+    one per layer, or a single values used for every layer.
     
-    The filters, kernel_size, strides, padding and activation arguments can be
-    a List of values, one per layer, or a single values used for every layer.
-    
-    :previous_layer: the existing layer to append to
+    :last_tensor: the output tensor from the preceding layer
     :num_layers: number of Conv1D layers to create
     :filters: the filters value of each layer
     :kernel_size: the kernel_size of each layer
@@ -26,8 +27,9 @@ def append_conv1d_layers(previous_layer: layers.Layer,
     :padding: the padding value of each layer
     :activation: the activation value of each layer
     :name_prefix: the text to prefix the indexed layer name
-    :returns: the final new layer appended
+    :returns: the output tensor of the last new layer
     """
+    # pylint: disable=too-many-arguments
     if not isinstance(filters, List):
         filters = [filters] * num_layers
     if not isinstance(kernel_size, List):
@@ -41,82 +43,125 @@ def append_conv1d_layers(previous_layer: layers.Layer,
 
     # Expected failure if any list isn't num_layers long
     for ix in range(num_layers):
-        previous_layer = layers.Conv1D(filters=filters[ix],
-                                       kernel_size=kernel_size[ix],
-                                       strides=strides[ix],
-                                       padding=padding[ix],
-                                       activation=activation[ix],
-                                       name=f"{name_prefix}{ix}")(previous_layer)
-    return previous_layer
+        last_tensor = layers.Conv1D(filters=filters[ix],
+                                    kernel_size=kernel_size[ix],
+                                    strides=strides[ix],
+                                    padding=padding[ix],
+                                    activation=activation[ix],
+                                    name=f"{name_prefix}{ix}")(last_tensor)
+    return last_tensor
 
 
-def append_concatenate_layer(previous_layers: Iterable[layers.Layer],
-                             axis: int = -1,
-                             name: str = "Concatenate") -> layers.Layer:
+def hidden_layers(last_tensor: KerasTensor,
+                  num_layers: int=1,
+                  units: Union[int, List[int]]=256,
+                  kernel_initializer: Union[str, List[str]]="glorot_uniform",
+                  activation: Union[any, List[any]]=None,
+                  dropout_rate: Union[float, List[float]]=0,
+                  name_prefix: Tuple[str, str]=("Hidden-", "Dropout-")) -> KerasTensor:
     """
-    Appends a new concatenate layer which flattens and joins previous_layers
-
-    :previous_layers: the existing layers to concatenate
-    :axis: the axis along which to concatenate (defaults to the last axis)
-    :name: the name to give the Concatenate layer
-    :returns: the newly created Concatenate layer
-    """
-    return layers.Concatenate(axis, name=name) \
-                ([layers.Flatten(name=f"Flat-{ix}")(pl) for (ix, pl) in enumerate(previous_layers)])
-
-
-def append_hidden_layers(previous_layer: layers.Layer,
-                         num_layers: int=1,
-                         units: Union[int, List[int]]=256,
-                         activation: Union[any, List[any]]=None,
-                         kernel_initializer: Union[str, List[str]]="glorot_uniform",
-                         dropout_rate: Union[float, List[float]]=0,
-                         name_prefix: Tuple[str, str]=("Hidden-", "Dropout-")) -> layers.Layer:
-    """
-    Appends the requested set of hidden Dense layers with optional accompanying Dropout layers.
-
-    The units, activation, kernel_initializer and dropout_rate arguments can be
-    a List of values, one per layer, or a single values used for every layer.
+    Builds the requested set of hidden Dense layers with optional accompanying Dropout layers,
+    returning the output tensor of the last layer built. The units, activation, kernel_initializer
+    and dropout_rate arguments can be a List of values, one per layer, or a single values used for
+    every layer.
     
-    :previous_layer: the existing layer to append to
+    :last_tensor: the output tensor from the preceding layer
     :num_layers: number of Dense+Dropout layer pairs to append
     :units: the number of neurons in new each layer
-    :activation: the activation function for each new layer
     :kernel_initializer: the initializer for each new layer
+    :activation: the activation function for each new layer
     :dropout_rate: the fraction of the units to drop for each layer. No dropout layer when set to 0
     :name_prefix: the text to prefix the indexed layer name
-    :returns: the final new layer appended
+    :returns: the output tensor of the last new layer
     """
+    # pylint: disable=too-many-arguments
     if not isinstance(units, List):
         units = [units] * num_layers
-    if not isinstance(activation, List):
-        activation = [activation] * num_layers
     if not isinstance(kernel_initializer, List):
         kernel_initializer = [kernel_initializer] * num_layers
+    if not isinstance(activation, List):
+        activation = [activation] * num_layers
     if not isinstance(dropout_rate, List):
         dropout_rate = [dropout_rate] * num_layers
 
     # Expected failure if any list isn't num_layers long
     for ix in range(num_layers):
-        previous_layer = layers.Dense(units[ix],
-                                      activation=activation[ix],
-                                      kernel_initializer=kernel_initializer[ix],
-                                      name=f"{name_prefix[0]}{ix}")(previous_layer)
+        last_tensor = layers.Dense(units[ix],
+                                   kernel_initializer=kernel_initializer[ix],
+                                   activation=activation[ix],
+                                   name=f"{name_prefix[0]}{ix}")(last_tensor)
         if dropout_rate[ix]:
-            previous_layer = layers.Dropout(dropout_rate[ix],
-                                            name=f"{name_prefix[1]}{ix}")(previous_layer)
-    return previous_layer
+            last_tensor = layers.Dropout(dropout_rate[ix],
+                                         name=f"{name_prefix[1]}{ix}")(last_tensor)
+    return last_tensor
 
 
-def append_output_layer(previous_layer: layers.Layer, units: int):
+def output_layer(last_tensor: KerasTensor,
+                 units: int=len(deb_example.label_names),
+                 kernel_initializer: str="glorot_uniform",
+                 activation: str="linear",
+                 name: str="Output") -> KerasTensor:
     """
-    Appends a new Output layer with the linear activation
+    Builds the requested output layer, returning its output tensor.
 
-    :previous_layer: the existing layer to append to
-    :name: the name to give the layer
-    :returns: the newly created output layer
+    :last_tensor: the output tensor from the preceding layer
+    :units: the number of output neurons
+    :kernel_initializer: the initializer
+    :activation: the activation function
+    :name: the name of the layer
+    :returns: the output tensor of the new layer
     """
-    return layers.Dense(units, activation="linear", name="Output")(previous_layer)
+    return layers.Dense(units,
+                        kernel_initializer=kernel_initializer,
+                        activation=activation,
+                        name=name)(last_tensor)
+
+def empty_layer(last_tensor: KerasTensor) -> KerasTensor:
+    """
+    Do not build any layers ... just return the output tensor of the preceding layer.
+    """
+    return last_tensor
+
+
+def build_lc_ext_model(
+        mags_input: KerasTensor,
+        ext_input: KerasTensor,
+        build_mags_layers: Callable[[KerasTensor], KerasTensor]=empty_layer,
+        build_ext_layers: Callable[[KerasTensor], KerasTensor]=empty_layer,
+        build_dnn_layers: Callable[[KerasTensor], KerasTensor]=empty_layer,
+        build_output_layer: Callable[[KerasTensor], KerasTensor]=output_layer,
+        name: str="Mags-Ext-Model"
+    ) -> models.Model:
+    """
+    Builds a multiple input model with separate Mags-Feature and Extra-Features inputs.
+    These are concatenated and a Deep Neural Network is appended. Finally an output layer
+    is appended before the final Model is returned.
+
+    :mags_input: the phase-folded lightcurve magnitudes feature input
+    :ext_input: the extra features input
+    :build_mags_layers: function which builds the magnitudes input branch,
+        with the output tensor of mags_input as its input
+    :build_ext_layers: function which builds the extra features input branch,
+        with the output tensor of ext_input as its input
+    :build_dnn_layers: function which builds the deep neural network,
+        with the output tensor of the concatenated mags & ext input branches as its input
+    :build_output_layer: function which build the layer of output neurons,
+        with the output tensor of the dnn layers as its input
+    :name: the name of the new model
+    :returns: the new model
+    """
+    # pylint: disable=too-many-arguments
+
+    # Build up the model by building the two input branches, concatenating them, passing their
+    # combined output to a DNN and then passing the DNN output to a set of output neurons.
+    output_tensor = build_output_layer(
+        build_dnn_layers(
+            layers.Concatenate(axis=1, name="DNN-Input")([
+                layers.Flatten(name="Mags-Reshape")(build_mags_layers(mags_input)),
+                layers.Flatten(name="Ext-Reshape")(build_ext_layers(ext_input))
+            ])))
+
+    return models.Model(inputs=[mags_input, ext_input], outputs=output_tensor, name=name)
 
 
 def save_model(file_name: Path,
