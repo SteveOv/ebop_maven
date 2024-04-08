@@ -22,3 +22,6 @@ tensorflow-estimator
 tensorboard
 keras
 keras-preprocessing
+
+# For hyperparameter grid search
+hyperopt
