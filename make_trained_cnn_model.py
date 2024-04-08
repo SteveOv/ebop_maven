@@ -79,8 +79,7 @@ if ENFORCE_REPEATABILITY:
     # constraints! Necessary if repeatable results are required (Keras advises
     # that out of order processing within GPU/CUDA can lead to varying results).
     os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-print(f"Found {len(tf.config.experimental.list_physical_devices('GPU'))} GPU(s)\n")
-
+print(f"Found {len(tf.config.list_physical_devices('GPU'))} GPU(s)\n")
 
 # -----------------------------------------------------------
 # Set up the training/validation/test datasets
