@@ -12,7 +12,7 @@ def conv1d_layers(last_tensor: KerasTensor,
                   kernel_size: Union[int, List[int]]=8,
                   strides: Union[int, List[int]]=2,
                   padding: Union[str, List[str]]="same",
-                  activation: Union[any, List[any]]="ReLU",
+                  activation: Union[any, List[any]]="relu",
                   name_prefix: str="CNN-") -> KerasTensor:
     """
     Builds the requested set of Conv1D layers, returning the output tensor of the last layer built.
@@ -56,7 +56,7 @@ def hidden_layers(last_tensor: KerasTensor,
                   num_layers: int=1,
                   units: Union[int, List[int]]=256,
                   kernel_initializer: Union[str, List[str]]="glorot_uniform",
-                  activation: Union[any, List[any]]=None,
+                  activation: Union[any, List[any]]="relu",
                   dropout_rate: Union[float, List[float]]=0,
                   name_prefix: Tuple[str, str]=("Hidden-", "Dropout-")) -> KerasTensor:
     """
@@ -96,6 +96,30 @@ def hidden_layers(last_tensor: KerasTensor,
     return last_tensor
 
 
+def mags_input_layer(shape: Tuple[int, int]=(deb_example.mags_bins, 1),
+                     name: str="Mags-Input") -> KerasTensor:
+    """
+    Builds a standard mags-feature input layer.
+
+    :shape: the shape of the input tensors
+    :name: the name of the layer
+    :returns: the output tensor of the input layer
+    """
+    return layers.Input(shape=shape, name=name)
+
+
+def ext_input_layer(shape: Tuple[int, int]=(len(deb_example.extra_features_and_defaults), 1),
+                    name: str="Ext-Input") -> KerasTensor:
+    """
+    Builds a standard ext-features input layer.
+
+    :shape: the shape of the input tensors
+    :name: the name of the layer
+    :returns: the output tensor of the input layer
+    """
+    return layers.Input(shape=shape, name=name)
+
+
 def output_layer(last_tensor: KerasTensor,
                  units: int=len(deb_example.label_names),
                  kernel_initializer: str="glorot_uniform",
@@ -123,9 +147,9 @@ def empty_layer(last_tensor: KerasTensor) -> KerasTensor:
     return last_tensor
 
 
-def build_lc_ext_model(
-        mags_input: KerasTensor,
-        ext_input: KerasTensor,
+def build_mags_ext_model(
+        mags_input: KerasTensor=mags_input_layer(),
+        ext_input: KerasTensor=ext_input_layer(),
         build_mags_layers: Callable[[KerasTensor], KerasTensor]=empty_layer,
         build_ext_layers: Callable[[KerasTensor], KerasTensor]=empty_layer,
         build_dnn_layers: Callable[[KerasTensor], KerasTensor]=empty_layer,

@@ -130,9 +130,7 @@ def build_dnn_layers(tensor):
     tensor = modelling.hidden_layers(tensor, 1, 128, DNN_INITIALIZER, DNN_ACTIVATE, 0, ("Taper-", ))
     return tensor
 
-model = modelling.build_lc_ext_model(
-    mags_input=layers.Input(shape=(MAGS_BINS, 1), name="Mags-Input"),
-    ext_input=layers.Input(shape=(NUM_EXT_INPUTS, 1), name="Ext-Input"),
+model = modelling.build_mags_ext_model(
     build_mags_layers=build_cnn_layers,
     build_dnn_layers=build_dnn_layers,
     name=MODEL_NAME)

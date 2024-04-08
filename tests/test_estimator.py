@@ -1,19 +1,61 @@
 """ Unit tests for the TensorFlowEstimator base class. """
 # pylint: disable=too-many-public-methods, line-too-long, protected-access
 from pathlib import Path
+from contextlib import redirect_stdout
 from inspect import getsourcefile
 import unittest
+
 import numpy as np
+import tensorflow as tf
+
+from ebop_maven.libs.tee import Tee
+from ebop_maven import modelling
+from ebop_maven.libs import deb_example
 
 from ebop_maven.estimator import Estimator
-from ebop_maven.modelling import load_model
-from ebop_maven.libs import deb_example
+
 
 class TestEstimator(unittest.TestCase):
     """ Unit tests for the TensorFlowEstimator base class. """
     # Tests for tf.DataSet support are in test_tensorflow_estimator_dataset
     _this_dir = Path(getsourcefile(lambda:0)).parent
-    _default_model_file = _this_dir / "data/test_estimator/cnn_ext_model.keras"
+    _default_model_file = _this_dir / "data/test_estimator/test_cnn_ext_model.keras"
+    _default_model_name = "Test-CNN-Ext-Model"
+
+    @classmethod
+    def setUpClass(cls):
+        """ Make sure the test model file exists. """
+        # To re-generate the test model file delete the existing file (under data) & run these tests
+        model_file = cls._default_model_file
+        if not model_file.exists():
+            with redirect_stdout(Tee(open(model_file.parent / f"{model_file.stem}.txt",
+                                          "w",
+                                          encoding="utf8"))):
+                # A very simple compatible model
+                model = modelling.build_mags_ext_model(
+                    build_mags_layers=lambda lt: modelling.conv1d_layers(lt,
+                                                                         num_layers=2,
+                                                                         filters=32,
+                                                                         kernel_size=16,
+                                                                         strides=12),
+                    build_dnn_layers=lambda lt: modelling.hidden_layers(lt,
+                                                                        num_layers=1,
+                                                                        units=32),
+                    name=cls._default_model_name
+                )
+
+                model.summary()
+                model.compile(loss=["mae"], optimizer="adam", metrics=["mse"])
+
+                # These are created by make_training_datasets.py
+                files = list(Path("./datasets/formal-training-dataset/training").glob("**/*.tfrecord"))
+                train_ds = tf.data.TFRecordDataset(files, num_parallel_reads=100)
+                x = train_ds.shuffle(100000, 42).map(deb_example.create_map_func()).batch(100)
+                model.fit(x, epochs=10, verbose=2)
+
+                model_file.parent.mkdir(parents=True, exist_ok=True)
+                modelling.save_model(model_file, model)
+        return super().setUpClass()
 
     #
     #   TEST __init__(self, Model | Path)
@@ -31,14 +73,14 @@ class TestEstimator(unittest.TestCase):
     def test_init_with_path(self):
         """ Tests __init__(valid model path) -> correct initialization """
         estimator = Estimator(self._default_model_file)
-        self.assertIn("CNN-Ext-Estimator", estimator.name)
+        self.assertIn("Test", estimator.name)
 
     def test_init_with_model(self):
         """ Tests __init__(valid model path) -> correct initialization """
         # Not tf.keras.models.load_model as we're potentially using custom layers
-        my_model = load_model(self._default_model_file)
+        my_model = modelling.load_model(self._default_model_file)
         estimator = Estimator(my_model)
-        self.assertIn("CNN-Ext-Estimator", estimator.name)
+        self.assertIn("Test", estimator.name)
 
     #
     #   TEST predict(self, instances = [(mags_feature, ext_features)])
