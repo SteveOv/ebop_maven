@@ -185,6 +185,8 @@ CALLBACKS = [
 print(f"\nTraining the model on {counts[0]} training and {counts[1]} validation",
       f"instances, with a further {counts[2]} instances held back for test.")
 try:
+    # You may see the following warning while training, which can safely be ignored;
+    #   UserWarning: Your input ran out of data; interrupting training
     history = model.fit(x = datasets[0],    # pylint: disable=invalid-name
                         epochs = TRAINING_EPOCHS,
                         callbacks = CALLBACKS,
