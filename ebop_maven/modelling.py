@@ -148,19 +148,21 @@ def empty_layer(last_tensor: KerasTensor) -> KerasTensor:
 
 
 def build_mags_ext_model(
+        name: str="Mags-Ext-Model",
         mags_input: KerasTensor=mags_input_layer(),
         ext_input: KerasTensor=ext_input_layer(),
         build_mags_layers: Callable[[KerasTensor], KerasTensor]=empty_layer,
         build_ext_layers: Callable[[KerasTensor], KerasTensor]=empty_layer,
         build_dnn_layers: Callable[[KerasTensor], KerasTensor]=empty_layer,
         build_output_layer: Callable[[KerasTensor], KerasTensor]=output_layer,
-        name: str="Mags-Ext-Model"
+        post_build_step: Callable[[models.Model], None]=None
     ) -> models.Model:
     """
     Builds a multiple input model with separate Mags-Feature and Extra-Features inputs.
     These are concatenated and a Deep Neural Network is appended. Finally an output layer
     is appended before the final Model is returned.
 
+    :name: the name of the new model
     :mags_input: the phase-folded lightcurve magnitudes feature input
     :ext_input: the extra features input
     :build_mags_layers: function which builds the magnitudes input branch,
@@ -171,7 +173,7 @@ def build_mags_ext_model(
         with the output tensor of the concatenated mags & ext input branches as its input
     :build_output_layer: function which build the layer of output neurons,
         with the output tensor of the dnn layers as its input
-    :name: the name of the new model
+    :post_build_step: optional hook to interact with the newly built model
     :returns: the new model
     """
     # pylint: disable=too-many-arguments
@@ -185,7 +187,12 @@ def build_mags_ext_model(
                 layers.Flatten(name="Ext-Reshape")(build_ext_layers(ext_input))
             ])))
 
-    return models.Model(inputs=[mags_input, ext_input], outputs=output_tensor, name=name)
+    model = models.Model(inputs=[mags_input, ext_input], outputs=output_tensor, name=name)
+
+    if post_build_step:
+        post_build_step(model)
+
+    return model
 
 
 def save_model(file_name: Path,

@@ -122,10 +122,15 @@ def build_dnn_layers(tensor):
     tensor = modelling.hidden_layers(tensor, 1, 128, DNN_INITIALIZER, DNN_ACTIVATE, 0, ("Taper-", ))
     return tensor
 
+def compile_model(new_model):
+    """ Compiles the new model """
+    new_model.compile(loss=LOSS, optimizer=OPTIMIZER, metrics=METRICS)
+
 model = modelling.build_mags_ext_model(
+    name=MODEL_NAME,
     build_mags_layers=build_cnn_layers,
     build_dnn_layers=build_dnn_layers,
-    name=MODEL_NAME)
+    post_build_step=compile_model)
 model.summary()
 
 try:
@@ -141,11 +146,8 @@ except ImportError:
 
 
 # -----------------------------------------------------------
-# Build & Train the model
+# Train the model
 # -----------------------------------------------------------
-print("Building the model.")
-model.compile(loss=LOSS, optimizer=OPTIMIZER, metrics=METRICS)
-
 CALLBACKS = [
     # To use tensorboard make sure the containing conda env is active then run
     # $ tensorboard --port 6006 --logdir ./logs
