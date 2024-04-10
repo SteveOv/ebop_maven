@@ -6,10 +6,6 @@ from typing import Dict, List, Tuple, Callable, Iterable
 import numpy as np
 import tensorflow as tf
 
-label_scales = [1., 1., 1., 1., 1., 0.01, 1., 1.]
-label_names = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "inc", "bP", "L3"]
-label_predict_cols = label_names + [f"{f}_sigma" for f in label_names]
-
 # We can store multiple configuration of the mags feature but we can publish only one.
 stored_mags_features = {
     "mags_1024_0.75": (1024, 0.75),
@@ -21,6 +17,19 @@ pub_mags_key = "mags_1024_0.75"                         # pylint: disable=invali
 (mags_bins, _) = stored_mags_features[pub_mags_key]     # pylint: disable=invalid-name
 
 # Python 3.7+ language spec ensures dictionary order is preserved
+# The full set of stored labels and any scaling applied to them when read
+labels_and_scales = {
+    "rA_plus_rB": 1.,
+    "k": 1.,
+    "J": 1.,
+    "ecosw": 1.,
+    "esinw": 1.,
+    "inc": 0.01,
+    "bP": 1.,
+    "L3": 1.,
+}
+label_predict_cols = [*labels_and_scales.keys()] + [f"{l}_sigma" for l in labels_and_scales]
+
 # Extra features other than the light-curve used for predictions
 extra_features_and_defaults = {
     "phiS": 0.5,        # Phase of secondary eclipse; correlated with ecosw
@@ -34,7 +43,7 @@ description = {
 
     # Every label is expected to have a single float value
     **{ k: tf.io.FixedLenFeature([], tf.float32, default_value=0.)
-                        for k in label_names },
+                        for k in labels_and_scales },
 
     # Complex features: multiple configs of the phase folded light-curve mags
     **{ k: tf.io.FixedLenFeature((bins,), tf.float32, [0.] * bins)
@@ -65,7 +74,7 @@ def serialize(identifier: str,
         "id": _to_bytes_feature(identifier),
 
         # Labels - will raise KeyError if an expected label is not given
-        **{ k: _to_float_feature(labels[k]) for k in label_names },
+        **{ k: _to_float_feature(labels[k]) for k in labels_and_scales },
 
         # Various supported configurations of the magnitudes feature. Will error if bins wrong?
         ** { k: _to_float_feature(v)
@@ -125,7 +134,7 @@ def create_map_func(noise_stddev: Callable[[], float] = None,
         ext_features = tf.reshape(ext_features, shape=(len(ext_features), 1))
 
         # Copy labels in the expected order & apply any scaling
-        labels = [example[k] * s for k, s in zip(label_names, label_scales)]
+        labels = [example[k] * s for k, s in labels_and_scales.items()]
         return ((mags_feature, ext_features), labels)
     return map_func
 

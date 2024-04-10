@@ -54,7 +54,8 @@ def test_with_estimator(model: Union[Model, Path],
 
     # Get the details of the labels we're to report on.
     # Optionally, discard any we're no longer interested in.
-    lbl_names, lbl_scales = deb_example.label_names.copy(), deb_example.label_scales.copy()
+    lbl_names = [*deb_example.labels_and_scales.keys()]
+    lbl_scales = [*deb_example.labels_and_scales.values()]
     if excluded_labels is not None:
         for exclude_label in excluded_labels:
             exclude_ix = lbl_names.index(exclude_label)

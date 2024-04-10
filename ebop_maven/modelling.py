@@ -121,7 +121,7 @@ def ext_input_layer(shape: Tuple[int, int]=(len(deb_example.extra_features_and_d
 
 
 def output_layer(last_tensor: KerasTensor,
-                 units: int=len(deb_example.label_names),
+                 units: int=len(deb_example.labels_and_scales),
                  kernel_initializer: str="glorot_uniform",
                  activation: str="linear",
                  name: str="Output") -> KerasTensor:

@@ -133,7 +133,7 @@ class Estimator(ABC):
         ])
 
         # Undo any scaling applied to the labels (e.g. the model predicts inc/100)
-        stkd_prds /= deb_example.label_scales
+        stkd_prds /= [*deb_example.labels_and_scales.values()]
 
         # Summarize the label predictions & append 1-sigma values to each inst
         # We go from shape (#iters, #insts, #labels) to shape (#insts, #labels*2)

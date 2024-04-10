@@ -402,7 +402,7 @@ def inspect_dataset(dataset_files: Union[Path, Iterator[Path]],
         example = tf.io.parse_single_example(raw_record, deb_example.description)
         identifier = example["id"].numpy().decode(encoding="utf8")
         if not identifiers or identifier in identifiers:
-            labels = { k: example[k].numpy() for k in deb_example.label_names }
+            labels = { k: example[k].numpy() for k in deb_example.labels_and_scales }
             mags = {k: example[k].numpy() for k in deb_example.stored_mags_features }
             ext_features = { k: example[k].numpy() for k in deb_example.extra_features_and_defaults}
             yield (identifier, labels, mags, ext_features)

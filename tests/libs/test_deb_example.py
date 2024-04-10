@@ -17,7 +17,7 @@ class Test_deb_example(unittest.TestCase):
         """ Test that the resulting map_func accurately deserializes a deb_example """
         with self.__class__.lock:
             # Set up a feature (light-curve) amd labels and with tracable values
-            input_labels = { k: v for v, k in enumerate(deb_example.label_names) }
+            input_labels = { k: v for v, k in enumerate(deb_example.labels_and_scales) }
             input_lc_feature =  { deb_example.pub_mags_key: np.arange(deb_example.mags_bins) }
             input_ext_features = { "phiS": 0.6, "dS_over_dP": 0.96 }
             deb = deb_example.serialize("t1", input_labels, input_lc_feature, input_ext_features)
@@ -40,9 +40,9 @@ class Test_deb_example(unittest.TestCase):
 
             # labels output should be a list of Tensors of length #labels
             # Assert they have been scaled and are in correct order
-            self.assertEqual(len(labels), len(deb_example.label_names))
+            self.assertEqual(len(labels), len(deb_example.labels_and_scales))
             self.assertIsInstance(labels, list)
-            exp_values = [v * s for v, s in zip(input_labels.values(), deb_example.label_scales)]
+            exp_values = [v * s for v, s in zip(input_labels.values(), deb_example.labels_and_scales.values())]
             for label, exp_value in zip(labels, exp_values):
                 # Some loss of fidelity in encoding/decoding a tf.Tensor so can't do exact assert
                 self.assertAlmostEqual(label.numpy(), exp_value, 6)
@@ -51,7 +51,7 @@ class Test_deb_example(unittest.TestCase):
         """ Tests the created map_func's roll functionality """
         with self.__class__.lock:
             # Set up a feature (light-curve) amd labels and with tracable values
-            input_labels = { k: v for v, k in enumerate(deb_example.label_names) }
+            input_labels = { k: v for v, k in enumerate(deb_example.labels_and_scales) }
             input_lc_feature = { deb_example.pub_mags_key: np.arange(deb_example.mags_bins) }
             deb = deb_example.serialize("t1", input_labels, input_lc_feature, {})
 
@@ -71,7 +71,7 @@ class Test_deb_example(unittest.TestCase):
         """ Tests the created map_func's roll functionality """
         with self.__class__.lock:
             # Set up a feature (light-curve) amd labels and with tracable values
-            input_labels = { k: v for v, k in enumerate(deb_example.label_names) }
+            input_labels = { k: v for v, k in enumerate(deb_example.labels_and_scales) }
             input_lc_feature = { deb_example.pub_mags_key: [1] * deb_example.mags_bins } # all the same, so stddev==0
             deb = deb_example.serialize("t1", input_labels, input_lc_feature, {})
 
@@ -88,7 +88,7 @@ class Test_deb_example(unittest.TestCase):
         """ Tests implementing a random roll_steps func via create_map_func() """
         with self.__class__.lock:
             # Set up a feature (light-curve) amd labels and with tracable values
-            input_labels = { k: v for v, k in enumerate(deb_example.label_names) }
+            input_labels = { k: v for v, k in enumerate(deb_example.labels_and_scales) }
             input_lc_feature = { deb_example.pub_mags_key: np.arange(deb_example.mags_bins) }
             deb = deb_example.serialize("t1", input_labels, input_lc_feature, {})
 
