@@ -47,6 +47,34 @@ class Test_deb_example(unittest.TestCase):
                 # Some loss of fidelity in encoding/decoding a tf.Tensor so can't do exact assert
                 self.assertAlmostEqual(label.numpy(), exp_value, 6)
 
+    def test_create_map_func_with_selected_labels(self):
+        """ Test that the resulting map_func deserializes a deb_example with subset of labels """
+        with self.__class__.lock:
+            # Set up a feature (light-curve) amd labels and with tracable values
+            input_labels_and_scales = deb_example.labels_and_scales.copy()
+            input_labels = { k: v for v, k in enumerate(input_labels_and_scales) }
+            input_lc_feature =  { deb_example.pub_mags_key: np.arange(deb_example.mags_bins) }
+            input_ext_features = { "phiS": 0.6, "dS_over_dP": 0.96 }
+            deb = deb_example.serialize("t1", input_labels, input_lc_feature, input_ext_features)
+
+            # We're going to request a shuffled subset - we should only get these and in this order
+            request_labels = [k for k in input_labels_and_scales if k not in ["J"]]
+            np.random.shuffle(request_labels)
+
+            # Execute a graph instance of the map_func to mimic a Dateset pipeline.
+            # map_parse_fn = deb_example.create_map_func()
+            map_parse_fn = tf.function(deb_example.create_map_func(labels=request_labels))
+            (_, labels) = map_parse_fn(deb)
+
+            # labels output should be a list of Tensors of length #request_labels
+            # Assert they have been scaled and are in request_labels order
+            self.assertEqual(len(labels), len(request_labels))
+            self.assertIsInstance(labels, list)
+            exp_values = [input_labels[l] * input_labels_and_scales[l] for l in request_labels]
+            for label, exp_value in zip(labels, exp_values):
+                # Some loss of fidelity in encoding/decoding a tf.Tensor so can't do exact assert
+                self.assertAlmostEqual(label.numpy(), exp_value, 6)
+
     def test_create_map_func_with_roll(self):
         """ Tests the created map_func's roll functionality """
         with self.__class__.lock:

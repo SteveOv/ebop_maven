@@ -89,7 +89,8 @@ def serialize(identifier: str,
     return example.SerializeToString()
 
 
-def create_map_func(noise_stddev: Callable[[], float] = None,
+def create_map_func(labels: List[str] = None,
+                    noise_stddev: Callable[[], float] = None,
                     roll_steps: Callable[[], int] = None) -> Callable:
     """
     Configures and returns a dataset map function for deb_examples. The map function
@@ -105,12 +106,14 @@ def create_map_func(noise_stddev: Callable[[], float] = None,
 
     roll_steps = lambda: tf.random.uniform([], -3, 4, tf.int32)
 
+    :labels: a chosen subset of the available labels, in requested order, or all if None
     :noise_stddev: a function which returns the stddev of the Gaussian noise to add
     :roll_steps: a function which returns the number of steps to roll the mag data,
     negative values roll to the left and positive values to the right
     :returns: the configured map function
     """
     # Define the map function with the two, optional perturbing actions on the mags feature
+    chosen_lab_and_scl = { k: labels_and_scales[k] for k in labels} if labels else labels_and_scales
     def map_func(record_bytes):
         example = tf.io.parse_single_example(record_bytes, description)
 
@@ -134,7 +137,7 @@ def create_map_func(noise_stddev: Callable[[], float] = None,
         ext_features = tf.reshape(ext_features, shape=(len(ext_features), 1))
 
         # Copy labels in the expected order & apply any scaling
-        labels = [example[k] * s for k, s in labels_and_scales.items()]
+        labels = [example[k] * s for k, s in chosen_lab_and_scl.items()]
         return ((mags_feature, ext_features), labels)
     return map_func
 
