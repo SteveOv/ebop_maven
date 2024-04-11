@@ -1,15 +1,17 @@
 """
 Searches for the best set of hyperparams for the Mags/Extra-Features model
 """
+from typing import Mapping
 from pathlib import Path
 import os
 import random as python_random
+import json
 
 import numpy as np
 import tensorflow as tf
 import keras
 
-from keras import layers, optimizers, callbacks as cb
+from keras import layers, optimizers, metrics, callbacks as cb
 from tensorflow.python.framework.errors_impl import OpError # pylint: disable=no-name-in-module
 
 from hyperopt import fmin, tpe, hp, Trials, space_eval, STATUS_OK, STATUS_FAIL
@@ -86,57 +88,91 @@ for ds_ix, (label, set_dir) in enumerate([("training", DATASET_DIR),
           f"{len(files)} tfrecord file(s) within '{set_dir}'.")
 
 
-# -----------------------------------------------------------
 # Define the target model and the hyperparameter space
 # -----------------------------------------------------------
+#pylint: disable=line-too-long
 scope.define(layers.ReLU)
 scope.define(layers.LeakyReLU)
 scope.define(layers.PReLU)
 scope.define(optimizers.Adam)
 scope.define(optimizers.Nadam)
-hyperparam_space = hp.choice("model_fn", [
+trials_pspace = hp.choice("train_and_test_model", [
         {
-            "model_fn": modelling.build_mags_ext_model,
-            # Parameters
-            "build_mags_layers": lambda lt: modelling.conv1d_layers(lt, 5, 64, 8, 4),
-            #"build_ext_layers": lambda lt: modelling.empty_layer(lt),
-            "build_dnn_layers": lambda lt: modelling.hidden_layers(lt, 2, 256, "he_normal", "leaky_relu", 0.5),
-            #"build_output_layer": lambda lt: modelling.output_layer(lt),
+            "model": hp.choice("model", [
+                {
+                    "model_fn": modelling.build_mags_ext_model,
+                    "build_mags_layers": hp.choice("bml", [
+                        "lambda lt: modelling.conv1d_layers(modelling.conv1d_layers(lt, 2, 64, 8, 4, 'same', 'relu', 'CNN-1.'), 3, 64, 4, 2, 'same', 'relu', 'CNN-2.')",
+                        "lambda lt: modelling.conv1d_layers(modelling.conv1d_layers(lt, 2, 32, 8, 4, 'same', 'relu', 'CNN-1.'), 3, 32, 4, 2, 'same', 'relu', 'CNN-2.')",
+                    ]),
+                    "build_ext_layers": hp.choice("bel", [
+                        "lambda lt: modelling.empty_layer(lt)"
+                    ]),
+                    "build_dnn_layers": hp.choice("bdl", [
+                        "lambda lt: modelling.hidden_layers(modelling.hidden_layers(lt, 3, 256, 'he_normal', 'leaky_relu', 0.5), 1, 128, 'he_normal', 'leaky_relu', name_prefix=('Taper-',))",
+                        "lambda lt: modelling.hidden_layers(modelling.hidden_layers(lt, 2, 256, 'he_normal', 'leaky_relu', 0.5), 1, 128, 'he_normal', 'leaky_relu', name_prefix=('Taper-',))",
 
+                        "lambda lt: modelling.hidden_layers(modelling.hidden_layers(lt, 3, 128, 'he_normal', 'leaky_relu', 0.5), 1, 64, 'he_normal', 'leaky_relu', name_prefix=('Taper-',))",
+                        "lambda lt: modelling.hidden_layers(modelling.hidden_layers(lt, 2, 128, 'he_normal', 'leaky_relu', 0.5), 1, 64, 'he_normal', 'leaky_relu', name_prefix=('Taper-',))",
+                    ]),
+                    "build_output_layer": hp.choice("bol", [
+                        "lambda lt: modelling.output_layer(lt)"
+                    ]),
+                }
+            ]),
             # Compile() parameters
-            "optimizer": hp.choice("optimizer", [optimizers.Adam, optimizers.Nadam]),
-            "learning_rate": hp.choice("learning_rate", [5e-5, 1e-5, 1e-6]),
-            "loss_function": hp.choice("loss_function", ["mae", "mse"]),
-        },
+            "optimizer": hp.choice("optimizer", [
+                "optimizers.Adam(5e-5)",
+                "optimizers.Adam(1e-5)",
+                "optimizers.Nadam(5e-5)",
+                "optimizers.Nadam(1e-5)"]),
+            "loss_function": hp.choice("loss_function", ["mae", "mse"]),      
+        }
     ])
 
 
-
+# Helpers for interpreting the trial kwargs
 # -----------------------------------------------------------
+
+def action_pspace_item(source, locals: Mapping[str, object]=None) -> any: # pylint: disable=redefined-builtin
+    """
+    Evaluate the passed str pspace item
+    """
+    # Hack - try to eval it, if it doesn't work return it as it is
+    if isinstance(source, str):
+        # pylint: disable=eval-used, bare-except
+        try:
+            return eval(source, locals)
+        except:
+            return source
+    else:
+        return source
+
 # Conduct the trials
 # -----------------------------------------------------------
-def evaluate_hyperparams(model_kwargs):
+def train_and_test_model(trial_kwargs):
     """
     Evaluate a single set of hyperparams by building, training and evaluating a model on them.
     """
-
-    model_fn = model_kwargs.pop("model_fn", None)
-    print(f"\nEvaluating {model_fn.__name__} with the set of hyperparameters.\n{model_kwargs}")
+    print("\nEvaluating model and hyperparameters based on the following trial_kwargs;",
+          json.dumps(trial_kwargs, indent=2, sort_keys=False, default=str))
 
     loss = candidate = history = None
     status = STATUS_FAIL
-    fixed_metrics = ["mae", "mse"]
-    try:
-        learning_rate = model_kwargs.pop("learning_rate", None)
-        optimizer = model_kwargs.pop("optimizer", None)
-        loss_function = model_kwargs.pop("loss_function", None)
 
-        candidate = model_fn(**model_kwargs)
+    # Pop these training params prior to creating the model
+    optimizer = action_pspace_item(trial_kwargs.pop("optimizer", None))
+    loss_function = action_pspace_item(trial_kwargs.pop("loss_function", "mae"), metrics)
+    fixed_metrics = ["mae", "mse"]
+
+    try:
+        # Now build the model
+        model_kwargs = trial_kwargs["model"]
+        model_fn = model_kwargs.pop("model_fn")
+        candidate = model_fn(**{ a: action_pspace_item(v) for (a, v) in model_kwargs.items() })
 
         # Compile it - always use the same metrics as we use them for trial evaluation
-        candidate.compile(optimizer=optimizer(learning_rate),
-                          loss=[loss_function],
-                          metrics=fixed_metrics)
+        candidate.compile(optimizer=optimizer, loss=[loss_function], metrics=fixed_metrics)
 
         print(f"Training the following model against {ds_counts[0]} {ds_titles[0]} instances.")
         print(candidate.summary())
@@ -158,17 +194,18 @@ def evaluate_hyperparams(model_kwargs):
         status = STATUS_OK
     except OpError as exc:
         print(f"*** Training failed! *** Caught a {type(exc).__name__}: {exc.op} / {exc.message}")
-        print(f"The problem hyperparam set is: {model_kwargs}\n")
+        print(f"The problem hyperparam set is: {trial_kwargs}\n")
 
     return { "loss": loss, "model": candidate, "history": history, "status": status }
 
 dataset_name = f"{DATASET_DIR.parent.name}/{DATASET_DIR.name}"
 output_dir = Path(f"./saves/results/hyperparams_search/{dataset_name}")
 
+
 # Conduct the trials
 trials = Trials()
-best = fmin(fn = evaluate_hyperparams,
-            space = hyperparam_space,
+best = fmin(fn = train_and_test_model,
+            space = trials_pspace,
             trials = trials,
             algo = tpe.suggest,
             max_evals = MAX_HYPEROPT_EVALS,
@@ -180,7 +217,7 @@ best = fmin(fn = evaluate_hyperparams,
 # Report on the outcome
 # -----------------------------------------------------------
 best_model = trials.best_trial["result"]["model"]
-best_params = space_eval(hyperparam_space, best)
+best_params = space_eval(trials_pspace, best)
 
 # TODO: Save best model
 
