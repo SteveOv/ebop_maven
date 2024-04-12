@@ -101,36 +101,22 @@ for ds_ix, (label, set_dir) in enumerate([("training", TRAINSET_DIR),
 # Define the model
 # -----------------------------------------------------------
 print("\nDefining the multiple-input/output CNN model.")
-
-def build_cnn_layers(tensor):
-    """
-    re-dimension each instance's Mags from 1d [#bins, 1] to 2D [bins, features] of dimension [8, 64]
-    """
-    tensor = modelling.conv1d_layers(tensor, 2, 64, 8, 4, CNN_PADDING, CNN_ACTIVATE, "CNN-1.")
-    tensor = modelling.conv1d_layers(tensor, 3, 64, 4, 2, CNN_PADDING, CNN_ACTIVATE, "CNN-2.")
-    return tensor
-
-def build_dnn_layers(tensor):
-    """
-    The Dropout layers randomly "drop" (set to 0) the ratio of inputs each training iteration.
-    Note: undermines comparison of training & validation loss as validation results w/o dropout
-    """
-    tensor = modelling.hidden_layers(tensor, DNN_NUM_FULL_LAYERS, 256, DNN_INITIALIZER,
-                                     DNN_ACTIVATE, DNN_DROPOUT_RATE, ("Hidden-", "Dropout-"))
-    # "Buffer" between the DNN+Dropout and the output layer; this non-dropout NN layer
-    # consistently gives a small, but significant improvement to the trained loss.
-    tensor = modelling.hidden_layers(tensor, 1, 128, DNN_INITIALIZER, DNN_ACTIVATE, 0, ("Taper-", ))
-    return tensor
-
-def compile_model(new_model):
-    """ Compiles the new model """
-    new_model.compile(loss=LOSS, optimizer=OPTIMIZER, metrics=METRICS)
-
 model = modelling.build_mags_ext_model(
     name=MODEL_NAME,
-    build_mags_layers=build_cnn_layers,
-    build_dnn_layers=build_dnn_layers,
-    post_build_step=compile_model)
+    mags_layers=[
+        modelling.conv1d_layers(2, 64, 8, 4, CNN_PADDING, CNN_ACTIVATE, "CNN-1."),
+        modelling.conv1d_layers(3, 64, 4, 2, CNN_PADDING, CNN_ACTIVATE, "CNN-2.")
+    ],
+    dnn_layers=[
+        modelling.hidden_layers(DNN_NUM_FULL_LAYERS, 256, DNN_INITIALIZER, DNN_ACTIVATE,
+                                DNN_DROPOUT_RATE, ("Hidden-", "Dropout-")),
+        # "Buffer" between the DNN+Dropout and the output layer; this non-dropout NN layer
+        # consistently gives a small, but significant improvement to the trained loss.
+        modelling.hidden_layers(1, 128, DNN_INITIALIZER, DNN_ACTIVATE, 0, ("Taper-", ))
+    ],
+    output=modelling.output_layer(len(deb_example.labels_and_scales), DNN_INITIALIZER,
+                                              "linear", "Output"),
+    post_build_step=lambda mdl: mdl.compile(loss=LOSS, optimizer=OPTIMIZER, metrics=METRICS))
 model.summary()
 
 try:

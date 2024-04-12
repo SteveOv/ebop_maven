@@ -101,43 +101,13 @@ def dnn_with_taper(num_layers: int,
                    taper_units: int=0) -> Callable[[keras.KerasTensor], keras.KerasTensor]:
     """ Creates the function to build the requested DNN layers """
     def layers_func(prev_tensor: keras.KerasTensor) -> keras.KerasTensor:
-        prev_tensor = modelling.hidden_layers(prev_tensor, num_layers, units, kernel_initializer,
+        prev_tensor = modelling.hidden_layers(num_layers, units, kernel_initializer,
                                               activation, dropout_rate,
-                                              name_prefix=("Hidden-", "Dropout-"))
+                                              name_prefix=("Hidden-", "Dropout-"))(prev_tensor)
         if taper_units:
-            prev_tensor = modelling.hidden_layers(prev_tensor, 1, taper_units, kernel_initializer,
-                                                  activation, name_prefix=("Taper-", ))
+            prev_tensor = modelling.hidden_layers(1, taper_units, kernel_initializer,
+                                                  activation, name_prefix=("Taper-", ))(prev_tensor)
         return prev_tensor
-    return layers_func
-
-def simple_symmetric_cnn(num_layers: int,
-                         filters: int,
-                         kernel_size: int,
-                         strides: int,
-                         padding: str,
-                         activation: str) -> Callable[[keras.KerasTensor], keras.KerasTensor]:
-    """ Creates the function to build the requested DNN layers """
-    def layers_func(prev_tensor: keras.KerasTensor) -> keras.KerasTensor:
-        prev_tensor = modelling.conv1d_layers(prev_tensor, num_layers=num_layers, filters=filters,
-                                              kernel_size=kernel_size, strides=strides,
-                                              padding=padding, activation=activation,
-                                              name_prefix="CNN-")
-        return prev_tensor
-    return layers_func
-
-def empty_layer() -> Callable[[keras.KerasTensor], keras.KerasTensor]:
-    """ Creates an empty passthrough layer """
-    def layers_func(prev_tensor: keras.KerasTensor) -> keras.KerasTensor:
-        return modelling.empty_layer(prev_tensor)
-    return layers_func
-
-def output_layer(units: int=8,
-                 kernel_initializer:str = "glorot_uniform",
-                 activation: str = "linear") -> Callable[[keras.KerasTensor], keras.KerasTensor]:
-    """ Create an output layer """
-    def layers_func(prev_tensor: keras.KerasTensor) -> keras.KerasTensor:
-        return modelling.output_layer(prev_tensor, units=units,
-                                      kernel_initializer=kernel_initializer, activation=activation)
     return layers_func
 
 
@@ -154,9 +124,9 @@ scope.define(optimizers.Nadam)
 trials_pspace = hp.choice("train_and_test_model", [{
     "model": hp.choice("model", [{
         "func": modelling.build_mags_ext_model,
-        "build_mags_layers": hp.choice("build_mags_layers", [
+        "mags_layers": hp.choice("mags_layers", [
             {
-                "func": simple_symmetric_cnn,
+                "func": modelling.conv1d_layers,
                 "num_layers": hp.choice("cnn_num_layers", [4, 5, 6]),
                 "filters": hp.choice("cnn_filters", [32, 64, 96]),
                 "kernel_size": hp.choice("cnn_kernel_size", [16, 8]),
@@ -165,10 +135,8 @@ trials_pspace = hp.choice("train_and_test_model", [{
                 "activation": hp.choice("cnn_activation", ["relu"])
             },
         ]),
-        "build_ext_layers": {
-            "func": empty_layer
-        },
-        "build_dnn_layers": hp.choice("build_dnn_layers", [
+        "ext_layers": None,
+        "dnn_layers": hp.choice("dnn_layers", [
             {
                 "func": dnn_with_taper,
                 "num_layers": hp.choice("dnn_num_layers", [1, 2, 3]),
@@ -179,8 +147,10 @@ trials_pspace = hp.choice("train_and_test_model", [{
                 "taper_units": hp.choice("dnn_taper", [None, 32, 64, 128]),
             },
         ]),
-        "build_output_layer": {
-            "func": output_layer
+        "output": {
+            "func": modelling.output_layer,
+            "kernel_initializer": hp.choice("ouput_initializer", ["glorot_uniform", "he_uniform"]),
+            "activation": "linear"
         },
     }]),
 

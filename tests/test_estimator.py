@@ -7,6 +7,7 @@ import unittest
 
 import numpy as np
 import tensorflow as tf
+from keras import layers
 
 from ebop_maven.libs.tee import Tee
 from ebop_maven import modelling
@@ -33,14 +34,14 @@ class TestEstimator(unittest.TestCase):
                                           encoding="utf8"))):
                 # A very simple compatible model
                 model = modelling.build_mags_ext_model(
-                    build_mags_layers=lambda lt: modelling.conv1d_layers(lt,
-                                                                         num_layers=2,
-                                                                         filters=32,
-                                                                         kernel_size=16,
-                                                                         strides=12),
-                    build_dnn_layers=lambda lt: modelling.hidden_layers(lt,
-                                                                        num_layers=1,
-                                                                        units=32),
+                    mags_layers=[
+                        layers.Conv1D(32, 16, 4, "same", activation="relu"),
+                        layers.AveragePooling1D(pool_size=4, strides=4, padding="same"),
+                        layers.Conv1D(32, 16, 4, "same", activation="relu"),
+                    ],
+                    dnn_layers=[
+                        layers.Dense(32, "leaky_relu")
+                    ],
                     name=cls._default_model_name
                 )
 

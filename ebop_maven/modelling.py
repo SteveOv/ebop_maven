@@ -1,4 +1,4 @@
-""" Contains functions for building and persisting ML models """
+""" Contains functions for building and persisting ML functional models """
 from typing import Union, List, Tuple, Callable
 from pathlib import Path
 
@@ -6,8 +6,7 @@ from keras import layers, models, KerasTensor
 
 from .libs import deb_example
 
-def conv1d_layers(last_tensor: KerasTensor,
-                  num_layers: int=1,
+def conv1d_layers(num_layers: int=1,
                   filters: Union[int, List[int]]=64,
                   kernel_size: Union[int, List[int]]=8,
                   strides: Union[int, List[int]]=2,
@@ -19,7 +18,6 @@ def conv1d_layers(last_tensor: KerasTensor,
     The filters, kernel_size, strides, padding and activation arguments can be a List of values,
     one per layer, or a single values used for every layer.
     
-    :last_tensor: the output tensor from the preceding layer
     :num_layers: number of Conv1D layers to create
     :filters: the filters value of each layer
     :kernel_size: the kernel_size of each layer
@@ -41,19 +39,20 @@ def conv1d_layers(last_tensor: KerasTensor,
     if not isinstance(activation, List):
         activation = [activation] * num_layers
 
-    # Expected failure if any list isn't num_layers long
-    for ix in range(num_layers):
-        last_tensor = layers.Conv1D(filters=filters[ix],
-                                    kernel_size=kernel_size[ix],
-                                    strides=strides[ix],
-                                    padding=padding[ix],
-                                    activation=activation[ix],
-                                    name=f"{name_prefix}{ix}")(last_tensor)
-    return last_tensor
+    def layers_func(input_tensor: KerasTensor) -> KerasTensor:
+        # Expected failure if any list isn't num_layers long
+        for ix in range(num_layers):
+            input_tensor = layers.Conv1D(filters=filters[ix],
+                                         kernel_size=kernel_size[ix],
+                                         strides=strides[ix],
+                                         padding=padding[ix],
+                                         activation=activation[ix],
+                                         name=f"{name_prefix}{ix+1}")(input_tensor)
+        return input_tensor
+    return layers_func
 
 
-def hidden_layers(last_tensor: KerasTensor,
-                  num_layers: int=1,
+def hidden_layers(num_layers: int=1,
                   units: Union[int, List[int]]=256,
                   kernel_initializer: Union[str, List[str]]="glorot_uniform",
                   activation: Union[any, List[any]]="relu",
@@ -65,7 +64,6 @@ def hidden_layers(last_tensor: KerasTensor,
     and dropout_rate arguments can be a List of values, one per layer, or a single values used for
     every layer.
     
-    :last_tensor: the output tensor from the preceding layer
     :num_layers: number of Dense+Dropout layer pairs to append
     :units: the number of neurons in new each layer
     :kernel_initializer: the initializer for each new layer
@@ -84,16 +82,18 @@ def hidden_layers(last_tensor: KerasTensor,
     if not isinstance(dropout_rate, List):
         dropout_rate = [dropout_rate] * num_layers
 
-    # Expected failure if any list isn't num_layers long
-    for ix in range(num_layers):
-        last_tensor = layers.Dense(units[ix],
-                                   kernel_initializer=kernel_initializer[ix],
-                                   activation=activation[ix],
-                                   name=f"{name_prefix[0]}{ix}")(last_tensor)
-        if dropout_rate[ix]:
-            last_tensor = layers.Dropout(dropout_rate[ix],
-                                         name=f"{name_prefix[1]}{ix}")(last_tensor)
-    return last_tensor
+    def layers_func(input_tensor: KerasTensor) -> KerasTensor:
+        # Expected failure if any list isn't num_layers long
+        for ix in range(num_layers):
+            input_tensor = layers.Dense(units[ix],
+                                        kernel_initializer=kernel_initializer[ix],
+                                        activation=activation[ix],
+                                        name=f"{name_prefix[0]}{ix+1}")(input_tensor)
+            if dropout_rate[ix]:
+                input_tensor = layers.Dropout(dropout_rate[ix],
+                                              name=f"{name_prefix[1]}{ix+1}")(input_tensor)
+        return input_tensor
+    return layers_func
 
 
 def mags_input_layer(shape: Tuple[int, int]=(deb_example.mags_bins, 1),
@@ -120,41 +120,36 @@ def ext_input_layer(shape: Tuple[int, int]=(len(deb_example.extra_features_and_d
     return layers.Input(shape=shape, name=name)
 
 
-def output_layer(last_tensor: KerasTensor,
-                 units: int=len(deb_example.labels_and_scales),
+def output_layer(units: int=len(deb_example.labels_and_scales),
                  kernel_initializer: str="glorot_uniform",
                  activation: str="linear",
                  name: str="Output") -> KerasTensor:
     """
     Builds the requested output layer, returning its output tensor.
 
-    :last_tensor: the output tensor from the preceding layer
     :units: the number of output neurons
     :kernel_initializer: the initializer
     :activation: the activation function
     :name: the name of the layer
     :returns: the output tensor of the new layer
     """
-    return layers.Dense(units,
-                        kernel_initializer=kernel_initializer,
-                        activation=activation,
-                        name=name)(last_tensor)
+    def layer_func(input_tensor: KerasTensor) -> KerasTensor:
+        return layers.Dense(units,
+                            kernel_initializer=kernel_initializer,
+                            activation=activation,
+                            name=name)(input_tensor)
+    return layer_func
 
-def empty_layer(last_tensor: KerasTensor) -> KerasTensor:
-    """
-    Do not build any layers ... just return the output tensor of the preceding layer.
-    """
-    return last_tensor
 
 
 def build_mags_ext_model(
         name: str="Mags-Ext-Model",
         mags_input: KerasTensor=mags_input_layer(),
         ext_input: KerasTensor=ext_input_layer(),
-        build_mags_layers: Callable[[KerasTensor], KerasTensor]=empty_layer,
-        build_ext_layers: Callable[[KerasTensor], KerasTensor]=empty_layer,
-        build_dnn_layers: Callable[[KerasTensor], KerasTensor]=empty_layer,
-        build_output_layer: Callable[[KerasTensor], KerasTensor]=output_layer,
+        mags_layers: List[Callable[[KerasTensor], KerasTensor]]=None,
+        ext_layers: List[Callable[[KerasTensor], KerasTensor]]=None,
+        dnn_layers: List[Callable[[KerasTensor], KerasTensor]]=None,
+        output: Callable[[KerasTensor], KerasTensor]=output_layer(),
         post_build_step: Callable[[models.Model], None]=None
     ) -> models.Model:
     """
@@ -165,14 +160,11 @@ def build_mags_ext_model(
     :name: the name of the new model
     :mags_input: the phase-folded lightcurve magnitudes feature input
     :ext_input: the extra features input
-    :build_mags_layers: function which builds the magnitudes input branch,
-        with the output tensor of mags_input as its input
-    :build_ext_layers: function which builds the extra features input branch,
-        with the output tensor of ext_input as its input
-    :build_dnn_layers: function which builds the deep neural network,
-        with the output tensor of the concatenated mags & ext input branches as its input
-    :build_output_layer: function which build the layer of output neurons,
-        with the output tensor of the dnn layers as its input
+    :mags_layers: list of layers which process the mags input tensor
+    :ext_layers: list of layers which process the ext_features input tensor
+    :dnn_layers: list of neural network layers for processing the concatenated
+    outputs of the mags and ext layers
+    :output: the output layer for publishing the output of the dnn_layers
     :post_build_step: optional hook to interact with the newly built model
     :returns: the new model
     """
@@ -180,13 +172,32 @@ def build_mags_ext_model(
 
     # Build up the model by building the two input branches, concatenating them, passing their
     # combined output to a DNN and then passing the DNN output to a set of output neurons.
-    output_tensor = build_output_layer(
-        build_dnn_layers(
-            layers.Concatenate(axis=1, name="DNN-Input")([
-                layers.Flatten(name="Mags-Reshape")(build_mags_layers(mags_input)),
-                layers.Flatten(name="Ext-Reshape")(build_ext_layers(ext_input))
-            ])))
+    mags_tensor = mags_input
+    if mags_layers:
+        if not isinstance(mags_layers, List):
+            mags_layers = [mags_layers]
+        for buildit in mags_layers:
+            mags_tensor = buildit(mags_tensor)
 
+    ext_tensor = ext_input
+    if ext_layers:
+        if not isinstance(ext_layers, List):
+            ext_layers = [ext_layers]
+        for buildit in ext_layers:
+            ext_tensor = buildit(ext_tensor)
+
+    output_tensor = layers.Concatenate(axis=1, name="DNN-Input")([
+                    layers.Flatten(name="Mags-Reshape")(mags_tensor),
+                    layers.Flatten(name="Ext-Reshape")(ext_tensor)
+                ])
+
+    if dnn_layers:
+        if not isinstance(dnn_layers, List):
+            dnn_layers = [dnn_layers]
+        for buildit in dnn_layers:
+            output_tensor = buildit(output_tensor)
+
+    output_tensor = output(output_tensor)
     model = models.Model(inputs=[mags_input, ext_input], outputs=output_tensor, name=name)
 
     if post_build_step:
