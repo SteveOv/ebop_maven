@@ -149,5 +149,14 @@ class TestEstimator(unittest.TestCase):
         result = estimator.predict(instances)
         self.assertTrue(any(result[0][c]!=0 for c in deb_example.label_predict_cols if c.endswith("_sigma")))
 
+    def test_predict_with_iterations_overriding_default(self):
+        """ Tests predict({ instance items }, 100 MC Dropout iterations) -> expect some sigmas!=0 """
+        estimator = Estimator(self._default_model_file, iterations=1) # 1 iteration == no MC Dropout
+        instances = { "mags": [0.5] * estimator.mags_feature_bins, "dS_over_dP": 1, "phiS": 0.5 }
+
+        # Make a prediction with 100 MC Dropout iterations - if this is ignored ours sigmas will all == 0
+        result = estimator.predict(instances, iterations=100)
+        self.assertTrue(any(result[0][c]!=0 for c in deb_example.label_predict_cols if c.endswith("_sigma")))
+
 if __name__ == "__main__":
     unittest.main()

@@ -75,7 +75,8 @@ class Estimator(ABC):
         return self._attrs
 
     def predict(self,
-                instances: List[Dict[str, any]]) -> List[Dict[str, float]]:
+                instances: List[Dict[str, any]],
+                iterations: int=None) -> List[Dict[str, float]]:
         """
         Make predictions on one or more instances' features. The instances are
         in the form of a List of dicts.
@@ -85,9 +86,11 @@ class Estimator(ABC):
         ]
         
         :instances: list of dicts, one for each instance to predict
+        :iterations: the number of MC Dropout iterations (overriding the instance default)
         :returns: a list dictionaries, each row the predicted labels for the matching input instance
         """
-        is_mc = self._iterations > 1
+        iterations = self._iterations if iterations is None else iterations
+        is_mc = iterations > 1
 
         # It's possible we can be given the instances as a List[Dict] but handle being given an
         # ndarray or a single instance as a Dict: we'll process these all as ndarrays.
@@ -129,7 +132,7 @@ class Estimator(ABC):
         # algorithm. Stacked predictions are output in shape (#iterations, #insts, #labels)
         stkd_prds = np.stack([
             self._model((mags_features, extra_values), training=is_mc)
-            for _ in range(self._iterations)
+            for _ in range(iterations)
         ])
 
         # Undo any scaling applied to the labels (e.g. the model predicts inc/100)
