@@ -28,6 +28,9 @@ FORMAL_TESTSET_DIR = Path(".") / "datasets/formal-test-dataset/"
 
 MODEL_FILE_NAME = "parameter-search-model"
 
+# The subset of all available labels which we will train to predict
+CHOSEN_LABELS = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "inc"]
+
 MAX_HYPEROPT_EVALS = 250        # Maximum number of distinct Hyperopt evals to run
 TRAINING_EPOCHS = 100           # Set high if we're using early stopping
 BATCH_FRACTION = 0.001          # larger -> quicker training per epoch but more to converge
@@ -62,31 +65,33 @@ print(f"\nPicking up training/validation/test datasets within '{DATASET_DIR}'",
       f"& the formal testing dataset (real data) from within '{FORMAL_TESTSET_DIR}'.")
 ds_titles = ["training", "validation", "testing", "formal testing"]
 datasets = [tf.data.TFRecordDataset] * len(ds_titles)
-ds_counts = [int] * len(ds_titles)
-map_func = deb_example.create_map_func(noise_stddev=lambda: 0.005,
-                                       roll_steps=lambda: tf.random.uniform([], -9, 10, tf.int32))
+counts = [int] * len(ds_titles)
 for ds_ix, (label, set_dir) in enumerate([("training", DATASET_DIR),
                                           ("validation", DATASET_DIR),
                                           ("testing", DATASET_DIR),
                                           (None, FORMAL_TESTSET_DIR)]):
     # Don't set up any mappings/shuffle/batch yet as we want to count the contents first
+    map_func = deb_example.create_map_func(labels=CHOSEN_LABELS,
+                                       noise_stddev=lambda: 0.005,
+                                       roll_steps=lambda: tf.random.uniform([], -9, 10, tf.int32))
     if ds_ix < 3:
         files = list(set_dir.glob(f"**/{label}/**/*.tfrecord"))
         if ds_ix == 0:
-            (datasets[ds_ix], ds_counts[ds_ix]) = \
+            (datasets[ds_ix], counts[ds_ix]) = \
                 deb_example.create_dataset_pipeline(files, BATCH_FRACTION, map_func,
                                                     shuffle=True, reshuffle_each_iteration=True,
                                                     max_buffer_size=MAX_BUFFER_SIZE,
                                                     prefetch=1, seed=SEED)
         else:
-            (datasets[ds_ix], ds_counts[ds_ix]) = \
+            (datasets[ds_ix], counts[ds_ix]) = \
                 deb_example.create_dataset_pipeline(files, BATCH_FRACTION, map_func)
     else:
         # For the formal test dataset simple pipeline with no noise/roll and a single batch
         files = list(set_dir.glob("**/*.tfrecord"))
-        (datasets[ds_ix], ds_counts[ds_ix]) = deb_example.create_dataset_pipeline(files, 10000)
+        map_func = deb_example.create_map_func(labels=CHOSEN_LABELS) # No added noise or roll
+        datasets[ds_ix], counts[ds_ix] = deb_example.create_dataset_pipeline(files, 10000, map_func)
 
-    print(f"Found {ds_counts[ds_ix]:,} {label} instances spread over",
+    print(f"Found {counts[ds_ix]:,} {label} instances spread over",
           f"{len(files)} tfrecord file(s) within '{set_dir}'.")
 
 
@@ -149,6 +154,7 @@ trials_pspace = hp.choice("train_and_test_model", [{
         ]),
         "output": {
             "func": modelling.output_layer,
+            "label_names_and_scales": { l: deb_example.labels_and_scales[l] for l in CHOSEN_LABELS },
             "kernel_initializer": hp.choice("ouput_initializer", ["glorot_uniform", "he_uniform"]),
             "activation": "linear"
         },
@@ -223,7 +229,7 @@ def train_and_test_model(trial_kwargs):
         candidate = get_trial_value(trial_kwargs, "model", False)
         candidate.compile(optimizer=optimizer, loss=[loss_function], metrics=fixed_metrics)
 
-        print(f"\nTraining the following model against {ds_counts[0]} {ds_titles[0]} instances.")
+        print(f"\nTraining the following model against {counts[0]} {ds_titles[0]} instances.")
         print(candidate.summary(line_length=120, show_trainable=True))
         history = candidate.fit(x = datasets[0],
                                 epochs = TRAINING_EPOCHS,
@@ -231,10 +237,10 @@ def train_and_test_model(trial_kwargs):
                                 validation_data = datasets[1],
                                 verbose=2)
 
-        print(f"\nEvaluating model against {ds_counts[2]} {ds_titles[2]} dataset test instances.")
+        print(f"\nEvaluating model against {counts[2]} {ds_titles[2]} dataset test instances.")
         candidate.evaluate(x=datasets[2], y=None, verbose=2)
 
-        print(f"\nFull evaluation against {ds_counts[3]} {ds_titles[3]} dataset instances.")
+        print(f"\nFull evaluation against {counts[3]} {ds_titles[3]} dataset instances.")
         results = candidate.evaluate(x=datasets[3], y=None, verbose=2)
 
         # Always MAE from metrics, as this allows us to vary the loss function

@@ -1,10 +1,52 @@
 """ Contains functions for building and persisting ML functional models """
-from typing import Union, List, Tuple, Callable
+from typing import Union, List, Dict, Tuple, Callable
 from pathlib import Path
 
 from keras import layers, models, KerasTensor
 
 from .libs import deb_example
+
+
+class OutputLayer(layers.Dense):
+    """ A custom OutputLayer which can store metadata about the labels being predicted. """
+    # pylint: disable=abstract-method, too-many-ancestors, too-many-arguments
+
+    @property
+    def label_names_and_scales(self) -> Dict[str, float]:
+        """ The names and any scaling which needs to be undone. """
+        return self._label_names_and_scales
+
+    def __init__(self,
+                 units:int,
+                 kernel_initializer: str="he_uniform",
+                 activation: str="linear",
+                 name: str="Output",
+                 label_names_and_scales: Dict[str, float] = None,
+                 **kwargs):
+        """
+        Initializes a new OutputLayer
+
+        :units: the number of predicting values
+        :kernel_initializer: dictates how the neurons are initialized
+        :activation: the activation function to use
+        :name: the name of the layer
+        :label_names_and_scales: dictionary giving the output labels' names and any scaling applied
+        """
+        if label_names_and_scales:
+            num_name = len(label_names_and_scales)
+            if num_name != units:
+                raise ValueError(f"len(label_names_and_scales)!={units} units. Actually {num_name}")
+        self._label_names_and_scales = label_names_and_scales
+        super().__init__(units,
+                         kernel_initializer=kernel_initializer,
+                         activation=activation,
+                         name=name,
+                         **kwargs)
+
+    def get_config(self):
+        """ Serializes this layer. """
+        return { **super().get_config(), "label_names_and_scales": self.label_names_and_scales }
+
 
 def conv1d_layers(num_layers: int=1,
                   filters: Union[int, List[int]]=64,
@@ -120,24 +162,27 @@ def ext_input_layer(shape: Tuple[int, int]=(len(deb_example.extra_features_and_d
     return layers.Input(shape=shape, name=name)
 
 
-def output_layer(units: int=len(deb_example.labels_and_scales),
+def output_layer(label_names_and_scales: Dict[str, any]=None,
                  kernel_initializer: str="glorot_uniform",
                  activation: str="linear",
                  name: str="Output") -> KerasTensor:
     """
     Builds the requested output layer, returning its output tensor.
 
-    :units: the number of output neurons
+    :label_names_and_scales: the dictionary of labels we will be predicting
     :kernel_initializer: the initializer
     :activation: the activation function
     :name: the name of the layer
     :returns: the output tensor of the new layer
     """
+    if not label_names_and_scales:
+        label_names_and_scales = deb_example.labels_and_scales
     def layer_func(input_tensor: KerasTensor) -> KerasTensor:
-        return layers.Dense(units,
-                            kernel_initializer=kernel_initializer,
-                            activation=activation,
-                            name=name)(input_tensor)
+        return OutputLayer(units=len(label_names_and_scales),
+                           kernel_initializer=kernel_initializer,
+                           activation=activation,
+                           label_names_and_scales=label_names_and_scales,
+                           name=name)(input_tensor)
     return layer_func
 
 
@@ -230,6 +275,7 @@ def load_model(file_name: Path) -> models.Model:
     """
     return models.load_model(file_name,
                              custom_objects={
+                                 "OutputLayer": OutputLayer,
                                  # I shouldn't *have* to do this; fails to deserialize otherwise!
                                  "ReLU": layers.ReLU,
                                  "LeakyReLU": layers.LeakyReLU

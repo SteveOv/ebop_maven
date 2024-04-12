@@ -28,7 +28,6 @@ labels_and_scales = {
     "bP": 1.,
     "L3": 1.,
 }
-label_predict_cols = [*labels_and_scales.keys()] + [f"{l}_sigma" for l in labels_and_scales]
 
 # Extra features other than the light-curve used for predictions
 extra_features_and_defaults = {

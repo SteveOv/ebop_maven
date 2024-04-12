@@ -38,6 +38,9 @@ PLOTS_DIR = SAVE_DIR / "plots"
 FORMAL_TESTSET_DIR = Path(".") / "datasets/formal-test-dataset/"
 FORMAL_RESULTS_DIR = SAVE_DIR / f"results/{MODEL_NAME}/{TRAINSET_NAME}/{deb_example.pub_mags_key}/"
 
+# The subset of all available labels which we will train to predict
+CHOSEN_LABELS = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "inc"]
+
 TRAINING_EPOCHS = 100           # Set high if we're using early stopping
 BATCH_FRACTION = 0.001          # larger -> quicker training per epoch but more to converge
 MAX_BUFFER_SIZE = 20000000      # Size of Dataset shuffle buffer (in instances)
@@ -79,7 +82,8 @@ print(f"Found {len(tf.config.list_physical_devices('GPU'))} GPU(s)\n")
 print("Picking up training/validation/test datasets.")
 datasets = [tf.data.TFRecordDataset] * 3
 counts = [int] * 3
-map_func = deb_example.create_map_func(noise_stddev=lambda: 0.005,
+map_func = deb_example.create_map_func(labels=CHOSEN_LABELS,
+                                       noise_stddev=lambda: 0.005,
                                        roll_steps=lambda: tf.random.uniform([], -9, 10, tf.int32))
 for ds_ix, (label, set_dir) in enumerate([("training", TRAINSET_DIR),
                                           ("valiation", VALIDSET_DIR),
@@ -100,7 +104,7 @@ for ds_ix, (label, set_dir) in enumerate([("training", TRAINSET_DIR),
 # -----------------------------------------------------------
 # Define the model
 # -----------------------------------------------------------
-print("\nDefining the multiple-input/output CNN model.")
+print("\nDefining the multiple-input/output CNN model for predicting:", ", ".join(CHOSEN_LABELS))
 model = modelling.build_mags_ext_model(
     name=MODEL_NAME,
     mags_layers=[
@@ -114,8 +118,8 @@ model = modelling.build_mags_ext_model(
         # consistently gives a small, but significant improvement to the trained loss.
         modelling.hidden_layers(1, 128, DNN_INITIALIZER, DNN_ACTIVATE, 0, ("Taper-", ))
     ],
-    output=modelling.output_layer(len(deb_example.labels_and_scales), DNN_INITIALIZER,
-                                              "linear", "Output"),
+    output=modelling.output_layer({ l: deb_example.labels_and_scales[l] for l in CHOSEN_LABELS },
+                                  DNN_INITIALIZER, "linear", "Output"),
     post_build_step=lambda mdl: mdl.compile(loss=LOSS, optimizer=OPTIMIZER, metrics=METRICS))
 model.summary()
 

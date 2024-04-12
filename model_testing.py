@@ -21,8 +21,7 @@ def test_with_estimator(model: Union[Model, Path],
                         test_dataset_dir: Path,
                         results_dir: Path=None,
                         plot_results: bool=True,
-                        echo_results: bool=False,
-                        excluded_labels: List[str]=None):
+                        echo_results: bool=False):
     """
     Will test the indicated model file against the contents of the passed
     testset directory. The results for MC and non-MC estimates will be written
@@ -34,15 +33,22 @@ def test_with_estimator(model: Union[Model, Path],
     None, the /results/{model.name}/{trainset_name} subdirectory of the model location is used
     :plot_results: whether to produce a plot of the results vs labels
     :echo_results: whether to also echo the results csv to stdout
-    :excluded_labels: list of labels to exclude from the report.
     """
+    # Create our Estimator. It will tell us which labels it (& the model) can predict.
+    estimator = Estimator(model)
+    lbl_names = [*estimator.label_names_and_scales.keys()]
+    lbl_scales = [*estimator.label_names_and_scales.values()]
+    num_labels = len(estimator.label_names_and_scales)
+
     print(f"\nLooking for the test dataset in '{test_dataset_dir}'.")
     tfrecord_files = list(test_dataset_dir.glob("**/*.tfrecord"))
     if len(tfrecord_files) == 0:
         raise IndexError("No dataset files found")
 
     # Don't iterate over the dataset; it's easier if we work with all the data (via a single batch)
-    (ds_formal_test, inst_count) = deb_example.create_dataset_pipeline(tfrecord_files, 10000)
+    map_func = deb_example.create_map_func(labels=lbl_names)
+    (ds_formal_test, inst_count) = deb_example.create_dataset_pipeline(tfrecord_files,
+                                                                       10000, map_func)
     (test_mags, test_feats), lbls = next(ds_formal_test.take(inst_count).as_numpy_iterator())
 
     # The features arrive in a tuple (array[shape(#inst, #bin, 1)], array[shape(#inst, #feat, 1)])
@@ -52,27 +58,11 @@ def test_with_estimator(model: Union[Model, Path],
         { "mags": tm, **{n:f[0] for (n,f) in zip(fn,tf)} } for tm, tf in zip(test_mags, test_feats)
     ]
 
-    # Get the details of the labels we're to report on.
-    # Optionally, discard any we're no longer interested in.
-    lbl_names = [*deb_example.labels_and_scales.keys()]
-    lbl_scales = [*deb_example.labels_and_scales.values()]
-    if excluded_labels is not None:
-        for exclude_label in excluded_labels:
-            exclude_ix = lbl_names.index(exclude_label)
-            lbl_names.pop(exclude_ix)
-            lbl_scales.pop(exclude_ix)
-            lbls = np.delete(lbls, exclude_ix, 1)
-    num_labels = len(lbl_names)
-
     # Run the predictions twice; with and without using MC Dropout enabled.
     for iterations, suffix in [(1, "nonmc"), (1000, "mc")]:
         # Make our prediction which will return [#inst, {}]
         print(f"\nUsing an Estimator to make predictions on {inst_count} formal test instances.")
-        estimator = Estimator(model, iterations)
-        # training_set = estimator.attrs.get("training_dataset", "unkown")
-        # print(f"The model was trained on the '{training_set}' training set")
-        # print()
-        predictions = estimator.predict(instance_features)
+        predictions = estimator.predict(instance_features, iterations)
 
         # To generate the results we get the predictions (not sigmas) into
         # shape [#inst, 8]. The labels/predictions are scaled in the Model which
@@ -134,19 +124,27 @@ def test_with_estimator(model: Union[Model, Path],
         if plot_results:
             size = 3
             cols = 2
-            pub_fields = ["rA_plus_rB", "k", "inc", "J",
-                          "ecosw", "esinw", "L3", "bP"]
-            pub_labels = ["$r_A+r_B$", "$k$", "$i$", "$J$",
-                          r"$e\cos{\omega}$", r"$e\sin{\omega}$", "$L_3$", "$b_P$"]
+            all_pub_labels = {
+                "rA_plus_rB": "$r_A+r_B$",
+                "k": "$k$",
+                "inc": "$i$",
+                "J": "$J$",
+                "ecosw": r"$e\cos{\omega}$",
+                "esinw": r"$e\sin{\omega}$",
+                "L3": "$L_3$",
+                "bP": "$b_P$"
+            }
+
+            pub_fields = { k: v for (k, v) in all_pub_labels.items() if k in lbl_names }
             rows = math.ceil(len(pub_fields) / cols)
             _, axes = plt.subplots(rows, cols,
                                    figsize=(cols*size, rows*size), constrained_layout=True)
             axes = axes.flatten()
             print(f"Plotting single publication scatter plot {rows}x{cols} grid",
-                  f"for the fields: {pub_fields}")
+                  f"for the fields: {', '.join(pub_fields.keys())}")
 
             # Produce a plot of prediction vs label for each label type
-            for ax_ix, (lbl_name, ax_label) in enumerate(zip(pub_fields, pub_labels)):
+            for ax_ix, (lbl_name, ax_label) in enumerate(pub_fields.items()):
                 c = lbl_names.index(lbl_name)
                 lbl_vals = lbls[:, c]
                 pred_vals = noms[:, c]
@@ -189,4 +187,4 @@ if __name__ == "__main__":
     the_model = modelling.load_model(Path("./drop/cnn_ext_model.keras"))
     testset_dir = Path("./datasets/formal-test-dataset")
     out_dir = Path(f"./drop/results/{the_model.name}/{TRAINSET_NAME}/{deb_example.pub_mags_key}")
-    test_with_estimator(the_model, testset_dir, out_dir, plot_results=True, excluded_labels=[])
+    test_with_estimator(the_model, testset_dir, out_dir, plot_results=True)

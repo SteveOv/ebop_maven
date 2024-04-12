@@ -14,6 +14,7 @@ class Estimator(ABC):
     """ An estimator for the CNN model """
     _attrs = {}
     _ATTR_CREATE_TS = "created_timestamp"
+    _label_names_and_scales = deb_example.labels_and_scales
 
     def __init__(self, model: Union[Model, Path], iterations: int=1):
         """
@@ -48,6 +49,17 @@ class Estimator(ABC):
         else:
             raise TypeError("Expected model to be a Path or a tf.keras.models.Model.")
 
+        # Find out about what we're predicting - it should be in the output layer
+        output_layer = self._model.get_layer("Output")
+        if output_layer \
+                and isinstance(output_layer, modelling.OutputLayer) \
+                and output_layer.label_names_and_scales:
+            self._label_names_and_scales = output_layer.label_names_and_scales
+
+        # Now set up the names for the predictions (these include 1-sigma values)
+        self._prediction_names = [*self._label_names_and_scales] \
+                                + [f"{k}_sigma" for k in self._label_names_and_scales]
+
         print(f"\tInputs: {self._model.input_shape}")
         print(f"\tOutputs: {self._model.output_shape}")
 
@@ -68,6 +80,16 @@ class Estimator(ABC):
         The MC Dropout algorithm will be used if this is greater than 1.
         """
         return self._iterations
+
+    @property
+    def label_names_and_scales(self) -> Dict[str, float]:
+        """ Names and scaling applied to the labels to be predicted """
+        return self._label_names_and_scales
+
+    @property
+    def prediction_names(self) -> List[str]:
+        """ Gets the ordered list of the names of the predicted values. """
+        return self._prediction_names
 
     @property
     def attrs(self) -> Dict:
@@ -136,7 +158,7 @@ class Estimator(ABC):
         ])
 
         # Undo any scaling applied to the labels (e.g. the model predicts inc/100)
-        stkd_prds /= [*deb_example.labels_and_scales.values()]
+        stkd_prds /= [*self.label_names_and_scales.values()]
 
         # Summarize the label predictions & append 1-sigma values to each inst
         # We go from shape (#iters, #insts, #labels) to shape (#insts, #labels*2)
@@ -147,4 +169,4 @@ class Estimator(ABC):
             psets = np.concatenate([nominals, np.zeros_like(nominals)], axis=1)
 
         # Load the predictions back into a list of dicts
-        return [dict(zip(deb_example.label_predict_cols, pset)) for pset in psets]
+        return [dict(zip(self.prediction_names, pset)) for pset in psets]
