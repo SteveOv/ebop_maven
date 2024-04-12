@@ -33,11 +33,6 @@ MODEL_NAME = "CNN-Ext-Estimator-New"
 SAVE_DIR = Path(".") / "drop/"
 PLOTS_DIR = SAVE_DIR / "plots"
 
-# Formal testset is a currated set of test systems for formal testing across models.
-# It's the dataset used for the testing and reports of test_estimator.
-FORMAL_TESTSET_DIR = Path(".") / "datasets/formal-test-dataset/"
-FORMAL_RESULTS_DIR = SAVE_DIR / f"results/{MODEL_NAME}/{TRAINSET_NAME}/{deb_example.pub_mags_key}/"
-
 # The subset of all available labels which we will train to predict
 CHOSEN_LABELS = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "inc"]
 
@@ -183,5 +178,6 @@ print(f"\nSaved model '{MODEL_NAME}' to: {model_save_file}")
 # Tests the newly saved model, within an Estimator, against a dataset of real systems.
 # -----------------------------------------------------------
 print("\n *** Running formal test against real data ***")
+FORMAL_RESULTS_DIR = SAVE_DIR / f"results/{MODEL_NAME}/{TRAINSET_NAME}/{deb_example.pub_mags_key}/"
 FORMAL_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-model_testing.test_with_estimator(model_save_file, FORMAL_TESTSET_DIR, FORMAL_RESULTS_DIR)
+model_testing.test_with_estimator(model_save_file, results_dir=FORMAL_RESULTS_DIR)

@@ -5,6 +5,7 @@ from typing import Union, List
 import sys
 from pathlib import Path
 from contextlib import redirect_stdout
+import json
 import math
 
 import matplotlib.pyplot as plt
@@ -18,7 +19,8 @@ from ebop_maven.estimator import Estimator
 from ebop_maven import modelling
 
 def test_with_estimator(model: Union[Model, Path],
-                        test_dataset_dir: Path,
+                        test_dataset_dir: Path=Path("./datasets/formal-test-dataset"),
+                        test_dataset_config: Path=Path("./config/formal-test-dataset.json"),
                         results_dir: Path=None,
                         plot_results: bool=True,
                         echo_results: bool=False):
@@ -29,6 +31,7 @@ def test_with_estimator(model: Union[Model, Path],
 
     :model: the save model to test
     :test_dataset_dir: the location of the test dataset to use
+    :test_dataset_config: Path to the config that created the test dataset
     :results_dir: the parent location to write the results csv file(s) or, if
     None, the /results/{model.name}/{trainset_name} subdirectory of the model location is used
     :plot_results: whether to produce a plot of the results vs labels
@@ -135,6 +138,12 @@ def test_with_estimator(model: Union[Model, Path],
                 "bP": "$b_P$"
             }
 
+            # Read additional target data from the config file
+            transit_flags = [False] * inst_count
+            with open(test_dataset_config, mode="r", encoding="utf8") as f:
+                targets = json.load(f)
+                transit_flags = [config.get("transits", False) for t, config in targets.items()]
+
             pub_fields = { k: v for (k, v) in all_pub_labels.items() if k in lbl_names }
             rows = math.ceil(len(pub_fields) / cols)
             _, axes = plt.subplots(rows, cols,
@@ -157,17 +166,9 @@ def test_with_estimator(model: Union[Model, Path],
                 ax.plot(diag, diag, color="gray", linestyle="-", linewidth=0.5)
 
                 # Plot the preds vs labels, with those with transits highlighted
-                # TODO: this is a bit of a hack for now. We need some way of
-                # passing transiting/eclipsing flag through the dataset
-                transit_ixs = [7, 16, 17]
-                for fill, z, plot_ixs in [
-                    ("none", 0, [i for i in range(lbl_vals.shape[0]) if i not in transit_ixs]),
-                    ("full", 10, transit_ixs),
-                ]:
-                    x = [lbl_vals[i] for i in plot_ixs]
-                    y = [pred_vals[i] for i in plot_ixs]
-                    yerr = [pred_errs[i] for i in plot_ixs]
-
+                # We want to set the fillstyle by transit flag which means plotting each item alone
+                for x, y, yerr, transiting in zip(lbl_vals, pred_vals, pred_errs, transit_flags):
+                    (fill, z) = ("full", 10) if transiting else ("none", 0)
                     if suffix == "mc":
                         ax.errorbar(x=x, y=y, yerr=yerr, fmt="o", c="tab:blue", ms=5.0, lw=1.0,
                                     capsize=2.0, markeredgewidth=0.5, fillstyle=fill, zorder=z)
@@ -185,6 +186,5 @@ def test_with_estimator(model: Union[Model, Path],
 if __name__ == "__main__":
     TRAINSET_NAME = "formal-training-dataset"   # Assume the usual training set
     the_model = modelling.load_model(Path("./drop/cnn_ext_model.keras"))
-    testset_dir = Path("./datasets/formal-test-dataset")
     out_dir = Path(f"./drop/results/{the_model.name}/{TRAINSET_NAME}/{deb_example.pub_mags_key}")
-    test_with_estimator(the_model, testset_dir, out_dir, plot_results=True)
+    test_with_estimator(the_model, results_dir=out_dir, plot_results=True)
