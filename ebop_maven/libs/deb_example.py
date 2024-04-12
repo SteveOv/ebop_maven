@@ -88,7 +88,8 @@ def serialize(identifier: str,
     return example.SerializeToString()
 
 
-def create_map_func(labels: List[str] = None,
+def create_map_func(ext_features: List[str] = None,
+                    labels: List[str] = None,
                     noise_stddev: Callable[[], float] = None,
                     roll_steps: Callable[[], int] = None) -> Callable:
     """
@@ -105,14 +106,24 @@ def create_map_func(labels: List[str] = None,
 
     roll_steps = lambda: tf.random.uniform([], -3, 4, tf.int32)
 
+    :ext_features: a chosen subset of the available ext_features,
+    in the requested order, or all if None
     :labels: a chosen subset of the available labels, in requested order, or all if None
     :noise_stddev: a function which returns the stddev of the Gaussian noise to add
     :roll_steps: a function which returns the number of steps to roll the mag data,
     negative values roll to the left and positive values to the right
     :returns: the configured map function
     """
+    if ext_features is not None:
+        chosen_ext_feat_and_defs = { ef: extra_features_and_defaults[ef] for ef in ext_features}
+    else:
+        chosen_ext_feat_and_defs = extra_features_and_defaults
+    if labels is not None:
+        chosen_lab_and_scl = { l: labels_and_scales[l] for l in labels }
+    else:
+        chosen_lab_and_scl = labels_and_scales
+
     # Define the map function with the two, optional perturbing actions on the mags feature
-    chosen_lab_and_scl = { k: labels_and_scales[k] for k in labels} if labels else labels_and_scales
     def map_func(record_bytes):
         example = tf.io.parse_single_example(record_bytes, description)
 
@@ -132,7 +143,7 @@ def create_map_func(labels: List[str] = None,
                 mags_feature = tf.roll(mags_feature, [roll_by], axis=[0])
 
         # The Extra features: ignore unknown fields and use default if not found
-        ext_features = [example.get(k, d) for k, d in extra_features_and_defaults.items()]
+        ext_features = [example.get(k, d) for (k, d) in chosen_ext_feat_and_defs.items()]
         ext_features = tf.reshape(ext_features, shape=(len(ext_features), 1))
 
         # Copy labels in the expected order & apply any scaling

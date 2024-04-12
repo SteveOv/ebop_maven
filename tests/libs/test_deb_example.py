@@ -47,6 +47,34 @@ class Test_deb_example(unittest.TestCase):
                 # Some loss of fidelity in encoding/decoding a tf.Tensor so can't do exact assert
                 self.assertAlmostEqual(label.numpy(), exp_value, 6)
 
+    def test_create_map_func_with_selected_ext_features(self):
+        """ Test that the resulting map_func deserializes a deb_example with subset of ext_features """
+        with self.__class__.lock:
+            # Set up a feature (light-curve) amd labels and with tracable values
+            input_labels_and_scales = deb_example.labels_and_scales.copy()
+            input_labels = { k: v for v, k in enumerate(input_labels_and_scales) }
+            input_mags_feature =  { deb_example.pub_mags_key: np.arange(deb_example.mags_bins) }
+            input_ext_features = { "phiS": 0.6, "dS_over_dP": 0.96 }
+            deb = deb_example.serialize("t1", input_labels, input_mags_feature, input_ext_features)
+
+            # We're going to request a shuffled subset of the ext_features
+            request_features = [f for f in input_ext_features if f not in ["phiS"]]
+
+            # Execute a graph instance of the map_func to mimic a Dateset pipeline.
+            # map_parse_fn = deb_example.create_map_func()
+            map_parse_fn = tf.function(deb_example.create_map_func(ext_features=request_features))
+            ((mags_feature, ext_features), labels) = map_parse_fn(deb)
+
+            # features output should be a Tensor of the shape (#request_features, 1)
+            self.assertEqual(ext_features.shape, (len(request_features), 1))
+            exp_values = [input_ext_features[e] for e in request_features]
+            for feature, exp_value in zip(ext_features.numpy(), exp_values):
+                self.assertEqual(feature, exp_value)
+
+            # Check no effect on the other values
+            self.assertEqual(mags_feature.shape, (deb_example.mags_bins, 1))
+            self.assertEqual(len(labels), len(input_labels))
+
     def test_create_map_func_with_selected_labels(self):
         """ Test that the resulting map_func deserializes a deb_example with subset of labels """
         with self.__class__.lock:
