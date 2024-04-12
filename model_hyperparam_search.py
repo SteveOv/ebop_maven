@@ -1,8 +1,9 @@
 """
 Searches for the best set of hyperparams for the Mags/Extra-Features model
 """
-from typing import Mapping
+from typing import Callable, Union
 from pathlib import Path
+from contextlib import redirect_stdout
 import os
 import random as python_random
 import json
@@ -11,7 +12,7 @@ import numpy as np
 import tensorflow as tf
 import keras
 
-from keras import layers, optimizers, metrics, callbacks as cb
+from keras import layers, optimizers, callbacks as cb
 from tensorflow.python.framework.errors_impl import OpError # pylint: disable=no-name-in-module
 
 from hyperopt import fmin, tpe, hp, Trials, space_eval, STATUS_OK, STATUS_FAIL
@@ -19,6 +20,7 @@ from hyperopt.pyll import scope
 
 from ebop_maven.libs import deb_example
 from ebop_maven import modelling
+from ebop_maven.libs.tee import Tee
 
 TRAINSET_NAME = "formal-training-dataset/"
 DATASET_DIR = Path(".") / "datasets" / TRAINSET_NAME
@@ -26,11 +28,11 @@ FORMAL_TESTSET_DIR = Path(".") / "datasets/formal-test-dataset/"
 
 MODEL_FILE_NAME = "parameter-search-model"
 
+MAX_HYPEROPT_EVALS = 250        # Maximum number of distinct Hyperopt evals to run
 TRAINING_EPOCHS = 100           # Set high if we're using early stopping
 BATCH_FRACTION = 0.001          # larger -> quicker training per epoch but more to converge
 MAX_BUFFER_SIZE = 20000000      # Size of Dataset shuffle buffer (in instances)
 EARLY_STOPPING_PATIENCE = 10    # Number of epochs w/o improvement before stopping
-MAX_HYPEROPT_EVALS = 100        # Maximum number of distinct Hyperopt evals to run
 
 ENFORCE_REPEATABILITY = True    # If true, avoid GPU/CUDA cores for repeatable results
 SEED = 42                       # Standard random seed ensures repeatable randomization
@@ -88,6 +90,58 @@ for ds_ix, (label, set_dir) in enumerate([("training", DATASET_DIR),
           f"{len(files)} tfrecord file(s) within '{set_dir}'.")
 
 
+# -----------------------------------------------------------
+# Temporary model Helpers (will go when modelling updated)
+# -----------------------------------------------------------
+def dnn_with_taper(num_layers: int,
+                   units: int,
+                   kernel_initializer: any,
+                   activation: any,
+                   dropout_rate: float=0,
+                   taper_units: int=0) -> Callable[[keras.KerasTensor], keras.KerasTensor]:
+    """ Creates the function to build the requested DNN layers """
+    def layers_func(prev_tensor: keras.KerasTensor) -> keras.KerasTensor:
+        prev_tensor = modelling.hidden_layers(prev_tensor, num_layers, units, kernel_initializer,
+                                              activation, dropout_rate,
+                                              name_prefix=("Hidden-", "Dropout-"))
+        if taper_units:
+            prev_tensor = modelling.hidden_layers(prev_tensor, 1, taper_units, kernel_initializer,
+                                                  activation, name_prefix=("Taper-", ))
+        return prev_tensor
+    return layers_func
+
+def simple_symmetric_cnn(num_layers: int,
+                         filters: int,
+                         kernel_size: int,
+                         strides: int,
+                         padding: str,
+                         activation: str) -> Callable[[keras.KerasTensor], keras.KerasTensor]:
+    """ Creates the function to build the requested DNN layers """
+    def layers_func(prev_tensor: keras.KerasTensor) -> keras.KerasTensor:
+        prev_tensor = modelling.conv1d_layers(prev_tensor, num_layers=num_layers, filters=filters,
+                                              kernel_size=kernel_size, strides=strides,
+                                              padding=padding, activation=activation,
+                                              name_prefix="CNN-")
+        return prev_tensor
+    return layers_func
+
+def empty_layer() -> Callable[[keras.KerasTensor], keras.KerasTensor]:
+    """ Creates an empty passthrough layer """
+    def layers_func(prev_tensor: keras.KerasTensor) -> keras.KerasTensor:
+        return modelling.empty_layer(prev_tensor)
+    return layers_func
+
+def output_layer(units: int=8,
+                 kernel_initializer:str = "glorot_uniform",
+                 activation: str = "linear") -> Callable[[keras.KerasTensor], keras.KerasTensor]:
+    """ Create an output layer """
+    def layers_func(prev_tensor: keras.KerasTensor) -> keras.KerasTensor:
+        return modelling.output_layer(prev_tensor, units=units,
+                                      kernel_initializer=kernel_initializer, activation=activation)
+    return layers_func
+
+
+# -----------------------------------------------------------
 # Define the target model and the hyperparameter space
 # -----------------------------------------------------------
 #pylint: disable=line-too-long
@@ -96,86 +150,111 @@ scope.define(layers.LeakyReLU)
 scope.define(layers.PReLU)
 scope.define(optimizers.Adam)
 scope.define(optimizers.Nadam)
-trials_pspace = hp.choice("train_and_test_model", [
-        {
-            "model": hp.choice("model", [
-                {
-                    "model_fn": modelling.build_mags_ext_model,
-                    "build_mags_layers": hp.choice("bml", [
-                        "lambda lt: modelling.conv1d_layers(modelling.conv1d_layers(lt, 2, 64, 8, 4, 'same', 'relu', 'CNN-1.'), 3, 64, 4, 2, 'same', 'relu', 'CNN-2.')",
-                        "lambda lt: modelling.conv1d_layers(modelling.conv1d_layers(lt, 2, 32, 8, 4, 'same', 'relu', 'CNN-1.'), 3, 32, 4, 2, 'same', 'relu', 'CNN-2.')",
-                    ]),
-                    "build_ext_layers": hp.choice("bel", [
-                        "lambda lt: modelling.empty_layer(lt)"
-                    ]),
-                    "build_dnn_layers": hp.choice("bdl", [
-                        "lambda lt: modelling.hidden_layers(modelling.hidden_layers(lt, 3, 256, 'he_normal', 'leaky_relu', 0.5), 1, 128, 'he_normal', 'leaky_relu', name_prefix=('Taper-',))",
-                        "lambda lt: modelling.hidden_layers(modelling.hidden_layers(lt, 2, 256, 'he_normal', 'leaky_relu', 0.5), 1, 128, 'he_normal', 'leaky_relu', name_prefix=('Taper-',))",
 
-                        "lambda lt: modelling.hidden_layers(modelling.hidden_layers(lt, 3, 128, 'he_normal', 'leaky_relu', 0.5), 1, 64, 'he_normal', 'leaky_relu', name_prefix=('Taper-',))",
-                        "lambda lt: modelling.hidden_layers(modelling.hidden_layers(lt, 2, 128, 'he_normal', 'leaky_relu', 0.5), 1, 64, 'he_normal', 'leaky_relu', name_prefix=('Taper-',))",
-                    ]),
-                    "build_output_layer": hp.choice("bol", [
-                        "lambda lt: modelling.output_layer(lt)"
-                    ]),
-                }
-            ]),
-            # Compile() parameters
-            "optimizer": hp.choice("optimizer", [
-                "optimizers.Adam(5e-5)",
-                "optimizers.Adam(1e-5)",
-                "optimizers.Nadam(5e-5)",
-                "optimizers.Nadam(1e-5)"]),
-            "loss_function": hp.choice("loss_function", ["mae", "mse"]),      
-        }
-    ])
+trials_pspace = hp.choice("train_and_test_model", [{
+    "model": hp.choice("model", [{
+        "func": modelling.build_mags_ext_model,
+        "build_mags_layers": hp.choice("build_mags_layers", [
+            {
+                "func": simple_symmetric_cnn,
+                "num_layers": hp.choice("cnn_num_layers", [4, 5, 6]),
+                "filters": hp.choice("cnn_filters", [32, 64, 96]),
+                "kernel_size": hp.choice("cnn_kernel_size", [16, 8]),
+                "strides": hp.choice("cnn_strides", [4, 2]),
+                "padding": hp.choice("cnn_padding", ["same"]),
+                "activation": hp.choice("cnn_activation", ["relu"])
+            },
+        ]),
+        "build_ext_layers": {
+            "func": empty_layer
+        },
+        "build_dnn_layers": hp.choice("build_dnn_layers", [
+            {
+                "func": dnn_with_taper,
+                "num_layers": hp.choice("dnn_num_layers", [1, 2, 3]),
+                "units": hp.choice("dnn_units", [64, 128, 256]),
+                "kernel_initializer": hp.choice("dnn_init", ["glorot_uniform", "he_uniform", "he_normal"]),
+                "activation": hp.choice("activation", ["relu", "leaky_relu"]),
+                "dropout_rate": hp.choice("dnn_dropout", [0.3, 0.4, 0.5, 0.6]),
+                "taper_units": hp.choice("dnn_taper", [None, 32, 64, 128]),
+            },
+        ]),
+        "build_output_layer": {
+            "func": output_layer
+        },
+    }]),
+
+    "optimizer": hp.choice("optimizer", [
+        { "class": optimizers.Adam, "learning_rate": hp.choice("adam_lr", [1e-5, 5e-5, 1e-6]) },
+        { "class": optimizers.Nadam, "learning_rate": hp.choice("nadam_lr", [1e-5, 5e-5, 1e-6]) }
+    ]),
+
+    "loss_function": hp.choice("loss_function", ["mae", "mse"]),      
+}])
 
 
-# Helpers for interpreting the trial kwargs
+def get_trial_value(trial_dict: dict, key: str, pop_it: bool=False) -> Union[Callable, any]:
+    """
+    Will get the requested value from the trial dictionary. Specifically handles the special
+    case where we are getting a function/class with hp.choices over the args by parsing the
+    function and its kwargs list and then executing it.
+
+    Example of get the "model" which is the result of the build_mags_ext_model() function
+    with the accompanying kwargs. Also, handles that build_dnn_layers kwarg is a nested function.
+
+    "model": {
+        "func": "<function build_mags_ext_model at 0x7d0270610d60>"
+        "build_dnn_layers": {
+          "func": "<function dnn_with_taper at 0x7d0270543920>",
+          "activation": "leaky_rely",
+          ...
+        },
+        "build_ext_layers": {
+          "func": "<function empty_layer at 0x7d0270610360>"
+        },
+        ...
+    """
+    # We want a KeyError if item not found
+    target_value = trial_dict.pop(key) if pop_it else trial_dict.get(key)
+
+    # We're looking for the special case: a dict with a func/class item and the rest the kwargs.
+    if isinstance(target_value, dict) and ("func" in target_value or "class" in target_value):
+        the_callable = target_value.get("func", target_value.get("class"))
+        if isinstance(the_callable, str): # support it being a str (easier to read when reporting)
+            the_callable = eval(the_callable) # pylint: disable=eval-used
+        callable_kwargs = {}
+        for kwarg in target_value: # recurse to handle funcs which have funcs as args
+            if kwarg not in ["func", "class"]:
+                callable_kwargs[kwarg] = get_trial_value(target_value, kwarg)
+        return the_callable(**callable_kwargs)
+    return target_value
+
+
 # -----------------------------------------------------------
-
-def action_pspace_item(source, locals: Mapping[str, object]=None) -> any: # pylint: disable=redefined-builtin
-    """
-    Evaluate the passed str pspace item
-    """
-    # Hack - try to eval it, if it doesn't work return it as it is
-    if isinstance(source, str):
-        # pylint: disable=eval-used, bare-except
-        try:
-            return eval(source, locals)
-        except:
-            return source
-    else:
-        return source
-
 # Conduct the trials
 # -----------------------------------------------------------
 def train_and_test_model(trial_kwargs):
     """
     Evaluate a single set of hyperparams by building, training and evaluating a model on them.
     """
-    print("\nEvaluating model and hyperparameters based on the following trial_kwargs;",
-          json.dumps(trial_kwargs, indent=2, sort_keys=False, default=str))
+    print("\nEvaluating model and hyperparameters based on the following trial_kwargs:\n"
+          + json.dumps(trial_kwargs, indent=4, sort_keys=False, default=str))
 
     loss = candidate = history = None
     status = STATUS_FAIL
 
-    # Pop these training params prior to creating the model
-    optimizer = action_pspace_item(trial_kwargs.pop("optimizer", None))
-    loss_function = action_pspace_item(trial_kwargs.pop("loss_function", "mae"), metrics)
+    optimizer = get_trial_value(trial_kwargs, "optimizer")
+    loss_function = get_trial_value(trial_kwargs, "loss_function")
     fixed_metrics = ["mae", "mse"]
 
     try:
-        # Now build the model
-        model_kwargs = trial_kwargs["model"]
-        model_fn = model_kwargs.pop("model_fn")
-        candidate = model_fn(**{ a: action_pspace_item(v) for (a, v) in model_kwargs.items() })
-
-        # Compile it - always use the same metrics as we use them for trial evaluation
+        # Build and Compile the trial model
+        # always use the same metrics as we use them for trial evaluation
+        candidate = get_trial_value(trial_kwargs, "model", False)
         candidate.compile(optimizer=optimizer, loss=[loss_function], metrics=fixed_metrics)
 
-        print(f"Training the following model against {ds_counts[0]} {ds_titles[0]} instances.")
-        print(candidate.summary())
+        print(f"\nTraining the following model against {ds_counts[0]} {ds_titles[0]} instances.")
+        print(candidate.summary(line_length=120, show_trainable=True))
         history = candidate.fit(x = datasets[0],
                                 epochs = TRAINING_EPOCHS,
                                 callbacks = CALLBACKS,
@@ -198,19 +277,18 @@ def train_and_test_model(trial_kwargs):
 
     return { "loss": loss, "model": candidate, "history": history, "status": status }
 
-dataset_name = f"{DATASET_DIR.parent.name}/{DATASET_DIR.name}"
-output_dir = Path(f"./saves/results/hyperparams_search/{dataset_name}")
-
-
 # Conduct the trials
-trials = Trials()
-best = fmin(fn = train_and_test_model,
-            space = trials_pspace,
-            trials = trials,
-            algo = tpe.suggest,
-            max_evals = MAX_HYPEROPT_EVALS,
-            loss_threshold = 0.04,
-            catch_eval_exceptions = True)
+results_dir = Path(".") / "drop" / "hyperparam_search"
+results_dir.mkdir(parents=True, exist_ok=True)
+with redirect_stdout(Tee(open(results_dir / "search.log", "w", encoding="utf8"))):
+    trials = Trials()
+    best = fmin(fn = train_and_test_model,
+                space = trials_pspace,
+                trials = trials,
+                algo = tpe.suggest,
+                max_evals = MAX_HYPEROPT_EVALS,
+                loss_threshold = 0.04,
+                catch_eval_exceptions = True)
 
 
 # -----------------------------------------------------------
@@ -218,9 +296,10 @@ best = fmin(fn = train_and_test_model,
 # -----------------------------------------------------------
 best_model = trials.best_trial["result"]["model"]
 best_params = space_eval(trials_pspace, best)
+print("\nBest model hyperparameter set is:\n"
+      + json.dumps(best_params, indent=4, sort_keys=False, default=str))
 
-# TODO: Save best model
-
-
-# TODO: Save best params as JSON
-print(f"\nBest model hyperparameter set is: {best_params}")
+# Save the best model / best parameter set
+modelling.save_model(results_dir / "best_mode.keras", best_model)
+with open(results_dir / "best_params.json", mode="w", encoding="utf8") as of:
+    json.dump(best_params, of, indent=4, default=str)
