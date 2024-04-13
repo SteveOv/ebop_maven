@@ -35,7 +35,7 @@ MAX_HYPEROPT_EVALS = 250        # Maximum number of distinct Hyperopt evals to r
 TRAINING_EPOCHS = 100           # Set high if we're using early stopping
 BATCH_FRACTION = 0.001          # larger -> quicker training per epoch but more to converge
 MAX_BUFFER_SIZE = 20000000      # Size of Dataset shuffle buffer (in instances)
-EARLY_STOPPING_PATIENCE = 10    # Number of epochs w/o improvement before stopping
+PATIENCE = 10                   # Number of epochs w/o improvement before stopping
 
 ENFORCE_REPEATABILITY = True    # If true, avoid GPU/CUDA cores for repeatable results
 SEED = 42                       # Standard random seed ensures repeatable randomization
@@ -43,10 +43,6 @@ np.random.seed(SEED)
 python_random.seed(SEED)
 tf.random.set_seed(SEED)
 
-CALLBACKS = [
-    cb.EarlyStopping("val_loss", restore_best_weights=True,
-                     patience=EARLY_STOPPING_PATIENCE, verbose=1)
-]
 
 print("\n".join(f"{lib.__name__} v{lib.__version__}" for lib in [tf, keras]))
 if ENFORCE_REPEATABILITY:
@@ -233,7 +229,8 @@ def train_and_test_model(trial_kwargs):
         print(candidate.summary(line_length=120, show_trainable=True))
         history = candidate.fit(x = datasets[0],
                                 epochs = TRAINING_EPOCHS,
-                                callbacks = CALLBACKS,
+                                callbacks = [cb.EarlyStopping("val_loss", restore_best_weights=True,
+                                                              patience=PATIENCE, verbose=1)],
                                 validation_data = datasets[1],
                                 verbose=2)
 
