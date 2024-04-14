@@ -35,7 +35,7 @@ MAX_HYPEROPT_EVALS = 250        # Maximum number of distinct Hyperopt evals to r
 TRAINING_EPOCHS = 250           # Set high if we're using early stopping
 BATCH_FRACTION = 0.001          # larger -> quicker training per epoch but more to converge
 MAX_BUFFER_SIZE = 20000000      # Size of Dataset shuffle buffer (in instances)
-PATIENCE = 10                   # Number of epochs w/o improvement before stopping
+PATIENCE = 7                    # Number of epochs w/o improvement before stopping
 
 ENFORCE_REPEATABILITY = True    # If true, avoid GPU/CUDA cores for repeatable results
 SEED = 42                       # Standard random seed ensures repeatable randomization
@@ -211,8 +211,8 @@ trials_pspace = hp.choice("train_and_test_model", [{
     }]),
 
     "optimizer": hp.choice("optimizer", [
-        { "class": optimizers.Adam, "learning_rate": hp.choice("adam_lr", [1e-5, 5e-5, 1e-6]) },
-        { "class": optimizers.Nadam, "learning_rate": hp.choice("nadam_lr", [1e-5, 5e-5, 1e-6]) }
+        { "class": optimizers.Adam, "learning_rate": hp.choice("adam_lr", [1e-5, 5e-5, 1e-4]) },
+        { "class": optimizers.Nadam, "learning_rate": hp.choice("nadam_lr", [1e-5, 5e-5, 1e-4]) }
     ]),
 
     "loss_function": hp.choice("loss_function", ["mae", "mse", "huber"]),      
