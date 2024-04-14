@@ -129,10 +129,10 @@ trials_pspace = hp.choice("train_and_test_model", [{
             {
                 "func": modelling.conv1d_layers,
                 "num_layers": hp.choice("cnn_num_layers", [4, 5, 6]),
-                "filters": hp.choice("cnn_filters", [32, 64, 96]),
+                "filters": hp.choice("cnn_filters", [32, 48, 64]),
                 "kernel_size": hp.choice("cnn_kernel_size", [16, 8]),
                 "strides": hp.choice("cnn_strides", [4, 2]),
-                "padding": hp.choice("cnn_padding", ["same"]),
+                "padding": hp.choice("cnn_padding", ["same", "valid"]),
                 "activation": hp.choice("cnn_activation", ["relu"])
             },
         ]),
@@ -143,7 +143,7 @@ trials_pspace = hp.choice("train_and_test_model", [{
                 "num_layers": hp.choice("dnn_num_layers", [1, 2, 3]),
                 "units": hp.choice("dnn_units", [64, 128, 256]),
                 "kernel_initializer": hp.choice("dnn_init", ["glorot_uniform", "he_uniform", "he_normal"]),
-                "activation": hp.choice("activation", ["relu", "leaky_relu"]),
+                "activation": hp.choice("activation", ["relu", "leaky_relu", "elu"]),
                 "dropout_rate": hp.choice("dnn_dropout", [0.3, 0.4, 0.5, 0.6]),
                 "taper_units": hp.choice("dnn_taper", [None, 32, 64, 128]),
             },
@@ -151,7 +151,7 @@ trials_pspace = hp.choice("train_and_test_model", [{
         "output": {
             "func": modelling.output_layer,
             "label_names_and_scales": { l: deb_example.labels_and_scales[l] for l in CHOSEN_LABELS },
-            "kernel_initializer": hp.choice("ouput_initializer", ["glorot_uniform", "he_uniform"]),
+            "kernel_initializer": hp.choice("ouput_initializer", ["glorot_uniform", "he_uniform", "he_normal"]),
             "activation": "linear"
         },
     }]),
@@ -161,7 +161,7 @@ trials_pspace = hp.choice("train_and_test_model", [{
         { "class": optimizers.Nadam, "learning_rate": hp.choice("nadam_lr", [1e-5, 5e-5, 1e-6]) }
     ]),
 
-    "loss_function": hp.choice("loss_function", ["mae", "mse"]),      
+    "loss_function": hp.choice("loss_function", ["mae", "mse", "huber"]),      
 }])
 
 
@@ -217,7 +217,7 @@ def train_and_test_model(trial_kwargs):
 
     optimizer = get_trial_value(trial_kwargs, "optimizer")
     loss_function = get_trial_value(trial_kwargs, "loss_function")
-    fixed_metrics = ["mae", "mse"]
+    fixed_metrics = ["mae", "mse", "r2_score"]
 
     try:
         # Build and Compile the trial model

@@ -278,5 +278,6 @@ def load_model(file_name: Path) -> models.Model:
                                  "OutputLayer": OutputLayer,
                                  # I shouldn't *have* to do this; fails to deserialize otherwise!
                                  "ReLU": layers.ReLU,
-                                 "LeakyReLU": layers.LeakyReLU
+                                 "LeakyReLU": layers.LeakyReLU,
+                                 "ELU": layers.ELU,
                             })
