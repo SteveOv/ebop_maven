@@ -263,8 +263,9 @@ def train_and_test_model(trial_kwargs):
     """
     Evaluate a single set of hyperparams by building, training and evaluating a model on them.
     """
-    print("\nEvaluating model and hyperparameters based on the following trial_kwargs:\n"
-          + json.dumps(trial_kwargs, indent=4, sort_keys=False, default=str))
+    print("\n" + "-"*80,
+          "Evaluating model and hyperparameters based on the following trial_kwargs:",
+          json.dumps(trial_kwargs, indent=4, sort_keys=False, default=str))
 
     weighted_loss = candidate = history = None
     status = STATUS_FAIL
@@ -301,17 +302,25 @@ def train_and_test_model(trial_kwargs):
 
         # The trial is evaluated on a "weighted loss"; the loss modified with a penalty
         # on model complexity/#params (which is approximated from the number of trainable params).
-        params = int(sum(np.prod(s) for s in [w.shape for w in candidate.trainable_weights]))
-        weighted_loss = mse * np.log(params)
+        weights = int(sum(np.prod(s) for s in [w.shape for w in candidate.trainable_weights]))
+        params = np.log(weights)
+        weighted_loss = mse * params
         status = STATUS_OK
-        print(f"Trial result: MAE={mae:.6f}, MSE={mse:.6f} and #trainable_params={params:.6f}. "
-              + f"giving a weighted loss(mse*ln[params])={weighted_loss:6f}")
+        print("-"*80,
+             f"Trial result: MAE = {mae:.6f}, MSE = {mse:.6f} & params(ln[weights]) = {params:.6f}",
+             f"{' '*14}giving a weighted loss(mse*params) = {weighted_loss:6f}")
+
+        features = candidate.get_layer("Mags-Input").output.shape[1] \
+                    + candidate.get_layer("Ext-Input").output.shape[1]
+        aic = features*np.log(mse) + 2*params
+        bic = features*np.log(mse) + np.log(features)*params
+        print(f"Alternatively: AIC = {aic:,.3f} and BIC = {bic:,.3f}", "-"*80)
     except OpError as exc:
         print(f"*** Training failed! *** Caught a {type(exc).__name__}: {exc.op} / {exc.message}")
         print(f"The problem hyperparam set is: {trial_kwargs}\n")
 
-    return { "loss": weighted_loss, "status": status, # mandatory pair
-             "mae": mae, "mse": mse, "model": candidate, "history": history }
+    return { "loss": weighted_loss, "status": status, "mae": mae, "mse": mse,
+            "AIC": aic, "BIC": bic, "model": candidate, "history": history }
 
 # Conduct the trials
 results_dir = Path(".") / "drop" / "hyperparam_search"
