@@ -32,7 +32,7 @@ MODEL_FILE_NAME = "parameter-search-model"
 CHOSEN_LABELS = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "inc"]
 
 MAX_HYPEROPT_EVALS = 250        # Maximum number of distinct Hyperopt evals to run
-TRAINING_EPOCHS = 100           # Set high if we're using early stopping
+TRAINING_EPOCHS = 250           # Set high if we're using early stopping
 BATCH_FRACTION = 0.001          # larger -> quicker training per epoch but more to converge
 MAX_BUFFER_SIZE = 20000000      # Size of Dataset shuffle buffer (in instances)
 PATIENCE = 10                   # Number of epochs w/o improvement before stopping
