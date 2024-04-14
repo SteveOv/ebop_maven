@@ -297,20 +297,21 @@ def train_and_test_model(trial_kwargs):
         # Out final loss is always MAE from metrics. This allows us to vary the
         # training loss function while using a consistent metric for trial evaluation.
         mae = results[1 + fixed_metrics.index("mae")]
+        mse = results[1 + fixed_metrics.index("mse")]
 
         # The trial is evaluated on a "weighted loss"; the loss modified with a penalty
-        # on model complexity (which is based on the number of trainable params).
-        complxty = np.log10(sum(np.prod(s) for s in [w.shape for w in candidate.trainable_weights]))
-        weighted_loss = mae * complxty
+        # on model complexity/#params (which is approximated from the number of trainable params).
+        params = int(sum(np.prod(s) for s in [w.shape for w in candidate.trainable_weights]))
+        weighted_loss = mse * np.log(params)
         status = STATUS_OK
-        print(f"Trial result: MAE={mae:.6f} and complexity={complxty:.6f}. "
-              + f"The product gives the reported (weighted) loss={weighted_loss:6f}")
+        print(f"Trial result: MAE={mae:.6f}, MSE={mse:.6f} and #trainable_params={params:.6f}. "
+              + f"giving a weighted loss(mse*ln[params])={weighted_loss:6f}")
     except OpError as exc:
         print(f"*** Training failed! *** Caught a {type(exc).__name__}: {exc.op} / {exc.message}")
         print(f"The problem hyperparam set is: {trial_kwargs}\n")
 
     return { "loss": weighted_loss, "status": status, # mandatory pair
-             "mae": mae, "model": candidate, "history": history }
+             "mae": mae, "mse": mse, "model": candidate, "history": history }
 
 # Conduct the trials
 results_dir = Path(".") / "drop" / "hyperparam_search"
