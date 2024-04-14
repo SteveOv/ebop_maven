@@ -212,7 +212,7 @@ def train_and_test_model(trial_kwargs):
     print("\nEvaluating model and hyperparameters based on the following trial_kwargs:\n"
           + json.dumps(trial_kwargs, indent=4, sort_keys=False, default=str))
 
-    loss = candidate = history = None
+    weighted_loss = candidate = history = None
     status = STATUS_FAIL
 
     optimizer = get_trial_value(trial_kwargs, "optimizer")
@@ -232,7 +232,7 @@ def train_and_test_model(trial_kwargs):
                                 callbacks = [cb.EarlyStopping("val_loss", restore_best_weights=True,
                                                               patience=PATIENCE, verbose=1)],
                                 validation_data = datasets[1],
-                                verbose=2)
+                                verbose=0)
 
         print(f"\nEvaluating model against {counts[2]} {ds_titles[2]} dataset test instances.")
         candidate.evaluate(x=datasets[2], y=None, verbose=2)
@@ -240,15 +240,23 @@ def train_and_test_model(trial_kwargs):
         print(f"\nFull evaluation against {counts[3]} {ds_titles[3]} dataset instances.")
         results = candidate.evaluate(x=datasets[3], y=None, verbose=2)
 
-        # Always MAE from metrics, as this allows us to vary the loss function
-        # during training while having a consistent metric for trial evaluation.
-        loss = results[1 + fixed_metrics.index("mae")]
+        # Out final loss is always MAE from metrics. This allows us to vary the
+        # training loss function while using a consistent metric for trial evaluation.
+        mae = results[1 + fixed_metrics.index("mae")]
+
+        # The trial is evaluated on a "weighted loss"; the loss modified with a penalty
+        # on model complexity (which is based on the number of trainable params).
+        complxty = np.log10(sum(np.prod(s) for s in [w.shape for w in candidate.trainable_weights]))
+        weighted_loss = mae * complxty
         status = STATUS_OK
+        print(f"Trial result: MAE={mae:.6f} and complexity={complxty:.6f}. "
+              + f"The product gives the reported (weighted) loss={weighted_loss:6f}")
     except OpError as exc:
         print(f"*** Training failed! *** Caught a {type(exc).__name__}: {exc.op} / {exc.message}")
         print(f"The problem hyperparam set is: {trial_kwargs}\n")
 
-    return { "loss": loss, "model": candidate, "history": history, "status": status }
+    return { "loss": weighted_loss, "status": status, # mandatory pair
+             "mae": mae, "model": candidate, "history": history }
 
 # Conduct the trials
 results_dir = Path(".") / "drop" / "hyperparam_search"
