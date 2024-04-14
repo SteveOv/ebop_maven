@@ -1,7 +1,7 @@
 """
 Searches for the best set of hyperparams for the Mags/Extra-Features model
 """
-from typing import Callable, Union
+from typing import Callable, Union, List, Dict
 from pathlib import Path
 from contextlib import redirect_stdout
 import os
@@ -94,6 +94,52 @@ for ds_ix, (label, set_dir) in enumerate([("training", DATASET_DIR),
 # -----------------------------------------------------------
 # Temporary model Helpers (will go when modelling updated)
 # -----------------------------------------------------------
+def cnn_with_pooling(num_layers: int=1,
+                     filters: Union[int, List[int]]=64,
+                     kernel_size: Union[int, List[int]]=8,
+                     strides: Union[int, List[int]]=2,
+                     padding: Union[str, List[str]]="same",
+                     activation: Union[any, List[any]]="relu",
+                     pooling_ixs: Union[int, List[int]]=None,
+                     pooling_type: layers.Layer=None,
+                     pooling_kwargs: Union[Dict, List[Dict]]=None):
+    """
+    Prototype of creating a set of CNN layers with optional pooling at given indices.
+    """
+    # pylint: disable=too-many-arguments
+    if not isinstance(filters, List):
+        filters = [filters] * num_layers
+    if not isinstance(kernel_size, List):
+        kernel_size = [kernel_size] * num_layers
+    if not isinstance(strides, List):
+        strides = [strides] * num_layers
+    if not isinstance(padding, List):
+        padding = [padding] * num_layers
+    if not isinstance(activation, List):
+        activation = [activation] * num_layers
+    if pooling_ixs and pooling_type and pooling_kwargs and isinstance(pooling_kwargs, dict):
+        num_pools = len(pooling_ixs)
+        pooling_kwargs = [pooling_kwargs] * num_pools
+
+    def layers_func(input_tensor: keras.KerasTensor) -> keras.KerasTensor:
+        # Expected failure if any list isn't num_layers long
+        pooling_ix = 0
+        for cnn_ix in range(num_layers):
+            if pooling_ixs and pooling_type and cnn_ix+pooling_ix in pooling_ixs:
+                input_tensor = pooling_type(name=f"Pool-{pooling_ix+1}",
+                                            **pooling_kwargs[pooling_ix])(input_tensor)
+                pooling_ix += 1
+
+            input_tensor = layers.Conv1D(filters=filters[cnn_ix],
+                                         kernel_size=kernel_size[cnn_ix],
+                                         strides=strides[cnn_ix],
+                                         padding=padding[cnn_ix],
+                                         activation=activation[cnn_ix],
+                                         name=f"CNN-{cnn_ix+1}")(input_tensor)
+        return input_tensor
+    return layers_func
+
+
 def dnn_with_taper(num_layers: int,
                    units: int,
                    kernel_initializer: any,
@@ -127,13 +173,21 @@ trials_pspace = hp.choice("train_and_test_model", [{
         "func": modelling.build_mags_ext_model,
         "mags_layers": hp.choice("mags_layers", [
             {
-                "func": modelling.conv1d_layers,
+                "func": cnn_with_pooling,
                 "num_layers": hp.choice("cnn_num_layers", [4, 5, 6]),
-                "filters": hp.choice("cnn_filters", [32, 48, 64]),
+                "filters": hp.choice("cnn_filters", [32, 64]),
                 "kernel_size": hp.choice("cnn_kernel_size", [16, 8]),
                 "strides": hp.choice("cnn_strides", [4, 2]),
                 "padding": hp.choice("cnn_padding", ["same", "valid"]),
-                "activation": hp.choice("cnn_activation", ["relu"])
+                "activation": hp.choice("cnn_activation", ["relu"]),
+                "pooling_ixs": hp.choice("cnn_pooling_ixs", [None, [2], [2, 5]]),
+                "pooling_type": hp.choice("cnn_pooling_type", [layers.AvgPool1D, layers.MaxPool1D]),
+                "pooling_kwargs": hp.choice("cnn_pooling_kwargs", [
+                    {
+                        "pool_size": 2,
+                        "strides": 2,
+                        "padding": hp.choice("cnn_pooling_padding", ["same", "valid"])
+                    }])
             },
         ]),
         "ext_layers": None,
@@ -144,7 +198,7 @@ trials_pspace = hp.choice("train_and_test_model", [{
                 "units": hp.choice("dnn_units", [64, 128, 256]),
                 "kernel_initializer": hp.choice("dnn_init", ["glorot_uniform", "he_uniform", "he_normal"]),
                 "activation": hp.choice("activation", ["relu", "leaky_relu", "elu"]),
-                "dropout_rate": hp.choice("dnn_dropout", [0.3, 0.4, 0.5, 0.6]),
+                "dropout_rate": hp.choice("dnn_dropout", [0.4, 0.5, 0.6]),
                 "taper_units": hp.choice("dnn_taper", [None, 32, 64, 128]),
             },
         ]),
