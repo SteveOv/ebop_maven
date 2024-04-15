@@ -23,7 +23,9 @@ from ebop_maven import modelling
 from ebop_maven.libs.tee import Tee
 
 TRAINSET_NAME = "formal-training-dataset/"
-DATASET_DIR = Path(".") / "datasets" / TRAINSET_NAME
+TRAINSET_DIR = Path(".") / "datasets" / TRAINSET_NAME / "training"
+VALIDSET_DIR = Path(".") / "datasets" / TRAINSET_NAME / "validation"
+TESTSET_DIR = Path(".") / "datasets" / "synthetic-mist-tess-dataset"
 FORMAL_TESTSET_DIR = Path(".") / "datasets/formal-test-dataset/"
 
 MODEL_FILE_NAME = "parameter-search-model"
@@ -57,21 +59,16 @@ print(f"Found {len(tf.config.list_physical_devices('GPU'))} GPU(s)\n")
 # -----------------------------------------------------------
 # Set up the training/validation/test datasets
 # -----------------------------------------------------------
-print(f"\nPicking up training/validation/test datasets within '{DATASET_DIR}'",
-      f"& the formal testing dataset (real data) from within '{FORMAL_TESTSET_DIR}'.")
 ds_titles = ["training", "validation", "testing", "formal testing"]
+ds_dirs = [TRAINSET_DIR, VALIDSET_DIR, TESTSET_DIR, FORMAL_TESTSET_DIR]
 datasets = [tf.data.TFRecordDataset] * len(ds_titles)
 counts = [int] * len(ds_titles)
-for ds_ix, (label, set_dir) in enumerate([("training", DATASET_DIR),
-                                          ("validation", DATASET_DIR),
-                                          ("testing", DATASET_DIR),
-                                          (None, FORMAL_TESTSET_DIR)]):
-    # Don't set up any mappings/shuffle/batch yet as we want to count the contents first
-    map_func = deb_example.create_map_func(labels=CHOSEN_LABELS,
-                                       noise_stddev=lambda: 0.005,
-                                       roll_steps=lambda: tf.random.uniform([], -9, 10, tf.int32))
+for ds_ix, (label, set_dir) in enumerate(zip(ds_titles, ds_dirs)):
+    files = list(set_dir.glob("**/*.tfrecord"))
     if ds_ix < 3:
-        files = list(set_dir.glob(f"**/{label}/**/*.tfrecord"))
+        map_func = deb_example.create_map_func(labels=CHOSEN_LABELS,
+                                        noise_stddev=lambda: 0.005,
+                                        roll_steps=lambda: tf.random.uniform([], -9, 10, tf.int32))
         if ds_ix == 0:
             (datasets[ds_ix], counts[ds_ix]) = \
                 deb_example.create_dataset_pipeline(files, BATCH_FRACTION, map_func,
@@ -83,12 +80,9 @@ for ds_ix, (label, set_dir) in enumerate([("training", DATASET_DIR),
                 deb_example.create_dataset_pipeline(files, BATCH_FRACTION, map_func)
     else:
         # For the formal test dataset simple pipeline with no noise/roll and a single batch
-        files = list(set_dir.glob("**/*.tfrecord"))
         map_func = deb_example.create_map_func(labels=CHOSEN_LABELS) # No added noise or roll
         datasets[ds_ix], counts[ds_ix] = deb_example.create_dataset_pipeline(files, 10000, map_func)
-
-    print(f"Found {counts[ds_ix]:,} {label} instances spread over",
-          f"{len(files)} tfrecord file(s) within '{set_dir}'.")
+    print(f"Found {counts[ds_ix]:,} {label} instances over {len(files)} tfrecord files in", set_dir)
 
 
 # -----------------------------------------------------------

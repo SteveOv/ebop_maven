@@ -79,8 +79,8 @@ trainsets.plot_trainset_histograms(dataset_dir, dataset_dir / "histogram_main.ep
 with redirect_stdout(Tee(open(dataset_dir/"dataset.log", "a" if RESUME else "w", encoding="utf8"))):
     datasets.make_dataset_files(trainset_files=dataset_dir.glob("trainset*.csv"),
                                 output_dir=dataset_dir,
-                                valid_ratio=0.1,
-                                test_ratio=0.1,
+                                valid_ratio=0.2,
+                                test_ratio=0,
                                 resume=RESUME,
                                 max_workers=8,
                                 verbose=True,

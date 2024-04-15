@@ -23,11 +23,10 @@ MAGS_BINS = deb_example.mags_bins
 NUM_EXT_INPUTS = len(deb_example.extra_features_and_defaults)
 
 # We can now specify paths to train/val/test datasets separately for greater flexibility.
-TRAINSET_NAME = "formal-training-dataset/"
-DATASET_DIR = Path(".") / "datasets" / TRAINSET_NAME
-TRAINSET_DIR = DATASET_DIR / "training"
-VALIDSET_DIR = DATASET_DIR / "validation"
-TESTSET_DIR = DATASET_DIR / "testing"
+TRAINSET_NAME = "formal-training-dataset"
+TRAINSET_DIR = Path(".") / "datasets" / TRAINSET_NAME / "training"
+VALIDSET_DIR = Path(".") / "datasets" / TRAINSET_NAME / "validation"
+TESTSET_DIR = Path(".") / "datasets" / "synthetic-mist-tess-dataset"
 MODEL_FILE_NAME = "cnn_ext_model"
 MODEL_NAME = "CNN-Ext-Estimator-New"
 SAVE_DIR = Path(".") / "drop/"
@@ -93,8 +92,7 @@ for ds_ix, (label, set_dir) in enumerate([("training", TRAINSET_DIR),
     else:
         (datasets[ds_ix], counts[ds_ix]) = \
             deb_example.create_dataset_pipeline(files, BATCH_FRACTION, map_func)
-    print(f"Found {counts[ds_ix]:,} {label} instances spread over",
-          f"{len(files)} tfrecord file(s) within '{set_dir}'.")
+    print(f"Found {counts[ds_ix]:,} {label} instances over {len(files)} tfrecord files in", set_dir)
 
 # -----------------------------------------------------------
 # Define the model
