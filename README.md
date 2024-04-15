@@ -3,6 +3,9 @@ A machine learning model for estimating input values for characterization of det
 
 Included in this repository are codes for generating training & test datasets, for building, training & testing the machine learning model and _some other stuff still to be decided_.
 
+> [!WARNING]  
+> This is a work in progress. Handle with care.
+
 ## Installation
 This code base was developed within the context of an Anaconda 3 conda environment named ebop_maven. This environment supports Python 3.9+, TensorFlow, Keras, lightkurve, astropy and any further libraries upon which the code is dependent. To set up the ebop_maven conda environment, having first cloned this GitHub repo, open a Terminal, navigate to this local directory and run the following command;
 ```sh
@@ -40,7 +43,7 @@ $ python make_training_datasets.py
 ```
 This module will write three datasets under the ./datasets directory:
 - **formal-training-dataset** : a synthetic dataset built by randomly sampling distributions of JKTEBOP model parameters
-    - currently this generates 100,000 instances split on the ratios 8:1:1 between training, validation and testing
+    - currently this generates 100,000 instances split on the ratios 80:20 between training and validation sets
     - the base parameters sampled are $r_A+r_B$, $k$, $i$, $J$, $q_{phot}$, $e$ and $\omega$ ($L_3$ under revirew)
 - **synthetic-mist-tess-dataset** : a synthetic dataset built from a grid of physical parameters
     - the file ./config/synthetic-mist-tess-dataset.json gives the grid of base physical parameters; $M_{init}$, $P$, $i$, $e$, $\omega$ ($L_3$ under review)
