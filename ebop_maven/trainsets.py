@@ -25,8 +25,9 @@ from .libs.stellarmodels import StellarModels
 _this_dir = Path(getsourcefile(lambda:0)).parent
 
 # Useable "general use" limb-darkening algo and coefficients
+# for a F-type star T_eff~7200 K and logg~4.0
 _def_limb_darkening_params = {"LDA": "quad", "LDB": "quad",
-                              "LDA1": 0.25,  "LDB1": 0.25,
+                              "LDA1": 0.28,  "LDB1": 0.28,
                               "LDA2": 0.22,  "LDB2": 0.22 }
 
 # The full set of parameters available for histograms, their #bins and plot labels
