@@ -158,5 +158,21 @@ class TestEstimator(unittest.TestCase):
         result = estimator.predict(instances, iterations=100)
         self.assertTrue(any(result[0][c]!=0 for c in estimator.prediction_names if c.endswith("_sigma")))
 
+    def test_predict_with_unscale_on(self):
+        """ Tests predict({ instance items }, unscale=True) -> expect unscaled inc """
+        estimator = Estimator(self._default_model_file, iterations=1) # 1 iteration == no MC Dropout
+        instances = { "mags": [0.5] * estimator.mags_feature_bins, "dS_over_dP": 1, "phiS": 0.5 }
+
+        result = estimator.predict(instances, unscale=True)
+        self.assertTrue(result[0]["inc"] > 5, "expecting inc to not be re-scaled")
+
+    def test_predict_with_unscale_off(self):
+        """ Tests predict({ instance items }, unscale=False) -> expect scaled inc """
+        estimator = Estimator(self._default_model_file, iterations=1) # 1 iteration == no MC Dropout
+        instances = { "mags": [0.5] * estimator.mags_feature_bins, "dS_over_dP": 1, "phiS": 0.5 }
+
+        result = estimator.predict(instances, unscale=False)
+        self.assertTrue(result[0]["inc"] < 5, "expecting inc to be scaled value")
+
 if __name__ == "__main__":
     unittest.main()

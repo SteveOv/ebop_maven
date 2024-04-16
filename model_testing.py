@@ -40,7 +40,6 @@ def test_with_estimator(model: Union[Model, Path],
     # Create our Estimator. It will tell us which labels it (& the model) can predict.
     estimator = Estimator(model)
     lbl_names = [*estimator.label_names_and_scales.keys()]
-    lbl_scales = [*estimator.label_names_and_scales.values()]
     num_labels = len(estimator.label_names_and_scales)
 
     print(f"\nLooking for the test dataset in '{test_dataset_dir}'.")
@@ -49,6 +48,7 @@ def test_with_estimator(model: Union[Model, Path],
         raise IndexError("No dataset files found")
 
     # Don't iterate over the dataset; it's easier if we work with all the data (via a single batch)
+    # As the lbls have come through a dataset pipeline any scaling will be applied.
     map_func = deb_example.create_map_func(labels=lbl_names)
     (ds_formal_test, inst_count) = deb_example.create_dataset_pipeline(tfrecord_files,
                                                                        10000, map_func)
@@ -64,19 +64,15 @@ def test_with_estimator(model: Union[Model, Path],
     # Run the predictions twice; with and without using MC Dropout enabled.
     for iterations, suffix in [(1, "nonmc"), (1000, "mc")]:
         # Make our prediction which will return [#inst, {}]
+        # Here we don't want to unscale the predictions so we're consistent with evaluate().
         print(f"\nUsing an Estimator to make predictions on {inst_count} formal test instances.")
-        predictions = estimator.predict(instance_features, iterations)
+        predictions = estimator.predict(instance_features, iterations, unscale=False)
 
-        # To generate the results we get the predictions (not sigmas) into
-        # shape [#inst, 8]. The labels/predictions are scaled in the Model which
-        # the estimator's funcs handle (i.e. it's trained on inc/100). However
-        # here we un-scale the predictions so we're consistent with evaluate().
+        # To generate the results we get the predictions (and sigmas) into shape [#inst, 8].
         noms = np.array([[d[k] for k in lbl_names] for d in predictions])
-        noms = np.multiply(noms, lbl_scales)
         nom_errs = np.array([[d[f"{k}_sigma"] for k in lbl_names] for d in predictions])
-        nom_errs = np.multiply(nom_errs, lbl_scales)
 
-        # Summary stats (MAE, MSE) by label and over the whole set of preds
+        # Summary stats (MAE, MSE) by label and over the whole set of preds. 
         ocs = np.subtract(noms, lbls)
         lbl_maes = [np.mean(np.abs(ocs[:, c])) for c in range(num_labels)]
         lbl_mses = [np.mean(np.power(ocs[:, c], 2)) for c in range(num_labels)]

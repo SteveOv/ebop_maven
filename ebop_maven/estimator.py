@@ -98,7 +98,8 @@ class Estimator(ABC):
 
     def predict(self,
                 instances: List[Dict[str, any]],
-                iterations: int=None) -> List[Dict[str, float]]:
+                iterations: int=None,
+                unscale: bool=True) -> List[Dict[str, float]]:
         """
         Make predictions on one or more instances' features. The instances are
         in the form of a List of dicts.
@@ -109,6 +110,8 @@ class Estimator(ABC):
         
         :instances: list of dicts, one for each instance to predict
         :iterations: the number of MC Dropout iterations (overriding the instance default)
+        :unscale: indicates whether to undo the scaling of the predicted values. For example,
+        the model may predict inc*0.01 and unscale would undo this returning inc as prediction/0.01
         :returns: a list dictionaries, each row the predicted labels for the matching input instance
         """
         iterations = self._iterations if iterations is None else iterations
@@ -158,7 +161,8 @@ class Estimator(ABC):
         ])
 
         # Undo any scaling applied to the labels (e.g. the model predicts inc/100)
-        stkd_prds /= [*self.label_names_and_scales.values()]
+        if unscale:
+            stkd_prds /= [*self.label_names_and_scales.values()]
 
         # Summarize the label predictions & append 1-sigma values to each inst
         # We go from shape (#iters, #insts, #labels) to shape (#insts, #labels*2)
