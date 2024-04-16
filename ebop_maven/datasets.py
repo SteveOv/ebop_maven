@@ -310,7 +310,7 @@ Selected targets are:               {', '.join(target_names) if target_names els
             fits_dir = fits_cache_dir / re.sub(r'[^\w\d-]', '_', target.lower())
             for sector in [int(s) for s in target_cfg["sectors"].keys() if s.isdigit()]:
                 inst_id = f"{target}/{sector:0>4}"
-                sector_cfg = _sector_config_from_target(sector, target_cfg)
+                sector_cfg = sector_config_from_target(sector, target_cfg)
 
                 # These are mandatory, so error if missing
                 labels = sector_cfg["labels"]
@@ -319,7 +319,7 @@ Selected targets are:               {', '.join(target_names) if target_names els
 
                 # Get the Lightcurve that matches the target & sector criteria and preprocess it.
                 # Will attempt to service the request from previously downloaded fits if present.
-                lc = _prepare_lc_for_target_sector(target, sector, sector_cfg, fits_dir, verbose)
+                lc = prepare_lc_for_target_sector(target, sector, sector_cfg, fits_dir, verbose)
                 pe = lightcurve.to_lc_time(pe, lc)
 
                 # Produce multiple mags set (varying #bins & wrap phase) available for serialization
@@ -460,7 +460,7 @@ def plot_dataset_instance_model_feature(dataset_files: Union[Path, Iterator[Path
         plt.close()
 
 
-def _sector_config_from_target(sector: int, target_cfg: Dict[str, any]) -> Dict[str, any]:
+def sector_config_from_target(sector: int, target_cfg: Dict[str, any]) -> Dict[str, any]:
     """
     Get the sector specific config from the passed target config. The sector config
     is the target config overlaid with the sector config so the sector provides overrides.
@@ -473,11 +473,11 @@ def _sector_config_from_target(sector: int, target_cfg: Dict[str, any]) -> Dict[
     return sector_cfg
 
 
-def _prepare_lc_for_target_sector(target: str,
-                                  sector: int,
-                                  config: Dict[str, any],
-                                  fits_dir: Path,
-                                  verbose: bool=True) -> LightCurve:
+def prepare_lc_for_target_sector(target: str,
+                                 sector: int,
+                                 config: Dict[str, any],
+                                 fits_dir: Path,
+                                 verbose: bool=True) -> LightCurve:
     """
     Will find and load the requested target/sector lightcurve then mask, bin and
     append the rectified delta_mag and delta_mag_err columns. It will read the
