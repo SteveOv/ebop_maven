@@ -85,7 +85,7 @@ with redirect_stdout(Tee(open(dataset_dir/"dataset.log", "a" if RESUME else "w",
                                 max_workers=8,
                                 verbose=True,
                                 simulate=False)
-
+quit()
 
 # ------------------------------------------------------------------------------
 # A second testing dataset based on MIST models and a configured parameter space
