@@ -1,6 +1,5 @@
 """ Unit tests for the jktebop module. """
 import os
-import sys
 import io
 import unittest
 from pathlib import Path
@@ -108,6 +107,36 @@ class Testjktebop(unittest.TestCase):
             self.fail("Should not get here")
         except CalledProcessError:
             pass
+
+    def test_run_jktebop_task_stdout_callback_with_TextIO(self):
+        """ Test run_jktebop_task(all necessary params) generates model """
+        # Need to create the in file first
+        in_filename = get_jktebop_dir() / "test_run_jktebop_task_ext_valid.2.in"
+        out_filename = get_jktebop_dir() / f"{in_filename.stem}.out"
+        params = { **self._task2_params.copy(), "out_filename": f"{out_filename.name}" }
+        write_in_file(in_filename, 2, None, **params)
+
+        output = io.StringIO()
+
+        # Outfile content
+        list(jktebop.run_jktebop_task(in_filename, out_filename, f"{in_filename.stem}.*", output))
+        self.assertIn("JKTEBOP", output.getvalue())
+
+    def test_run_jktebop_task_stdout_callback_with_callback(self):
+        """ Test run_jktebop_task(all necessary params) generates model """
+        # Need to create the in file first
+        in_filename = get_jktebop_dir() / "test_run_jktebop_task_ext_valid.2.in"
+        out_filename = get_jktebop_dir() / f"{in_filename.stem}.out"
+        params = { **self._task2_params.copy(), "out_filename": f"{out_filename.name}" }
+        write_in_file(in_filename, 2, None, **params)
+
+        output = io.StringIO()
+        def write_stdout(line: str):
+            print(line, file=output)
+
+        # Outfile content
+        list(jktebop.run_jktebop_task(in_filename, out_filename, f"{in_filename.stem}.*", write_stdout))
+        self.assertIn("JKTEBOP", output.getvalue())
 
 
     #

@@ -2,8 +2,10 @@
 # pylint: disable=invalid-name
 from typing import Union, Dict, List, Callable
 import os
+import threading
 import subprocess
 import tempfile
+from io import TextIOBase
 from inspect import getsourcefile
 from pathlib import Path
 from string import Template
@@ -30,33 +32,80 @@ def get_jktebop_dir() -> Path:
 
 
 def run_jktebop_task(in_filename: Path,
-                     out_filename: Path,
-                     delete_files_pattern: str=None):
+                     out_filename: Path=None,
+                     delete_files_pattern: str=None,
+                     stdout_capture: Union[TextIOBase, Callable[[str], None]]=None):
     """
     Will run JKTEBOP against the passed in file, waiting for the production of the
     expected out file. The contents of the outfile will be returned line by line.
+
+    The function returns a Generator[str] yielding the lines of text writteing to
+    the out_filename. These can be read in a for loop:
+    ```Python
+    for line in run_jktebop_task(...):
+        ...
+    ```
+    or, to capture everything wrap it in a list() function:
+    ```Python
+    lines = list(run_jktebop_task(...))
+    ```
+
+    To use the stdout_capture functionality you can pass in an instance of a
+    TextIOBase, for example:
+    ```Python
+    output=io.StringIO()
+    run_jktebop_task(..., stdout_capture=output)
+    ```
+    or, you can pass in a function or lambda which takes a single str argument
+    which will be called each time the console is written to. For example the
+    print() function will work to echo JKTEBOP's stdout to the current console:
+    ```Python
+    run_jktebop_task(..., stdout_capture=print)
+    ```
 
     :in_filename: the path of the in file containing the JKTEBOP input parameters.
     :out_filename: the path of the primary output file we expect be created.
     This will be read and the contents yielded in a Generator.
     :delete_files_pattern: optional glob pattern of files to be deleted after
     successful processing. The files will not be deleted if there is a failure.
-    :stdout: a TextIO to capture the command's stdout and stderr output
+    :stdout_capture: a callback or TextIO given each line JKTEBOP writtes to stdout as it happens
     :returns: yields the content of the primary output file, line by line.
     """
     # Call out to jktebop to process the in file and generate the requested output file
+    return_code = None
     cmd = ["./jktebop", f"{in_filename.name}"]
-    result = subprocess.run(cmd, cwd=get_jktebop_dir(), capture_output=True, text=True, check=True)
+    with subprocess.Popen(cmd,
+                          cwd=get_jktebop_dir(),
+                          stdout=subprocess.PIPE,
+                          stderr=subprocess.STDOUT,
+                          text=True) as proc:
+        # This is an async call so we can publish any writes to stdout/stderr as they happen
+        stdout_thread = None
+        if stdout_capture is not None:
+            def echo_to_capture_console():
+                while True:
+                    line = proc.stdout.readline()
+                    if not line:
+                        break
+                    if isinstance(stdout_capture, TextIOBase):
+                        print(line.strip(), file=stdout_capture)
+                    elif isinstance(stdout_capture, Callable):
+                        stdout_capture(line.strip())
+            stdout_thread = threading.Thread(target=echo_to_capture_console)
+            stdout_thread.start()
+        return_code = proc.wait()
+        if stdout_thread:
+            stdout_thread.join()
 
     # JKTEBOP (v43) doesn't appear to set the response code on failures so
     # we'll check if there has been a problem by trying to pick up the out file.
-    if result.returncode == 0 and out_filename.exists():
+    if return_code == 0 and out_filename.exists():
         # Read the resulting out file
         with open(out_filename, mode="r", encoding="utf8") as of:
             for line in of:
                 yield line
-    else:
-        raise subprocess.CalledProcessError(result.returncode, cmd, result.stdout)
+    elif not out_filename.exists():
+        raise subprocess.CalledProcessError(0, cmd)
 
     if delete_files_pattern:
         # Optional cleanup
