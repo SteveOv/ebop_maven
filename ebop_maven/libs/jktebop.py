@@ -13,10 +13,56 @@ from lightkurve import LightCurve
 from astropy.io import ascii as io_ascii
 
 _this_dir = Path(getsourcefile(lambda:0)).parent
-_task2_template_file = _this_dir / "data/jktebop/task2.in.template"
-_task3_template_file = _this_dir / "data/jktebop/task3.in.template"
+_template_files = {
+    2: _this_dir / "data/jktebop/task2.in.template",
+    3: _this_dir / "data/jktebop/task3.in.template"
+}
+
 _jktebop_directory = \
     Path(os.environ.get("JKTEBOP_DIR", "~/jktebop/")).expanduser().absolute()
+
+
+def get_jktebop_dir() -> Path:
+    """
+    Publishes the path of the directory holding the JKTEBOP executable
+    """
+    return _jktebop_directory
+
+
+def run_jktebop_task(in_filename: Path,
+                     out_filename: Path,
+                     delete_files_pattern: str=None):
+    """
+    Will run JKTEBOP against the passed in file, waiting for the production of the
+    expected out file. The contents of the outfile will be returned line by line.
+
+    :in_filename: the path of the in file containing the JKTEBOP input parameters.
+    :out_filename: the path of the primary output file we expect be created.
+    This will be read and the contents yielded in a Generator.
+    :delete_files_pattern: optional glob pattern of files to be deleted after
+    successful processing. The files will not be deleted if there is a failure.
+    :stdout: a TextIO to capture the command's stdout and stderr output
+    :returns: yields the content of the primary output file, line by line.
+    """
+    # Call out to jktebop to process the in file and generate the requested output file
+    cmd = ["./jktebop", f"{in_filename.name}"]
+    result = subprocess.run(cmd, cwd=get_jktebop_dir(), capture_output=True, text=True, check=True)
+
+    # JKTEBOP (v43) doesn't appear to set the response code on failures so
+    # we'll check if there has been a problem by trying to pick up the out file.
+    if result.returncode == 0 and out_filename.exists():
+        # Read the resulting out file
+        with open(out_filename, mode="r", encoding="utf8") as of:
+            for line in of:
+                yield line
+    else:
+        raise subprocess.CalledProcessError(result.returncode, cmd, result.stdout)
+
+    if delete_files_pattern:
+        # Optional cleanup
+        for parent in [in_filename.parent, out_filename.parent]:
+            for file in parent.glob(delete_files_pattern):
+                file.unlink()
 
 
 def generate_model_light_curve(file_prefix: str, **params) -> np.ndarray:
@@ -35,7 +81,7 @@ def generate_model_light_curve(file_prefix: str, **params) -> np.ndarray:
 
     # Create a unique temp .in file, for jktebop to process. Set it to write to
     # an output file with an equivalent name so they're both easy to clean up.
-    with tempfile.NamedTemporaryFile(dir=_jktebop_directory,
+    with tempfile.NamedTemporaryFile(dir=get_jktebop_dir(),
                                      prefix=file_prefix,
                                      suffix=".in",
                                      delete=False,
@@ -43,55 +89,33 @@ def generate_model_light_curve(file_prefix: str, **params) -> np.ndarray:
                                      encoding="utf8") as wf:
         in_filename = Path(wf.name)
         out_filename = in_filename.parent / (in_filename.stem + ".out")
-        with open(_task2_template_file, "r", encoding="utf8") as tpf:
-            template = Template(tpf.read())
-
         in_params["out_filename"] = f"{out_filename.name}"
-        wf.write(template.substitute(**in_params))
+        write_in_file(in_filename, 2, **in_params)
 
-    # Call out to jktebop to process the in file and generate the
-    # corresponding .out file with the modelled LC data
-    cmd = ["./jktebop", f"{in_filename.name}"]
-    result = subprocess.run(cmd,
-                            cwd=_jktebop_directory,
-                            capture_output=True,
-                            check=True)
-
-    # JKTEBOP (v43) doesn't appear to set the response code on failures so
-    # we'll check if there has been a problem by trying to pick up the out file.
-    model_data = None
-    if result.returncode == 0 and out_filename.exists():
-        # Read the resulting out file
-        model_data = np.loadtxt(fname=out_filename,
-                                usecols=(0, 1),
-                                comments="#",
-                                dtype=np.double,
-                                unpack=True)
-
-        # Delete the in and out files
-        in_filename.unlink()
-        out_filename.unlink()
-    elif not out_filename.exists():
-        raise subprocess.CalledProcessError(0, cmd, result.stdout)
-    return model_data
+    # Call out to jktebop to process the in file & generate the corresponding .out file
+    # with the modelled LC data, which we parse and return as shape [2, #rows]
+    return np.loadtxt(run_jktebop_task(in_filename, out_filename, f"{in_filename.stem}.*"),
+                      usecols=(0, 1), comments="#", dtype=np.double, unpack=True)
 
 
-def write_task3_in_file(file_name: Path,
-                        append_lines: List[str]=None,
-                        **params):
+def write_in_file(file_name: Path,
+                  task: int,
+                  append_lines: List[str]=None,
+                  **params):
     """
-    Writes a JKTEBOP task3 .in file based on applying the passed params/token
-    values to the task3.in.template file.
+    Writes a JKTEBOP .in file based on applying the passed params/token
+    values to the template file corresponding to the selected task.
 
-    :file_name: the name and path of the file to write
-    :append_lines: lines to optionally append at the end of the in file
-    :params: a dictionary of param tokens/keys and values
+    :file_name: the name and path of the file to write.
+    :task: the task being undertaken. Currently only 2 and 3 are supported.
+    :append_lines: lines to optionally append at the end of the in file.
+    :params: a dictionary of param tokens/keys and values.
     """
     if file_name is None or not isinstance(file_name, Path):
         raise TypeError("file_name is not a Path")
 
     # Pre-process the params/tokens to be applied to the .in file.
-    in_params = _prepare_params_for_task(3, params)
+    in_params = _prepare_params_for_task(task, params)
 
     if "L3" in in_params and in_params["L3"] < 0.:
         raise ValueError("Minimum L3 input value is 0.0")
@@ -102,7 +126,7 @@ def write_task3_in_file(file_name: Path,
         in_params["file_name_stem"] = file_name.stem
 
     with open(file_name, mode="w", encoding="utf8") as wf:
-        with open(_task3_template_file, "r", encoding="utf8") as tpf:
+        with open(_template_files[task], "r", encoding="utf8") as tpf:
             template = Template(tpf.read())
 
         # Will error if any expected tokens are not present.
@@ -178,6 +202,8 @@ def _prepare_params_for_task(task: int,
     """
     if task is None:
         raise TypeError("task cannot be None")
+    if not isinstance(task, int):
+        raise TypeError("task must be an int")
     if params is None:
         raise TypeError("params cannot be None")
 

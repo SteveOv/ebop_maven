@@ -1,5 +1,7 @@
 """ Unit tests for the jktebop module. """
 import os
+import sys
+import io
 import unittest
 from pathlib import Path
 from subprocess import CalledProcessError
@@ -10,8 +12,9 @@ import tests.libs.helpers.lightcurve_helpers as th
 
 from ebop_maven.libs import jktebop
 from ebop_maven.libs.jktebop import _prepare_params_for_task
-from ebop_maven.libs.jktebop import generate_model_light_curve
-from ebop_maven.libs.jktebop import write_task3_in_file, write_light_curve_to_dat_file
+from ebop_maven.libs.jktebop import get_jktebop_dir
+from ebop_maven.libs.jktebop import run_jktebop_task, generate_model_light_curve
+from ebop_maven.libs.jktebop import write_in_file, write_light_curve_to_dat_file
 
 # pylint: disable=invalid-name, too-many-public-methods, line-too-long, protected-access
 class Testjktebop(unittest.TestCase):
@@ -62,6 +65,50 @@ class Testjktebop(unittest.TestCase):
         jktebop._jktebop_directory = Path(os.environ.get("JKTEBOP_DIR", "~/jktebop/")).expanduser().absolute()
         return super().tearDownClass()
 
+    #
+    # Tests get_jktebop_dir()
+    #
+    def test_get_jktebop_dir_assert_value(self):
+        """ Calls get_jktebop_dir() and assert its value. """
+        jdir = get_jktebop_dir()
+        exp_value = Path(os.environ.get("JKTEBOP_DIR", "~/jktebop/")).expanduser().absolute()
+        self.assertEqual(jdir, exp_value)
+
+
+    #
+    # Tests run_jktebop_task(in_filename, out_filename, delete_files_pattern)
+    #
+    def test_run_jktebop_task_valid(self):
+        """ Test run_jktebop_task(all necessary params) generates model """
+        # Need to create the in file first
+        in_filename = get_jktebop_dir() / "test_run_jktebop_task_valid.2.in"
+        out_filename = get_jktebop_dir() / f"{in_filename.stem}.out"
+        params = { **self._task2_params.copy(), "out_filename": f"{out_filename.name}" }
+        write_in_file(in_filename, 2, None, **params)
+
+        # Outfile content
+        out_content = list(run_jktebop_task(in_filename, out_filename, f"{in_filename.stem}.*"))
+        model = np.loadtxt(out_content, usecols=(0, 1), comments="#", dtype=np.double, unpack=True)
+        self.assertEqual(model.shape[0], 2) # columns
+        self.assertTrue(model.shape[1] > 0) # rows
+
+        # In and out files deleted
+        self.assertFalse(in_filename.exists())
+        self.assertFalse(out_filename.exists())
+
+    def test_run_jktebop_task_in_file_not_found(self):
+        """ Test run_jktebop_task(in_file doesn't exist) raises CalledProcessError """
+        # Don't create the in_filename
+        in_filename = get_jktebop_dir() / "test_run_jktebop_task_unknown.2.in"
+        out_filename = get_jktebop_dir() / f"{in_filename.stem}.out"
+
+        # self.assertRaises() not working for this. Instead assert by catching CalledProcessError
+        try:
+            next(run_jktebop_task(in_filename, out_filename, f"{in_filename.stem}.*"))
+            self.fail("Should not get here")
+        except CalledProcessError:
+            pass
+
 
     #
     # Tests generate_model_light_curve(file_prefix: str,
@@ -80,7 +127,7 @@ class Testjktebop(unittest.TestCase):
     def test_generate_model_light_curve_jktebop_error(self):
         """ Test generate_model_light_curve(jktebop fails) raises CalledProcessError """
         params = self._task2_params.copy()
-        params["rA_plus_rB"] = 0.9 # max supported up to v43 value is 0.8
+        params["ecosw"] = None
         self.assertRaises(CalledProcessError, generate_model_light_curve, self._prefix, **params)
 
     @unittest.skip("skip on full run as can cause parallel tests to fail")
@@ -109,46 +156,66 @@ class Testjktebop(unittest.TestCase):
 
 
     #
-    # TESTS write_task3_in_file(file_name, [append_lines], **params)
+    # TESTS write_in_file(file_name, task, [append_lines], **params)
     #
-    def test_write_task3_in_file_args_none_or_wrong_type(self):
-        """ Test write_light_curve_to_dat_file(wrong file_name type) raises TypeError """
-        self.assertRaises(TypeError, write_task3_in_file, None)
-        self.assertRaises(TypeError, write_task3_in_file, "hello")
+    def test_write_in_file_args_none_or_wrong_type(self):
+        """ Test write_in_file(wrong file_name type) raises TypeError """
+        self.assertRaises(TypeError, write_in_file, None, 2)
+        self.assertRaises(TypeError, write_in_file, get_jktebop_dir() / "valid.in", None)
+        self.assertRaises(TypeError, write_in_file, "hello", 2)
+        self.assertRaises(TypeError, write_in_file, get_jktebop_dir() / "valid.in", "Task2")
 
-    def test_write_task3_in_file_missing_params(self):
-        """ Test write_light_curve_to_dat_file(missing template params) raises KeyError """
+    def test_write_in_file_task_is_unknown(self):
+        """ Test write_in_file(task is unknown) raises KeyError """
+        self.assertRaises(KeyError, write_in_file, get_jktebop_dir() / "valid.in", 1)
+
+    def test_write_in_file_missing_params(self):
+        """ Test write_in_file(missing template params) raises KeyError """
         file_name = th.TEST_DATA_DIR / "any_old_file_will_do.dat"
-        self.assertRaises(KeyError, write_task3_in_file, file_name, k=0.5)
+        self.assertRaises(KeyError, write_in_file, file_name, task=3, k=0.5)
 
-    def test_write_task3_in_file_validation_rules(self):
-        """ Test write_light_curve_to_dat_file(some invalid param values) raises ValueError """
+    def test_write_in_file_validation_rules(self):
+        """ Testwrite_in_file(some invalid param values) raises ValueError """
         file_name = th.TEST_DATA_DIR / "any_old_file_will_do.dat"
         for param, value in [("L3", -0.1),
                              ("rA_plus_rB", 0.9)]:
             params = self._task3_params.copy()
             params[param] = value
             with self.assertRaises(ValueError, msg=f"{param} == {value}"):
-                write_task3_in_file(file_name, None, **params)
+                write_in_file(file_name, 3, None, **params)
 
-    def test_write_task3_in_file_full_set_of_params(self):
-        """ Test write_light_curve_to_dat_file(missing template params) raises KeyError """
-        file_stem = "test_write_task3_in_file_full_set_of_params.3"
+    def test_write_in_file_full_set_of_task2_params(self):
+        """ Test write_in_file(full set of task2 template params) asserts file is written """
+        file_stem = "test_write_in_file_full_set_of_params.2"
         file_name = th.TEST_DATA_DIR / f"{file_stem}.in"
-        write_task3_in_file(file_name, **self._task3_params)
+        params = { **self._task2_params.copy(), "out_filename": f"{file_name.stem}.out" }
+        write_in_file(file_name, task=2, **params)
 
         with open(file_name, "r", encoding="utf8") as inf:
             text = inf.read()
-            self.assertIn(self._task3_params["LDB"], text)
-            self.assertIn(self._task3_params["data_file_name"], text)
+            self.assertIn(params["LDB"], text)
+            self.assertIn(params["out_filename"], text)
             self.assertIn(file_stem, text)
 
-    def test_write_task3_in_file_append_lines(self):
-        """ Test write_light_curve_to_dat_file(missing template params) raises KeyError """
+    def test_write_in_file_full_set_of_task3_params(self):
+        """ Test write_in_file(full set of task3 template params) asserts file is written """
+        file_stem = "test_write_in_file_full_set_of_params.3"
+        file_name = th.TEST_DATA_DIR / f"{file_stem}.in"
+        params = { **self._task3_params.copy(), "data_file_name": f"{file_name.stem}.dat"}
+        write_in_file(file_name, task=3, **params)
+
+        with open(file_name, "r", encoding="utf8") as inf:
+            text = inf.read()
+            self.assertIn(params["LDB"], text)
+            self.assertIn(params["data_file_name"], text)
+            self.assertIn(file_stem, text)
+
+    def test_write_in_file_append_lines(self):
+        """ Test write_in_file(with append_lines) asserts they are written """
         file_name = th.TEST_DATA_DIR / "test_write_task3_in_file_append_lines.3.in"
         append_lines = [ "line 1\n\n", "\n\n\nline 2", "line 3" ]
 
-        write_task3_in_file(file_name, append_lines, **self._task3_params)
+        write_in_file(file_name, 3, append_lines, **self._task3_params)
         with open(file_name, "r", encoding="utf8") as inf:
             text = inf.read()
             for line in append_lines:
