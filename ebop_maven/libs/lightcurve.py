@@ -412,17 +412,19 @@ def get_reduced_folded_lc(flc: FoldedLightCurve,
 
 
 def find_lightcurve_segments(lc: LightCurve,
-                             threshold: TimeDelta) \
-                                -> Generator[Tuple[int, int], any, None]:
+                             threshold: TimeDelta,
+                             return_times: bool=False) \
+                                -> Generator[Union[Tuple[int, int], Tuple[Time, Time]], any, None]:
     """
-    Finds the indices of contiguous segments in the passed LightCurve. These are
-    subsets of the LC where the gaps between bins does not exceed the passed
-    threshold. Gaps > threshold are treated as boundaries between segments.
+    Finds the start and end of contiguous segments in the passed LightCurve.
+    These are subsets of the LC where the gaps between bins does not exceed the
+    passed threshold. Gaps > threshold are treated as boundaries between segments.
 
     :lc: the source LightCurve to parse for gaps/segments.
     :threshold: the threshold gap time beyond which a segment break is triggered
-    :returns: an generator of segment (start, end) indices. If no gaps found this 
-    will yield a single entry for the (first, last) indices in the LightCurve.
+    :return_times: if true start/end times will be yielded, otherwise the indices
+    :returns: an generator of segment (start, end). If no gaps found this 
+    will yield a single (start, end) for the whole LightCurve.
     """
     if not isinstance(threshold, TimeDelta):
         threshold = TimeDelta(threshold * u.d)
@@ -435,5 +437,8 @@ def find_lightcurve_segments(lc: LightCurve,
     segment_start_ix = 0
     for this_ix, previous_time in enumerate(times, start = 1):
         if this_ix > last_ix or times[this_ix] - previous_time > threshold:
-            yield (segment_start_ix, this_ix - 1)
+            if return_times:
+                yield (lc.time[segment_start_ix], lc.time[this_ix - 1])
+            else:
+                yield (segment_start_ix, this_ix - 1)
             segment_start_ix = this_ix
