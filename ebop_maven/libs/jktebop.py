@@ -9,6 +9,7 @@ from io import TextIOBase
 from inspect import getsourcefile
 from pathlib import Path
 from string import Template
+import re
 
 import numpy as np
 from lightkurve import LightCurve
@@ -24,6 +25,30 @@ _template_files = {
 _jktebop_directory = \
     Path(os.environ.get("JKTEBOP_DIR", "~/jktebop/")).expanduser().absolute()
 
+_regex_pattern_val_and_err = r"^[\s]*(?:{0})[\w\d\s]*[\s]+" \
+                             r"(?P<val>[\-\+]?[0-9]+[\.]?[0-9]*)"\
+                             r"[\s]*(?:\+\/\-)?[\s]*"\
+                             r"(?P<err>[0-9]+[\.]?[0-9]*)?"
+
+_param_file_line_beginswith = {
+    "rA_plus_rB":       "2  Sum of frac radii",
+    "k":                "3  Ratio of the radii",
+    "J":                "1  Surf. bright. ratio",
+    "ecosw":            "7  ecc * cos(omega)",
+    "esinw":            "8  ecc * sin(omega)",
+    "inc":              "6  Orbit",
+    "L3":               "15  Third light (L_3)",
+    "primary_epoch":    "20  Ephermeris",
+    "pe":               "20  Ephemeris",
+    "period":           "19  Orbital",
+    "rA":               "Fractional primary radius:",
+    "rB":               "Fractional secondary radius:",
+    "ecc":              "Orbital eccentricity e:",
+    "omega":            "Periastron longitude omega (degree):",
+    "bP":               "Impact parameter (primary eclipse):",
+    "bS":               "Impact paramtr (secondary eclipse):",
+    "phiS":             "Phase of secondary eclipse:"
+}
 
 def get_jktebop_dir() -> Path:
     """
@@ -248,6 +273,39 @@ def write_light_curve_to_dat_file(lc: LightCurve,
                    comment="#",
                    delimiter=" ",
                    overwrite=True)
+
+
+def read_fitted_params_from_par_file(par_filename: Path,
+                                     params: List[str]) -> Dict[str, Tuple[float, float]]:
+    """
+    Will retrieve the final values of the requested parameters from the
+    indicated JKTEBOP Task 3 parameter output file (.par).
+
+    :par_filename: path of the file to read
+    :params: the list of params to read (see _param_file_line_beginswith for those supported)
+    :returns: a dict with the value and any associated error for those parameters found
+    """
+    results = {}
+    def yield_lines_after(filename: Path, magic: str):
+        with open(filename, mode="r", encoding="utf8") as par:
+            do_read = False
+            for line in par.readlines():
+                if do_read:
+                    yield line
+                elif magic in line:
+                    do_read = True
+
+    final_result_lines = list(yield_lines_after(par_filename, "Final values of the parameters:"))
+    for param in params:
+        beginswith = re.escape(_param_file_line_beginswith.get(param, ""))
+        if beginswith:
+            pattern = re.compile(_regex_pattern_val_and_err.format(beginswith), re.IGNORECASE)
+            for line in final_result_lines:
+                match = pattern.match(line)
+                if match and "val" in match.groupdict():
+                    val, err = match.group("val"), match.group("err") or 0
+                    results[param] = (float(val), float(err))
+    return results
 
 
 #
