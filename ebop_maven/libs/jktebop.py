@@ -1,6 +1,6 @@
 """ Module for interacting with the JKTEBOP dEB light-curve fitting tool. """
 # pylint: disable=invalid-name
-from typing import Union, Dict, List, Callable
+from typing import Union, Dict, List, Tuple, Callable, Generator
 import os
 import threading
 import subprocess
@@ -13,6 +13,7 @@ from string import Template
 import numpy as np
 from lightkurve import LightCurve
 from astropy.io import ascii as io_ascii
+from astropy.time import Time
 
 _this_dir = Path(getsourcefile(lambda:0)).parent
 _template_files = {
@@ -185,6 +186,27 @@ def write_in_file(file_name: Path,
         if append_lines:
             # writelines doesn't put each line on a separate line
             wf.writelines("\n" + l for l in append_lines)
+
+
+def build_poly_instructions(time_ranges: List[Tuple[Time, Time]],
+                            term: str = "sf",
+                            degree: int = 1) -> List[str]:
+    """
+    Builds up and returns a JKTEBOP 'in' file fitted poly instructions.
+
+    :time_ranges: list of (from, to) ranges to fit it over - will pivot on the mean
+    :term: the term to fit - defaults to "sf" (scale factor)
+    :degree: the degree of the polynomial to fit - defaults to 1 (linear)
+    :returns: the required poly instruction, one per line
+    """
+    polies = []
+    flags = ' '.join(["1" if coef <= degree else "0" for coef in range(6)])
+    for time_range in time_ranges:
+        start = np.floor(np.min(time_range).value * 100) / 100  # Round up to 2 d.p.
+        end = np.ceil(np.max(time_range).value * 100) / 100     # Round down to 2 d.p.
+        pvt = np.mean([start, end])
+        polies += [f"poly  {term}  {pvt}  0.0 0.0 0.0 0.0 0.0 0.0  {flags}  {start} {end}"]
+    return polies
 
 
 def write_light_curve_to_dat_file(lc: LightCurve,

@@ -6,6 +6,7 @@ from pathlib import Path
 from subprocess import CalledProcessError
 
 import numpy as np
+from astropy.time import Time
 
 import tests.libs.helpers.lightcurve_helpers as th
 
@@ -249,6 +250,32 @@ class Testjktebop(unittest.TestCase):
             text = inf.read()
             for line in append_lines:
                 self.assertIn(line.strip(), text)
+
+
+    #
+    # TESTS build_poly_instructions(file_name, task, [append_lines], **params)
+    #
+    def test_build_poly_instructions_assert_format(self):
+        """ tests build_poly_instructions((from, to), term, degree) -> asserts poly written """
+        times = [
+            (Time(1000.009, format="btjd", scale="tdb"), Time(1099.991, format="btjd", scale="tdb"))
+        ]
+        polies = jktebop.build_poly_instructions(time_ranges=times, term="sf", degree=2)
+        self.assertEqual(len(polies), len(times))
+        self.assertIn("sf", polies[0])
+        self.assertIn("1 1 1 0 0 0 ", polies[0])    # from the degree; fit const, 1st deg, 2nd deg
+        self.assertIn("1000.0", polies[0])          # start rounded down to 2 d.p.
+        self.assertIn("1100.0", polies[0])          # end rounded up to 2 d.p.
+        self.assertIn("1050.0", polies[0])          # mean of start and end (after rounding)
+
+    def test_build_poly_instructions_assert_count(self):
+        """ tests build_poly_instructions((from, to), term, degree) -> asserts correct number """
+        times = [
+            (Time(1000, format="btjd", scale="tdb"), Time(1100, format="btjd", scale="tdb")),
+            (Time(1200, format="btjd", scale="tdb"), Time(1300, format="btjd", scale="tdb")),
+        ]
+        polies = jktebop.build_poly_instructions(time_ranges=times, term="sf", degree=2)
+        self.assertEqual(len(polies), len(times))
 
 
     #
