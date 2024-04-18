@@ -1,5 +1,5 @@
 """ Utility functions for Light-curves. """
-from typing import Union, List, Iterable, Tuple
+from typing import Union, List, Iterable, Tuple, Generator
 from pathlib import Path
 import math
 
@@ -7,7 +7,7 @@ import numpy as np
 from scipy import signal, interpolate
 import astropy.units as u
 from astropy.io import fits
-from astropy.time import Time
+from astropy.time import Time, TimeDelta
 
 import lightkurve as lk
 from lightkurve import LightCurve, FoldedLightCurve, LightCurveCollection
@@ -409,3 +409,31 @@ def get_reduced_folded_lc(flc: FoldedLightCurve,
         reduced_mags = signal.savgol_filter(reduced_mags, 7, 3)
 
     return (reduced_phases, reduced_mags)
+
+
+def find_lightcurve_segments(lc: LightCurve,
+                             threshold: TimeDelta) \
+                                -> Generator[Tuple[int, int], any, None]:
+    """
+    Finds the indices of contiguous segments in the passed LightCurve. These are
+    subsets of the LC where the gaps between bins does not exceed the passed
+    threshold. Gaps > threshold are treated as boundaries between segments.
+
+    :lc: the source LightCurve to parse for gaps/segments.
+    :threshold: the threshold gap time beyond which a segment break is triggered
+    :returns: an generator of segment (start, end) indices. If no gaps found this 
+    will yield a single entry for the (first, last) indices in the LightCurve.
+    """
+    if not isinstance(threshold, TimeDelta):
+        threshold = TimeDelta(threshold * u.d)
+
+    # Much quicker if we use primatives - make sure we work in days
+    threshold = threshold.to(u.d).value
+    times = lc.time.value
+
+    last_ix = len(lc) - 1
+    segment_start_ix = 0
+    for this_ix, previous_time in enumerate(times, start = 1):
+        if this_ix > last_ix or times[this_ix] - previous_time > threshold:
+            yield (segment_start_ix, this_ix - 1)
+            segment_start_ix = this_ix

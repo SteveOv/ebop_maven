@@ -52,15 +52,15 @@ KNOWN_TARGETS = {
         "expect_phase2": 0.78,
         "expect_width2": 1.1,
     }),
-    "V1388 Ori": Namespace(**{ # Very tough to fit - find_peaks approach fails
-        "tic": 337165095,
-        "sector": 43,
-        "author": "SPOC",
-        "exptime": "short",
-        "period": 2.1882 * u.d,
-        "epoch_time": Time(2491.7849606727, format="btjd", scale="tdb"),
-        "expect_phase2": 0.51,
-        "expect_width2": 1.1,
+    "V889 Aql": Namespace(**{ # Lower (600 s) cadence, highly eccentric and small mid-sector gap
+        "tic": 300000680,
+        "sector": 40,
+        "author": "TESS-SPOC",
+        "exptime": 600,
+        "period": 11.120757 * u.d,
+        "epoch_time": Time(2416.259790, format="btjd", scale="tdb"),
+        "expect_phase2": 0.35,
+        "expect_width2": 1.9,
     }),
 }
 
