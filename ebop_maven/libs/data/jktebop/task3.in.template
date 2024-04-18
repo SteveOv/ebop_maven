@@ -28,4 +28,4 @@
  ${file_name_stem}.out
  ${file_name_stem}.fit
 
-# Source Template: deblib/data/jktebop/task3.in.template
+# Source Template: /libs/data/jktebop/task3.in.template

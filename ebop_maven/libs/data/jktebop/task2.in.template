@@ -36,4 +36,4 @@ ${out_filename}             Output file name (continuous character string)
 # eterisation, and 'h1h2' (power-2 with the h1 and h2 parameterisation).        
 # Put 'same' for star B to force its coefficients to be equal those of star A.
 
-# Source Template: deblib/data/jktebop/task2.in.template
+# Source Template: /libs/data/jktebop/task2.in.template
