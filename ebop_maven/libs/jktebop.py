@@ -60,12 +60,12 @@ def get_jktebop_dir() -> Path:
 def run_jktebop_task(in_filename: Path,
                      out_filename: Path=None,
                      delete_files_pattern: str=None,
-                     stdout_capture: Union[TextIOBase, Callable[[str], None]]=None):
+                     stdout_to: TextIOBase=None):
     """
     Will run JKTEBOP against the passed in file, waiting for the production of the
     expected out file. The contents of the outfile will be returned line by line.
 
-    The function returns a Generator[str] yielding the lines of text writteing to
+    The function returns a Generator[str] yielding the lines of text written to
     the out_filename. These can be read in a for loop:
     ```Python
     for line in run_jktebop_task(...):
@@ -76,17 +76,10 @@ def run_jktebop_task(in_filename: Path,
     lines = list(run_jktebop_task(...))
     ```
 
-    To use the stdout_capture functionality you can pass in an instance of a
-    TextIOBase, for example:
+    To redirect the stdout/stderr output from JKTEBOP set stdout_to to an
+    instance of a TextIOBase, for example:
     ```Python
-    output=io.StringIO()
-    run_jktebop_task(..., stdout_capture=output)
-    ```
-    or, you can pass in a function or lambda which takes a single str argument
-    which will be called each time the console is written to. For example the
-    print() function will work to echo JKTEBOP's stdout to the current console:
-    ```Python
-    run_jktebop_task(..., stdout_capture=print)
+    run_jktebop_task(..., stdout_to=sys.stdout)
     ```
 
     :in_filename: the path of the in file containing the JKTEBOP input parameters.
@@ -94,7 +87,7 @@ def run_jktebop_task(in_filename: Path,
     This will be read and the contents yielded in a Generator.
     :delete_files_pattern: optional glob pattern of files to be deleted after
     successful processing. The files will not be deleted if there is a failure.
-    :stdout_capture: a callback or TextIO given each line JKTEBOP writtes to stdout as it happens
+    :stdout_to: if given, the JKTEBOP stdout/stderr will be redirected here
     :returns: yields the content of the primary output file, line by line.
     """
     # Call out to jktebop to process the in file and generate the requested output file
@@ -107,19 +100,16 @@ def run_jktebop_task(in_filename: Path,
                           text=True) as proc:
         # This is an async call so we can publish any writes to stdout/stderr as they happen
         stdout_thread = None
-        if stdout_capture is not None:
-            def echo_to_capture_console():
+        if stdout_to is not None:
+            def redirect_process_stdout():
                 while True:
                     line = proc.stdout.readline()
                     if not line:
                         break
-                    if isinstance(stdout_capture, TextIOBase):
-                        print(line.strip(), file=stdout_capture)
-                    elif isinstance(stdout_capture, Callable):
-                        stdout_capture(line.strip())
-            stdout_thread = threading.Thread(target=echo_to_capture_console)
+                    stdout_to.write(line)
+            stdout_thread = threading.Thread(target=redirect_process_stdout)
             stdout_thread.start()
-        return_code = proc.wait()
+        return_code = proc.wait() # Seem to have to do this get the return_code
         if stdout_thread:
             stdout_thread.join()
 
