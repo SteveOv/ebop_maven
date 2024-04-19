@@ -12,9 +12,6 @@ from .libs import deb_example
 
 class Estimator(ABC):
     """ An estimator for the CNN model """
-    _attrs = {}
-    _ATTR_CREATE_TS = "created_timestamp"
-    _label_names_and_scales = deb_example.labels_and_scales
 
     def __init__(self, model: Union[Model, Path], iterations: int=1):
         """
@@ -36,16 +33,11 @@ class Estimator(ABC):
                 raise ValueError(f"Model file '{model}' not found.")
             print(f"{self.__class__.__name__} loading model file '{model}'...")
             self._model = modelling.load_model(model)
-
-            create_ts = self._attrs.get(self._ATTR_CREATE_TS, None) or None
-            if create_ts:
-                print(f"Loaded '{self._model.name}' which was created at {create_ts}.")
-            else:
-                modified = datetime.fromtimestamp(model.stat().st_mtime).isoformat()
-                print(f"Loaded '{self._model.name}' last modified at {modified}.")
+            modified = datetime.fromtimestamp(model.stat().st_mtime).isoformat()
+            print(f"Loaded model '{self._model.name}' last modified at {modified}.")
         elif isinstance(model, Model):
             self._model = model
-            print(f"Assigned '{self._model.name}'")
+            print(f"Assigned model '{self._model.name}'")
         else:
             raise TypeError("Expected model to be a Path or a tf.keras.models.Model.")
 
@@ -55,13 +47,17 @@ class Estimator(ABC):
                 and isinstance(output_layer, modelling.OutputLayer) \
                 and output_layer.label_names_and_scales:
             self._label_names_and_scales = output_layer.label_names_and_scales
+        else:
+            self._label_names_and_scales = deb_example.labels_and_scales
 
         # Now set up the names for the predictions (these include 1-sigma values)
         self._prediction_names = [*self._label_names_and_scales] \
                                 + [f"{k}_sigma" for k in self._label_names_and_scales]
 
-        print(f"\tInputs: {self._model.input_shape}")
-        print(f"\tOutputs: {self._model.output_shape}")
+        print("Expects each input dict to hold:", ", ".join(self.input_feature_names))
+        print(f"\tThe mags feature to be of {self.mags_feature_bins} bins length,",
+              f"wrapped after phase {self.mags_feature_wrap_phase}")
+        print("Each output dict will publish:  ", ", ".join(self.prediction_names))
 
     @property
     def name(self) -> str:
@@ -72,6 +68,18 @@ class Estimator(ABC):
     def mags_feature_bins(self) -> int:
         """ The expected number of bins in each phase folded input mags feature """
         return self._model.input_shape[0][1]
+
+    @property
+    def mags_feature_wrap_phase(self) -> float:
+        """ The expected phase after which the mags feature is wrapped. """
+        # TODO: it would be better to be able to read this from the model
+        return deb_example.mags_wrap_phase
+
+    @property
+    def input_feature_names(self) -> List[str]:
+        """ The names to give the input features """
+        # TODO: it would be better to be able to read this from the model
+        return ["mags"] + list(deb_example.extra_features_and_defaults.keys())
 
     @property
     def iterations(self) -> int:
@@ -90,11 +98,6 @@ class Estimator(ABC):
     def prediction_names(self) -> List[str]:
         """ Gets the ordered list of the names of the predicted values. """
         return self._prediction_names
-
-    @property
-    def attrs(self) -> Dict:
-        """ The dictionary of attributes saved with the current model """
-        return self._attrs
 
     def predict(self,
                 instances: List[Dict[str, any]],

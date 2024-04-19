@@ -83,8 +83,7 @@ def test_with_estimator(model: Union[Model, Path],
         # Model name will include details of what it was trained on.
         if results_dir is None:
             parent = model.parent if isinstance(model, Path) else Path("./drop")
-            td_name = estimator.attrs.get("training_dataset", "unknown_training_dataset")
-            results_dir = parent / f"results/{estimator.name}/{td_name}"
+            results_dir = parent / f"results/{estimator.name}/unknown_training_dataset"
         results_dir.mkdir(parents=True, exist_ok=True)
         results_file = results_dir / f"formal.test.{suffix}.csv"
         output2 = sys.stdout if echo_results else None

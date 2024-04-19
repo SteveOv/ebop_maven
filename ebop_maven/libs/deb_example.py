@@ -13,8 +13,8 @@ stored_mags_features = {
     "mags_2048_0.75": (2048, 0.75),
     "mags_2048_1.0": (2048, 1.0)
 }
-pub_mags_key = "mags_1024_0.75"                         # pylint: disable=invalid-name
-(mags_bins, _) = stored_mags_features[pub_mags_key]     # pylint: disable=invalid-name
+pub_mags_key = "mags_1024_0.75"                                     # pylint: disable=invalid-name
+(mags_bins, mags_wrap_phase) = stored_mags_features[pub_mags_key]   # pylint: disable=invalid-name
 
 # Python 3.7+ language spec ensures dictionary order is preserved
 # The full set of stored labels and any scaling applied to them when read
