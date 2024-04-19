@@ -1,7 +1,8 @@
 """
 Formal testing of the regression TF Model trained by train_*_estimator.py
 """
-from typing import Union, List
+from typing import Union, List, Dict, Tuple
+from io import TextIOBase
 import sys
 from pathlib import Path
 from contextlib import redirect_stdout
@@ -40,7 +41,7 @@ def test_with_estimator(model: Union[Model, Path],
     # Create our Estimator. It will tell us which labels it (& the model) can predict.
     estimator = Estimator(model)
     lbl_names = [*estimator.label_names_and_scales.keys()]
-    num_labels = len(estimator.label_names_and_scales)
+    num_lbls = len(estimator.label_names_and_scales)
 
     print(f"\nLooking for the test dataset in '{test_dataset_dir}'.")
     tfrecord_files = list(test_dataset_dir.glob("**/*.tfrecord"))
@@ -61,6 +62,14 @@ def test_with_estimator(model: Union[Model, Path],
         { "mags": tm, **{n:f[0] for (n,f) in zip(fn,tf)} } for tm, tf in zip(test_mags, test_feats)
     ]
 
+    # Read additional target data from the config file
+    target_names = [] * inst_count
+    transit_flags = [False] * inst_count
+    with open(test_dataset_config, mode="r", encoding="utf8") as f:
+        targets = json.load(f)
+        target_names = [f"{t}" for t in targets]
+        transit_flags = [config.get("transits", False) for t, config in targets.items()]
+
     # Run the predictions twice; with and without using MC Dropout enabled.
     for iterations, suffix in [(1, "nonmc"), (1000, "mc")]:
         # Make our prediction which will return [#inst, {}]
@@ -74,8 +83,8 @@ def test_with_estimator(model: Union[Model, Path],
 
         # Summary stats (MAE, MSE) by label and over the whole set of preds. 
         ocs = np.subtract(noms, lbls)
-        lbl_maes = [np.mean(np.abs(ocs[:, c])) for c in range(num_labels)]
-        lbl_mses = [np.mean(np.power(ocs[:, c], 2)) for c in range(num_labels)]
+        lbl_maes = [np.mean(np.abs(ocs[:, c])) for c in range(num_lbls)]
+        lbl_mses = [np.mean(np.power(ocs[:, c], 2)) for c in range(num_lbls)]
         total_mae = np.mean(np.abs(ocs))
         total_mse = np.mean(np.power(ocs, 2))
 
@@ -89,27 +98,26 @@ def test_with_estimator(model: Union[Model, Path],
         output2 = sys.stdout if echo_results else None
         with redirect_stdout(Tee(open(results_file, "w", encoding="utf8"), output2)):
             # Headins row
-            print("Inst,",
+            print(f"{'Target':>10s},",
                     *[f"{n:>15s}, {n+'_lbl':>15s}, {n+'_res':>15s}," for n in lbl_names],
                     f"{'MAE':>15s},",
                     f"{'MSE':>15s}")
 
             # The instance's predictions, labels & O-Cs and its MAE & MSE
-            for r in range(ocs.shape[0]):
-                row_mae, row_mse = np.mean(np.abs(ocs[r])), np.mean(np.power(ocs[r], 2))
-                print(f"{r+1:4d},",
-                    *[f"{noms[r, c]:15.9f}, {lbls[r, c]:15.9f}, {ocs[r, c]:15.9f},"
-                                                                        for c in range(num_labels)],
+            for target, rnom, rlbl, roc in zip(target_names, noms, lbls, ocs):
+                row_mae, row_mse = np.mean(np.abs(roc)), np.mean(np.power(roc, 2))
+                print(f"{target:>10s},",
+                   *[f"{rnom[c]:15.9f}, {rlbl[c]:15.9f}, {roc[c]:15.9f}," for c in range(num_lbls)],
                     f"{row_mae:15.9f},",
                     f"{row_mse:15.9f}")
 
             # Loss rows, one each for MAE & MSE with grand totals at the end
-            print(" MAE,",
-                *[f"{' '*15}, {' '*15}, {lbl_maes[c]:15.9f}," for c in range(num_labels)],
+            print(f"{'MAE':>10s},",
+                *[f"{' '*15}, {' '*15}, {lbl_maes[c]:15.9f}," for c in range(num_lbls)],
                 f"{total_mae:15.9f},",
                 f"{' '*15}")
-            print(" MSE,",
-                *[f"{' '*15}, {' '*15}, {lbl_mses[c]:15.9f}," for c in range(num_labels)],
+            print(f"{'MSE':>10s},",
+                *[f"{' '*15}, {' '*15}, {lbl_mses[c]:15.9f}," for c in range(num_lbls)],
                 f"{' '*15},",
                 f"{total_mse:15.9f}")
 
@@ -118,6 +126,10 @@ def test_with_estimator(model: Union[Model, Path],
         print(f"Total MAE ({suffix}): {total_mae:.9f}")
         print(f"Total MSE ({suffix}): {total_mse:.9f}")
         print("--------------------------------\n")
+
+        with open(results_file.parent / f"{results_file.stem}.txt", "w", encoding="utf8") as of:
+            labels = [dict(zip(lbl_names, lbl_row)) for lbl_row in lbls]
+            table_of_labels_vs_predictions(labels, predictions, target_names, estimator, to=of)
 
         if plot_results:
             size = 3
@@ -132,12 +144,6 @@ def test_with_estimator(model: Union[Model, Path],
                 "L3": "$L_3$",
                 "bP": "$b_P$"
             }
-
-            # Read additional target data from the config file
-            transit_flags = [False] * inst_count
-            with open(test_dataset_config, mode="r", encoding="utf8") as f:
-                targets = json.load(f)
-                transit_flags = [config.get("transits", False) for t, config in targets.items()]
 
             pub_fields = { k: v for (k, v) in all_pub_labels.items() if k in lbl_names }
             rows = math.ceil(len(pub_fields) / cols)
@@ -177,6 +183,79 @@ def test_with_estimator(model: Union[Model, Path],
                                top=True, bottom=True, left=True, right=True)
             plt.savefig(results_dir / f"predictions_vs_labels_{suffix}.eps")
             plt.close()
+
+
+def table_of_labels_vs_predictions(
+        labels: Dict[str, float],
+        predictions: Union[Dict[str, float], Dict[str, Tuple[float, float]]],
+        titles: List[str],
+        estimator: Estimator,
+        names: List[str]=None,
+        rescale: bool=False,
+        to: TextIOBase=sys.stdout):
+    """
+    Will write a text table of the labels vs predictes nominal values
+    with O-C, MAE and MSE metrics, to the requested output.
+
+    :labels: the labels values as a dict of labels per instance
+    :predictions: the prediction values as a dict of predictions per instance.
+    All the dicts may either be as { "key": val, "key_sigma": err } or { "key":(val, err) }
+    :titles: the title for each row
+    :estimator: the estimator that is the source of the predictions. Used for
+    field names and scales
+    :names: a subset of the full list of labels/prediction names to render
+    :rescale: whether the re-scale the values so they represent the underlying model output
+    :to: the output to write the table to. Defaults to stdout.
+    """
+    # pylint: disable=too-many-arguments, too-many-locals
+    # We plot the keys common to the labels & preds, & optionally the input list
+    # of names. Avoiding using set() as we want names or the labels to set order
+    keys = names if names else estimator.label_names_and_scales.keys()
+    keys = [k for k in keys if k in labels[0].keys()]
+
+    # The make 2d lists for the label and pred values so we can perform matrix calcs
+    # There are two format we expect for the predictions, either
+    #   - { "key": value, "key_sigma": sigma_value }
+    #   - { "key": (value, sigma_value) }
+    # In either case we need to separate out the sigmas
+    raw_labels = [[label_dict[k] for k in keys] for label_dict in labels]
+    if predictions and isinstance(predictions[0][keys[0]], tuple):
+        pred_noms = [[pred_dict[k][0] for k in keys] for pred_dict in predictions]
+        pred_sigmas = [[pred_dict[k][1] for k in keys] for pred_dict in predictions]
+    else:
+        pred_noms = [[pred_dict[k] for k in keys] for pred_dict in predictions]
+        pred_sigmas = [[pred_dict[f"{k}_sigma"] for k in keys] for pred_dict in predictions]
+
+    # Optionally reapply the scaling the model uses so metrics represent the model not the Estimator
+    if rescale:
+        scales = [estimator.label_names_and_scales[k] for k in keys]
+        raw_labels = np.multiply(raw_labels, scales)
+        pred_noms = np.multiply(pred_noms, scales)
+        pred_sigmas = np.multiply(pred_sigmas, scales)
+
+    # Currently O-C only considers the nominal values (as that's what we use)
+    ocs = np.subtract(raw_labels, pred_noms)
+
+    line_len = 13 + (11 * len(keys))-1 + 22
+
+    for title, rlabs, rpreds, rocs in zip(titles, raw_labels, pred_noms, ocs):
+        # Plot a sub table for each row of labels/predictions/ocs
+        to.write("-"*line_len + "\n")
+        to.write(f"{title:<10s} | " + " ".join(f"{k:>10s}" for k in keys + ["MAE", "MSE"]))
+        to.write("\n")
+        rocs = np.concatenate([rocs, [np.mean(np.abs(rocs)), np.mean(np.power(rocs, 2))]])
+        to.write("-"*line_len + "\n")
+        for row_head, vals in zip(["Label", "Prediction", "O-C"], [rlabs, rpreds, rocs]):
+            to.write(f"{row_head:<10s} | " + " ".join(f"{v:10.6f}" for v in vals))
+            to.write("\n")
+
+    # Summary rows for aggregate stats over all of the rows
+    to.write("="*line_len + "\n")
+    to.write(f"{'MAE':<10s} | " + " ".join(f"{v:10.6f}" for v in np.mean(np.abs(ocs), 0)) +
+                 f" {np.mean(np.abs(ocs)):10.6f}\n")
+    to.write(f"{'MSE':<10s} | " + " ".join([f"{v:10.6f}" for v in np.mean(np.power(ocs, 2), 0)]) +
+                 " "*11 + f" {np.mean(np.power(ocs, 2)):10.6f}\n")
+
 
 if __name__ == "__main__":
     TRAINSET_NAME = "formal-training-dataset"   # Assume the usual training set
