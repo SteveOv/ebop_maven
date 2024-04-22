@@ -15,7 +15,7 @@
         "rA": 0.03822,      "rA_err": 0.00051,
         "rB": 0.04191,      "rB_err": 0.00029,
         "desc": "An eccentric orbit showing SLF pulsations. The long period means only one of each eclipse is observed with gap in observations near phase 0.15.",
-        "notes": "e=0.3835(18), ω=109.56(11), rA+rB=0.08015(28), k=1.097(22), inc=87.951(25), ecosw=-0.12838(11), esinw=0.3614(20), J=1.041(22), L3=-0.003(11) & derived bP=0.59(1)",
+        "notes": "bP derived from rA, inc, e & esinw;",
         "transits": false,
         "eclipses_similar": false,
         "components_similar": false,
@@ -24,9 +24,18 @@
                 "quality_bitmask": "hardest",
                 "primary_epoch": 1813.201149,
                 "period": 25.935953,
-                "ecc": 0.3835,
-                "omega": 109.56,
-                "labels": { "rA_plus_rB": 0.08015, "k": 1.097, "bP": 0.59, "inc": 87.951, "ecosw": -0.12838, "esinw": 0.3614, "J": 1.041, "L3": -0.003 }
+                "ecc": 0.3835,          "ecc_err": 0.0018,
+                "omega": 109.56,        "omega_err": 0.11,
+                "labels": {
+                    "rA_plus_rB": 0.08015,  "rA_plus_rB_err": 0.00028,
+                    "k": 1.097,             "k_err": 0.022,
+                    "bP": 0.59,             "bP_err": 0.01,
+                    "inc": 87.951,          "inc_err": 0.025,
+                    "ecosw": -0.12838,      "ecosw_err": 0.00011,
+                    "esinw": 0.3614,        "esinw_err": 0.0020,
+                    "J": 1.041,             "J_err": 0.022,
+                    "L3": -0.003,           "L3_err": 0.011
+                }
             }
         }
     },
@@ -46,7 +55,7 @@
         "rA": 0.22171,      "rA_err": 0.00055,
         "rB": 0.1742,       "rB_err": 0.0016,
         "desc": "A slightly eccentric orbit with eclipses of approximate depth of 0.45 and 0.40 mag and evidence of SLF pulsations. Primary fractional radius > 0.2 (0.22).",
-        "notes": "e=0.0555(11), ω=214.2(1.1), rA+rB=0.3958(13), k=0.786(9), inc=85.16(13), ecosw=-0.04600(97), esinw=-0.0311(19), J=0.9601(35), L3=0.0328(28) & derived bP=0.39(1)",
+        "notes": "bP derived from rA, inc, e & esinw;",
         "transits": false,
         "eclipses_similar": false,
         "components_similar": false,
@@ -55,14 +64,23 @@
                 "quality_bitmask": "hardest",
                 "primary_epoch": 2384.208649309,
                 "period": 3.168604135,
-                "ecc": 0.0555,
-                "omega": 214.2,
-                "labels": { "rA_plus_rB": 0.3958, "k": 0.786, "bP": 0.39, "inc": 85.16, "ecosw": -0.046, "esinw": -0.0311, "J": 0.9601, "L3": 0.0328 }
+                "ecc": 0.0555,              "ecc_err": 0.0011,
+                "omega": 214.2,             "omega_err": 1.1,
+                "labels": {
+                    "rA_plus_rB": 0.3958,       "rA_plus_rB_err": 0.0013,
+                    "k": 0.786,                 "k_err": 0.009,
+                    "bP": 0.39,                 "bP_err": 0.01,
+                    "inc": 85.16,               "inc_err": 0.13,
+                    "ecosw": -0.04600,          "ecosw_err": 0.00097,
+                    "esinw": -0.0311,           "esinw_err": 0.0019,
+                    "J": 0.9601,                "J_err": 0.0035,
+                    "L3": 0.0328,               "L3_err": 0.0028
+                }
             }
         }
     },
     "psi Cen": {
-        "source": "DEBCat and Bruntt et al. (2006) Table 2 based on WIRE photometry and JKTEBOP. We have access to TESS sectors 38 & 65 120 s SAP photometry (38 has incomplete eclipses). logL calculated from R and Teff.",
+        "source": "DEBCat and Bruntt et al. (2006) Table 2 based on WIRE photometry and JKTEBOP. We have access to TESS sectors 38 & 65 120 s SAP photometry (38 has incomplete eclipses).",
         "reference": "BrunttSouthworth+06aa",
         "label": "$\\mathrm{\\psi}$ Cen",
         "aka": "TIC 179958960, HD 125473, HR 5367",
@@ -78,7 +96,7 @@
         "rA": 0.043984,     "rA_err": 0.000045,
         "rB": 0.021877,     "rB_err": 0.000032,
         "desc": "A slightly eccentric orbit with eclipses of approximate depth of 0.45 and 0.40 mag and evidence of SLF pulsations. Primary fractional radius > 0.2 (0.22).",
-        "notes": "e=0.55408(24), ω=20.095(98), rA+rB=0.065861(70), k=0.49737(54), inc=88.955(12), ecosw=0.52035(11), esinw=0.19036(97), J=0.688(11), L3=0 & derived bP=",
+        "notes": "logLA & logLB derived from R and Teff;",
         "transits": true,
         "eclipses_similar": false,
         "components_similar": false,
@@ -87,14 +105,23 @@
                 "quality_bitmask": "hardest",
                 "primary_epoch": 3091.573672,
                 "period": 38.812522,
-                "ecc": 0.55408,
-                "omega": 20.095,
-                "labels": { "rA_plus_rB": 0.065861, "k": 0.49737, "bP": null, "inc": 88.955, "ecosw": 0.52035, "esinw": 0.19036, "J": 0.688, "L3": 0.0 }
+                "ecc": 0.55408,             "ecc_err": 0.00024,
+                "omega": 20.095,            "omega_err": 0.098,
+                "labels": {
+                    "rA_plus_rB": 0.065861,     "rA_plus_rB_err": 0.000070,
+                    "k": 0.49737,               "k_err": 0.00054,
+                    "bP": null,                 "bP_err": null,
+                    "inc": 88.955,              "inc_err": 0.012,
+                    "ecosw": 0.52035,           "ecosw_err": 0.00011,
+                    "esinw": 0.19036,           "esinw_err": 0.00097,
+                    "J": 0.688,                 "J_err": 0.011,
+                    "L3": 0.0,                  "L3_err": null
+                }
             }
         }
     },
     "V402 Lac": {
-        "source": "DEBCAT and Baroch et al. (2022) Tables 10 and 11. TESS sector 16 analysed with WD. We approximate J from T_eff.",
+        "source": "DEBCAT and Baroch et al. (2022) Tables 10 and 11. TESS sector 16 analysed with WD.",
         "reference": "BarochGimenez+22aa",
         "aka": "TIC 468792279, HD 210405",
         "SpT": "B8 V",
@@ -109,7 +136,7 @@
         "rA": 0.1315,       "rA_err": 0.0018,
         "rB": 0.1304,       "rB_err": 0.0014,
         "desc": "A highly eccentric orbit. The secondary is beyond phase 0.6 and significantly shallower than primary despite the similar radii. Very similar radii making k and J difficult to predict (degenerate; comment in paper)",
-        "notes": "e=0.376 (fixed), ω=58.1(1.4), rA+rB=0.262(2), k=0.99(2), inc=79.99(12) deg, ecosw=0.199(8), esinw=0.319(5) & derived bP=0.86(1)",
+        "notes": "e=0.376 (fixed); rA_plus_rB & k & ecosw & esinw derived from table 11; J approximated from Teff; bP derived from rA, inc, e & esinw;",
         "transits": false,
         "eclipses_similar": false,
         "components_similar": true,
@@ -118,9 +145,18 @@
                 "quality_bitmask": "hardest",
                 "primary_epoch": 1754.160254,
                 "period": 3.782043,
-                "ecc": 0.376,
-                "omega": 58.1, 
-                "labels": { "rA_plus_rB": 0.262, "k": 0.99, "bP": 0.86, "inc": 79.99, "ecosw": 0.199, "esinw": 0.319, "J": 0.99, "L3": 0.0 }
+                "ecc": 0.376,           "ecc_err": null,
+                "omega": 58.1,          "omega_err": 1.4,
+                "labels": {
+                    "rA_plus_rB": 0.262,    "rA_plus_rB_err": 0.002,
+                    "k": 0.99,              "k_err": 0.02,
+                    "bP": 0.86,             "bP_err": 0.01,
+                    "inc": 79.99,           "inc_err": 0.12,
+                    "ecosw": 0.199,         "ecosw_err": 0.008,
+                    "esinw": 0.319,         "esinw_err": 0.005,
+                    "J": 0.99,              "J_err": null,
+                    "L3": 0.15,              "L3_err": 0.04
+                }
             }
         }
     },
@@ -137,10 +173,10 @@
         "TeffB": 7670,      "TeffB_err": 85,
         "logLA": 1.499,     "logLA_err": 0.018,
         "logLB": 0.792,     "logLB_err": 0.023,
-        "rA": 0.07685,      "rA_err": 0.00053,
-        "rB": 0.05561,      "rB_err": 0.00085,
+        "rA": 0.1494,       "rA_err": 0.0016,
+        "rB": 0.1171,       "rB_err": 0.0017,
         "desc": "HD 23642 has an inclined, circular orbit with distinct primary (~0.10 mag) and secondary (~0.05 mag) eclipses. Delta Scutti pulsations are evident.",
-        "notes": "e=0, ω=0, rA+rB=0.2664(11), k=0.784(12), inc=78.63(9), ecosw=0, esinw=0, J=0.5561(11), L3=0.029(14) & derived bP=",
+        "notes": "e=0.0 & ω=0.0 (fixed);",
         "transits": false,
         "eclipses_similar": false,
         "components_similar": false,
@@ -149,7 +185,16 @@
                 "quality_bitmask": "hardest",
                 "primary_epoch": 2464.982832,
                 "period": 2.461132,
-                "labels": { "rA_plus_rB": 0.2664, "k": 0.784, "bP": null, "inc": 78.63, "ecosw": 0.0, "esinw": 0.0, "J": 0.5561, "L3": 0.029 }
+                "labels": {
+                    "rA_plus_rB": 0.2664,   "rA_plus_rB_err": 0.0011,
+                    "k": 0.784,             "k_err": 0.012,
+                    "bP": null,             "bP_err": null,
+                    "inc": 78.63,           "inc_err": 0.09,
+                    "ecosw": 0.0,           "ecosw_err": null,
+                    "esinw": 0.0,           "esinw_err": null,
+                    "J": 0.5561,            "J_err": 0.0011,
+                    "L3": 0.029,            "L3_err": 0.014
+                }
             }
         }
     },
@@ -169,7 +214,7 @@
         "rA": 0.0549,       "rA_err": 0.00012,
         "rB": 0.0544,       "rB_err": 0.00012,
         "desc": "A highly eccentric orbit. The light curve shows long term trends which detrending isn't removing - may make it a challange to predict. Sector 54 better. Very similar radii making k and J difficult to predict (degenerate; comment in paper)",
-        "notes": "e=0.3750 (fixed), ω=126.1(2), rA+rB=0.10932(5), k=0.99(4), inc=89.06(2), ecosw=-0.221(1), esinw=0.3030(8), J=0.971(2), L3=0.191(2) & derived bP=0.197(6)",
+        "notes": "e=0.3750 (fixed); ecosw & esinw derived from table 9; bP derived from rA, inc, e & esinw;",
         "transits": false,
         "eclipses_similar": false,
         "components_similar": true,
@@ -181,14 +226,23 @@
                 "quality_bitmask": "hardest",
                 "primary_epoch": 2416.259790,
                 "period": 11.120757,
-                "ecc": 0.3750,
-                "omega": 126.1,
-                "labels": { "rA_plus_rB": 0.10932, "k": 0.99, "bP": 0.197, "inc": 89.06, "ecosw": -0.221, "esinw": 0.303, "J": 0.971, "L3": 0.191 }
+                "ecc": 0.3750,      "ecc_err": null,
+                "omega": 126.1,     "omega_err": 0.2,
+                "labels": { 
+                    "rA_plus_rB": 0.10932,  "rA_plus_rB_err": 0.00005,
+                    "k": 0.99,              "k_err": 0.04,
+                    "bP": 0.197,            "bP_err": 0.006,
+                    "inc": 89.06,           "inc_err": 0.02,
+                    "ecosw": -0.221,        "ecosw_err": 0.001,
+                    "esinw": 0.303,         "esinw_err": 0.0008,
+                    "J": 0.971,             "J_err": 0.002,
+                    "L3": 0.191,            "L3_err": 0.002
+                }
             }
         }
     },
     "WW Aur": {
-        "source": "DEBCat and Southworth et al. (2005) who use EBOP (with mods to fit rA+rB & k and to use MRQMIN) for fitting of observations from the 1970s. We use V-band fitting results. Available TESS sectors 29, 43-45, 60 & 71-73 at 120 s cadence.",
+        "source": "DEBCat and Southworth et al. (2005) who use EBOP (with mods to fit rA+rB & k and to use MRQMIN) for fitting of observations from the 1970s. We use V-band fitting results (Table 10). Available TESS sectors 29, 43-45, 60 & 71-73 at 120 s cadence.",
         "reference": "SouthworthSMalley+05mnras",
         "aka": "TIC 172171873, HD 46052",
         "SpT": "A4 m + A5 m",
@@ -203,7 +257,7 @@
         "rA": 0.1562,       "rA_err": 0.0034,
         "rB": 0.1556,       "rB_err": 0.0029,
         "desc": "An inclined circular orbit showing partial eclipses of approximately 0.64 and 0.55 mag. The components are of similar size.",
-        "notes": "e=0.0, ω=0.0, rA+rB=0.3118(9), k=0.996(41), inc=87.64(11), ecosw=0, esinw=0, J=0.864(27) L3=0 & derived bP=",
+        "notes": "e=0.0 & ω=0.0 & L3=0 (fixed);",
         "transits": false,
         "eclipses_similar": false,
         "components_similar": true,
@@ -212,12 +266,21 @@
                 "quality_bitmask": "hardest",
                 "primary_epoch": 2511.2697083,
                 "period": 2.525087,
-                "labels": { "rA_plus_rB": 0.3118, "k": 0.996, "bP": null, "inc": 87.64, "ecosw": 0.0, "esinw": 0.0, "J": 0.864, "L3": 0.0 }
+                "labels": {
+                    "rA_plus_rB": 0.3118,   "rA_plus_rB_err": 0.0009,
+                    "k": 0.996,             "k_err": 0.041,
+                    "bP": null,             "bP_err": null,
+                    "inc": 87.64,           "inc_err": 0.11,
+                    "ecosw": 0.0,           "ecosw_err": null,
+                    "esinw": 0.0,           "esinw_err": null,
+                    "J": 0.869,             "J_err": 0.027,
+                    "L3": 0.0,               "L3_err": null
+                }
             }
         }
     },
     "V788 Cen": {
-        "source": "DEBCat and Graczyk et al. (2022) who use WD for fitting. We find J from JKTEBOP fit.",
+        "source": "DEBCat and Graczyk et al. (2022) who use WD for fitting (Table 8).",
         "reference": "GraczykPietrzynski+22aa",
         "aka": "TIC 258314976, HD 105509",
         "SpT": "A2mA5-F2",
@@ -232,7 +295,7 @@
         "rA": 0.14682,      "rA_err": 0.00049,
         "rB": 0.08821,      "rB_err": 0.00058,
         "desc": "An inclined circular orbit showing partial eclipses of approximately 0.19 and 0.16 mag.",
-        "notes": "e=0.0, ω=0.0, rA+rB=0.235(5), k=0.60(2), inc=82.821(41), ecosw=0, esinw=0, L3=0.021(2) & derived bP=0.851(6)",
+        "notes": "e=0.0 & ω=0.0 fixed; rA_plus_rB & k derived from rA & rB in table 8; J from JKTEBOP fit; bP derived from rA, inc, e & esinw;",
         "transits": false,
         "eclipses_similar": false,
         "components_similar": false,
@@ -241,7 +304,16 @@
                 "quality_bitmask": "hardest",
                 "primary_epoch": 1588.923728350,
                 "period": 4.966268262,
-                "labels": { "rA_plus_rB": 0.235, "k": 0.60, "bP": 0.851, "inc": 82.821, "ecosw": 0.0, "esinw": 0.0, "J": 0.9, "L3": 0.021 }
+                "labels": { 
+                    "rA_plus_rB": 0.235,    "rA_plus_rB_err": 0.005,
+                    "k": 0.60,              "k_err": 0.02,
+                    "bP": 0.851,            "bP_err": 0.006,
+                    "inc": 82.821,          "inc_err": 0.041,
+                    "ecosw": 0.0,           "ecosw_err": null,
+                    "esinw": 0.0,           "esinw_err": null,
+                    "J": 0.9,               "J_err": null,
+                    "L3": 0.021,            "L3_err": 0.002
+                }
             }
         }
     },
@@ -261,7 +333,7 @@
         "rA": 0.08720,      "rA_err": 0.00063,
         "rB": 0.05486,      "rB_err": 0.00045,
         "desc": "An eccentric orbit with eclipses of approximately 0.35 and 0.25 mag and the secondary near phase 0.45. Evidence of delta-Scut & gamma-Dor pulsations.",
-        "notes": "e=0.078078(76), ω=178.8(23), rA+rB=0.14206(82), k=0.6292(69), inc=87.46(13), ecosw=-0.078061(18), esinw=-0.0016(32), J=0.816(32), L3=0.036(23) and derived bP=0.51(3)",
+        "notes": "bP derived from rA, inc, e & esinw;",
         "transits": false,
         "eclipses_similar": false,
         "components_similar": false,
@@ -270,14 +342,23 @@
                 "quality_bitmask": "hardest",
                 "primary_epoch": 1851.927737130,
                 "period": 9.946591113,
-                "ecc": 0.078078,
-                "omega": 178.8,
-                "labels": { "rA_plus_rB": 0.14206, "k": 0.6292, "bP": 0.51, "inc": 87.46, "ecosw": -0.078061, "esinw": -0.0016, "J": 0.816, "L3": 0.036 }
+                "ecc": 0.078078,        "ecc_err": 0.000076,
+                "omega": 178.8,         "omega_err": 2.3,
+                "labels": { 
+                    "rA_plus_rB": 0.14206,  "rA_plus_rB_err": 0.00082,
+                    "k": 0.6292,            "k_err": 0.0069,
+                    "bP": 0.51,             "bP_err": 0.03,
+                    "inc": 87.46,           "inc_err": 0.13,
+                    "ecosw": -0.078061,     "ecosw_err": 0.000018,
+                    "esinw": -0.0016,       "esinw_err": 0.0032,
+                    "J": 0.816,             "J_err": 0.032,
+                    "L3": 0.036,            "L3_err": 0.023
+                }
             }
         }
     },
     "V362 Pav": {
-        "source": "DEBCat and Graczyk et al. (2022) Table 8 who use WD for fitting. We find J from JKTEBOP fit.",
+        "source": "DEBCat and Graczyk et al. (2022) Table 8 who use WD for fitting.",
         "reference": "GraczykPietrzynski+22aa",
         "aka": "TIC 464422047, HD 173344",
         "SpT": "A2mA5-A9",
@@ -292,7 +373,7 @@
         "rA": 0.18817,      "rA_err": 0.00061,
         "rB": 0.07231,      "rB_err": 0.00044,
         "desc": "An inclined slightly eccentric orbit with shallow transits of approximately 0.2 and 0.03 mag. Star B is signifantly smaller and less massive.",
-        "notes": "e=0.0014(4), ω=283(16), rA+rB=0.2605(8), k=0.384(3), inc=84.304(35), ecosw=0.003(4), esinw=-0.0014(4), L3=-0.054(5) & derived bP=0.528(4)",
+        "notes": "J from JKTEBOP fit; rA_plus_rB & k derived from rA & rB in table 8; bP derived from rA, inc, e & esinw;",
         "transits": true,
         "eclipses_similar": false,
         "components_similar": false,
@@ -301,14 +382,23 @@
                 "quality_bitmask": "hardest",
                 "primary_epoch": 1664.39587906,
                 "period": 2.74843680,
-                "ecc": 0.0014,
-                "omega": 283,
-                "labels": { "rA_plus_rB": 0.2605, "k": 0.384, "bP": 0.528, "inc": 84.304, "ecosw": 0.0003, "esinw": -0.0014, "J": 0.23, "L3": -0.054 }
+                "ecc": 0.0014,      "ecc_err": 0.0004,
+                "omega": 283,       "omega_err": 16,
+                "labels": { 
+                    "rA_plus_rB": 0.2605,   "rA_plus_rB_err": 0.0008,
+                    "k": 0.384,             "k_err": 0.003,
+                    "bP": 0.528,            "bP_err": 0.004,
+                    "inc": 84.304,          "inc_err": 0.035,
+                    "ecosw": 0.0003,        "ecosw_err": 0.004,
+                    "esinw": -0.0014,       "esinw_err": 0.0004,
+                    "J": 0.23,              "J_err": null,
+                    "L3": -0.054,           "L3_err": 0.005
+                }
             }
         }
     },
     "V456 Cyg": {
-        "source": "DEBCat and Van Reeth et al. (2022) Table 1. TESS sectors 14 and 15 fitted with JKTEBOP version 42. SpT and logLA from Bakis et al. (2014); their logLB is very low so we calc from logLA and Van Reeth Light Ratio.",
+        "source": "DEBCat and Van Reeth et al. (2022) Table 1. TESS sectors 14 and 15 fitted with JKTEBOP version 42. SpT and logLA from Bakis et al. (2014).",
         "reference": "VanReethSouthworth+22aa, BakisHensberge+14aj",
         "aka": "TIC 15795549",
         "SpT": "A2hA7mA4V + F3V",
@@ -323,7 +413,7 @@
         "rA": 0.2701,       "rA_err": 0.0015,
         "rB": 0.2563,       "rB_err": 0.0019,
         "desc": "A tight circular orbit of just 0.9 d. Variability due to pulsations. Distinct eclipses at 0.6 and 0.4 mag. Beyond range normal for JKTEBOP (rA+rB~0.53) but it was used in Van Reeth et al.",
-        "notes": "e=0, ω=0, rA+rB=0.5228(10), k=0.935(12), inc=83.198(52), ecosw=0, esinw=0, J=0.7701(63), L3=-0.0344(59) & derived bP=",
+        "notes": "e=0 & ω=0 (fixed); logLB=0.78(5) from from Bakis+ logLA and Van Reeth+ Light Ratio;",
         "transits": false,
         "eclipses_similar": false,
         "components_similar": true,
@@ -332,12 +422,21 @@
                 "quality_bitmask": "hardest",
                 "primary_epoch": 1712.409949,
                 "period": 0.891195,
-                "labels": { "rA_plus_rB": 0.5228, "k": 0.935, "bP": null, "inc": 83.198, "ecosw": 0.0, "esinw": 0.0, "J": 0.7701, "L3": -0.0344 }
+                "labels": { 
+                    "rA_plus_rB": 0.5228,   "rA_plus_rB_err": 0.0010,
+                    "k": 0.935,             "k_err": 0.012,
+                    "bP": null,             "bP_err": null,
+                    "inc": 83.198,          "inc_err": 0.052,
+                    "ecosw": 0.0,           "ecosw_err": null,
+                    "esinw": 0.0,           "esinw_err": null,
+                    "J": 0.7701,            "J_err": 0.0063,
+                    "L3": -0.0344,          "L3_err": 0.0059
+                }
             }
         }
     },
     "GW Eri": {
-        "source": "DEBCat and Graczyk et al. (2022) who use WD for fitting. We find J from JKTEBOP fit.",
+        "source": "DEBCat and Graczyk et al. (2022) who use WD for fitting (table 8).",
         "reference": "GraczykPietrzynski+22aa",
         "aka": "TIC 149861542, HD 26591",
         "SpT": "A1mA2-A8",
@@ -352,7 +451,7 @@
         "rA": 0.11971,      "rA_err": 0.00101,
         "rB": 0.11760,      "rB_err": 0.00098,
         "desc": "An inclined circuler orbit showing partial eclipses of similar depths at approximately 0.27 mag. Like V889 Aql, the radii are very similar making k & J difficult to predict.",
-        "notes": "e=0, ω=0, rA+rB=0.237(1), k=0.98(1), inc=83.933(51), ecosw=0, esinw=0, L3=0.028(3) & derived bP=0.88(1)",
+        "notes": "e=0 & ω=0 (fixed); rA_plus_rB & k derived from rA & rB in table 8; J from JKTEBOP fit; bP derived from rA, inc, e & esinw;",
         "transits": false,
         "eclipses_similar": true,
         "components_similar": true,
@@ -361,7 +460,16 @@
                 "quality_bitmask": "hardest",
                 "primary_epoch": 1454.347141832,
                 "period": 3.658635226,
-                "labels": { "rA_plus_rB": 0.237, "k": 0.98, "bP": 0.88, "inc": 83.933, "ecosw": 0.0, "esinw": 0.0, "J": 0.98, "L3": 0.028 }
+                "labels": { 
+                    "rA_plus_rB": 0.237,    "rA_plus_rB_err": 0.001, 
+                    "k": 0.98,              "k_err": 0.01,
+                    "bP": 0.88,             "bP_err": 0.01,
+                    "inc": 83.933,          "inc_err": 0.051,
+                    "ecosw": 0.0,           "ecosw_err": null,
+                    "esinw": 0.0,           "esinw_err": null,
+                    "J": 0.98,              "J_err": null,
+                    "L3": 0.028,            "L3_err": 0.003
+                }
             }
         }
     },
@@ -381,7 +489,7 @@
         "rA": 0.16107,      "rA_err": 0.00028,
         "rB": 0.14489,      "rB_err": 0.00039,
         "desc": "A circular orbit with clear primary and secondary eclipses of approximately 0.38 and 0.35 mag.",
-        "notes": "e=0, ω=0, rA+rB=0.30576(20), k=0.8983(38), inc=83.629(13), ecosw=0, esinw=0, J=0.96661(16), L3=0 & derived bP=",
+        "notes": "e=0 & ω=0 (fixed);",
         "transits": false,
         "eclipses_similar": true,
         "components_similar": false,
@@ -393,7 +501,16 @@
                 "quality_bitmask": "hard",
                 "primary_epoch": 2813.984151,
                 "period": 2.98465593,
-                "labels": { "rA_plus_rB": 0.30576, "k": 0.8983, "bP": null, "inc": 83.629, "ecosw": 0.0, "esinw": 0.0, "J": 0.96661, "L3": 0.0 }
+                "labels": { 
+                    "rA_plus_rB": 0.30576,  "rA_plus_rB_err": 0.00020,
+                    "k": 0.8983,            "k_err": 0.0038,
+                    "bP": null,             "bP_err": null,
+                    "inc": 83.629,          "inc_err": 0.013,
+                    "ecosw": 0.0,           "ecosw_err": null,
+                    "esinw": 0.0,           "esinw_err": null,
+                    "J": 0.96661,           "J_err": 0.00016,
+                    "L3": 0.0,              "L3_err": null
+                }
             }
         }
     },
@@ -413,7 +530,7 @@
         "rA": 0.18000,      "rA_err": 0.00020,
         "rB": 0.12667,      "rB_err": 0.00005,
         "desc": "A slightly eccentric orbit with clear primary and secondary eclipses of 0.46 and 0.40 mag and evidence of ellipsoidal variation.",
-        "notes": "e=0.0131(67), ω=292.4(1.7), rA+rB=0.30662(15), k=0.7037(11), bP=0.3550(39), inc=86.381(42), ecosw=0.00502(13), esinw=-0.01210(76), J=0.9262(57), L3=-0.0002(30), bP=0.3550(39) & derived bP=0.355(4) (from rA, inc, e & esinw)",
+        "notes": "bP derived from rA, inc, e & esinw;",
         "transits": false,
         "eclipses_similar": false,
         "components_similar": false,
@@ -422,9 +539,18 @@
                 "quality_bitmask": "hardest",
                 "primary_epoch": 2163.057026533,
                 "period": 2.728420258,
-                "ecc": 0.012936,
-                "omega": 292.4,
-                "labels": { "rA_plus_rB": 0.30662, "k": 0.7037, "bP": 0.355, "inc": 86.381, "ecosw": 0.00502, "esinw": -0.01210, "J": 0.9262, "L3": -0.0002 }
+                "ecc": 0.01310,         "ecc_err": 0.00067,
+                "omega": 292.4,         "omega_err": 1.7,
+                "labels": {
+                    "rA_plus_rB": 0.30662,      "rA_plus_rB_err": 0.00015, 
+                    "k": 0.7037,                "k_err": 0.0011, 
+                    "bP": 0.355,                "bP_err": 0.004,
+                    "inc": 86.381,              "inc_err": 0.042,
+                    "ecosw": 0.00502,           "ecosw_err": 0.00013,
+                    "esinw": -0.01210,          "esinw_err": 0.00076,
+                    "J": 0.9262,                "J_err": 0.0057,
+                    "L3": -0.0002,              "L3_err": 0.0030
+                }
             }
         }
     },
@@ -444,7 +570,7 @@
         "rA": 0.11440,      "rA_err": 0.00011,
         "rB": 0.12230,      "rB_err": 0.00006,
         "desc": "A circular orbit with similar eclipses at approximately 0.65 mag each.",
-        "notes": "e=0, ω=0, rA+rB=0.23669(8), k=1.0691(14), inc=88.6361(44), ecosw=0, esinw=0, J=1.0691(14), L3=-0.0001(8) & derived bP=0.2081(7)",
+        "notes": "e=0 & ω=0 (fixed); bP derived from rA, inc, e & esinw;",
         "transits": false,
         "eclipses_similar": true,
         "components_similar": true,
@@ -453,7 +579,16 @@
                 "quality_bitmask": "default",
                 "primary_epoch": 1942.301590525,
                 "period": 4.99176522,
-                "labels": { "rA_plus_rB": 0.23669, "k": 1.0691, "bP": 0.2081, "inc": 88.6361, "ecosw": 0.0, "esinw": 0.0, "J": 0.98003, "L3": -0.0001 }
+                "labels": { 
+                    "rA_plus_rB": 0.23669,  "rA_plus_rB_err": 0.00008,
+                    "k": 1.0691,            "k_err": 0.0014,
+                    "bP": 0.2081,           "bP_err": 0.0007,
+                    "inc": 88.6361,         "inc_err": 0.0044,
+                    "ecosw": 0.0,           "ecosw_err": null,
+                    "esinw": 0.0,           "esinw_err": null,
+                    "J": 0.98003,           "J_err": 0.00033,
+                    "L3": -0.0001,          "L3_err": 0.0008
+                }
             }
         }
     },
@@ -473,7 +608,7 @@
         "rA": 0.1690,       "rA_err": 0.0028,
         "rB": 0.1482,       "rB_err": 0.0035,
         "desc": "An inclined circular orbit with variability due to starspots, evidence of the ellipsoidal effect and shallow eclipses at approximately 0.11 & 0.1 mag.",
-        "notes": "e=0, ω=0, rA+rB=0.31715(57), k=0.877(36), inc=77.294(48), ecosw=0, esinw=0, J=0.8767(33), L3=0 & derived bP=1.30(2)",
+        "notes": "e=0 & ω=0 & L3=0 (fixed); bP derived from rA, inc, e & esinw;",
         "transits": false,
         "eclipses_similar": false,
         "components_similar": false,
@@ -483,12 +618,21 @@
                 "quality_masks": [[58790.6, 58792.5], [58801.0, 58804.7]],
                 "primary_epoch": 1808.958835302,
                 "period": 1.900888340,
-                "labels": { "rA_plus_rB": 0.31715, "k": 0.877, "bP": 1.30, "inc": 77.294, "ecosw": 0.0, "esinw": 0.0, "J": 0.8767, "L3": 0.0 }
+                "labels": { 
+                    "rA_plus_rB": 0.31715,  "rA_plus_rB_err": 0.00057,
+                    "k": 0.877,             "k_err": 0.036,
+                    "bP": 1.30,             "bP_err": 0.02,
+                    "inc": 77.294,          "inc_err": 0.048,
+                    "ecosw": 0.0,           "ecosw_err": null,
+                    "esinw": 0.0,           "esinw_err": null,
+                    "J": 0.8767,            "J_err": 0.0033,
+                    "L3": 0.0,              "L3_err": null
+                }
             }
         }
     },
     "AN Cam": {
-        "source": "DEBCat and Rediscussion IV, Table II.  TESS sectors 19, 25, and 26 (timeseries data from FFI) analysed with JKTEBOP version 41.  TESS sectors 52 & 53 were released subsequent to publication.",
+        "source": "DEBCat and Rediscussion IV, Table II.  TESS sectors 19, 25, and 26 (timeseries data from FFI) analysed with JKTEBOP version 41. ",
         "reference": "Southworth21obsR4",
         "aka": "TIC 103098373, HD 24906",
         "SpT": "F8",
@@ -502,8 +646,8 @@
         "logLB": 0.839,     "logLB_err": 0.046,
         "rA": 0.047920,     "rA_err": 0.000077,
         "rB": 0.058739,     "rB_err": 0.000032,
-        "desc": "A highly eccentric orbit with the secondary eclipse near phase 0.8. Southworth's analysis with observations of 1800 s cadence, here we use sector 52 which has a cadence of 600 s.",
-        "notes": "e=0.4676(2), ω=14.97(11), rA+rB=0.10665(10), k=1.2256(15), inc=89.213(13), ecosw=0.45176(9), esinw=0.1208(9), J=0.8368(8), L3=0 & derived bP=0.200(3)",
+        "desc": "A highly eccentric orbit with the secondary eclipse near phase 0.8. Southworth's analysis with observations of 1800 s cadence, here we use sector 52 (subsequent to publication) which has a cadence of 600 s.",
+        "notes": "L3=0 (fixed); bP derived from rA, inc, e & esinw;",
         "transits": false,
         "eclipses_similar": false,
         "components_similar": false,
@@ -516,9 +660,18 @@
                 "quality_masks": [[2742.0, 2743.0]],
                 "primary_epoch": 2726.965431,
                 "period": 20.998420,
-                "ecc": 0.4676,
-                "omega": 14.97,
-                "labels": { "rA_plus_rB": 0.10665, "k": 1.2256, "bP": 0.200, "inc": 89.213, "ecosw": 0.45176, "esinw": 0.1208, "J": 0.8368, "L3": 0.0 }
+                "ecc": 0.4676,      "ecc_err": 0.0002,
+                "omega": 14.97,     "omega_err": 0.11,
+                "labels": { 
+                    "rA_plus_rB": 0.10665,  "rA_plus_rB_err": 0.00010,
+                    "k": 1.2256,            "k_err": 0.0015,
+                    "bP": 0.200,            "bP_err": 0.003,
+                    "inc": 89.213,          "inc_err": 0.013,
+                    "ecosw": 0.45176,       "ecosw_err": 0.00009,
+                    "esinw": 0.1208,        "esinw_err": 0.0009,
+                    "J": 0.8368,            "J_err": 0.0008,
+                    "L3": 0.0,              "L3_err": null
+                }
             }
         }
     },
@@ -548,8 +701,17 @@
                 "omega": 335.74,
                 "rA": 0.10791,      "rA_err": 0.00013,
                 "rB": 0.10777,      "rB_err": 0.00014,
-                "labels": { "rA_plus_rB": 0.21568, "k": 0.9986, "bP": 0.048, "inc": 89.714, "ecosw": 0.080838, "esinw": -0.03644, "J": 0.99963, "L3": 0.0481 },
-                "notes": "Sector 17: e=0.08867(13), ω=335.74(19), rA+rB=0.21568(14), k=0.9986(21), inc=89.714(15), ecosw=0.080838(7), esinw=-0.03644(32), J=0.99963(54), L3=0.0481(30) & derived bP=0.048(3)"
+                "labels": { 
+                    "rA_plus_rB": 0.21568,  "rA_plus_rB_err": 0.00014,
+                    "k": 0.9986,            "k_err": 0.0021,
+                    "bP": 0.048,            "bP_err": 0.003,
+                    "inc": 89.714,          "inc_err": 0.015,
+                    "ecosw": 0.080838,      "ecosw_err": 0.000007,
+                    "esinw": -0.03644,      "esinw_err": 0.00032,
+                    "J": 0.99963,           "J_err": 0.00054,
+                    "L3": 0.0481,           "L3_err": 0.0030
+                },
+                "notes": "Using values from table II, Sector 17; bP derived from rA, inc, e & esinw;"
             }
         }
     },
@@ -569,7 +731,7 @@
         "rA": 0.1130,       "rA_err": 0.0009,
         "rB": 0.1072,       "rB_err": 0.0011,
         "desc": "An inclined orbit with a non-eclipsing third body in 4200 d orbit. The light curve shows eclipses of approximately 0.33 and 0.3 mag.",
-        "notes": "e=0.00985(27), ω=133.7(1.5), rA+rB=0.22018(24), k=0.949(17), inc=84.997(21), ecosw=-0.006803(7), esinw=0.00712(37), J=0.9543(11), L3=0.0282(22) & derived bP=0.766(7)",
+        "notes": "bP derived from rA, inc, e & esinw;",
         "transits": false,
         "eclipses_similar": true,
         "components_similar": true,
@@ -578,9 +740,18 @@
                 "quality_bitmask": "hardest",
                 "primary_epoch": 1847.488017872,
                 "period": 3.145795630,
-                "ecc": 0.00985,
-                "omega": 133.7,
-                "labels": { "rA_plus_rB": 0.22018, "k": 0.949, "bP": 0.766, "inc": 84.997, "ecosw": -0.006803, "esinw": 0.00712, "J": 0.9543, "L3": 0.0282 }
+                "ecc": 0.00985,     "ecc_err": 0.00027,
+                "omega": 133.7,     "omega_err": 1.5,
+                "labels": { 
+                    "rA_plus_rB": 0.22018,  "rA_plus_rB_err": 0.00024,
+                    "k": 0.949,             "k_err": 0.017,
+                    "bP": 0.766,            "bP_err": 0.007,
+                    "inc": 84.997,          "inc_err": 0.021,
+                    "ecosw": -0.006803,     "ecosw_err": 0.000007,
+                    "esinw": 0.00712,       "esinw_err": 0.00037,
+                    "J": 0.9543,            "J_err": 0.0011,
+                    "L3": 0.0282,           "L3_err": 0.0022
+                }
             }
         }
     },
@@ -600,7 +771,7 @@
         "rA": 0.086370,     "rA_err": 0.000078,
         "rB": 0.084536,     "rB_err": 0.000091,
         "desc": "A circular orbit with similar primary and secondary eclipses similar of approximately 0.45 mag. Some distortion of the light curve near BTJD 1791.",
-        "notes": "e=0, ω=0, rA+rB=0.170906(35), k=0.9788(19), inc=87.9166(30), ecosw=0, esinw=0, J=0.97775(50), L3=0 & derived bP=0.4209(7)",
+        "notes": "e=0 & ω=0 & L3=0 (fixed); bP derived from rA, inc, e & esinw;",
         "transits": false,
         "eclipses_similar": true,
         "components_similar": true,
@@ -609,12 +780,21 @@
                 "quality_bitmask": "hardest",
                 "primary_epoch": 1806.9611680,
                 "period": 4.2220216,
-                "labels": { "rA_plus_rB": 0.170906, "k": 0.9788, "bP": 0.4209, "inc": 87.9166, "ecosw": 0.0, "esinw": 0.0, "J": 0.97775, "L3": 0.0 }
+                "labels": { 
+                    "rA_plus_rB": 0.170906,     "rA_plus_rB_err": 0.000035,
+                    "k": 0.9788,                "k_err": 0.0019,
+                    "bP": 0.4209,               "bP_err": 0.0007,
+                    "inc": 87.9166,             "inc_err": 0.0030,
+                    "ecosw": 0.0,               "ecosw_err": null,
+                    "esinw": 0.0,               "esinw_err": null,
+                    "J": 0.97775,               "J_err": 0.00050,
+                    "L3": 0.0,                  "L3_err": null
+                }
             }
         }
     },
     "AI Phe": {
-        "source": "DEBCat and Maxted et al. (2020), Tables 2 and 3. The Southworth analysis of TESS sector 2 PDCSAP flux (K, JKTEBOP v38, quad LD law).  Teff and subsequently calculated L from Kirkby+Kent et al. (2016) We derive J and bP from a JKTEBOP fit with fixed params from run K.",
+        "source": "DEBCat and Maxted et al. (2020), Tables 2 and 3. The Southworth analysis of TESS sector 2 PDCSAP flux (K, JKTEBOP v38, quad LD law).  Teff and subsequently calculated L from Kirkby+Kent et al. (2016)",
         "reference": "Maxted+20mnras, Kirkby-KentMaxted+16aa",
         "aka": "TIC 102069549, HD 6980",
         "SpT": "G3 V",
@@ -629,7 +809,7 @@
         "rA": 0.037688,     "rA_err": 0.000032,
         "rB": 0.061263,     "rB_err": 0.000074,
         "desc": "An eccentric orbit with the secondary occuring before phase 0.5. Only sector 2 shows both transits. Star B is larger and evolved (k~1.6).",
-        "notes": "e=0.1881(8), ω=110.27(9), rA+rB=0.09895(8), k=1.6255(26), inc=88.359(7), ecosw=-0.065161(10), esinw=0.1765(8), L3=0.0053(25) & derived bP=0.623(3)",
+        "notes": "J from a JKTEBOP fit with fixed params from run K; bP derived from rA, inc, e & esinw;",
         "transits": true,
         "eclipses_similar": false,
         "components_similar": false,
@@ -638,9 +818,18 @@
                 "quality_bitmask": "hardest",
                 "primary_epoch": 1362.82834,
                 "period": 24.59240,
-                "ecc": 0.1881,
-                "omega": 110.27,
-                "labels": { "rA_plus_rB": 0.09895, "k": 1.6255, "bP": 0.623, "inc": 88.359, "ecosw": -0.065161, "esinw": 0.1765, "J": 0.498, "L3": 0.0053 }
+                "ecc": 0.1881,          "ecc_err": 0.0008,
+                "omega": 110.27,        "omega_err": 0.09,
+                "labels": { 
+                    "rA_plus_rB": 0.09895,  "rA_plus_rB_err": 0.00008,
+                    "k": 1.6255,            "k_err": 0.0026,
+                    "bP": 0.623,            "bP_err": 0.003,
+                    "inc": 88.359,          "inc_err": 0.007,
+                    "ecosw": -0.065161,     "ecosw_err": 0.000010,
+                    "esinw": 0.1765,        "esinw_err": 0.000022,
+                    "J": 0.498,             "J_err": null,
+                    "L3": 0.0053,           "L3_err": 0.0025
+                }
             }
         }
     },
@@ -660,7 +849,7 @@
         "rA": 0.15305,      "rA_err": 0.00067,
         "rB": 0.11453,      "rB_err": 0.00043,
         "desc": "A circular orbit with transits and further variability due to starspot activity.",
-        "notes": "e=0, ω=0, rA+rB=0.26756(85), k=0.7484(40), inc=89.41(22), ecosw=0, esinw=0, J=0.552(46), L3=0 and derived bP=0.07(3)",
+        "notes": "e=0 & ω=0 & L3=0 (fixed); bP derived from rA, inc, e & esinw;",
         "transits": true,
         "eclipses_similar": false,
         "components_similar": false,
@@ -669,12 +858,21 @@
                 "quality_bitmask": "hardest",
                 "primary_epoch": 1893.502047218,
                 "period": 2.299257258,
-                "labels": { "rA_plus_rB": 0.2676, "k": 0.7484, "bP": 0.07, "inc": 89.41, "ecosw": 0.0, "esinw": 0.0, "J": 0.552, "L3": 0.0 }
+                "labels": { 
+                    "rA_plus_rB": 0.26756,  "rA_plus_rB_err": 0.00085,
+                    "k": 0.7484,            "k_err": 0.0040,
+                    "bP": 0.07,             "bP_err": 0.03,
+                    "inc": 89.41,           "inc_err": 0.22,
+                    "ecosw": 0.0,           "ecosw_err": null,
+                    "esinw": 0.0,           "esinw_err": null,
+                    "J": 0.552,             "J_err": 0.046,
+                    "L3": 0.0,              "L3_err": null
+                }
             }
         }
     },
     "QR Hya": {
-        "source": "DEBCat and Graczyk et al. (2022) who use WD for fitting. We find J from JKTEBOP fit. Sectors 9 & 36 would have been available with 63 released subsequent to publication.",
+        "source": "DEBCat and Graczyk et al. (2022) table 8 who use WD for fitting. Sectors 9 & 36 would have been available with 63 released subsequent to publication.",
         "reference": "GraczykPietrzynski+22aa",
         "aka": "TIC 49003142, HD 94853",
         "SpT": "G1 V",
@@ -689,8 +887,7 @@
         "rA": 0.08059,      "rA_err": 0.00025,
         "rB": 0.07547,      "rB_err": 0.00034,
         "desc": "A slightly eccentric and inclined orbit with eclipses of approximately 0.30 and 0.28 mag.",
-        "notes": "e=0.0001(1), ω=217(11), rA+rB=0.1561(4), k=0.936(5), inc=86.087(7), ecosw=-0.00008(8), esinw=-0.00006(6), L3=0 & derived bP=0.847(3)",
-        "notes2": "the values for ecosw and esinw calculated from e and ω are very small and with significant errors so they're rounded by 1 d.p. for the labels",
+        "notes": "L3=0 (fixed); rA_plus_rB & k derived from rA & rB in table 8; J from JKTEBOP fit; bP derived from rA, inc, e & esinw;",
         "transits": false,
         "eclipses_similar": true,
         "components_similar": true,
@@ -699,14 +896,23 @@
                 "quality_bitmask": "hardest",
                 "primary_epoch": 1559.4571181,
                 "period": 5.0058710,
-                "ecc": 0.0001,
-                "omega": 217,
-                "labels": { "rA_plus_rB": 0.1561, "k": 0.936, "bP": 0.847, "inc": 86.087, "ecosw": -0.0001, "esinw": -0.0001, "J": 0.94, "L3": 0.0 }
+                "ecc": 0.0001,      "ecc_err": 0.0001,
+                "omega": 217,       "omega_err": 11,
+                "labels": { 
+                    "rA_plus_rB": 0.1561,   "rA_plus_rB_err": 0.0004,
+                    "k": 0.936,             "k_err": 0.005,
+                    "bP": 0.847,            "bP_err": 0.003,
+                    "inc": 86.087,          "inc_err": 0.007,
+                    "ecosw": -0.00008,      "ecosw_err": 0.00008, 
+                    "esinw": -0.00006,      "esinw_err": 0.00006, 
+                    "J": 0.94,              "J_err": null, 
+                    "L3": 0.0,              "L3_err": null
+                }
             }
         }
     },
     "V963 Cen": {
-        "source": "DEBCat and Graczyk et al. (2022) who use WD for fitting. We find J from JKTEBOP fit.",
+        "source": "DEBCat and Graczyk et al. (2022) who use WD for fitting.",
         "reference": "GraczykPietrzynski+22aa",
         "aka": "TIC 262126225, HD 115496",
         "SpT": "G2 V",
@@ -721,7 +927,7 @@
         "rA": 0.04320,      "rA_err": 0.00015,
         "rB": 0.04248,      "rB_err": 0.00020,
         "desc": "A highly eccentric orbit with eclipses of approximately 0.4 and 0.15 mag. The secondary eclipse is near phase 0.3. Some variability in LC means fold and fit is approximate.",
-        "notes": "e=0.4233(16), ω=140.10(3), rA+rB=0.0857(3), k=0.983(6), inc=87.255(32), ecosw=-0.329(1), esinw=0.265(1), L3=-0.028(4) & derived bP=0.719(9)",
+        "notes": "rA_plus_rB & k derived from rA & rB in table 8; bP derived from rA, inc, e & esinw;",
         "transits": false,
         "eclipses_similar": false,
         "components_similar": true,
@@ -730,9 +936,18 @@
                 "quality_bitmask": "hardest",
                 "primary_epoch": 2341.077182,
                 "period": 15.269303,
-                "ecc": 0.4223,
-                "omega": 140.1,
-                "labels": { "rA_plus_rB": 0.0857, "k": 0.983, "bP": 0.719, "inc": 87.255, "ecosw": -0.329, "esinw": 0.265, "J": 0.95, "L3": -0.028 }
+                "ecc": 0.4223,      "ecc_err": 0.0016,
+                "omega": 140.10,    "omega_err": 0.03,
+                "labels": { 
+                    "rA_plus_rB": 0.0857,   "rA_plus_rB_err": 0.0003,
+                    "k": 0.983,             "k_err": 0.006,
+                    "bP": 0.719,            "bP_err": 0.009,
+                    "inc": 87.255,          "inc_err": 0.032,
+                    "ecosw": -0.329,        "ecosw_err": 0.001,
+                    "esinw": 0.265,         "esinw_err": 0.001,
+                    "J": 0.95,              "J_err": null,
+                    "L3": -0.028,           "L3_err": 0.004
+                }
             }
         }
     },
@@ -752,7 +967,7 @@
         "rA": 0.019875,     "rA_err": 0.000039,
         "rB": 0.024582,     "rB_err": 0.000010,
         "desc": "A highly eccentric 27.2 d orbit with eclipses of approximately 0.4 and 0.3 mag, although some sectors don't have both. Very narrow eclipses not well represented with 1024 data points. Primary less massive and cooler.",
-        "notes": "e=0.38056(17), ω=49.562(25), rA+rB=0.044456(33), k=1.2368(27), inc=89.2084(23), ecosw=0.246836(18), esinw=0.28695(23), J=1.2059(20), L3=0 & derived bP=0.462(1)",
+        "notes": "L3=0 (fixed); bP derived from rA, inc, e & esinw;",
         "transits": false,
         "eclipses_similar": false,
         "components_similar": false,
@@ -761,9 +976,18 @@
                 "quality_bitmask": "hard",
                 "primary_epoch": 2526.2961006,
                 "period": 27.0198177,
-                "ecc": 0.38056,
-                "omega": 49.562,
-                "labels": { "rA_plus_rB": 0.044456, "k": 1.2368, "bP": 0.462, "inc": 89.2084, "ecosw": 0.246836, "esinw": 0.28965, "J": 1.2059, "L3": 0.0 }
+                "ecc": 0.38056,         "ecc_err": 0.00017,
+                "omega": 49.562,        "omega_err": 0.025,
+                "labels": { 
+                    "rA_plus_rB": 0.044456,     "rA_plus_rB_err": 0.00033,
+                    "k": 1.2368,                "k_err": 0.0027,
+                    "bP": 0.462,                "bP_err": 0.001,
+                    "inc": 89.2084,             "inc_err": 0.0023,
+                    "ecosw": 0.246836,          "ecosw_err": 0.000018,
+                    "esinw": 0.28965,           "esinw_err": 0.00023,
+                    "J": 1.2059,                "J_err": 0.0020,
+                    "L3": 0.0,                  "L3_err": null
+                }
             }
         }
     },
@@ -783,7 +1007,7 @@
         "rA": 0.06717,      "rA_err": 0.00001,
         "rB": 0.06347,      "rB_err": 0.00004,
         "desc": "Two M-dwarfs in a nearly circular, slightly inclined 1.27 d orbit. Eclipses are approximately 0.76 and 0.73 mag deep. Lightcurves show frequent flares however these should have little affect on the fit.",
-        "notes2": "Martin; e=0.00527(21), ω=107.98(70), rA+rB=0.13064(7), k=0.9450(8), inc=89.5514(20), ecosw=-0.00163(9), esinw=0.0050(2), J=0.98133(81), L3=0 & given bP=0.11711(54)",        
+        "notes2": "Martin values; L3=0 (fixed)",        
         "transits": false,
         "eclipses_similar": true,
         "components_similar": true,
@@ -794,10 +1018,19 @@
             "56": {
                 "quality_bitmask": "hard",
                 "primary_epoch": 2844.696709,
-                "ecc": 0.00527,
-                "omega": 107.98,
+                "ecc": 0.00527,         "ecc_err": 0.00021,
+                "omega": 107.98,        "omega_err": 0.70,
                 "period": 1.268389,
-                "labels": { "rA_plus_rB": 0.13064, "k": 0.9450, "bP": 0.11711, "inc": 89.5514, "ecosw": -0.00163, "esinw": 0.0050, "J": 0.98133, "L3": 0.0 }
+                "labels": { 
+                    "rA_plus_rB": 0.13064,  "rA_plus_rB_err": 0.00007,
+                    "k": 0.9450,            "k_err": 0.0008,
+                    "bP": 0.11711,          "bP_err": 0.00054,
+                    "inc": 89.5514,         "inc_err": 0.0020,
+                    "ecosw": -0.00163,      "ecosw_err": 0.00009,
+                    "esinw": 0.0050,        "esinw_err": 0.0002,
+                    "J": 0.98133,           "J_err": 0.00081,
+                    "L3": 0.0,              "L3_err": null
+                }
             }
         }
     }
