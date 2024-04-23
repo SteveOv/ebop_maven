@@ -92,8 +92,8 @@ def cnn_with_pooling(num_layers: int=1,
                      filters: Union[int, List[int]]=64,
                      kernel_size: Union[int, List[int]]=8,
                      strides: Union[int, List[int]]=2,
-                     padding: Union[str, List[str]]="same",
-                     activation: Union[any, List[any]]="relu",
+                     padding: str="same",
+                     activation: str="relu",
                      pooling_ixs: Union[int, List[int]]=None,
                      pooling_type: layers.Layer=None,
                      pooling_kwargs: Union[Dict, List[Dict]]=None):
@@ -107,10 +107,6 @@ def cnn_with_pooling(num_layers: int=1,
         kernel_size = [kernel_size] * num_layers
     if not isinstance(strides, List):
         strides = [strides] * num_layers
-    if not isinstance(padding, List):
-        padding = [padding] * num_layers
-    if not isinstance(activation, List):
-        activation = [activation] * num_layers
     if pooling_ixs and pooling_type and pooling_kwargs and isinstance(pooling_kwargs, dict):
         num_pools = len(pooling_ixs)
         pooling_kwargs = [pooling_kwargs] * num_pools
@@ -127,8 +123,8 @@ def cnn_with_pooling(num_layers: int=1,
             input_tensor = layers.Conv1D(filters=filters[cnn_ix],
                                          kernel_size=kernel_size[cnn_ix],
                                          strides=strides[cnn_ix],
-                                         padding=padding[cnn_ix],
-                                         activation=activation[cnn_ix],
+                                         padding=padding,
+                                         activation=activation,
                                          name=f"CNN-{cnn_ix+1}")(input_tensor)
         return input_tensor
     return layers_func
