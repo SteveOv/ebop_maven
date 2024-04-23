@@ -1,7 +1,8 @@
 """
 Searches for the best set of hyperparams for the Mags/Extra-Features model
 """
-from typing import Callable, Union, List, Dict
+# pylint: disable=too-many-arguments
+from typing import Callable, Union, List, Dict, Tuple
 from pathlib import Path
 from contextlib import redirect_stdout
 import os
@@ -88,7 +89,7 @@ for ds_ix, (label, set_dir) in enumerate(zip(ds_titles, ds_dirs)):
 # -----------------------------------------------------------
 # Temporary model Helpers (will go when modelling updated)
 # -----------------------------------------------------------
-def cnn_with_pooling(num_layers: int=1,
+def cnn_with_pooling(num_layers: int=4,
                      filters: Union[int, List[int]]=64,
                      kernel_size: Union[int, List[int]]=8,
                      strides: Union[int, List[int]]=2,
@@ -100,17 +101,17 @@ def cnn_with_pooling(num_layers: int=1,
     """
     Prototype of creating a set of CNN layers with optional pooling at given indices.
     """
-    # pylint: disable=too-many-arguments
     if not isinstance(filters, List):
         filters = [filters] * num_layers
     if not isinstance(kernel_size, List):
         kernel_size = [kernel_size] * num_layers
     if not isinstance(strides, List):
         strides = [strides] * num_layers
+    if pooling_kwargs is None:
+        pooling_kwargs = { "pool_size": 2, "strides": 2 }
     if pooling_ixs and pooling_type and pooling_kwargs and isinstance(pooling_kwargs, dict):
         num_pools = len(pooling_ixs)
         pooling_kwargs = [pooling_kwargs] * num_pools
-
     def layers_func(input_tensor: keras.KerasTensor) -> keras.KerasTensor:
         # Expected failure if any list isn't num_layers long
         pooling_ix = 0
@@ -129,6 +130,58 @@ def cnn_with_pooling(num_layers: int=1,
         return input_tensor
     return layers_func
 
+def cnn_scaled_pairs_with_pooling(num_pairs: int=2,
+                                  filters: int=32,
+                                  kernel_size: int=16,
+                                  strides: int=None,
+                                  scaling_multiplier: int=2,
+                                  padding: str="same",
+                                  activation: str="relu",
+                                  pooling_type: layers.Layer=None,
+                                  pooling_kwargs: Union[Dict, List[Dict]]=None,
+                                  trailing_pool: bool=True):
+    """
+    Pairs of Conv1d layers where the filters/kernel_size can optionally be
+    scaled up/down for each successive pair (by scaling_multiplier).
+    Each pair can optionally be followed with a pooling layer (this last)
+    """
+    if pooling_kwargs is None:
+        pooling_kwargs = { "pool_size": 2, "strides": 2 }
+    def layer_func(input_tensor: keras.KerasTensor) -> keras.KerasTensor:
+        for ix in range(num_pairs):
+            for sub_ix in range(2):
+                scale = 1 if ix == 0 else scaling_multiplier * ix
+                this_filters = filters * scale
+                this_kernel_size = int(kernel_size / scale)
+                this_strides = strides if strides else int(kernel_size / 2)
+                input_tensor = layers.Conv1D(filters=this_filters,
+                                             kernel_size=this_kernel_size,
+                                             strides=this_strides,
+                                             padding=padding,
+                                             activation=activation,
+                                             name=f"CNN-{ix+1}-{sub_ix+1}")(input_tensor)
+            if pooling_type and (trailing_pool or ix < num_pairs-1):
+                input_tensor = pooling_type(name=f"Pool-{ix+1}",
+                                            **pooling_kwargs)(input_tensor)
+        return input_tensor
+    return layer_func
+
+def cnn_fixed_pairs_with_pooling(num_pairs: int=2,
+                                 filters: int=64,
+                                 kernel_size: int=4,
+                                 strides: int=None,
+                                 padding: str="same",
+                                 activation: str="relu",
+                                 pooling_type: layers.Layer=None,
+                                 pooling_kwargs: Union[Dict, List[Dict]]=None,
+                                 trailing_pool: bool=True):
+    """
+    Pairs of Conv1d layers with fixed filters, kernel_size and strided and
+    optionally followed with a pooling layer.
+    """
+    return cnn_scaled_pairs_with_pooling(num_pairs, filters, kernel_size, strides, 1,
+                                         padding, activation,
+                                         pooling_type, pooling_kwargs, trailing_pool)
 
 def dnn_with_taper(num_layers: int,
                    units: int,
@@ -158,26 +211,68 @@ scope.define(layers.PReLU)
 scope.define(optimizers.Adam)
 scope.define(optimizers.Nadam)
 
+# Shared choices
+cnn_padding_choice = hp.choice("cnn_padding", ["same", "valid"])
+cnn_activation_choice = hp.choice("cnn_activation", ["relu"])
+cnn_pooling_type_choice = hp.choice("cnn_pooling_type", [layers.AvgPool1D, layers.MaxPool1D, None])
+cnn_trailing_pool_choice = hp.choice("cnn_trailing_pool", [True, False])
+dnn_kernel_initializer_choice = hp.choice("dnn_init", ["he_uniform", "he_normal", "glorot_uniform"])
+learning_rate_choice = hp.choice("learning_rate", [1e-5, 5e-5, 1e-4])
+
 trials_pspace = hp.choice("train_and_test_model", [{
     "model": hp.choice("model", [{
         "func": modelling.build_mags_ext_model,
         "mags_layers": hp.choice("mags_layers", [
             {
+                # Current CNN from best performing model from manual search
+                "func": cnn_fixed_pairs_with_pooling,
+                "num_pairs": 4,
+                "filters": 64,
+                "kernel_size": 4,
+                "strides": 2,
+                "padding": "same",
+                "activation": "relu",
+                "pooling_type": layers.MaxPool1D,
+                "pooling_kwargs": { "pool_size": 2, "strides": 2 },
+                "trailing_pool": False,
+            },
+            {
+                # Pairs of Conv1ds with fixed filters/kernels/strides and optional pooling layers
+                "func": cnn_fixed_pairs_with_pooling,
+                "num_pairs": hp.choice("cnn_fixed_num_layers", [3, 4]),
+                "filters": hp.choice("cnn_fixed_filters", [32, 64]),
+                "kernel_size": hp.choice("cnn_fixed_kernel_size", [4, 8]),
+                "strides": None, # Always kernel_size/2
+                "padding": cnn_padding_choice,
+                "activation": cnn_activation_choice,
+                "pooling_type": cnn_pooling_type_choice,
+                "trailing_pool": cnn_trailing_pool_choice,
+            },
+            {
+                # Pairs of Conv1ds with doubling filters & halving kernels/strides per pair
+                # and optional pooling layers
+                "func": cnn_scaled_pairs_with_pooling,
+                "num_pairs": hp.choice("cnn_scaled_num_layers", [3]),
+                "filters": hp.choice("cnn_scaled_filters", [16, 32]),
+                "kernel_size": hp.choice("cnn_scaled_kernel_size", [16, 8]),
+                "strides": hp.choice("cnn_scaled_strides", [2]),
+                "scaling_multiplier": 2,
+                "padding": "same",
+                "activation": cnn_activation_choice,
+                "pooling_type": cnn_pooling_type_choice,
+                "trailing_pool": cnn_trailing_pool_choice,
+            },
+            {
+                # Randomized CNN with/without pooling.
                 "func": cnn_with_pooling,
-                "num_layers": hp.choice("cnn_num_layers", [4, 5, 6]),
+                "num_layers": hp.choice("cnn_num_layers", [4, 5, 6, 7]),
                 "filters": hp.choice("cnn_filters", [32, 64]),
                 "kernel_size": hp.choice("cnn_kernel_size", [16, 8]),
                 "strides": hp.choice("cnn_strides", [4, 2]),
-                "padding": hp.choice("cnn_padding", ["same", "valid"]),
-                "activation": hp.choice("cnn_activation", ["relu"]),
+                "padding": cnn_padding_choice,
+                "activation": cnn_activation_choice,
                 "pooling_ixs": hp.choice("cnn_pooling_ixs", [None, [2], [2, 5]]),
-                "pooling_type": hp.choice("cnn_pooling_type", [layers.AvgPool1D, layers.MaxPool1D]),
-                "pooling_kwargs": hp.choice("cnn_pooling_kwargs", [
-                    {
-                        "pool_size": 2,
-                        "strides": 2,
-                        "padding": hp.choice("cnn_pooling_padding", ["same", "valid"])
-                    }])
+                "pooling_type": cnn_pooling_type_choice,
             },
         ]),
         "ext_layers": None,
@@ -186,23 +281,23 @@ trials_pspace = hp.choice("train_and_test_model", [{
                 "func": dnn_with_taper,
                 "num_layers": hp.choice("dnn_num_layers", [1, 2, 3]),
                 "units": hp.choice("dnn_units", [64, 128, 256]),
-                "kernel_initializer": hp.choice("dnn_init", ["glorot_uniform", "he_uniform", "he_normal"]),
+                "kernel_initializer": dnn_kernel_initializer_choice,
                 "activation": hp.choice("activation", ["relu", "leaky_relu", "elu"]),
                 "dropout_rate": hp.choice("dnn_dropout", [0.4, 0.5, 0.6]),
-                "taper_units": hp.choice("dnn_taper", [None, 32, 64, 128]),
+                "taper_units": hp.choice("dnn_taper", [None, 32, 64]),
             },
         ]),
         "output": {
             "func": modelling.output_layer,
             "label_names_and_scales": { l: deb_example.labels_and_scales[l] for l in CHOSEN_LABELS },
-            "kernel_initializer": hp.choice("ouput_initializer", ["glorot_uniform", "he_uniform", "he_normal"]),
+            "kernel_initializer": dnn_kernel_initializer_choice,
             "activation": "linear"
         },
     }]),
 
     "optimizer": hp.choice("optimizer", [
-        { "class": optimizers.Adam, "learning_rate": hp.choice("adam_lr", [1e-5, 5e-5, 1e-4]) },
-        { "class": optimizers.Nadam, "learning_rate": hp.choice("nadam_lr", [1e-5, 5e-5, 1e-4]) }
+        { "class": optimizers.Adam, "learning_rate": learning_rate_choice },
+        { "class": optimizers.Nadam, "learning_rate": learning_rate_choice }
     ]),
 
     "loss_function": hp.choice("loss_function", ["mae", "mse", "huber"]),      
@@ -285,7 +380,7 @@ def train_and_test_model(trial_kwargs):
                                 callbacks = [cb.EarlyStopping("val_loss", restore_best_weights=True,
                                                               patience=PATIENCE, verbose=1)],
                                 validation_data = datasets[1],
-                                verbose=0)
+                                verbose=2)
 
         print(f"\nEvaluating model against {counts[2]} {ds_titles[2]} dataset test instances.")
         candidate.evaluate(x=datasets[2], y=None, verbose=2)
@@ -317,8 +412,8 @@ def train_and_test_model(trial_kwargs):
         print(f"*** Training failed! *** Caught a {type(exc).__name__}: {exc.op} / {exc.message}")
         print(f"The problem hyperparam set is: {trial_kwargs}\n")
 
-    return { "loss": weighted_loss, "status": status, "mae": mae, "mse": mse,
-            "AIC": aic, "BIC": bic, "model": candidate, "history": history }
+    return { "loss": mae, "status": status, "mae": mae, "mse": mse,
+            "weighted_loss": weighted_loss, "AIC": aic, "BIC": bic, "model": candidate, "history": history }
 
 # Conduct the trials
 results_dir = Path(".") / "drop" / "hyperparam_search"
