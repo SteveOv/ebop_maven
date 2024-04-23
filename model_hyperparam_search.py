@@ -209,7 +209,10 @@ trials_pspace = hp.choice("train_and_test_model", [{
 }])
 
 
-def get_trial_value(trial_dict: dict, key: str, pop_it: bool=False) -> Union[Callable, any]:
+def get_trial_value(trial_dict: dict,
+                    key: str,
+                    pop_it: bool=False, 
+                    tuples_to_lists: bool=True) -> Union[Callable, any]:
     """
     Will get the requested value from the trial dictionary. Specifically handles the special
     case where we are getting a function/class with hp.choices over the args by parsing the
@@ -232,6 +235,11 @@ def get_trial_value(trial_dict: dict, key: str, pop_it: bool=False) -> Union[Cal
     """
     # We want a KeyError if item not found
     target_value = trial_dict.pop(key) if pop_it else trial_dict.get(key)
+
+    # Workaround for the nasty behaviour in hyperopt where lists get silently converted to tuples
+    # (see: https://github.com/hyperopt/hyperopt/issues/526)
+    if isinstance(target_value, Tuple) and tuples_to_lists:
+        target_value = list(target_value)
 
     # We're looking for the special case: a dict with a func/class item and the rest the kwargs.
     if isinstance(target_value, dict) and ("func" in target_value or "class" in target_value):
