@@ -101,15 +101,20 @@ print("\nDefining the multiple-input/output CNN model for predicting:", ", ".joi
 model = modelling.build_mags_ext_model(
     name=MODEL_NAME,
     mags_layers=[
-        modelling.conv1d_layers(2, 64, 8, 4, CNN_PADDING, CNN_ACTIVATE, "CNN-1."),
-        modelling.conv1d_layers(3, 64, 4, 2, CNN_PADDING, CNN_ACTIVATE, "CNN-2.")
+        modelling.conv1d_layers(2, 64, 4, 2, CNN_PADDING, CNN_ACTIVATE, "CNN-1-"),
+        layers.MaxPool1D(pool_size=2, strides=2),
+        modelling.conv1d_layers(2, 64, 4, 2, CNN_PADDING, CNN_ACTIVATE, "CNN-2-"),
+        layers.MaxPool1D(pool_size=2, strides=2),
+        modelling.conv1d_layers(2, 64, 4, 2, CNN_PADDING, CNN_ACTIVATE, "CNN-3-"),
+        layers.MaxPool1D(pool_size=2, strides=2),
+        modelling.conv1d_layers(2, 64, 4, 2, CNN_PADDING, CNN_ACTIVATE, "CNN-4-")
     ],
     dnn_layers=[
         modelling.hidden_layers(DNN_NUM_FULL_LAYERS, 256, DNN_INITIALIZER, DNN_ACTIVATE,
                                 DNN_DROPOUT_RATE, ("Hidden-", "Dropout-")),
         # "Buffer" between the DNN+Dropout and the output layer; this non-dropout NN layer
         # consistently gives a small, but significant improvement to the trained loss.
-        modelling.hidden_layers(1, 128, DNN_INITIALIZER, DNN_ACTIVATE, 0, ("Taper-", ))
+        modelling.hidden_layers(1, 64, DNN_INITIALIZER, DNN_ACTIVATE, 0, ("Taper-",))
     ],
     output=modelling.output_layer({ l: deb_example.labels_and_scales[l] for l in CHOSEN_LABELS },
                                   DNN_INITIALIZER, "linear", "Output"),
