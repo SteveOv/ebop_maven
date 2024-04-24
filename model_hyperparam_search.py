@@ -194,6 +194,17 @@ def cnn_fixed_pairs_with_pooling(num_pairs: int=2,
                                          padding, activation,
                                          pooling_type, pooling_kwargs, trailing_pool)
 
+def cnn_best_performing_known_set():
+    """
+    Whatever the current best model's CNN is (from previous runs and/or manual search).
+    As a rule of thumb, this should be equivalent to what's in make_trained_cnn_model.py
+    """
+    return cnn_fixed_pairs_with_pooling(num_pairs=4, filters=64, kernel_size=4, strides=2,
+                                        padding="same", activation="relu",
+                                        pooling_type=layers.MaxPool1D,
+                                        pooling_kwargs={ "pool_size": 2, "strides": 2 },
+                                        trailing_pool=False)
+
 def dnn_with_taper(num_layers: int,
                    units: int,
                    kernel_initializer: any,
@@ -236,16 +247,7 @@ trials_pspace = hp.choice("train_and_test_model", [{
         "mags_layers": hp.choice("mags_layers", [
             {
                 # Current CNN from best performing model from manual search
-                "func": cnn_fixed_pairs_with_pooling,
-                "num_pairs": 4,
-                "filters": 64,
-                "kernel_size": 4,
-                "strides": 2,
-                "padding": "same",
-                "activation": "relu",
-                "pooling_type": layers.MaxPool1D,
-                "pooling_kwargs": { "pool_size": 2, "strides": 2 },
-                "trailing_pool": False,
+                "func": cnn_best_performing_known_set,
             },
             {
                 # Pairs of Conv1ds with fixed filters/kernels/strides and optional pooling layers
