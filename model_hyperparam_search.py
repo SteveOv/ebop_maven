@@ -141,19 +141,25 @@ def cnn_scaled_pairs_with_pooling(num_pairs: int=2,
                                   pooling_kwargs: Union[Dict, List[Dict]]=None,
                                   trailing_pool: bool=True):
     """
-    Pairs of Conv1d layers where the filters/kernel_size can optionally be
-    scaled up/down for each successive pair (by scaling_multiplier).
-    Each pair can optionally be followed with a pooling layer (this last)
+    Pairs of Conv1d layers where the filters & kernel_size/strides can
+    optionally be scaled up/down for each successive pair (by scaling_multiplier).
+    Each pair can optionally be followed with a pooling layer. If we are
+    including pooling layers the trailing_pool flag dictates whether the
+    pooling layer after the final pair of Conv1ds is appended or not.
     """
     if pooling_kwargs is None:
         pooling_kwargs = { "pool_size": 2, "strides": 2 }
+
     def layer_func(input_tensor: keras.KerasTensor) -> keras.KerasTensor:
+        this_filters = filters
+        this_kernel_size = kernel_size
+        if not strides:
+            this_strides = this_kernel_size // 2
+        else:
+            this_strides = strides
+
         for ix in range(num_pairs):
             for sub_ix in range(2):
-                scale = 1 if ix == 0 else scaling_multiplier * ix
-                this_filters = filters * scale
-                this_kernel_size = int(kernel_size / scale)
-                this_strides = strides if strides else int(kernel_size / 2)
                 input_tensor = layers.Conv1D(filters=this_filters,
                                              kernel_size=this_kernel_size,
                                              strides=this_strides,
@@ -161,8 +167,14 @@ def cnn_scaled_pairs_with_pooling(num_pairs: int=2,
                                              activation=activation,
                                              name=f"CNN-{ix+1}-{sub_ix+1}")(input_tensor)
             if pooling_type and (trailing_pool or ix < num_pairs-1):
-                input_tensor = pooling_type(name=f"Pool-{ix+1}",
-                                            **pooling_kwargs)(input_tensor)
+                input_tensor = pooling_type(name=f"Pool-{ix+1}", **pooling_kwargs)(input_tensor)
+            if scaling_multiplier != 1:
+                this_filters *= scaling_multiplier
+                this_kernel_size //= scaling_multiplier
+                if not strides:
+                    this_strides = this_kernel_size // 2
+                else:
+                    this_strides //= scaling_multiplier
         return input_tensor
     return layer_func
 
