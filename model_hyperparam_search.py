@@ -153,10 +153,7 @@ def cnn_scaled_pairs_with_pooling(num_pairs: int=2,
     def layer_func(input_tensor: keras.KerasTensor) -> keras.KerasTensor:
         this_filters = filters
         this_kernel_size = kernel_size
-        if not strides:
-            this_strides = this_kernel_size // 2
-        else:
-            this_strides = strides
+        this_strides = strides if strides else max(1, this_kernel_size // 2)
 
         for ix in range(num_pairs):
             for sub_ix in range(2):
@@ -166,15 +163,17 @@ def cnn_scaled_pairs_with_pooling(num_pairs: int=2,
                                              padding=padding,
                                              activation=activation,
                                              name=f"CNN-{ix+1}-{sub_ix+1}")(input_tensor)
+
             if pooling_type and (trailing_pool or ix < num_pairs-1):
                 input_tensor = pooling_type(name=f"Pool-{ix+1}", **pooling_kwargs)(input_tensor)
+
             if scaling_multiplier != 1:
                 this_filters *= scaling_multiplier
-                this_kernel_size //= scaling_multiplier
-                if not strides:
-                    this_strides = this_kernel_size // 2
+                this_kernel_size = max(1, this_kernel_size // scaling_multiplier)
+                if strides:
+                    this_strides = max(1, this_strides // scaling_multiplier)
                 else:
-                    this_strides //= scaling_multiplier
+                    this_strides = max(1, this_kernel_size // 2)
         return input_tensor
     return layer_func
 
