@@ -385,6 +385,9 @@ def train_and_test_model(trial_kwargs):
         candidate = get_trial_value(trial_kwargs, "model", False)
         candidate.compile(optimizer=optimizer, loss=[loss_function], metrics=fixed_metrics)
 
+        # Reset the tf random seed so shuffling & other "random" behaviour is repeated
+        tf.random.set_seed(SEED)
+
         print(f"\nTraining the following model against {counts[0]} {ds_titles[0]} instances.")
         print(candidate.summary(line_length=120, show_trainable=True))
         history = candidate.fit(x = datasets[0],
