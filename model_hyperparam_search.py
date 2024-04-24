@@ -87,7 +87,7 @@ for ds_ix, (label, set_dir) in enumerate(zip(ds_titles, ds_dirs)):
 
 
 # -----------------------------------------------------------
-# Temporary model Helpers (will go when modelling updated)
+# Constructors for variously structured network building blocks
 # -----------------------------------------------------------
 def cnn_with_pooling(num_layers: int=4,
                      filters: Union[int, List[int]]=64,
@@ -100,6 +100,8 @@ def cnn_with_pooling(num_layers: int=4,
                      pooling_kwargs: Union[Dict, List[Dict]]=None):
     """
     Prototype of creating a set of CNN layers with optional pooling at given indices.
+
+    Useful for a less structured approach than 2*conv+pooling of the other cnn methods.
     """
     if not isinstance(filters, List):
         filters = [filters] * num_layers
@@ -148,6 +150,12 @@ def cnn_scaled_pairs_with_pooling(num_pairs: int=2,
     can optionally be followed with a pooling layer. If we are including
     pooling layers the trailing_pool flag dictates whether the pooling layer
     after the final pair of Conv1ds is appended or not.
+
+    The pattern of repeating 2*Conv+1*pool with increasing filters/decreasing
+    kernels crops up regularly in known/documented CNNs such as;
+    - LeNet-5 (LeCun+98)
+    - AlexNet (Krishevsky+12)
+    - Shallue & Vanderburg (2018, AJ, 155); especially relevant as based on Kepler LCs
     """
     if pooling_kwargs is None:
         pooling_kwargs = { "pool_size": 2, "strides": 2 }
@@ -189,6 +197,15 @@ def cnn_fixed_pairs_with_pooling(num_pairs: int=2,
     """
     Pairs of Conv1d layers with fixed filters, kernel_size and strided and
     optionally followed with a pooling layer.
+
+    Another repeated 2*conv+1*pool structure but this time the
+    filters/kernels/strides remain constant across all the conv1d layers.
+    It's a very simple structure with the filters "seeing" an ever larger
+    FOV as the spatial extent of the input data is reduced as it proceeds
+    through the layers.
+    
+    Experimentation has shown that variations on this structure appear to offer
+    a good baseline level of performance.
     """
     return cnn_scaled_pairs_with_pooling(num_pairs, filters, kernel_size, strides, 1,
                                          padding, activation,
