@@ -141,11 +141,11 @@ def cnn_scaled_pairs_with_pooling(num_pairs: int=2,
                                   pooling_kwargs: Union[Dict, List[Dict]]=None,
                                   trailing_pool: bool=True):
     """
-    Pairs of Conv1d layers where the filters & kernel_size/strides can
-    optionally be scaled up/down for each successive pair (by scaling_multiplier).
-    Each pair can optionally be followed with a pooling layer. If we are
-    including pooling layers the trailing_pool flag dictates whether the
-    pooling layer after the final pair of Conv1ds is appended or not.
+    Pairs of Conv1d layers where the filters & kernel_size can optionally be
+    scaled up/down for each successive pair (by scaling_multiplier). Each pair
+    can optionally be followed with a pooling layer. If we are including
+    pooling layers the trailing_pool flag dictates whether the pooling layer
+    after the final pair of Conv1ds is appended or not.
     """
     if pooling_kwargs is None:
         pooling_kwargs = { "pool_size": 2, "strides": 2 }
@@ -170,9 +170,7 @@ def cnn_scaled_pairs_with_pooling(num_pairs: int=2,
             if scaling_multiplier != 1:
                 this_filters *= scaling_multiplier
                 this_kernel_size = max(1, this_kernel_size // scaling_multiplier)
-                if strides:
-                    this_strides = max(1, this_strides // scaling_multiplier)
-                else:
+                if not strides or this_strides > this_kernel_size:
                     this_strides = max(1, this_kernel_size // 2)
         return input_tensor
     return layer_func
@@ -268,7 +266,7 @@ trials_pspace = hp.choice("train_and_test_model", [{
                 "num_pairs": hp.choice("cnn_scaled_num_layers", [3]),
                 "filters": hp.choice("cnn_scaled_filters", [16, 32]),
                 "kernel_size": hp.choice("cnn_scaled_kernel_size", [16, 8]),
-                "strides": hp.choice("cnn_scaled_strides", [2]),
+                "strides": hp.choice("cnn_scaled_strides", [None, 4]),
                 "scaling_multiplier": 2,
                 "padding": "same",
                 "activation": cnn_activation_choice,
