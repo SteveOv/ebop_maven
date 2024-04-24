@@ -92,7 +92,7 @@ for ds_ix, (label, set_dir) in enumerate(zip(ds_titles, ds_dirs)):
 def cnn_with_pooling(num_layers: int=4,
                      filters: Union[int, List[int]]=64,
                      kernel_size: Union[int, List[int]]=8,
-                     strides: Union[int, List[int]]=2,
+                     strides: Union[int, List[int]]=None,
                      padding: str="same",
                      activation: str="relu",
                      pooling_ixs: Union[int, List[int]]=None,
@@ -121,6 +121,8 @@ def cnn_with_pooling(num_layers: int=4,
                                             **pooling_kwargs[pooling_ix])(input_tensor)
                 pooling_ix += 1
 
+            if not strides[cnn_ix] or strides[cnn_ix] > kernel_size[cnn_ix]:
+                strides[cnn_ix] = max(1, kernel_size[cnn_ix] // 2)
             input_tensor = layers.Conv1D(filters=filters[cnn_ix],
                                          kernel_size=kernel_size[cnn_ix],
                                          strides=strides[cnn_ix],
@@ -279,7 +281,7 @@ trials_pspace = hp.choice("train_and_test_model", [{
                 "num_layers": hp.choice("cnn_num_layers", [4, 5, 6, 7]),
                 "filters": hp.choice("cnn_filters", [32, 64]),
                 "kernel_size": hp.choice("cnn_kernel_size", [16, 8]),
-                "strides": hp.choice("cnn_strides", [4, 2]),
+                "strides": hp.choice("cnn_strides", [None]),
                 "padding": cnn_padding_choice,
                 "activation": cnn_activation_choice,
                 "pooling_ixs": hp.choice("cnn_pooling_ixs", [None, [2], [2, 5]]),
