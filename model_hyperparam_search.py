@@ -434,17 +434,19 @@ def train_and_test_model(trial_kwargs):
         params = np.log(weights)
         weighted_loss = mse * params
         status = STATUS_OK
-        print(f"""
-{'-'*80}
-Trial result: MAE = {mae:.6f}, MSE = {mse:.6f} & params(ln[weights]) = {params:.6f}",
-{' '*14}giving a weighted loss(mse*params) = {weighted_loss:6f}""")
-
-        features = candidate.get_layer("Mags-Input").output.shape[1] \
-                    + candidate.get_layer("Ext-Input").output.shape[1]
+        features = sum(candidate.get_layer(f"{n}-Input").output.shape[1] for n in ["Mags", "Ext"])
         aic = features*np.log(mse) + 2*params
         bic = features*np.log(mse) + np.log(features)*params
-        print(f"Alternatively: AIC = {aic:,.3f} and BIC = {bic:,.3f}")
-        print("-"*80 + "\n")
+        print(f"""
+{'-'*80}
+Trial result: MAE = {mae:.6f} and MSE = {mse:.6f}
+
+count(trainable weights) = {weights:,d} yielding params(ln[weights]) = {params:.6f} and:
+              weighted loss(MSE*params) = {weighted_loss:6f}
+              AIC = {aic:,.3f}
+              BIC = {bic:,.3f}
+{'-'*80}
+""")
     except OpError as exc:
         print(f"*** Training failed! *** Caught a {type(exc).__name__}: {exc.op} / {exc.message}")
         print(f"The problem hyperparam set is: {trial_kwargs}\n")
