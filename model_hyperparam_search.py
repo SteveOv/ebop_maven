@@ -126,9 +126,9 @@ def cnn_with_pooling(num_layers: int=4,
 
             if not strides[cnn_ix] or strides[cnn_ix] > kernel_size[cnn_ix]:
                 strides[cnn_ix] = max(1, kernel_size[cnn_ix] // 2)
-            input_tensor = layers.Conv1D(filters=filters[cnn_ix],
-                                         kernel_size=kernel_size[cnn_ix],
-                                         strides=strides[cnn_ix],
+            input_tensor = layers.Conv1D(filters=int(filters[cnn_ix]),
+                                         kernel_size=int(kernel_size[cnn_ix]),
+                                         strides=int(strides[cnn_ix]),
                                          padding=padding,
                                          activation=activation,
                                          name=f"CNN-{cnn_ix+1}")(input_tensor)
@@ -162,9 +162,9 @@ def cnn_scaled_pairs_with_pooling(num_pairs: int=2,
         pooling_kwargs = { "pool_size": 2, "strides": 2 }
 
     def layer_func(input_tensor: keras.KerasTensor) -> keras.KerasTensor:
-        this_filters = filters
-        this_kernel_size = kernel_size
-        this_strides = strides if strides else max(1, this_kernel_size // 2)
+        this_filters = int(filters)
+        this_kernel_size = int(kernel_size)
+        this_strides = int(strides) if strides else max(1, this_kernel_size // 2)
 
         for ix in range(num_pairs):
             for sub_ix in range(2):
@@ -231,11 +231,11 @@ def dnn_with_taper(num_layers: int,
                    taper_units: int=0) -> Callable[[keras.KerasTensor], keras.KerasTensor]:
     """ Creates the function to build the requested DNN layers """
     def layers_func(prev_tensor: keras.KerasTensor) -> keras.KerasTensor:
-        prev_tensor = modelling.hidden_layers(num_layers, units, kernel_initializer,
+        prev_tensor = modelling.hidden_layers(int(num_layers), int(units), kernel_initializer,
                                               activation, dropout_rate,
                                               name_prefix=("Hidden-", "Dropout-"))(prev_tensor)
         if taper_units:
-            prev_tensor = modelling.hidden_layers(1, taper_units, kernel_initializer,
+            prev_tensor = modelling.hidden_layers(1, int(taper_units), kernel_initializer,
                                                   activation, name_prefix=("Taper-", ))(prev_tensor)
         return prev_tensor
     return layers_func
@@ -257,7 +257,7 @@ cnn_activation_choice = hp.choice("cnn_activation", ["relu"])
 cnn_pooling_type_choice = hp.choice("cnn_pooling_type", [layers.AvgPool1D, layers.MaxPool1D, None])
 cnn_trailing_pool_choice = hp.choice("cnn_trailing_pool", [True, False])
 dnn_kernel_initializer_choice = hp.choice("dnn_init", ["he_uniform", "he_normal", "glorot_uniform"])
-learning_rate_choice = hp.choice("learning_rate", [1e-5, 5e-5, 1e-4])
+learning_rate_choice = hp.qloguniform("learning_rate", -12, -4, 1e-6)
 
 trials_pspace = hp.choice("train_and_test_model", [{
     "model": hp.choice("model", [{
@@ -270,9 +270,9 @@ trials_pspace = hp.choice("train_and_test_model", [{
             {
                 # Pairs of Conv1ds with fixed filters/kernels/strides and optional pooling layers
                 "func": cnn_fixed_pairs_with_pooling,
-                "num_pairs": hp.choice("cnn_fixed_num_layers", [3, 4]),
-                "filters": hp.choice("cnn_fixed_filters", [32, 64]),
-                "kernel_size": hp.choice("cnn_fixed_kernel_size", [4, 8]),
+                "num_pairs": hp.uniformint("cnn_fixed_num_layers", low=2, high=4),
+                "filters": hp.quniform("cnn_fixed_filters", low=32, high=96, q=16),
+                "kernel_size": hp.quniform("cnn_fixed_kernel_size", low=4, high=12, q=4),
                 "strides": None, # Always kernel_size/2
                 "padding": cnn_padding_choice,
                 "activation": cnn_activation_choice,
@@ -284,8 +284,8 @@ trials_pspace = hp.choice("train_and_test_model", [{
                 # and optional pooling layers
                 "func": cnn_scaled_pairs_with_pooling,
                 "num_pairs": hp.choice("cnn_scaled_num_layers", [3]),
-                "filters": hp.choice("cnn_scaled_filters", [16, 32]),
-                "kernel_size": hp.choice("cnn_scaled_kernel_size", [16, 8]),
+                "filters": hp.quniform("cnn_scaled_filters", low=16, high=32, q=16),
+                "kernel_size": hp.quniform("cnn_scaled_kernel_size", low=8, high=32, q=8),
                 "strides": hp.choice("cnn_scaled_strides", [None, 4]),
                 "scaling_multiplier": 2,
                 "padding": "same",
@@ -296,10 +296,10 @@ trials_pspace = hp.choice("train_and_test_model", [{
             {
                 # Randomized CNN with/without pooling.
                 "func": cnn_with_pooling,
-                "num_layers": hp.choice("cnn_num_layers", [4, 5, 6, 7]),
-                "filters": hp.choice("cnn_filters", [32, 64]),
-                "kernel_size": hp.choice("cnn_kernel_size", [16, 8]),
-                "strides": hp.choice("cnn_strides", [None]),
+                "num_layers": hp.uniformint("cnn_num_layers", low=3, high=6),
+                "filters": hp.quniform("cnn_filters", low=16, high=64, q=16),
+                "kernel_size": hp.quniform("cnn_kernel_size", low=2, high=16, q=2),
+                "strides": None, # Always kernel_size//2
                 "padding": cnn_padding_choice,
                 "activation": cnn_activation_choice,
                 "pooling_ixs": hp.choice("cnn_pooling_ixs", [None, [2], [2, 5]]),
@@ -310,12 +310,12 @@ trials_pspace = hp.choice("train_and_test_model", [{
         "dnn_layers": hp.choice("dnn_layers", [
             {
                 "func": dnn_with_taper,
-                "num_layers": hp.choice("dnn_num_layers", [1, 2, 3]),
-                "units": hp.choice("dnn_units", [64, 128, 256]),
+                "num_layers": hp.uniformint("dnn_num_layers", low=1, high=4),
+                "units": hp.quniform("dnn_units", low=64, high=256, q=64),
                 "kernel_initializer": dnn_kernel_initializer_choice,
                 "activation": hp.choice("activation", ["relu", "leaky_relu", "elu"]),
-                "dropout_rate": hp.choice("dnn_dropout", [0.4, 0.5, 0.6]),
-                "taper_units": hp.choice("dnn_taper", [None, 32, 64]),
+                "dropout_rate": hp.quniform("dnn_dropout", low=0.3, high=0.7, q=0.1),
+                "taper_units": hp.quniform("dnn_taper", low=0, high=128, q=32),
             },
         ]),
         "output": {
