@@ -34,12 +34,12 @@ MODEL_FILE_NAME = "parameter-search-model"
 # The subset of all available labels which we will train to predict
 CHOSEN_LABELS = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "inc"]
 
-MAX_HYPEROPT_EVALS = 250        # Maximum number of distinct Hyperopt evals to run
+MAX_HYPEROPT_EVALS = 100        # Maximum number of distinct Hyperopt evals to run
 HYPEROPT_LOSS_TH = 0.01         # Will stop search in the unlikely event we get below this loss
 TRAINING_EPOCHS = 250           # Set high if we're using early stopping
 BATCH_FRACTION = 0.001          # larger -> quicker training per epoch but more to converge
 MAX_BUFFER_SIZE = 20000000      # Size of Dataset shuffle buffer (in instances)
-PATIENCE = 7                    # Number of epochs w/o improvement before stopping
+PATIENCE = 10                   # Number of epochs w/o improvement before stopping
 
 ENFORCE_REPEATABILITY = True    # If true, avoid GPU/CUDA cores for repeatable results
 SEED = 42                       # Standard random seed ensures repeatable randomization
@@ -476,9 +476,9 @@ count(trainable weights) = {weights:,d} yielding params(ln[weights]) = {params:.
             "weighted_loss": weighted_loss, "AIC": aic, "BIC": bic, "model": candidate, "history": history }
 
 # Conduct the trials
-results_dir = Path(".") / "drop" / "hyperparam_search"
+results_dir = Path(".") / "drop" / "model_search"
 results_dir.mkdir(parents=True, exist_ok=True)
-with redirect_stdout(Tee(open(results_dir / "search.log", "w", encoding="utf8"))):
+with redirect_stdout(Tee(open(results_dir / "trials.log", "w", encoding="utf8"))):
     trials = Trials()
     best = fmin(fn = train_and_test_model,
                 space = trials_pspace,
