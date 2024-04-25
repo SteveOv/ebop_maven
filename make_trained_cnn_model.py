@@ -168,12 +168,6 @@ model.evaluate(datasets[2], verbose=1)
 
 # Save the newly trained model
 model_save_file = SAVE_DIR / f"{MODEL_FILE_NAME}.keras"
-# custom_attrs = {
-#     "training_dataset": TRAINSET_NAME,
-#     "training_instances": counts[0],
-#     "training_cuda_devices": tf.config.experimental.list_physical_devices('GPU'),
-#     "mags_wrap_phase": MAGS_WRAP_PHASE,
-# }
 modelling.save_model(model_save_file, model)
 print(f"\nSaved model '{MODEL_NAME}' to: {model_save_file}")
 
