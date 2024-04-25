@@ -464,6 +464,8 @@ with redirect_stdout(Tee(open(results_dir / "search.log", "w", encoding="utf8"))
                 max_evals = MAX_HYPEROPT_EVALS,
                 loss_threshold = HYPEROPT_LOSS_TH,
                 catch_eval_exceptions = True,
+                rstate=np.random.default_rng(SEED),
+                verbose=True,
                 show_progressbar=False)
 
 
