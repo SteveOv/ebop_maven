@@ -94,6 +94,7 @@ def cnn_with_pooling(num_layers: int=4,
                      filters: Union[int, List[int]]=64,
                      kernel_size: Union[int, List[int]]=8,
                      strides: Union[int, List[int]]=None,
+                     strides_fraction: float=0.5,
                      padding: str="same",
                      activation: str="relu",
                      pooling_ixs: Union[int, List[int]]=None,
@@ -124,8 +125,11 @@ def cnn_with_pooling(num_layers: int=4,
                                             **pooling_kwargs[pooling_ix])(input_tensor)
                 pooling_ix += 1
 
-            if not strides[cnn_ix] or strides[cnn_ix] > kernel_size[cnn_ix]:
-                strides[cnn_ix] = max(1, kernel_size[cnn_ix] // 2)
+            if not strides[cnn_ix]:
+                strides[cnn_ix] = max(1, int(kernel_size[cnn_ix] * strides_fraction))
+            if strides[cnn_ix] > kernel_size[cnn_ix]:
+                strides[cnn_ix] = kernel_size[cnn_ix]
+
             input_tensor = layers.Conv1D(filters=int(filters[cnn_ix]),
                                          kernel_size=int(kernel_size[cnn_ix]),
                                          strides=int(strides[cnn_ix]),
@@ -139,6 +143,7 @@ def cnn_scaled_pairs_with_pooling(num_pairs: int=2,
                                   filters: int=32,
                                   kernel_size: int=16,
                                   strides: int=None,
+                                  strides_fraction: float=0.5,
                                   scaling_multiplier: int=2,
                                   padding: str="same",
                                   activation: str="relu",
@@ -152,6 +157,10 @@ def cnn_scaled_pairs_with_pooling(num_pairs: int=2,
     pooling layers the trailing_pool flag dictates whether the pooling layer
     after the final pair of Conv1ds is appended or not.
 
+    strides can be specified either as a fixed value (strides) or as a fraction
+    of the kernel (strides_fraction) even as the kernel_size is itself scaled.
+    If both set, strides takes precendent.
+
     The pattern of repeating 2*Conv+1*pool with increasing filters/decreasing
     kernels crops up regularly in known/documented CNNs such as;
     - LeNet-5 (LeCun+98)
@@ -160,11 +169,13 @@ def cnn_scaled_pairs_with_pooling(num_pairs: int=2,
     """
     if pooling_kwargs is None:
         pooling_kwargs = { "pool_size": 2, "strides": 2 }
+    if not strides and not strides_fraction:
+        strides_fraction = 0.5
 
     def layer_func(input_tensor: keras.KerasTensor) -> keras.KerasTensor:
         this_filters = int(filters)
         this_kernel_size = int(kernel_size)
-        this_strides = int(strides) if strides else max(1, this_kernel_size // 2)
+        this_strides = int(strides) if strides else max(1, int(this_kernel_size * strides_fraction))
 
         for ix in range(num_pairs):
             for sub_ix in range(2):
@@ -182,7 +193,7 @@ def cnn_scaled_pairs_with_pooling(num_pairs: int=2,
                 this_filters *= scaling_multiplier
                 this_kernel_size = max(1, this_kernel_size // scaling_multiplier)
                 if not strides or this_strides > this_kernel_size:
-                    this_strides = max(1, this_kernel_size // 2)
+                    this_strides = max(1, int(this_kernel_size * strides_fraction))
         return input_tensor
     return layer_func
 
@@ -190,6 +201,7 @@ def cnn_fixed_pairs_with_pooling(num_pairs: int=2,
                                  filters: int=64,
                                  kernel_size: int=4,
                                  strides: int=None,
+                                 strides_fraction: float=0.5,
                                  padding: str="same",
                                  activation: str="relu",
                                  pooling_type: layers.Layer=None,
@@ -204,20 +216,26 @@ def cnn_fixed_pairs_with_pooling(num_pairs: int=2,
     It's a very simple structure with the filters "seeing" an ever larger
     FOV as the spatial extent of the input data is reduced as it proceeds
     through the layers.
+
+    strides can be specified either as an explicit value (strides) or a fraction
+    of the kernel (strides_fraction). If both set, strides takes precendent.
     
     Experimentation has shown that variations on this structure appear to offer
     a good baseline level of performance.
     """
-    return cnn_scaled_pairs_with_pooling(num_pairs, filters, kernel_size, strides, 1,
+    return cnn_scaled_pairs_with_pooling(num_pairs, filters, kernel_size,
+                                         strides, strides_fraction, 1,
                                          padding, activation,
                                          pooling_type, pooling_kwargs, trailing_pool)
 
 def cnn_best_performing_known_set():
     """
-    Whatever the current best model's CNN is (from previous runs and/or manual search).
-    As a rule of thumb, this should be equivalent to what's in make_trained_cnn_model.py
+    Whatever the current best model's Conv layers is (from previous runs and/or
+    manual search). As a rule of thumb, this should be equivalent to what's in
+    make_trained_cnn_model.py
     """
-    return cnn_fixed_pairs_with_pooling(num_pairs=4, filters=64, kernel_size=4, strides=2,
+    return cnn_fixed_pairs_with_pooling(num_pairs=4, filters=64, kernel_size=4,
+                                        strides=None, strides_fraction=0.5,
                                         padding="same", activation="relu",
                                         pooling_type=layers.MaxPool1D,
                                         pooling_kwargs={ "pool_size": 2, "strides": 2 },
@@ -273,7 +291,8 @@ trials_pspace = hp.choice("train_and_test_model", [{
                 "num_pairs": hp.uniformint("cnn_fixed_num_layers", low=2, high=4),
                 "filters": hp.quniform("cnn_fixed_filters", low=32, high=96, q=16),
                 "kernel_size": hp.quniform("cnn_fixed_kernel_size", low=4, high=12, q=4),
-                "strides": None, # Always kernel_size/2
+                "strides": hp.pchoice("cnn_fixed_strides", [(0.75, None), (0.125, 2), (0.125, 4)]), # None defers to strides_fraction
+                "strides_fraction": hp.quniform("cnn_fixed_strides_fraction", low=.25, high=1, q=.25),
                 "padding": cnn_padding_choice,
                 "activation": cnn_activation_choice,
                 "pooling_type": cnn_pooling_type_choice,
@@ -286,7 +305,8 @@ trials_pspace = hp.choice("train_and_test_model", [{
                 "num_pairs": hp.choice("cnn_scaled_num_layers", [3]),
                 "filters": hp.quniform("cnn_scaled_filters", low=16, high=32, q=16),
                 "kernel_size": hp.quniform("cnn_scaled_kernel_size", low=8, high=32, q=8),
-                "strides": hp.choice("cnn_scaled_strides", [None, 4]),
+                "strides": hp.pchoice("cnn_scaled_strides", [(0.75, None), (0.125, 2), (0.125, 4)]), # None defers to strides_fraction
+                "strides_fraction": hp.quniform("cnn_scaled_strides_fraction", low=.25, high=1, q=.25),
                 "scaling_multiplier": 2,
                 "padding": "same",
                 "activation": cnn_activation_choice,
@@ -298,8 +318,9 @@ trials_pspace = hp.choice("train_and_test_model", [{
                 "func": cnn_with_pooling,
                 "num_layers": hp.uniformint("cnn_num_layers", low=3, high=6),
                 "filters": hp.quniform("cnn_filters", low=16, high=64, q=16),
-                "kernel_size": hp.quniform("cnn_kernel_size", low=2, high=16, q=2),
-                "strides": None, # Always kernel_size//2
+                "kernel_size": hp.quniform("cnn_kernel_size", low=4, high=16, q=4),
+                "strides": hp.pchoice("cnn_strides", [(0.75, None), (0.125, 2), (0.125, 4)]), # None defers to strides_fraction
+                "strides_fraction": hp.quniform("cnn_strides_fraction", low=.25, high=1, q=.25),
                 "padding": cnn_padding_choice,
                 "activation": cnn_activation_choice,
                 "pooling_ixs": hp.choice("cnn_pooling_ixs", [None, [2], [2, 5]]),
