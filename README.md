@@ -95,11 +95,12 @@ model with the following:
 $ python model_testing.py
 ```
 
-#### Model structure and hyperparameter grid search
-A grid search over a range of model structures and hyperparameter values can be run with
+#### Model structure and hyperparameter search
+A search over a range of model structures and hyperparameter values, using the 
+[hyperopt libarary](http://hyperopt.github.io/hyperopt/)'s tpe.suggest algorithm, can be run with
 the following command:
 ```sh
-$ python model_hyperparam_search.py
+$ python model_search.py
 ```
 > [!WARNING]  
-> This will take a long time!
+> This will take a long time! As in hours, if not days.
