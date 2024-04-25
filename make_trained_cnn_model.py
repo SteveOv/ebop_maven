@@ -28,7 +28,7 @@ TRAINSET_DIR = Path(".") / "datasets" / TRAINSET_NAME / "training"
 VALIDSET_DIR = Path(".") / "datasets" / TRAINSET_NAME / "validation"
 TESTSET_DIR = Path(".") / "datasets" / "synthetic-mist-tess-dataset"
 MODEL_FILE_NAME = "cnn_ext_model"
-MODEL_NAME = "CNN-Ext-Estimator-New"
+MODEL_NAME = "CNN-Ext-Estimator"
 SAVE_DIR = Path(".") / "drop/"
 PLOTS_DIR = SAVE_DIR / "plots"
 
