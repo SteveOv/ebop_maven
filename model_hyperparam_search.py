@@ -35,6 +35,7 @@ MODEL_FILE_NAME = "parameter-search-model"
 CHOSEN_LABELS = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "inc"]
 
 MAX_HYPEROPT_EVALS = 250        # Maximum number of distinct Hyperopt evals to run
+HYPEROPT_LOSS_TH = 0.01         # Will stop search in the unlikely event we get below this loss
 TRAINING_EPOCHS = 250           # Set high if we're using early stopping
 BATCH_FRACTION = 0.001          # larger -> quicker training per epoch but more to converge
 MAX_BUFFER_SIZE = 20000000      # Size of Dataset shuffle buffer (in instances)
@@ -434,7 +435,7 @@ def train_and_test_model(trial_kwargs):
         weighted_loss = mse * params
         status = STATUS_OK
         print(f"""
-{'='*80}
+{'-'*80}
 Trial result: MAE = {mae:.6f}, MSE = {mse:.6f} & params(ln[weights]) = {params:.6f}",
 {' '*14}giving a weighted loss(mse*params) = {weighted_loss:6f}""")
 
@@ -443,6 +444,7 @@ Trial result: MAE = {mae:.6f}, MSE = {mse:.6f} & params(ln[weights]) = {params:.
         aic = features*np.log(mse) + 2*params
         bic = features*np.log(mse) + np.log(features)*params
         print(f"Alternatively: AIC = {aic:,.3f} and BIC = {bic:,.3f}")
+        print("-"*80 + "\n")
     except OpError as exc:
         print(f"*** Training failed! *** Caught a {type(exc).__name__}: {exc.op} / {exc.message}")
         print(f"The problem hyperparam set is: {trial_kwargs}\n")
@@ -460,7 +462,7 @@ with redirect_stdout(Tee(open(results_dir / "search.log", "w", encoding="utf8"))
                 trials = trials,
                 algo = tpe.suggest,
                 max_evals = MAX_HYPEROPT_EVALS,
-                loss_threshold = 0.04,
+                loss_threshold = HYPEROPT_LOSS_TH,
                 catch_eval_exceptions = True,
                 show_progressbar=False)
 
