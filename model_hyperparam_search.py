@@ -386,8 +386,8 @@ def train_and_test_model(trial_kwargs):
     """
     Evaluate a single set of hyperparams by building, training and evaluating a model on them.
     """
-    print("\n" + "-"*80,
-          "Evaluating model and hyperparameters based on the following trial_kwargs:",
+    print("\n" + "-"*80 + "\n",
+          "Evaluating model and hyperparameters based on the following trial_kwargs:\n",
           json.dumps(trial_kwargs, indent=4, sort_keys=False, default=str))
 
     weighted_loss = candidate = history = None
@@ -406,8 +406,9 @@ def train_and_test_model(trial_kwargs):
         # Reset the tf random seed so shuffling & other "random" behaviour is repeated
         tf.random.set_seed(SEED)
 
-        print(f"\nTraining the following model against {counts[0]} {ds_titles[0]} instances.")
-        print(candidate.summary(line_length=120, show_trainable=True))
+        print(f"\nTraining the following model against {counts[0]} {ds_titles[0]} instances:")
+        candidate.summary(line_length=120, show_trainable=True)
+        print()
         history = candidate.fit(x = datasets[0],
                                 epochs = TRAINING_EPOCHS,
                                 callbacks = [cb.EarlyStopping("val_loss", restore_best_weights=True,
@@ -432,15 +433,16 @@ def train_and_test_model(trial_kwargs):
         params = np.log(weights)
         weighted_loss = mse * params
         status = STATUS_OK
-        print("-"*80,
-             f"Trial result: MAE = {mae:.6f}, MSE = {mse:.6f} & params(ln[weights]) = {params:.6f}",
-             f"{' '*14}giving a weighted loss(mse*params) = {weighted_loss:6f}")
+        print(f"""
+{'='*80}
+Trial result: MAE = {mae:.6f}, MSE = {mse:.6f} & params(ln[weights]) = {params:.6f}",
+{' '*14}giving a weighted loss(mse*params) = {weighted_loss:6f}""")
 
         features = candidate.get_layer("Mags-Input").output.shape[1] \
                     + candidate.get_layer("Ext-Input").output.shape[1]
         aic = features*np.log(mse) + 2*params
         bic = features*np.log(mse) + np.log(features)*params
-        print(f"Alternatively: AIC = {aic:,.3f} and BIC = {bic:,.3f}", "-"*80)
+        print(f"Alternatively: AIC = {aic:,.3f} and BIC = {bic:,.3f}")
     except OpError as exc:
         print(f"*** Training failed! *** Caught a {type(exc).__name__}: {exc.op} / {exc.message}")
         print(f"The problem hyperparam set is: {trial_kwargs}\n")
@@ -459,7 +461,8 @@ with redirect_stdout(Tee(open(results_dir / "search.log", "w", encoding="utf8"))
                 algo = tpe.suggest,
                 max_evals = MAX_HYPEROPT_EVALS,
                 loss_threshold = 0.04,
-                catch_eval_exceptions = True)
+                catch_eval_exceptions = True,
+                show_progressbar=False)
 
 
 # -----------------------------------------------------------
