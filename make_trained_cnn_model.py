@@ -101,13 +101,13 @@ print("\nDefining the multiple-input/output CNN model for predicting:", ", ".joi
 model = modelling.build_mags_ext_model(
     name=MODEL_NAME,
     mags_layers=[
-        modelling.conv1d_layers(2, 64, 4, 2, CNN_PADDING, CNN_ACTIVATE, "CNN-1-"),
+        modelling.conv1d_layers(2, 64, 4, 2, CNN_PADDING, CNN_ACTIVATE, "Conv-1-"),
         layers.MaxPool1D(pool_size=2, strides=2),
-        modelling.conv1d_layers(2, 64, 4, 2, CNN_PADDING, CNN_ACTIVATE, "CNN-2-"),
+        modelling.conv1d_layers(2, 64, 4, 2, CNN_PADDING, CNN_ACTIVATE, "Conv-2-"),
         layers.MaxPool1D(pool_size=2, strides=2),
-        modelling.conv1d_layers(2, 64, 4, 2, CNN_PADDING, CNN_ACTIVATE, "CNN-3-"),
+        modelling.conv1d_layers(2, 64, 4, 2, CNN_PADDING, CNN_ACTIVATE, "Conv-3-"),
         layers.MaxPool1D(pool_size=2, strides=2),
-        modelling.conv1d_layers(2, 64, 4, 2, CNN_PADDING, CNN_ACTIVATE, "CNN-4-")
+        modelling.conv1d_layers(2, 64, 4, 2, CNN_PADDING, CNN_ACTIVATE, "Conv-4-")
     ],
     dnn_layers=[
         modelling.hidden_layers(DNN_NUM_FULL_LAYERS, 256, DNN_INITIALIZER, DNN_ACTIVATE,
