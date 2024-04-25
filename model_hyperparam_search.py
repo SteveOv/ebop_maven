@@ -471,6 +471,8 @@ print("\nBest model hyperparameter set is:\n"
       + json.dumps(best_params, indent=4, sort_keys=False, default=str))
 
 # Save the best model / best parameter set
-modelling.save_model(results_dir / "best_mode.keras", best_model)
-with open(results_dir / "best_params.json", mode="w", encoding="utf8") as of:
+modelling.save_model(results_dir / "best_model.keras", best_model)
+with open(results_dir / "best_model_summary.txt", mode="w", encoding="utf8") as of:
+    best_model.summary(show_trainable=True, print_fn=lambda line, line_break: of.write(line + "\n"))
+with open(results_dir / "best_model_params.json", mode="w", encoding="utf8") as of:
     json.dump(best_params, of, indent=4, default=str)
