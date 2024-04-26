@@ -271,7 +271,7 @@ trials_pspace = hp.choice("train_and_test_model", [
         # The current best performing model we have
         "model": { "func": make_trained_cnn_model.make_best_model, "verbose": True },
         "optimizer": make_trained_cnn_model.OPTIMIZER,
-        "loss_function": make_trained_cnn_model.LOSS[0],
+        "loss_function": make_trained_cnn_model.LOSS,
     },
     {
         "model": hp.choice("model", [{
@@ -344,7 +344,7 @@ trials_pspace = hp.choice("train_and_test_model", [
             { "class": optimizers.Nadam, "learning_rate": learning_rate_choice }
         ]),
 
-        "loss_function": hp.choice("loss_function", ["mae", "mse", "huber"]),      
+        "loss_function": hp.choice("loss_function", [["mae"], ["mse"], ["huber"]]),      
     }
 ])
 
@@ -410,13 +410,15 @@ def train_and_test_model(trial_kwargs):
 
     optimizer = get_trial_value(trial_kwargs, "optimizer")
     loss_function = get_trial_value(trial_kwargs, "loss_function")
+    if not isinstance(loss_function, List):
+        loss_function = [loss_function]
     fixed_metrics = ["mae", "mse", "r2_score"]
 
     try:
         # Build and Compile the trial model
         # always use the same metrics as we use them for trial evaluation
         candidate = get_trial_value(trial_kwargs, "model", False)
-        candidate.compile(optimizer=optimizer, loss=[loss_function], metrics=fixed_metrics)
+        candidate.compile(optimizer=optimizer, loss=loss_function, metrics=fixed_metrics)
 
         # Reset the tf random seed so shuffling & other "random" behaviour is repeated
         tf.random.set_seed(SEED)
