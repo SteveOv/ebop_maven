@@ -470,6 +470,25 @@ count(trainable weights) = {weights:,d} yielding params(ln[weights]) = {params:.
     return { "loss": mae, "status": status, "mae": mae, "mse": mse,
             "weighted_loss": weighted_loss, "AIC": aic, "BIC": bic, "model": candidate, "history": history }
 
+
+def early_stopping_to_report_progress(this_trials, *early_stop_args):
+    """
+    Callback for early stopping. We don't use it for early stopping but it is
+    useful for reporting on the current status of the trials without the
+    progress_bar making a mess when capturing the stdout output to a file.
+    """
+    stop = False # Will stop the trial if set to True
+    if this_trials and this_trials.best_trial:
+        best_tid = this_trials.best_trial.get("tid", None) # seem to be zero based; +1 for iteration
+        br = this_trials.best_trial.get("result", {})
+        num_tids = len(this_trials.tids or [])
+        print("\n" + "="*80 + "\n",
+            f"[{num_tids}/{MAX_HYPEROPT_EVALS}] Best trial tid={best_tid},",
+            f"status={br.get('status', None)}, loss={br.get('loss', 0):.6f},",
+            f"MAE={br.get('mae', 0):.6f}, MSE={br.get('mse', 0):.6f}",
+            "\n" + "="*80 + "\n")
+    return stop, early_stop_args
+
 # Conduct the trials
 results_dir = Path(".") / "drop" / "model_search"
 results_dir.mkdir(parents=True, exist_ok=True)
@@ -483,8 +502,9 @@ with redirect_stdout(Tee(open(results_dir / "trials.log", "w", encoding="utf8"))
                 loss_threshold = HYPEROPT_LOSS_TH,
                 catch_eval_exceptions = True,
                 rstate=np.random.default_rng(SEED),
+                early_stop_fn=early_stopping_to_report_progress,
                 verbose=True,
-                show_progressbar=False)
+                show_progressbar=False) # Can't use progressbar as it makes a mess of logging
 
 
 # -----------------------------------------------------------
