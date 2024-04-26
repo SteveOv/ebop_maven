@@ -23,6 +23,8 @@ from ebop_maven.libs import deb_example
 from ebop_maven import modelling
 from ebop_maven.libs.tee import Tee
 
+import make_trained_cnn_model
+
 TRAINSET_NAME = "formal-training-dataset/"
 TRAINSET_DIR = Path(".") / "datasets" / TRAINSET_NAME / "training"
 VALIDSET_DIR = Path(".") / "datasets" / TRAINSET_NAME / "validation"
@@ -135,7 +137,7 @@ def cnn_with_pooling(num_layers: int=4,
                                          strides=int(strides[cnn_ix]),
                                          padding=padding,
                                          activation=activation,
-                                         name=f"CNN-{cnn_ix+1}")(input_tensor)
+                                         name=f"Conv-{cnn_ix+1}")(input_tensor)
         return input_tensor
     return layers_func
 
@@ -184,7 +186,7 @@ def cnn_scaled_pairs_with_pooling(num_pairs: int=2,
                                              strides=this_strides,
                                              padding=padding,
                                              activation=activation,
-                                             name=f"CNN-{ix+1}-{sub_ix+1}")(input_tensor)
+                                             name=f"Conv-{ix+1}-{sub_ix+1}")(input_tensor)
 
             if pooling_type and (trailing_pool or ix < num_pairs-1):
                 input_tensor = pooling_type(name=f"Pool-{ix+1}", **pooling_kwargs)(input_tensor)
@@ -228,19 +230,6 @@ def cnn_fixed_pairs_with_pooling(num_pairs: int=2,
                                          padding, activation,
                                          pooling_type, pooling_kwargs, trailing_pool)
 
-def cnn_best_performing_known_set():
-    """
-    Whatever the current best model's Conv layers is (from previous runs and/or
-    manual search). As a rule of thumb, this should be equivalent to what's in
-    make_trained_cnn_model.py
-    """
-    return cnn_fixed_pairs_with_pooling(num_pairs=4, filters=64, kernel_size=4,
-                                        strides=None, strides_fraction=0.5,
-                                        padding="same", activation="relu",
-                                        pooling_type=layers.MaxPool1D,
-                                        pooling_kwargs={ "pool_size": 2, "strides": 2 },
-                                        trailing_pool=False)
-
 def dnn_with_taper(num_layers: int,
                    units: int,
                    kernel_initializer: any,
@@ -278,87 +267,90 @@ dnn_kernel_initializer_choice = hp.choice("dnn_init", ["he_uniform", "he_normal"
 learning_rate_choice = hp.qloguniform("learning_rate", -12, -4, 1e-6)
 
 trials_pspace = hp.choice("train_and_test_model", [{
-    "model": hp.choice("model", [{
-        "func": modelling.build_mags_ext_model,
-        "mags_layers": hp.choice("mags_layers", [
-            {
-                # Current CNN from best performing model from manual search
-                "func": cnn_best_performing_known_set,
-            },
-            {
-                # Pairs of Conv1ds with fixed filters/kernels/strides and optional pooling layers
-                "func": cnn_fixed_pairs_with_pooling,
-                "num_pairs": hp.uniformint("cnn_fixed_num_layers", low=2, high=4),
-                "filters": hp.quniform("cnn_fixed_filters", low=32, high=96, q=16),
-                "kernel_size": hp.quniform("cnn_fixed_kernel_size", low=4, high=12, q=4),
-                "strides": hp.pchoice("cnn_fixed_strides", [(0.75, None), (0.125, 2), (0.125, 4)]), # None defers to strides_fraction
-                "strides_fraction": hp.quniform("cnn_fixed_strides_fraction", low=.25, high=1, q=.25),
-                "padding": cnn_padding_choice,
-                "activation": cnn_activation_choice,
-                "pooling_type": cnn_pooling_type_choice,
-                "trailing_pool": cnn_trailing_pool_choice,
-            },
-            {
-                # Pairs of Conv1ds with doubling filters & halving kernels/strides per pair
-                # and optional pooling layers
-                "func": cnn_scaled_pairs_with_pooling,
-                "num_pairs": hp.choice("cnn_scaled_num_layers", [3]),
-                "filters": hp.quniform("cnn_scaled_filters", low=16, high=32, q=16),
-                "kernel_size": hp.quniform("cnn_scaled_kernel_size", low=8, high=32, q=8),
-                "strides": hp.pchoice("cnn_scaled_strides", [(0.75, None), (0.125, 2), (0.125, 4)]), # None defers to strides_fraction
-                "strides_fraction": hp.quniform("cnn_scaled_strides_fraction", low=.25, high=1, q=.25),
-                "scaling_multiplier": 2,
-                "padding": "same",
-                "activation": cnn_activation_choice,
-                "pooling_type": cnn_pooling_type_choice,
-                "trailing_pool": cnn_trailing_pool_choice,
-            },
-            {
-                # Randomized CNN with/without pooling.
-                "func": cnn_with_pooling,
-                "num_layers": hp.uniformint("cnn_num_layers", low=3, high=6),
-                "filters": hp.quniform("cnn_filters", low=16, high=64, q=16),
-                "kernel_size": hp.quniform("cnn_kernel_size", low=4, high=16, q=4),
-                "strides": hp.pchoice("cnn_strides", [(0.75, None), (0.125, 2), (0.125, 4)]), # None defers to strides_fraction
-                "strides_fraction": hp.quniform("cnn_strides_fraction", low=.25, high=1, q=.25),
-                "padding": cnn_padding_choice,
-                "activation": cnn_activation_choice,
-                "pooling_ixs": hp.choice("cnn_pooling_ixs", [None, [2], [2, 5]]),
-                "pooling_type": cnn_pooling_type_choice,
-            },
-        ]),
-        "ext_layers": None,
-        "dnn_layers": hp.choice("dnn_layers", [
-            {
-                "func": dnn_with_taper,
-                "num_layers": hp.uniformint("dnn_num_layers", low=1, high=4),
-                "units": hp.quniform("dnn_units", low=64, high=256, q=64),
+        # The current best performing model we have
+        "model": { "func": make_trained_cnn_model.make_best_model },
+        "optimizer": make_trained_cnn_model.OPTIMIZER,
+        "loss_function": make_trained_cnn_model.LOSS[0],
+    },
+    {
+        "model": hp.choice("model", [{
+            "func": modelling.build_mags_ext_model,
+            "mags_layers": hp.choice("mags_layers", [
+                {
+                    # Pairs of Conv1ds with fixed filters/kernels/strides and optional pooling layers
+                    "func": cnn_fixed_pairs_with_pooling,
+                    "num_pairs": hp.uniformint("cnn_fixed_num_layers", low=2, high=4),
+                    "filters": hp.quniform("cnn_fixed_filters", low=32, high=96, q=16),
+                    "kernel_size": hp.quniform("cnn_fixed_kernel_size", low=4, high=12, q=4),
+                    "strides": hp.pchoice("cnn_fixed_strides", [(0.75, None), (0.125, 2), (0.125, 4)]), # None defers to strides_fraction
+                    "strides_fraction": hp.quniform("cnn_fixed_strides_fraction", low=.25, high=1, q=.25),
+                    "padding": cnn_padding_choice,
+                    "activation": cnn_activation_choice,
+                    "pooling_type": cnn_pooling_type_choice,
+                    "trailing_pool": cnn_trailing_pool_choice,
+                },
+                {
+                    # Pairs of Conv1ds with doubling filters & halving kernels/strides per pair
+                    # and optional pooling layers
+                    "func": cnn_scaled_pairs_with_pooling,
+                    "num_pairs": hp.choice("cnn_scaled_num_layers", [3]),
+                    "filters": hp.quniform("cnn_scaled_filters", low=16, high=32, q=16),
+                    "kernel_size": hp.quniform("cnn_scaled_kernel_size", low=8, high=32, q=8),
+                    "strides": hp.pchoice("cnn_scaled_strides", [(0.75, None), (0.125, 2), (0.125, 4)]), # None defers to strides_fraction
+                    "strides_fraction": hp.quniform("cnn_scaled_strides_fraction", low=.25, high=1, q=.25),
+                    "scaling_multiplier": 2,
+                    "padding": "same",
+                    "activation": cnn_activation_choice,
+                    "pooling_type": cnn_pooling_type_choice,
+                    "trailing_pool": cnn_trailing_pool_choice,
+                },
+                {
+                    # Randomized CNN with/without pooling.
+                    "func": cnn_with_pooling,
+                    "num_layers": hp.uniformint("cnn_num_layers", low=3, high=6),
+                    "filters": hp.quniform("cnn_filters", low=16, high=64, q=16),
+                    "kernel_size": hp.quniform("cnn_kernel_size", low=4, high=16, q=4),
+                    "strides": hp.pchoice("cnn_strides", [(0.75, None), (0.125, 2), (0.125, 4)]), # None defers to strides_fraction
+                    "strides_fraction": hp.quniform("cnn_strides_fraction", low=.25, high=1, q=.25),
+                    "padding": cnn_padding_choice,
+                    "activation": cnn_activation_choice,
+                    "pooling_ixs": hp.choice("cnn_pooling_ixs", [None, [2], [2, 5]]),
+                    "pooling_type": cnn_pooling_type_choice,
+                },
+            ]),
+            "ext_layers": None,
+            "dnn_layers": hp.choice("dnn_layers", [
+                {
+                    "func": dnn_with_taper,
+                    "num_layers": hp.uniformint("dnn_num_layers", low=1, high=4),
+                    "units": hp.quniform("dnn_units", low=64, high=256, q=64),
+                    "kernel_initializer": dnn_kernel_initializer_choice,
+                    "activation": hp.choice("activation", ["relu", "leaky_relu", "elu"]),
+                    "dropout_rate": hp.quniform("dnn_dropout", low=0.3, high=0.7, q=0.1),
+                    "taper_units": hp.quniform("dnn_taper", low=0, high=128, q=32),
+                },
+            ]),
+            "output": {
+                "func": modelling.output_layer,
+                "label_names_and_scales": { l: deb_example.labels_and_scales[l] for l in CHOSEN_LABELS },
                 "kernel_initializer": dnn_kernel_initializer_choice,
-                "activation": hp.choice("activation", ["relu", "leaky_relu", "elu"]),
-                "dropout_rate": hp.quniform("dnn_dropout", low=0.3, high=0.7, q=0.1),
-                "taper_units": hp.quniform("dnn_taper", low=0, high=128, q=32),
+                "activation": "linear"
             },
+        }]),
+
+        "optimizer": hp.choice("optimizer", [
+            { "class": optimizers.Adam, "learning_rate": learning_rate_choice },
+            { "class": optimizers.Nadam, "learning_rate": learning_rate_choice }
         ]),
-        "output": {
-            "func": modelling.output_layer,
-            "label_names_and_scales": { l: deb_example.labels_and_scales[l] for l in CHOSEN_LABELS },
-            "kernel_initializer": dnn_kernel_initializer_choice,
-            "activation": "linear"
-        },
-    }]),
 
-    "optimizer": hp.choice("optimizer", [
-        { "class": optimizers.Adam, "learning_rate": learning_rate_choice },
-        { "class": optimizers.Nadam, "learning_rate": learning_rate_choice }
-    ]),
-
-    "loss_function": hp.choice("loss_function", ["mae", "mse", "huber"]),      
-}])
+        "loss_function": hp.choice("loss_function", ["mae", "mse", "huber"]),      
+    }
+])
 
 
 def get_trial_value(trial_dict: dict,
                     key: str,
-                    pop_it: bool=False, 
+                    pop_it: bool=False,
                     tuples_to_lists: bool=True) -> Union[Callable, any]:
     """
     Will get the requested value from the trial dictionary. Specifically handles the special

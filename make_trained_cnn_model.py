@@ -61,120 +61,131 @@ DNN_INITIALIZER = "he_uniform"
 DNN_NUM_FULL_LAYERS = 2
 DNN_DROPOUT_RATE=0.5
 
-print("\n".join(f"{lib.__name__} v{lib.__version__}" for lib in [tf, tensorboard, keras]))
-if ENFORCE_REPEATABILITY:
-    # Extreme, but it stops TensorFlow/Keras from using (even seeing) the GPU.
-    # Slows training down massively (by 3-4 times) but should avoid GPU memory
-    # constraints! Necessary if repeatable results are required (Keras advises
-    # that out of order processing within GPU/CUDA can lead to varying results).
-    os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-print(f"Found {len(tf.config.list_physical_devices('GPU'))} GPU(s)\n")
-
-# -----------------------------------------------------------
-# Set up the training/validation/test datasets
-# -----------------------------------------------------------
-print("Picking up training/validation/test datasets.")
-datasets = [tf.data.TFRecordDataset] * 3
-counts = [int] * 3
-map_func = deb_example.create_map_func(labels=CHOSEN_LABELS,
-                                       noise_stddev=lambda: 0.005,
-                                       roll_steps=lambda: tf.random.uniform([], -9, 10, tf.int32))
-for ds_ix, (label, set_dir) in enumerate([("training", TRAINSET_DIR),
-                                          ("valiation", VALIDSET_DIR),
-                                          ("testing", TESTSET_DIR)]):
-    files = list(set_dir.glob("**/*.tfrecord"))
-    if ds_ix == 0:
-        (datasets[ds_ix], counts[ds_ix]) = \
-            deb_example.create_dataset_pipeline(files, BATCH_FRACTION, map_func,
-                                                shuffle=True, reshuffle_each_iteration=True,
-                                                max_buffer_size=MAX_BUFFER_SIZE,
-                                                prefetch=1, seed=SEED)
-    else:
-        (datasets[ds_ix], counts[ds_ix]) = \
-            deb_example.create_dataset_pipeline(files, BATCH_FRACTION, map_func)
-    print(f"Found {counts[ds_ix]:,} {label} instances over {len(files)} tfrecord files in", set_dir)
-
-# -----------------------------------------------------------
-# Define the model
-# -----------------------------------------------------------
-print("\nDefining the multiple-input/output CNN model for predicting:", ", ".join(CHOSEN_LABELS))
-model = modelling.build_mags_ext_model(
-    name=MODEL_NAME,
-    mags_layers=[
-        modelling.conv1d_layers(2, 64, 4, 2, CNN_PADDING, CNN_ACTIVATE, "Conv-1-"),
-        layers.MaxPool1D(pool_size=2, strides=2),
-        modelling.conv1d_layers(2, 64, 4, 2, CNN_PADDING, CNN_ACTIVATE, "Conv-2-"),
-        layers.MaxPool1D(pool_size=2, strides=2),
-        modelling.conv1d_layers(2, 64, 4, 2, CNN_PADDING, CNN_ACTIVATE, "Conv-3-"),
-        layers.MaxPool1D(pool_size=2, strides=2),
-        modelling.conv1d_layers(2, 64, 4, 2, CNN_PADDING, CNN_ACTIVATE, "Conv-4-")
-    ],
-    dnn_layers=[
-        modelling.hidden_layers(DNN_NUM_FULL_LAYERS, 256, DNN_INITIALIZER, DNN_ACTIVATE,
-                                DNN_DROPOUT_RATE, ("Hidden-", "Dropout-")),
-        # "Buffer" between the DNN+Dropout and the output layer; this non-dropout NN layer
-        # consistently gives a small, but significant improvement to the trained loss.
-        modelling.hidden_layers(1, 64, DNN_INITIALIZER, DNN_ACTIVATE, 0, ("Taper-",))
-    ],
-    output=modelling.output_layer({ l: deb_example.labels_and_scales[l] for l in CHOSEN_LABELS },
-                                  DNN_INITIALIZER, "linear", "Output"),
-    post_build_step=lambda mdl: mdl.compile(loss=LOSS, optimizer=OPTIMIZER, metrics=METRICS))
-model.summary()
-
-try:
-    # Can only get this working specific pydot (1.4) & graphviz (8.0) conda packages.
-    # With pip I can't get graphviz beyond 0.2.0 which leads to pydot errors here.
-    # At least with the try block I can degrade gracefully.
-    PLOTS_DIR.mkdir(parents=True, exist_ok=True)
-    plot_model(model, to_file=PLOTS_DIR / f"{MODEL_FILE_NAME}.png",
-               show_layer_names=True, show_shapes=True, show_layer_activations=True,
-               show_dtype=False, show_trainable=False, rankdir="LR", dpi=300)
-except ImportError:
-    print("Unable to plot_model() without pydot and/or graphviz.")
+def make_best_model():
+    """
+    Helper function for building the current best performing model. 
+    Publish model from a function, rather than inline, so it can be shared with model_search.
+    """
+    print("\nBuilding the best known CNN model for predicting:", ", ".join(CHOSEN_LABELS), "\n")
+    return modelling.build_mags_ext_model(
+        name=MODEL_NAME,
+        mags_layers=[
+            modelling.conv1d_layers(2, 64, 4, 2, CNN_PADDING, CNN_ACTIVATE, "Conv-1-"),
+            layers.MaxPool1D(pool_size=2, strides=2, name="Pool-1"),
+            modelling.conv1d_layers(2, 64, 4, 2, CNN_PADDING, CNN_ACTIVATE, "Conv-2-"),
+            layers.MaxPool1D(pool_size=2, strides=2, name="Pool-2"),
+            modelling.conv1d_layers(2, 64, 4, 2, CNN_PADDING, CNN_ACTIVATE, "Conv-3-"),
+            layers.MaxPool1D(pool_size=2, strides=2, name="Pool-3"),
+            modelling.conv1d_layers(2, 64, 4, 2, CNN_PADDING, CNN_ACTIVATE, "Conv-4-")
+        ],
+        dnn_layers=[
+            modelling.hidden_layers(DNN_NUM_FULL_LAYERS, 256, DNN_INITIALIZER, DNN_ACTIVATE,
+                                    DNN_DROPOUT_RATE, ("Hidden-", "Dropout-")),
+            # "Buffer" between the DNN+Dropout and the output layer; this non-dropout NN layer
+            # consistently gives a small, but significant improvement to the trained loss.
+            modelling.hidden_layers(1, 64, DNN_INITIALIZER, DNN_ACTIVATE, 0, ("Taper-",))
+        ],
+        output=modelling.output_layer({l: deb_example.labels_and_scales[l] for l in CHOSEN_LABELS},
+                                    DNN_INITIALIZER, "linear", "Output"))
 
 
-# -----------------------------------------------------------
-# Train the model
-# -----------------------------------------------------------
-CALLBACKS = [
-    # To use tensorboard make sure the containing conda env is active then run
-    # $ tensorboard --port 6006 --logdir ./logs
-    # Then start a browser and head to http://localhost:6006
-    #callbacks.TensorBoard(log_dir="./logs", write_graph=True, write_images=True),
-    callbacks.EarlyStopping("val_loss", restore_best_weights=True,
-                            patience=EARLY_STOPPING_PATIENCE, verbose=1)
-]
+if __name__ == "__main__":
+    print("\n".join(f"{lib.__name__} v{lib.__version__}" for lib in [tf, tensorboard, keras]))
+    if ENFORCE_REPEATABILITY:
+        # Extreme, but it stops TensorFlow/Keras from using (even seeing) the GPU.
+        # Slows training down massively (by 3-4 times) but should avoid GPU memory
+        # constraints! Necessary if repeatable results are required (Keras advises
+        # that out of order processing within GPU/CUDA can lead to varying results).
+        os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+    print(f"Found {len(tf.config.list_physical_devices('GPU'))} GPU(s)\n")
 
-print(f"\nTraining the model on {counts[0]} training and {counts[1]} validation",
-      f"instances, with a further {counts[2]} instances held back for test.")
-try:
-    # You may see the following warning while training, which can safely be ignored;
-    #   UserWarning: Your input ran out of data; interrupting training
-    history = model.fit(x = datasets[0],    # pylint: disable=invalid-name
-                        epochs = TRAINING_EPOCHS,
-                        callbacks = CALLBACKS,
-                        validation_data = datasets[1])
-    # Plot the learning curves
-    pd.DataFrame(history.history).plot(figsize=(8, 5))
-    PLOTS_DIR.mkdir(parents=True, exist_ok=True)
-    plt.savefig(PLOTS_DIR / f"{MODEL_FILE_NAME}_learning_curves.png", dpi=300)
-except tf.errors.InvalidArgumentError as exc:
-    if ("lc" in exc.message or "mags" in exc.message) and "Can't parse serialized" in exc.message:
-        msg = exc.message + "\n*** Probable cause: incompatible serialized mags feature length. ***"
-        raise tf.errors.InvalidArgumentError(exc.node_def, exc.op, msg, exc.args) from exc
+    # -----------------------------------------------------------
+    # Set up the training/validation/test datasets
+    # -----------------------------------------------------------
+    print("Picking up training/validation/test datasets.")
+    datasets = [tf.data.TFRecordDataset] * 3
+    counts = [int] * 3
+    map_func = deb_example.create_map_func(labels=CHOSEN_LABELS,
+                                        noise_stddev=lambda: 0.005,
+                                        roll_steps=lambda: tf.random.uniform([], -9, 10, tf.int32))
+    for ds_ix, (label, set_dir) in enumerate([("training", TRAINSET_DIR),
+                                            ("valiation", VALIDSET_DIR),
+                                            ("testing", TESTSET_DIR)]):
+        files = list(set_dir.glob("**/*.tfrecord"))
+        if ds_ix == 0:
+            (datasets[ds_ix], counts[ds_ix]) = \
+                deb_example.create_dataset_pipeline(files, BATCH_FRACTION, map_func,
+                                                    shuffle=True, reshuffle_each_iteration=True,
+                                                    max_buffer_size=MAX_BUFFER_SIZE,
+                                                    prefetch=1, seed=SEED)
+        else:
+            (datasets[ds_ix], counts[ds_ix]) = \
+                deb_example.create_dataset_pipeline(files, BATCH_FRACTION, map_func)
+        print(f"Found {counts[ds_ix]:,} {label} insts over {len(files)} tfrecord files in", set_dir)
 
-print(f"\nEvaluating the model on {counts[2]} test instances.")
-model.evaluate(datasets[2], verbose=1)
+    # -----------------------------------------------------------
+    # Define the model
+    # -----------------------------------------------------------
+    model = make_best_model()
+    model.compile(loss=LOSS, optimizer=OPTIMIZER, metrics=METRICS)
+    model.summary()
 
-# Save the newly trained model
-model_save_file = SAVE_DIR / f"{MODEL_FILE_NAME}.keras"
-modelling.save_model(model_save_file, model)
-print(f"\nSaved model '{MODEL_NAME}' to: {model_save_file}")
+    try:
+        # Can only get this working specific pydot (1.4) & graphviz (8.0) conda packages.
+        # With pip I can't get graphviz beyond 0.2.0 which leads to pydot errors here.
+        # At least with the try block I can degrade gracefully.
+        PLOTS_DIR.mkdir(parents=True, exist_ok=True)
+        plot_model(model, to_file=PLOTS_DIR / f"{MODEL_FILE_NAME}.png",
+                show_layer_names=True, show_shapes=True, show_layer_activations=True,
+                show_dtype=False, show_trainable=False, rankdir="LR", dpi=300)
+    except ImportError:
+        print("Unable to plot_model() without pydot and/or graphviz.")
 
-# -----------------------------------------------------------
-# Tests the newly saved model, within an Estimator, against a dataset of real systems.
-# -----------------------------------------------------------
-print("\n *** Running formal test against real data ***")
-FORMAL_RESULTS_DIR = SAVE_DIR / f"results/{MODEL_NAME}/{TRAINSET_NAME}/{deb_example.pub_mags_key}/"
-FORMAL_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-model_testing.test_with_estimator(model_save_file, results_dir=FORMAL_RESULTS_DIR)
+
+    # -----------------------------------------------------------
+    # Train the model
+    # -----------------------------------------------------------
+    CALLBACKS = [
+        # To use tensorboard make sure the containing conda env is active then run
+        # $ tensorboard --port 6006 --logdir ./logs
+        # Then start a browser and head to http://localhost:6006
+        #callbacks.TensorBoard(log_dir="./logs", write_graph=True, write_images=True),
+        callbacks.EarlyStopping("val_loss", restore_best_weights=True,
+                                patience=EARLY_STOPPING_PATIENCE, verbose=1)
+    ]
+
+    print(f"\nTraining the model on {counts[0]} training and {counts[1]} validation",
+        f"instances, with a further {counts[2]} instances held back for test.")
+    try:
+        # You may see the following warning while training, which can safely be ignored;
+        #   UserWarning: Your input ran out of data; interrupting training
+        history = model.fit(x = datasets[0],    # pylint: disable=invalid-name
+                            epochs = TRAINING_EPOCHS,
+                            callbacks = CALLBACKS,
+                            validation_data = datasets[1])
+        # Plot the learning curves
+        pd.DataFrame(history.history).plot(figsize=(8, 5))
+        PLOTS_DIR.mkdir(parents=True, exist_ok=True)
+        plt.savefig(PLOTS_DIR / f"{MODEL_FILE_NAME}_learning_curves.png", dpi=300)
+    except tf.errors.InvalidArgumentError as exc:
+        if ("lc" in exc.message or "mags" in exc.message) \
+                and "Can't parse serialized" in exc.message:
+            msg = exc.message + "\n*** Probable cause: incompatible serialized mags feature length."
+            raise tf.errors.InvalidArgumentError(exc.node_def, exc.op, msg, exc.args) from exc
+
+    print(f"\nEvaluating the model on {counts[2]} test instances.")
+    model.evaluate(datasets[2], verbose=1)
+
+    # Save the newly trained model
+    model_save_file = SAVE_DIR / f"{MODEL_FILE_NAME}.keras"
+    modelling.save_model(model_save_file, model)
+    print(f"\nSaved model '{MODEL_NAME}' to: {model_save_file}")
+
+    # -----------------------------------------------------------
+    # Tests the newly saved model, within an Estimator, against a dataset of real systems.
+    # -----------------------------------------------------------
+    print("\n *** Running formal test against real data ***")
+    FORMAL_RESULTS_DIR = SAVE_DIR / \
+        f"results/{MODEL_NAME}/{TRAINSET_NAME}/{deb_example.pub_mags_key}/"
+    FORMAL_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    model_testing.test_with_estimator(model_save_file, results_dir=FORMAL_RESULTS_DIR)
