@@ -66,16 +66,18 @@ def make_best_model():
     Helper function for building the current best performing model. 
     Publish model from a function, rather than inline, so it can be shared with model_search.
     """
-    print("\nBuilding the best known CNN model for predicting:", ", ".join(CHOSEN_LABELS), "\n")
-    return modelling.build_mags_ext_model(
+    print("\nBuilding the best known CNN model for predicting:", ", ".join(CHOSEN_LABELS))
+    best_model = modelling.build_mags_ext_model(
         name=MODEL_NAME,
+        mags_input=modelling.mags_input_layer(shape=(MAGS_BINS, 1)),
+        ext_input=modelling.ext_input_layer(shape=(NUM_EXT_INPUTS, 1)),
         mags_layers=[
             modelling.conv1d_layers(2, 64, 4, 2, CNN_PADDING, CNN_ACTIVATE, "Conv-1-"),
-            layers.MaxPool1D(pool_size=2, strides=2, name="Pool-1"),
+            modelling.pooling_layer(layers.MaxPool1D, pool_size=2, strides=2, name="Pool-1"),
             modelling.conv1d_layers(2, 64, 4, 2, CNN_PADDING, CNN_ACTIVATE, "Conv-2-"),
-            layers.MaxPool1D(pool_size=2, strides=2, name="Pool-2"),
+            modelling.pooling_layer(layers.MaxPool1D, pool_size=2, strides=2, name="Pool-2"),
             modelling.conv1d_layers(2, 64, 4, 2, CNN_PADDING, CNN_ACTIVATE, "Conv-3-"),
-            layers.MaxPool1D(pool_size=2, strides=2, name="Pool-3"),
+            modelling.pooling_layer(layers.MaxPool1D, pool_size=2, strides=2, name="Pool-3"),
             modelling.conv1d_layers(2, 64, 4, 2, CNN_PADDING, CNN_ACTIVATE, "Conv-4-")
         ],
         dnn_layers=[
@@ -86,7 +88,9 @@ def make_best_model():
             modelling.hidden_layers(1, 64, DNN_INITIALIZER, DNN_ACTIVATE, 0, ("Taper-",))
         ],
         output=modelling.output_layer({l: deb_example.labels_and_scales[l] for l in CHOSEN_LABELS},
-                                    DNN_INITIALIZER, "linear", "Output"))
+                                      DNN_INITIALIZER, "linear", "Output"))
+    print(f"Have built the model {best_model.name}\n")
+    return best_model
 
 
 if __name__ == "__main__":
