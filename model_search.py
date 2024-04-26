@@ -270,7 +270,7 @@ trials_pspace = hp.choice("train_and_test_model", [
     {
         # The current best performing model we have
         "model": { "func": make_trained_cnn_model.make_best_model, "verbose": True },
-        "optimizer": make_trained_cnn_model.OPTIMIZER,
+        "optimizer": { "class": optimizers.Nadam, "learning_rate": learning_rate_choice },
         "loss_function": make_trained_cnn_model.LOSS,
     },
     {
