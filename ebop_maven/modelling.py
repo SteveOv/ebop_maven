@@ -56,7 +56,7 @@ def conv1d_layers(num_layers: int=1,
                   padding: Union[str, List[str]]="same",
                   activation: Union[any, List[any]]="relu",
                   name_prefix: str="Conv-",
-                  verbose: bool=True) -> KerasTensor:
+                  verbose: bool=False) -> KerasTensor:
     """
     Builds the requested set of Conv1D layers, returning the output tensor of the last layer built.
     The filters, kernel_size, strides, padding and activation arguments can be a List of values,
@@ -108,7 +108,7 @@ def pooling_layer(pool_type: BasePooling,
                   pool_size: int=2,
                   strides: int=2,
                   name: str=None,
-                  verbose: bool=True) -> KerasTensor:
+                  verbose: bool=False) -> KerasTensor:
     """
     Builds the requested Pooling layer, returning its output tensor.
 
@@ -135,7 +135,7 @@ def hidden_layers(num_layers: int=1,
                   activation: Union[any, List[any]]="relu",
                   dropout_rate: Union[float, List[float]]=0,
                   name_prefix: Tuple[str, str]=("Hidden-", "Dropout-"),
-                  verbose: bool=True) -> KerasTensor:
+                  verbose: bool=False) -> KerasTensor:
     """
     Builds the requested set of hidden Dense layers with optional accompanying Dropout layers,
     returning the output tensor of the last layer built. The units, activation, kernel_initializer
@@ -189,7 +189,7 @@ def hidden_layers(num_layers: int=1,
 
 def mags_input_layer(shape: Tuple[int, int]=(deb_example.mags_bins, 1),
                      name: str="Mags-Input",
-                     verbose: bool=True) -> KerasTensor:
+                     verbose: bool=False) -> KerasTensor:
     """
     Builds a standard mags-feature input layer.
 
@@ -205,7 +205,7 @@ def mags_input_layer(shape: Tuple[int, int]=(deb_example.mags_bins, 1),
 
 def ext_input_layer(shape: Tuple[int, int]=(len(deb_example.extra_features_and_defaults), 1),
                     name: str="Ext-Input",
-                    verbose: bool=True) -> KerasTensor:
+                    verbose: bool=False) -> KerasTensor:
     """
     Builds a standard ext-features input layer.
 
@@ -223,7 +223,7 @@ def output_layer(label_names_and_scales: Dict[str, any]=None,
                  kernel_initializer: str="glorot_uniform",
                  activation: str="linear",
                  name: str="Output",
-                 verbose: bool=True) -> KerasTensor:
+                 verbose: bool=False) -> KerasTensor:
     """
     Builds the requested output layer, returning its output tensor.
 
@@ -261,7 +261,7 @@ def build_mags_ext_model(
         dnn_layers: List[Callable[[KerasTensor], KerasTensor]]=None,
         output: Callable[[KerasTensor], KerasTensor]=output_layer(verbose=False),
         post_build_step: Callable[[models.Model], None]=None,
-        verbose: bool=True
+        verbose: bool=False
     ) -> models.Model:
     """
     Builds a multiple input model with separate Mags-Feature and Extra-Features inputs.
