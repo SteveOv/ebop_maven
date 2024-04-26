@@ -266,9 +266,10 @@ cnn_trailing_pool_choice = hp.choice("cnn_trailing_pool", [True, False])
 dnn_kernel_initializer_choice = hp.choice("dnn_init", ["he_uniform", "he_normal", "glorot_uniform"])
 learning_rate_choice = hp.qloguniform("learning_rate", -12, -4, 1e-6)
 
-trials_pspace = hp.choice("train_and_test_model", [{
+trials_pspace = hp.choice("train_and_test_model", [
+    {
         # The current best performing model we have
-        "model": { "func": make_trained_cnn_model.make_best_model },
+        "model": { "func": make_trained_cnn_model.make_best_model, "verbose": True },
         "optimizer": make_trained_cnn_model.OPTIMIZER,
         "loss_function": make_trained_cnn_model.LOSS[0],
     },
