@@ -490,11 +490,12 @@ def early_stopping_to_report_progress(this_trials, *early_stop_args):
     """
     stop = False # Will stop the trial if set to True
     if this_trials and this_trials.best_trial:
-        best_tid = this_trials.best_trial.get("tid", None) # seem to be zero based; +1 for iteration
+        # tids seem to be zero based; +1 for iteration
+        best_iter = this_trials.best_trial.get("tid", None) + 1
         br = this_trials.best_trial.get("result", {})
-        num_tids = len(this_trials.tids or [])
+        this_iter = len(this_trials._ids or []) # pylint: disable=protected-access
         print("\n" + "="*80 + "\n",
-            f"[{num_tids}/{MAX_HYPEROPT_EVALS}] Best trial tid={best_tid},",
+            f"[{this_iter}/{MAX_HYPEROPT_EVALS}] Best Trial: #{best_iter},",
             f"status={br.get('status', None)}, loss={br.get('loss', 0):.6f},",
             f"MAE={br.get('mae', 0):.6f}, MSE={br.get('mse', 0):.6f}",
             "\n" + "="*80 + "\n")
