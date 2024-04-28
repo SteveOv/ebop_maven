@@ -267,7 +267,7 @@ cnn_padding_choices = ["same", "valid"]
 cnn_activation_choices = ["relu"]
 loss_function_choices = [["mae"], ["mse"], ["huber"]]
 lr_qlogu_kwargs = { "low": -12, "high": -3, "q": 1e-6 }
-sgd_momentum_norm_kwargs = { "mu": 0.9, "sigma": 0.4 }
+sgd_momentum_uniform_kwargs = { "low": 0.5, "high": 1.0 }
 sgd_lr_qlogu_kwargs = { "low": -8, "high": -1, "q": 1e-4 }
 
 # Genuinely shared choice between DNN layers and output layer
@@ -289,7 +289,7 @@ trials_pspace = hp.pchoice("train_and_test_model", [
             { # Covers both vanilla SGD and Nesterov momentum
                 "class": optimizers.SGD,
                 "learning_rate": hp.qloguniform("best_lr_sgd", **sgd_lr_qlogu_kwargs), 
-                "momentum": hp.normal("best_sgd_momentum", **sgd_momentum_norm_kwargs),
+                "momentum": hp.uniform("best_sgd_momentum", **sgd_momentum_uniform_kwargs),
                 "nesterov": hp.choice("best_sgd_nesterov", [True, False])
             }
         ]),
@@ -302,7 +302,7 @@ trials_pspace = hp.pchoice("train_and_test_model", [
             { # Covers both vanilla SGD and Nesterov momentum
                 "class": optimizers.SGD, 
                 "learning_rate": hp.qloguniform("free_lr_sgd", **sgd_lr_qlogu_kwargs), 
-                "momentum": hp.normal("free_sgd_momentum", **sgd_momentum_norm_kwargs),
+                "momentum": hp.normal("free_sgd_momentum", **sgd_momentum_uniform_kwargs),
                 "nesterov": hp.choice("free_sgd_nesterov", [True, False])
             }
         ]),
