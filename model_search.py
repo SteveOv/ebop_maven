@@ -302,7 +302,7 @@ trials_pspace = hp.pchoice("train_and_test_model", [
             { # Covers both vanilla SGD and Nesterov momentum
                 "class": optimizers.SGD, 
                 "learning_rate": hp.qloguniform("free_lr_sgd", **sgd_lr_qlogu_kwargs), 
-                "momentum": hp.normal("free_sgd_momentum", **sgd_momentum_uniform_kwargs),
+                "momentum": hp.uniform("free_sgd_momentum", **sgd_momentum_uniform_kwargs),
                 "nesterov": hp.choice("free_sgd_nesterov", [True, False])
             }
         ]),
