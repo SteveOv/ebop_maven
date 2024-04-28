@@ -36,12 +36,12 @@ MODEL_FILE_NAME = "parameter-search-model"
 # The subset of all available labels which we will train to predict
 CHOSEN_LABELS = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "inc"]
 
-MAX_HYPEROPT_EVALS = 100        # Maximum number of distinct Hyperopt evals to run
+MAX_HYPEROPT_EVALS = 200        # Maximum number of distinct Hyperopt evals to run
 HYPEROPT_LOSS_TH = 0.01         # Will stop search in the unlikely event we get below this loss
 TRAINING_EPOCHS = 250           # Set high if we're using early stopping
 BATCH_FRACTION = 0.001          # larger -> quicker training per epoch but more to converge
 MAX_BUFFER_SIZE = 20000000      # Size of Dataset shuffle buffer (in instances)
-PATIENCE = 10                   # Number of epochs w/o improvement before stopping
+PATIENCE = 7                    # Number of epochs w/o improvement before stopping
 
 ENFORCE_REPEATABILITY = True    # If true, avoid GPU/CUDA cores for repeatable results
 SEED = 42                       # Standard random seed ensures repeatable randomization
@@ -264,16 +264,34 @@ cnn_activation_choice = hp.choice("cnn_activation", ["relu"])
 cnn_pooling_type_choice = hp.choice("cnn_pooling_type", [layers.AvgPool1D, layers.MaxPool1D, None])
 cnn_trailing_pool_choice = hp.choice("cnn_trailing_pool", [True, False])
 dnn_kernel_initializer_choice = hp.choice("dnn_init", ["he_uniform", "he_normal", "glorot_uniform"])
-learning_rate_choice = hp.qloguniform("learning_rate", -12, -4, 1e-6)
+learning_rate_choice = hp.qloguniform("learning_rate", -10, -3, 1e-6)
+optimizer_choice = hp.choice("optimizer", [
+    { "class": optimizers.Adam, "learning_rate": learning_rate_choice },
+    { "class": optimizers.Nadam, "learning_rate": learning_rate_choice },
+    { # Covers both vanilla SGD and Nesterov momentum
+        "class": optimizers.SGD, "learning_rate": learning_rate_choice, 
+        "momentum": hp.normal("sgd_momentum", mu=0.9, sigma=0.4),
+        "nesterov": hp.choice("sgd_nesterov", [True, False])
+    }
+])
+loss_choice = hp.choice("loss", [["mae"], ["mse"], ["huber"]])
 
 trials_pspace = hp.pchoice("train_and_test_model", [
     (0.01, {
-        # The current best performing model we have
+        # The current best performing model/training params we know, for use as a control
         "model": { "func": make_trained_cnn_model.make_best_model, "verbose": True },
         "optimizer": { "class": optimizers.Nadam, "learning_rate": 5e-4 },
         "loss_function": make_trained_cnn_model.LOSS,
     }),
-    (0.99, {
+    (0.09, {
+        # The current best performing model we know, but lets vary the training
+        "model": { "func": make_trained_cnn_model.make_best_model, "verbose": True },
+        "optimizer": optimizer_choice,
+        "loss_function": loss_choice,
+    }),
+    (0.90, {
+        "optimizer": optimizer_choice,
+        "loss_function": loss_choice,  
         "model": hp.choice("model", [{
             "func": modelling.build_mags_ext_model,
             "mags_layers": hp.choice("mags_layers", [
@@ -308,8 +326,8 @@ trials_pspace = hp.pchoice("train_and_test_model", [
                 {
                     # Randomized CNN with/without pooling.
                     "func": cnn_with_pooling,
-                    "num_layers": hp.uniformint("cnn_num_layers", low=3, high=6),
-                    "filters": hp.quniform("cnn_filters", low=16, high=64, q=16),
+                    "num_layers": hp.uniformint("cnn_num_layers", low=3, high=5),
+                    "filters": hp.quniform("cnn_filters", low=32, high=64, q=16),
                     "kernel_size": hp.quniform("cnn_kernel_size", low=4, high=16, q=4),
                     "strides": hp.pchoice("cnn_strides", [(0.75, None), (0.125, 2), (0.125, 4)]), # None defers to strides_fraction
                     "strides_fraction": hp.quniform("cnn_strides_fraction", low=.25, high=1, q=.25),
@@ -337,14 +355,7 @@ trials_pspace = hp.pchoice("train_and_test_model", [
                 "kernel_initializer": dnn_kernel_initializer_choice,
                 "activation": "linear"
             },
-        }]),
-
-        "optimizer": hp.choice("optimizer", [
-            { "class": optimizers.Adam, "learning_rate": learning_rate_choice },
-            { "class": optimizers.Nadam, "learning_rate": learning_rate_choice }
-        ]),
-
-        "loss_function": hp.choice("loss_function", [["mae"], ["mse"], ["huber"]]),      
+        }]),    
     })
 ])
 
