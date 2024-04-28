@@ -174,6 +174,9 @@ def plot_predictions_vs_labels(
     _, axes = plt.subplots(rows, cols, figsize=(cols * 3, rows * 2.9), constrained_layout=True)
     axes = axes.flatten()
 
+    if not transit_flags:
+        transit_flags = [False] * len(labels)
+
     # Produce a plot of prediction vs label for each label type
     print(f"Plotting scatter plot {rows}x{cols} grid for: {', '.join(pub_labels.keys())}")
     for ax_ix, (lbl_name, ax_label) in enumerate(pub_labels.items()):
