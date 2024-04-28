@@ -502,8 +502,9 @@ def early_stopping_to_report_progress(this_trials, *early_stop_args):
     Callback for early stopping. We don't use it for early stopping but it is
     useful for reporting on the current status of the trials without the
     progress_bar making a mess when capturing the stdout output to a file.
+    We also use it to save the best model & params as we go.
     """
-    stop = False # Will stop the trial if set to True
+    no_no_dont_stop = False # Will stop the trial if set to True
     if this_trials and this_trials.best_trial:
         # tids seem to be zero based; +1 for iteration
         best_iter = this_trials.best_trial.get("tid", None) + 1
@@ -514,7 +515,33 @@ def early_stopping_to_report_progress(this_trials, *early_stop_args):
             f"status={br.get('status', None)}, loss={br.get('loss', 0):.6f},",
             f"MAE={br.get('mae', 0):.6f}, MSE={br.get('mse', 0):.6f}",
             "\n" + "="*80 + "\n")
-    return stop, early_stop_args
+
+        if this_iter == best_iter:
+            # This is the new best: persist its details so we don't loose them
+            best_model = br.get("model", None)
+            if best_model:
+                model_file = results_dir / "best_model.keras"
+                summary_file = results_dir / "best_model_summary.txt"
+                print(f"Saving model to {model_file}\nSaving summary to {summary_file}")
+                modelling.save_model(model_file, best_model)
+                with open(summary_file, mode="w", encoding="utf8") as f:
+                    best_model.summary(show_trainable=True,
+                                       print_fn=lambda line, line_break: f.write(line + "\n"))
+                del br["model"] # Now it's save we don't need this in memory
+
+            # We have to convert the misc vals dict, which has items like "activation": [2]
+            # into the form returned by fmin; the equivalent dict where above is "activation": 2
+            # With that we can use space_eval() func to give us the actual values from the vals
+            if "misc" in this_trials.best_trial:
+                vals = this_trials.best_trial["misc"].get("vals", {})
+                vals = { k: v[0] for (k, v) in vals.items() if v }
+                if vals:
+                    params = space_eval(trials_pspace, vals)
+                    params_file = results_dir / "best_model_params.json"
+                    print(f"Saving parameters to {params_file}")
+                    with open(params_file, mode="w", encoding="utf8") as f:
+                        json.dump(params, f, indent=4, default=str)
+    return no_no_dont_stop, early_stop_args
 
 # Conduct the trials
 results_dir = Path(".") / "drop" / "model_search"
@@ -533,18 +560,7 @@ with redirect_stdout(Tee(open(results_dir / "trials.log", "w", encoding="utf8"))
                 verbose=True,
                 show_progressbar=False) # Can't use progressbar as it makes a mess of logging
 
-
-# -----------------------------------------------------------
-# Report on the outcome
-# -----------------------------------------------------------
-best_model = trials.best_trial["result"]["model"]
-best_params = space_eval(trials_pspace, best)
-print("\nBest model hyperparameter set is:\n"
-      + json.dumps(best_params, indent=4, sort_keys=False, default=str))
-
-# Save the best model / best parameter set
-modelling.save_model(results_dir / "best_model.keras", best_model)
-with open(results_dir / "best_model_summary.txt", mode="w", encoding="utf8") as of:
-    best_model.summary(show_trainable=True, print_fn=lambda line, line_break: of.write(line + "\n"))
-with open(results_dir / "best_model_params.json", mode="w", encoding="utf8") as of:
-    json.dump(best_params, of, indent=4, default=str)
+    # Report on the outcome (we saved the best to files as we went along)
+    best_params = space_eval(trials_pspace, best)
+    print("\nBest model hyperparameter set is:\n"
+        + json.dumps(best_params, indent=4, sort_keys=False, default=str))
