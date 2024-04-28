@@ -266,8 +266,9 @@ cnn_pooling_type_choices = [layers.AvgPool1D, layers.MaxPool1D, None]
 cnn_padding_choices = ["same", "valid"]
 cnn_activation_choices = ["relu"]
 loss_function_choices = [["mae"], ["mse"], ["huber"]]
-lr_qlogu_kwargs = { "low": -10, "high": -3, "q": 1e-6 }
+lr_qlogu_kwargs = { "low": -12, "high": -3, "q": 1e-6 }
 sgd_momentum_norm_kwargs = { "mu": 0.9, "sigma": 0.4 }
+sgd_lr_qlogu_kwargs = { "low": -8, "high": -1, "q": 1e-4 }
 
 # Genuinely shared choice between DNN layers and output layer
 dnn_kernel_initializer_choice = hp.choice("dnn_init", ["he_uniform", "he_normal", "glorot_uniform"])
@@ -286,7 +287,8 @@ trials_pspace = hp.pchoice("train_and_test_model", [
             { "class": optimizers.Adam, "learning_rate": hp.qloguniform("best_lr_adam", **lr_qlogu_kwargs) },
             { "class": optimizers.Nadam, "learning_rate": hp.qloguniform("best_lr_nadam", **lr_qlogu_kwargs) },
             { # Covers both vanilla SGD and Nesterov momentum
-                "class": optimizers.SGD, "learning_rate": hp.qloguniform("best_lr_sgd", **lr_qlogu_kwargs), 
+                "class": optimizers.SGD,
+                "learning_rate": hp.qloguniform("best_lr_sgd", **sgd_lr_qlogu_kwargs), 
                 "momentum": hp.normal("best_sgd_momentum", **sgd_momentum_norm_kwargs),
                 "nesterov": hp.choice("best_sgd_nesterov", [True, False])
             }
@@ -298,7 +300,8 @@ trials_pspace = hp.pchoice("train_and_test_model", [
             { "class": optimizers.Adam, "learning_rate": hp.qloguniform("free_lr_adam", **lr_qlogu_kwargs) },
             { "class": optimizers.Nadam, "learning_rate": hp.qloguniform("free_lr_nadam", **lr_qlogu_kwargs) },
             { # Covers both vanilla SGD and Nesterov momentum
-                "class": optimizers.SGD, "learning_rate": hp.qloguniform("free_r_sgd", **lr_qlogu_kwargs), 
+                "class": optimizers.SGD, 
+                "learning_rate": hp.qloguniform("free_lr_sgd", **sgd_lr_qlogu_kwargs), 
                 "momentum": hp.normal("free_sgd_momentum", **sgd_momentum_norm_kwargs),
                 "nesterov": hp.choice("free_sgd_nesterov", [True, False])
             }
