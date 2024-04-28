@@ -267,7 +267,7 @@ cnn_padding_choices = ["same", "valid"]
 cnn_activation_choices = ["relu"]
 loss_function_choices = [["mae"], ["mse"], ["huber"]]
 lr_qlogu_kwargs = { "low": -12, "high": -3, "q": 1e-6 }
-sgd_momentum_uniform_kwargs = { "low": 0.5, "high": 1.0 }
+sgd_momentum_uniform_kwargs = { "low": 0.0, "high": 1.0 }
 sgd_lr_qlogu_kwargs = { "low": -8, "high": -1, "q": 1e-4 }
 
 # Genuinely shared choice between DNN layers and output layer
