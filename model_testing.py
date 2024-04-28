@@ -178,8 +178,17 @@ def plot_predictions_vs_labels(
     print(f"Plotting scatter plot {rows}x{cols} grid for: {', '.join(pub_labels.keys())}")
     for ax_ix, (lbl_name, ax_label) in enumerate(pub_labels.items()):
         lbl_vals = [lbls[lbl_name] for lbls in labels]
-        pred_vals = [preds[lbl_name] for preds in predictions]
-        pred_sigmas = [preds[f"{lbl_name}_sigma"] for preds in predictions]
+        # There are two format we expect for the predictions, either
+        #   - { "key": value, "key_sigma": sigma_value }    (from Estimator)
+        #   - { "key": (value, sigma_value) }               (from JKTEBOP prediction)
+        # In either case we need to separate out the sigmas
+        if f"{lbl_name}_sigma" in predictions[0]:
+            pred_vals = [preds[lbl_name] for preds in predictions]
+            pred_sigmas = [preds[f"{lbl_name}_sigma"] for preds in predictions]
+        else:
+            pred_vals = [preds[lbl_name][0] for preds in predictions]
+            pred_sigmas = [preds[lbl_name][1] for preds in predictions]
+
         if rescale:
             scale = deb_example.labels_and_scales[lbl_name]
             lbl_vals = np.multiply(lbl_vals, scale)
