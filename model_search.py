@@ -36,7 +36,7 @@ MODEL_FILE_NAME = "parameter-search-model"
 # The subset of all available labels which we will train to predict
 CHOSEN_LABELS = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "inc"]
 
-MAX_HYPEROPT_EVALS = 200        # Maximum number of distinct Hyperopt evals to run
+MAX_HYPEROPT_EVALS = 500        # Maximum number of distinct Hyperopt evals to run
 HYPEROPT_LOSS_TH = 0.01         # Will stop search in the unlikely event we get below this loss
 TRAINING_EPOCHS = 250           # Set high if we're using early stopping
 BATCH_FRACTION = 0.001          # larger -> quicker training per epoch but more to converge
