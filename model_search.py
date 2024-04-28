@@ -258,23 +258,19 @@ scope.define(layers.PReLU)
 scope.define(optimizers.Adam)
 scope.define(optimizers.Nadam)
 
-# Shared choices
-cnn_padding_choice = hp.choice("cnn_padding", ["same", "valid"])
-cnn_activation_choice = hp.choice("cnn_activation", ["relu"])
-cnn_pooling_type_choice = hp.choice("cnn_pooling_type", [layers.AvgPool1D, layers.MaxPool1D, None])
-cnn_trailing_pool_choice = hp.choice("cnn_trailing_pool", [True, False])
+# Shared choices: define the ranges, choices etc consistently, but keep the hp.*
+# func calls specific to model type so fmin/TPE has free reign across each.
+cnn_strides_pchoices = [(0.75, None), (0.125, 2), (0.125, 4)]
+cnn_strides_fraction_kwargs = { "low": 0.25, "high": 1, "q": 0.25 }
+cnn_pooling_type_choices = [layers.AvgPool1D, layers.MaxPool1D, None]
+cnn_padding_choices = ["same", "valid"]
+cnn_activation_choices = ["relu"]
+loss_function_choices = [["mae"], ["mse"], ["huber"]]
+lr_qlogu_kwargs = { "low": -10, "high": -3, "q": 1e-6 }
+sgd_momentum_norm_kwargs = { "mu": 0.9, "sigma": 0.4 }
+
+# Genuinely shared choice between DNN layers and output layer
 dnn_kernel_initializer_choice = hp.choice("dnn_init", ["he_uniform", "he_normal", "glorot_uniform"])
-learning_rate_choice = hp.qloguniform("learning_rate", -10, -3, 1e-6)
-optimizer_choice = hp.choice("optimizer", [
-    { "class": optimizers.Adam, "learning_rate": learning_rate_choice },
-    { "class": optimizers.Nadam, "learning_rate": learning_rate_choice },
-    { # Covers both vanilla SGD and Nesterov momentum
-        "class": optimizers.SGD, "learning_rate": learning_rate_choice, 
-        "momentum": hp.normal("sgd_momentum", mu=0.9, sigma=0.4),
-        "nesterov": hp.choice("sgd_nesterov", [True, False])
-    }
-])
-loss_choice = hp.choice("loss", [["mae"], ["mse"], ["huber"]])
 
 trials_pspace = hp.pchoice("train_and_test_model", [
     (0.01, {
@@ -286,12 +282,28 @@ trials_pspace = hp.pchoice("train_and_test_model", [
     (0.09, {
         # The current best performing model we know, but lets vary the training
         "model": { "func": make_trained_cnn_model.make_best_model, "verbose": True },
-        "optimizer": optimizer_choice,
-        "loss_function": loss_choice,
+        "optimizer": hp.choice("best_optimizer", [
+            { "class": optimizers.Adam, "learning_rate": hp.qloguniform("best_lr_adam", **lr_qlogu_kwargs) },
+            { "class": optimizers.Nadam, "learning_rate": hp.qloguniform("best_lr_nadam", **lr_qlogu_kwargs) },
+            { # Covers both vanilla SGD and Nesterov momentum
+                "class": optimizers.SGD, "learning_rate": hp.qloguniform("best_lr_sgd", **lr_qlogu_kwargs), 
+                "momentum": hp.normal("best_sgd_momentum", **sgd_momentum_norm_kwargs),
+                "nesterov": hp.choice("best_sgd_nesterov", [True, False])
+            }
+        ]),
+        "loss_function": hp.choice("best_loss", loss_function_choices),
     }),
     (0.90, {
-        "optimizer": optimizer_choice,
-        "loss_function": loss_choice,  
+        "optimizer": hp.choice("free_optimizer", [
+            { "class": optimizers.Adam, "learning_rate": hp.qloguniform("free_lr_adam", **lr_qlogu_kwargs) },
+            { "class": optimizers.Nadam, "learning_rate": hp.qloguniform("free_lr_nadam", **lr_qlogu_kwargs) },
+            { # Covers both vanilla SGD and Nesterov momentum
+                "class": optimizers.SGD, "learning_rate": hp.qloguniform("free_r_sgd", **lr_qlogu_kwargs), 
+                "momentum": hp.normal("free_sgd_momentum", **sgd_momentum_norm_kwargs),
+                "nesterov": hp.choice("free_sgd_nesterov", [True, False])
+            }
+        ]),
+        "loss_function": hp.choice("free_loss", loss_function_choices),  
         "model": hp.choice("model", [{
             "func": modelling.build_mags_ext_model,
             "mags_layers": hp.choice("mags_layers", [
@@ -301,12 +313,12 @@ trials_pspace = hp.pchoice("train_and_test_model", [
                     "num_pairs": hp.uniformint("cnn_fixed_num_layers", low=2, high=4),
                     "filters": hp.quniform("cnn_fixed_filters", low=32, high=96, q=16),
                     "kernel_size": hp.quniform("cnn_fixed_kernel_size", low=4, high=12, q=4),
-                    "strides": hp.pchoice("cnn_fixed_strides", [(0.75, None), (0.125, 2), (0.125, 4)]), # None defers to strides_fraction
-                    "strides_fraction": hp.quniform("cnn_fixed_strides_fraction", low=.25, high=1, q=.25),
-                    "padding": cnn_padding_choice,
-                    "activation": cnn_activation_choice,
-                    "pooling_type": cnn_pooling_type_choice,
-                    "trailing_pool": cnn_trailing_pool_choice,
+                    "strides": hp.pchoice("cnn_fixed_strides", cnn_strides_pchoices), # None defers to strides_fraction
+                    "strides_fraction": hp.quniform("cnn_fixed_strides_fraction", **cnn_strides_fraction_kwargs),
+                    "padding": hp.choice("cnn_fixed_padding", cnn_padding_choices),
+                    "activation": hp.choice("cnn_fixed_activation", cnn_activation_choices),
+                    "pooling_type": hp.choice("cnn_fixed_pooling_type", cnn_pooling_type_choices),
+                    "trailing_pool": hp.choice("cnn_fixed_trailing_pool", [True, False]),
                 },
                 {
                     # Pairs of Conv1ds with doubling filters & halving kernels/strides per pair
@@ -315,13 +327,13 @@ trials_pspace = hp.pchoice("train_and_test_model", [
                     "num_pairs": hp.choice("cnn_scaled_num_layers", [3]),
                     "filters": hp.quniform("cnn_scaled_filters", low=16, high=32, q=16),
                     "kernel_size": hp.quniform("cnn_scaled_kernel_size", low=8, high=32, q=8),
-                    "strides": hp.pchoice("cnn_scaled_strides", [(0.75, None), (0.125, 2), (0.125, 4)]), # None defers to strides_fraction
-                    "strides_fraction": hp.quniform("cnn_scaled_strides_fraction", low=.25, high=1, q=.25),
+                    "strides": hp.pchoice("cnn_scaled_strides", cnn_strides_pchoices), # None defers to strides_fraction
+                    "strides_fraction": hp.quniform("cnn_scaled_strides_fraction", **cnn_strides_fraction_kwargs),
                     "scaling_multiplier": 2,
                     "padding": "same",
-                    "activation": cnn_activation_choice,
-                    "pooling_type": cnn_pooling_type_choice,
-                    "trailing_pool": cnn_trailing_pool_choice,
+                    "activation": hp.choice("cnn_scaled_activation", cnn_activation_choices),
+                    "pooling_type": hp.choice("cnn_scaled_pooling_type", cnn_pooling_type_choices),
+                    "trailing_pool": hp.choice("cnn_scaled_trailing_pool", [True, False]),
                 },
                 {
                     # Randomized CNN with/without pooling.
@@ -329,12 +341,12 @@ trials_pspace = hp.pchoice("train_and_test_model", [
                     "num_layers": hp.uniformint("cnn_num_layers", low=3, high=5),
                     "filters": hp.quniform("cnn_filters", low=32, high=64, q=16),
                     "kernel_size": hp.quniform("cnn_kernel_size", low=4, high=16, q=4),
-                    "strides": hp.pchoice("cnn_strides", [(0.75, None), (0.125, 2), (0.125, 4)]), # None defers to strides_fraction
-                    "strides_fraction": hp.quniform("cnn_strides_fraction", low=.25, high=1, q=.25),
-                    "padding": cnn_padding_choice,
-                    "activation": cnn_activation_choice,
+                    "strides": hp.pchoice("cnn_strides", cnn_strides_pchoices), # None defers to strides_fraction
+                    "strides_fraction": hp.quniform("cnn_strides_fraction", **cnn_strides_fraction_kwargs),
+                    "padding": hp.choice("cnn_padding", cnn_padding_choices),
+                    "activation": hp.choice("cnn_activation", cnn_activation_choices),
                     "pooling_ixs": hp.choice("cnn_pooling_ixs", [None, [2], [2, 5]]),
-                    "pooling_type": cnn_pooling_type_choice,
+                    "pooling_type": hp.choice("cnn_pooling_type", cnn_pooling_type_choices),
                 },
             ]),
             "ext_layers": None,
