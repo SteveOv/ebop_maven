@@ -79,9 +79,8 @@ def test_with_estimator(model: Union[Model, Path],
 
         # To generate the results we get the predictions (and sigmas) into shape [#inst, 8].
         noms = np.array([[d[k] for k in lbl_names] for d in predictions])
-        nom_errs = np.array([[d[f"{k}_sigma"] for k in lbl_names] for d in predictions])
 
-        # Summary stats (MAE, MSE) by label and over the whole set of preds. 
+        # Summary stats (MAE, MSE) by label and over the whole set of preds.
         ocs = np.subtract(noms, lbls)
         lbl_maes = [np.mean(np.abs(ocs[:, c])) for c in range(num_lbls)]
         lbl_mses = [np.mean(np.power(ocs[:, c], 2)) for c in range(num_lbls)]
@@ -127,62 +126,90 @@ def test_with_estimator(model: Union[Model, Path],
         print(f"Total MSE ({suffix}): {total_mse:.9f}")
         print("--------------------------------\n")
 
+        labels = [dict(zip(lbl_names, lbl_row)) for lbl_row in lbls]
         with open(results_file.parent / f"{results_file.stem}.txt", "w", encoding="utf8") as of:
-            labels = [dict(zip(lbl_names, lbl_row)) for lbl_row in lbls]
             table_of_labels_vs_predictions(labels, predictions, target_names, estimator, to=of)
-
         if plot_results:
-            size = 3
-            cols = 2
-            all_pub_labels = {
-                "rA_plus_rB": "$r_A+r_B$",
-                "k": "$k$",
-                "inc": "$i$",
-                "J": "$J$",
-                "ecosw": r"$e\cos{\omega}$",
-                "esinw": r"$e\sin{\omega}$",
-                "L3": "$L_3$",
-                "bP": "$b_P$"
-            }
+            plot_file = results_file.parent / f"predictions_vs_labels_{suffix}.eps"
+            plot_predictions_vs_labels(labels, predictions, transit_flags, plot_file)
 
-            pub_fields = { k: v for (k, v) in all_pub_labels.items() if k in lbl_names }
-            rows = math.ceil(len(pub_fields) / cols)
-            _, axes = plt.subplots(rows, cols,
-                                   figsize=(cols*size, rows*size), constrained_layout=True)
-            axes = axes.flatten()
-            print(f"Plotting single publication scatter plot {rows}x{cols} grid",
-                  f"for the fields: {', '.join(pub_fields.keys())}")
 
-            # Produce a plot of prediction vs label for each label type
-            for ax_ix, (lbl_name, ax_label) in enumerate(pub_fields.items()):
-                c = lbl_names.index(lbl_name)
-                lbl_vals = lbls[:, c]
-                pred_vals = noms[:, c]
-                pred_errs = nom_errs[:, c]
+def plot_predictions_vs_labels(
+        labels: List[Dict[str, float]],
+        predictions: List[Union[Dict[str, float], Dict[str, Tuple[float, float]]]],
+        transit_flags: List[bool],
+        plot_file: Path,
+        names: List[str]=None,
+        rescale: bool=False):
+    """
+    Will create a plot with a grid of axes, one per label, showing the
+    predictions vs label values.
 
-                # Plot a diagonal line for exact match
-                ax = axes[ax_ix]
-                diag = [min(lbl_vals.min(), pred_vals.min()) - 0.1,
-                        max(lbl_vals.max(), pred_vals.max()) + 0.1]
-                ax.plot(diag, diag, color="gray", linestyle="-", linewidth=0.5)
+    :labels: the labels values as a dict of labels per instance
+    :predictions: the prediction values as a dict of predictions per instance.
+    All the dicts may either be as { "key": val, "key_sigma": err } or { "key":(val, err) }
+    :transit_flags: the associated transit flags; points where the transit flag is True
+    are plotted as a filled shape otherwise as an empty shape
+    :plot_File: the file to save the plot to
+    :names: a subset of the full list of labels/prediction names to render
+    :rescale: whether the re-scale the values so they represent the underlying model output
+    """
+    all_pub_labels = {
+        "rA_plus_rB": "$r_A+r_B$",
+        "k": "$k$",
+        "inc": "$i$",
+        "J": "$J$",
+        "ecosw": r"$e\cos{\omega}$",
+        "esinw": r"$e\sin{\omega}$",
+        "L3": "$L_3$",
+        "bP": "$b_P$"
+    }
 
-                # Plot the preds vs labels, with those with transits highlighted
-                # We want to set the fillstyle by transit flag which means plotting each item alone
-                for x, y, yerr, transiting in zip(lbl_vals, pred_vals, pred_errs, transit_flags):
-                    (fill, z) = ("full", 10) if transiting else ("none", 0)
-                    if suffix == "mc":
-                        ax.errorbar(x=x, y=y, yerr=yerr, fmt="o", c="tab:blue", ms=5.0, lw=1.0,
-                                    capsize=2.0, markeredgewidth=0.5, fillstyle=fill, zorder=z)
-                    else:
-                        ax.errorbar(x=x, y=y, fmt="o", c="tab:blue", ms=5.0, lw=1.0,
-                                    fillstyle=fill, zorder=z)
+    # Use list and order of label names or the dict above if not given
+    chosen_labels = names if names else all_pub_labels.keys()
+    pub_labels = { k: all_pub_labels[k] for k in chosen_labels if k in labels[0].keys() }
 
-                ax.set_ylabel(f"predicted {ax_label}")
-                ax.set_xlabel(f"label {ax_label}")
-                ax.tick_params(axis="both", which="both", direction="in",
-                               top=True, bottom=True, left=True, right=True)
-            plt.savefig(results_dir / f"predictions_vs_labels_{suffix}.eps")
-            plt.close()
+    cols = 2
+    rows = math.ceil(len(pub_labels) / cols)
+    _, axes = plt.subplots(rows, cols, figsize=(cols * 3, rows * 2.9), constrained_layout=True)
+    axes = axes.flatten()
+
+    # Produce a plot of prediction vs label for each label type
+    print(f"Plotting scatter plot {rows}x{cols} grid for: {', '.join(pub_labels.keys())}")
+    for ax_ix, (lbl_name, ax_label) in enumerate(pub_labels.items()):
+        lbl_vals = [lbls[lbl_name] for lbls in labels]
+        pred_vals = [preds[lbl_name] for preds in predictions]
+        pred_sigmas = [preds[f"{lbl_name}_sigma"] for preds in predictions]
+        if rescale:
+            scale = deb_example.labels_and_scales[lbl_name]
+            lbl_vals = np.multiply(lbl_vals, scale)
+            pred_vals = np.multiply(pred_vals, scale)
+            pred_sigmas = np.multiply(pred_sigmas, scale)
+
+        # Plot a diagonal line for exact match
+        dmin, dmax = min(min(lbl_vals), min(pred_vals)), max(max(lbl_vals), max(pred_vals)) # pylint: disable=nested-min-max
+        dmore = 0.1 * (dmax - dmin)
+        diag = [dmin - dmore, dmax + dmore]
+        ax = axes[ax_ix]
+        ax.plot(diag, diag, color="gray", linestyle="-", linewidth=0.5)
+
+        # Plot the preds vs labels, with those with transits highlighted
+        # We want to set the fillstyle by transit flag which means plotting each item alone
+        for x, y, yerr, transiting in zip(lbl_vals, pred_vals, pred_sigmas, transit_flags):
+            (f, z) = ("full", 10) if transiting else ("none", 0)
+            if max(np.abs(pred_sigmas)) > 0:
+                ax.errorbar(x=x, y=y, yerr=yerr, fmt="o", c="tab:blue", ms=5.0, lw=1.0,
+                            capsize=2.0, markeredgewidth=0.5, fillstyle=f, zorder=z)
+            else:
+                ax.errorbar(x=x, y=y, fmt="o", c="tab:blue", ms=5.0, lw=1.0, fillstyle=f, zorder=z)
+
+        ax.set_ylabel(f"predicted {ax_label}")
+        ax.set_xlabel(f"label {ax_label}")
+        ax.tick_params(axis="both", which="both", direction="in",
+                       top=True, bottom=True, left=True, right=True)
+
+    plt.savefig(plot_file, dpi=300)
+    plt.close()
 
 
 def table_of_labels_vs_predictions(
