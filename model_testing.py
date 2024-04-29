@@ -40,11 +40,12 @@ def test_model_against_formal_test_dataset(
     l_names = list(estimator.label_names_and_scales.keys())
     f_names = estimator.input_feature_names
 
-    t_names, labels, features = \
+    ids, labels, features = \
         _get_dataset_labels_and_features(test_dataset_dir, estimator, l_names, f_names, True)
-    inst_count = len(labels)
+    inst_count = len(ids)
 
     # Read additional target data from the config file
+    t_names = [i.split("/")[0] for i in ids] # formal test set has these as target/sector
     with open(test_dataset_config, mode="r", encoding="utf8") as f:
         targets_config = json.load(f)
         transit_flags = [targets_config.get(tn, {}).get("transits", False) for tn in t_names]
@@ -79,7 +80,7 @@ def test_model_against_formal_test_dataset(
 
         if plot_results:
             plot_file = results_file.parent / f"predictions_vs_labels_{suffix}.eps"
-            plot_predictions_vs_labels(labels, predictions, transit_flags, plot_file, l_names)
+            plot_predictions_vs_labels(labels, predictions, transit_flags, plot_file)
 
 
 def predictions_vs_labels_to_csv(
@@ -301,7 +302,7 @@ def _get_dataset_labels_and_features(
     ids, labels, features = [], [], []
     for (targ, lrow, mrow, frow) in datasets.inspect_dataset(tfrecord_files,
                                                              scale_labels=scale_labels):
-        ids += [targ.split("/")[0]] # formal test ds has id in format sys_name/sector other are nums
+        ids += [targ]
         labels += [{ ln: lrow[ln] for ln in label_names }]
         features += [{
             "mags": mrow[deb_example.pub_mags_key], 
