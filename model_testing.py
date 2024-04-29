@@ -14,7 +14,7 @@ from keras.models import Model
 
 from ebop_maven.libs import deb_example
 from ebop_maven.estimator import Estimator
-from ebop_maven import modelling
+from ebop_maven import modelling, datasets
 
 def test_model_against_formal_test_dataset(
         model: Union[Model, Path],
@@ -26,8 +26,7 @@ def test_model_against_formal_test_dataset(
     Will test the indicated model file against the contents of the formal
     test dataset. The results for MC and non-MC estimates will be written
     to csv files in the indicated results directory. Will also need access
-    to the config for the formal test dataset so that it can retrieve target
-    names and flags.
+    to the config for the formal test dataset so that it can retrieve flags.
 
     :model: the save model to test
     :test_dataset_dir: the location of the formal test dataset
@@ -38,34 +37,17 @@ def test_model_against_formal_test_dataset(
     """
     # Create our Estimator. It will tell us which labels it (& the model) can predict.
     estimator = Estimator(model)
-    label_names = [*estimator.label_names_and_scales.keys()]
+    l_names = list(estimator.label_names_and_scales.keys())
+    f_names = estimator.input_feature_names
 
-    print(f"\nLooking for the test dataset in '{test_dataset_dir}'.")
-    tfrecord_files = list(test_dataset_dir.glob("**/*.tfrecord"))
-    if len(tfrecord_files) == 0:
-        raise IndexError("No dataset files found")
-
-    # Don't iterate over the dataset; it's easier if we work with all the data (via a single batch)
-    # As the lbls have come through a dataset pipeline any scaling will be applied.
-    map_func = deb_example.create_map_func(labels=label_names)
-    (ds_formal_test, inst_count) = deb_example.create_dataset_pipeline(tfrecord_files,
-                                                                       10000, map_func)
-    (test_mags, test_feats), label_vals = next(ds_formal_test.take(inst_count).as_numpy_iterator())
-
-    # The features arrive in a tuple (array[shape(#inst, #bin, 1)], array[shape(#inst, #feat, 1)])
-    # We need them in the input format for the Estimator [{"mags":.. , "feat1": ... }]
-    fn = [*deb_example.extra_features_and_defaults.keys()]
-    instance_features = [
-        { "mags": tm, **{n:f[0] for (n,f) in zip(fn,tf)} } for tm, tf in zip(test_mags, test_feats)
-    ]
+    t_names, labels, features = \
+        _get_dataset_labels_and_features(test_dataset_dir, estimator, l_names, f_names, True)
+    inst_count = len(labels)
 
     # Read additional target data from the config file
-    target_names = [] * inst_count
-    transit_flags = [False] * inst_count
     with open(test_dataset_config, mode="r", encoding="utf8") as f:
-        targets = json.load(f)
-        target_names = [f"{t}" for t in targets]
-        transit_flags = [config.get("transits", False) for t, config in targets.items()]
+        targets_config = json.load(f)
+        transit_flags = [targets_config.get(tn, {}).get("transits", False) for tn in t_names]
 
     # Make the results directory
     if results_dir is None:
@@ -74,17 +56,16 @@ def test_model_against_formal_test_dataset(
     results_dir.mkdir(parents=True, exist_ok=True)
 
     # Run the predictions twice; with and without using MC Dropout enabled.
-    # We get the labels into a [{"name": value}]*insts format for easier comparison with preds
-    labels = [dict(zip(label_names, label_row)) for label_row in label_vals]
     for iterations, suffix in [(1, "nonmc"), (1000, "mc")]:
         # Make our prediction which will return [{"name": value, "name_sigma": sigma_value}]*insts
-        # Here we don't want to unscale the predictions so we're consistent with evaluate().
+        # We don't want to unscale predictions so we get the values predicted by the model,
+        # and which match the labels & are consistent with model.evaluate().
         print(f"\nUsing an Estimator to make predictions on {inst_count} formal test instances.")
-        predictions = estimator.predict(instance_features, iterations, unscale=False)
+        predictions = estimator.predict(features, iterations, unscale=False)
 
         results_file = results_dir / f"formal.test.{suffix}.csv"
         with open(results_file, mode="w", encoding="utf8") as of:
-            predictions_vs_labels_to_csv(labels, predictions, estimator, target_names, to=of)
+            predictions_vs_labels_to_csv(labels, predictions, estimator, t_names, l_names, to=of)
 
         print(f"\nSaved predictions and associated loss information to '{results_file}'")
         (_, _, _, ocs) = _get_label_and_prediction_raw_values(labels, predictions)
@@ -94,11 +75,11 @@ def test_model_against_formal_test_dataset(
         print("--------------------------------\n")
 
         with open(results_file.parent / f"{results_file.stem}.txt", "w", encoding="utf8") as of:
-            table_of_predictions_vs_labels(labels, predictions, estimator, target_names, to=of)
+            table_of_predictions_vs_labels(labels, predictions, estimator, t_names, l_names, to=of)
 
         if plot_results:
             plot_file = results_file.parent / f"predictions_vs_labels_{suffix}.eps"
-            plot_predictions_vs_labels(labels, predictions, transit_flags, plot_file)
+            plot_predictions_vs_labels(labels, predictions, transit_flags, plot_file, l_names)
 
 
 def predictions_vs_labels_to_csv(
@@ -288,6 +269,45 @@ def plot_predictions_vs_labels(
                        top=True, bottom=True, left=True, right=True)
     plt.savefig(plot_file, dpi=300)
     plt.close()
+
+
+def _get_dataset_labels_and_features(
+    dataset_dir: Path,
+    estimator: Estimator,
+    label_names: List[str]=None,
+    feature_names: List[str]=None,
+    scale_labels: bool=True):
+    """
+    Gets the ids, labels and features of the requested dataset.
+
+    :dataset_dir: the directory within which it lives
+    :estimator: Estimator instance which publishes the full set of label/feature names supported
+    :label_names: the names of the labels to return, or all suuported by estimatory if None
+    :feature_names: the names of the features to return, or all suuported by estimatory if None
+    :returns: Tuple[List[ids], List[labels dict], List[features dict]]
+    """
+    if not label_names:
+        label_names = list(estimator.label_names_and_scales.keys())
+    if not feature_names:
+        feature_names = estimator.input_feature_names
+
+    print(f"Looking for the test dataset in '{dataset_dir}'...", end="False")
+    tfrecord_files = list(dataset_dir.glob("**/*.tfrecord"))
+    if len(tfrecord_files) > 0:
+        print(f"found {len(tfrecord_files)} dataset file(s).")
+    else:
+        raise IndexError("No dataset files found")
+
+    ids, labels, features = [], [], []
+    for (targ, lrow, mrow, frow) in datasets.inspect_dataset(tfrecord_files,
+                                                             scale_labels=scale_labels):
+        ids += [targ.split("/")[0]] # formal test ds has id in format sys_name/sector other are nums
+        labels += [{ ln: lrow[ln] for ln in label_names }]
+        features += [{
+            "mags": mrow[deb_example.pub_mags_key], 
+            **{ fn: frow[fn] for fn in feature_names if fn not in ["mags"] }}
+        ]
+    return ids, labels, features
 
 
 def _get_label_and_prediction_raw_values(
