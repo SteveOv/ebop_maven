@@ -382,7 +382,8 @@ Selected targets are:               {', '.join(target_names) if target_names els
 
 
 def inspect_dataset(dataset_files: Union[Path, Iterator[Path]],
-                    identifiers: List[str]=None):
+                    identifiers: List[str]=None,
+                    scale_labels: bool=False):
     """
     Utility/diagnostics function which will parse a saved dataset yielding each
     row that matches the passed list of ids (or every row if ids is None). The
@@ -390,6 +391,7 @@ def inspect_dataset(dataset_files: Union[Path, Iterator[Path]],
 
     :dataset_files: the set of dataset files to parse
     :identifiers: optional list of ids to yield, or all ids if None
+    :scale_values: if True values will be scaled 
     """
 
     if isinstance(dataset_files, Path):
@@ -397,13 +399,17 @@ def inspect_dataset(dataset_files: Union[Path, Iterator[Path]],
     else:
         dataset_files = [f"{f.resolve()}" for f in sorted(dataset_files)]
 
+    label_names_and_scales = deb_example.labels_and_scales
     for raw_record in tf.data.TFRecordDataset(dataset_files, _ds_options.compression_type):
         # We know the id is encoded as a utf8 str in a bytes feature
         example = tf.io.parse_single_example(raw_record, deb_example.description)
         identifier = example["id"].numpy().decode(encoding="utf8")
         if not identifiers or identifier in identifiers:
-            labels = { k: example[k].numpy() for k in deb_example.labels_and_scales }
-            mags = {k: example[k].numpy() for k in deb_example.stored_mags_features }
+            if scale_labels:
+                labels = { k: example[k].numpy()*sc for k, sc in label_names_and_scales.items() }
+            else:
+                labels = { k: example[k].numpy() for k in label_names_and_scales }
+            mags = { k: example[k].numpy() for k in deb_example.stored_mags_features }
             ext_features = { k: example[k].numpy() for k in deb_example.extra_features_and_defaults}
             yield (identifier, labels, mags, ext_features)
 
