@@ -1,18 +1,20 @@
 """
 Formal testing of the regression TF Model trained by train_*_estimator.py
 """
+# pylint: disable=too-many-arguments, too-many-locals
 from typing import Union, List, Dict, Tuple
 from io import TextIOBase
 import sys
 from pathlib import Path
 import json
 import math
+import re
 
 import matplotlib.pyplot as plt
 import numpy as np
 from keras.models import Model
 
-from ebop_maven.libs import deb_example
+from ebop_maven.libs import deb_example, lightcurve, jktebop
 from ebop_maven.estimator import Estimator
 from ebop_maven import modelling, datasets
 
@@ -81,6 +83,130 @@ def test_model_against_formal_test_dataset(
         if plot_results:
             plot_file = results_file.parent / f"predictions_vs_labels_{suffix}.eps"
             plot_predictions_vs_labels(labels, predictions, transit_flags, plot_file)
+
+
+def test_fitting_against_formal_test_dataset(
+        model: Union[Model, Path],
+        test_dataset_dir: Path=Path("./datasets/formal-test-dataset"),
+        test_dataset_config: Path=Path("./config/formal-test-dataset.json"),
+        results_dir: Path=None,
+        plot_results: bool=True,
+        iterations: int=1000):
+    """
+    Will test the indicated model file by making predictions against the formal
+    test dataset and then using these predictions to fit the corresponding
+    lightcurves with JKTEBOP task 3. The results of the fitting will be written
+    to the result directory. Will also need access to the config for the formal
+    test dataset so that it can correctly set up the lightcurves for fitting.
+
+    :model: the save model to test
+    :test_dataset_dir: the location of the formal test dataset
+    :test_dataset_config: Path to the config that created the test dataset
+    :results_dir: the parent location to write the results csv file(s) or, if
+    None, the /results/{model.name}/{trainset_name} subdirectory of the model location is used
+    :plot_results: whether to produce a plot of the results vs labels
+    """
+    # Create our Estimator. It will tell us which labels it (& the model) can predict.
+    estimator = Estimator(model)
+    l_names = list(estimator.label_names_and_scales.keys())
+    f_names = estimator.input_feature_names
+
+    # Gets the target details, labels (unscaled) and the mags/ext features make preds from
+    ids, labels, features = \
+        _get_dataset_labels_and_features(test_dataset_dir, estimator, l_names, f_names, False)
+    inst_count = len(ids)
+
+    # Read additional target data from the config file
+    # Get a tuple of (target, sector) from the formal testset ids which have are "target/sector"
+    targets = [i.split("/") for i in ids]
+    with open(test_dataset_config, mode="r", encoding="utf8") as f:
+        targets_config = json.load(f)
+        transit_flags = [targets_config.get(tn[0], {}).get("transits", False) for tn in targets]
+
+    # Make the results directory
+    if results_dir is None:
+        parent = model.parent if isinstance(model, Path) else Path("./drop")
+        results_dir = parent / f"results/{estimator.name}/formal-training-dataset"
+    results_dir.mkdir(parents=True, exist_ok=True)
+
+    # Make our prediction which will return [{"name": value, "name_sigma": sigma_value}]*insts
+    # We don't want to unscale predictions so we get the values predicted by the model,
+    # and which match the labels & are consistent with model.evaluate().
+    print(f"\nUsing an Estimator to make predictions on {inst_count} formal test instances.")
+    estimator_predictions = estimator.predict(features, iterations)
+    fitted_params = []
+    for counter, ((target, sector), t_preds) in enumerate(zip(targets, estimator_predictions), 1):
+        print(f"\nProcessing target {counter} of {len(targets)}: {target} / {sector}")
+        sector = int(sector)
+        sector_cfg = datasets.sector_config_from_target(sector, targets_config[target])
+
+        # The basic lightcurve data read, rectified & extended with delta_mag and delta_mag_err cols
+        fits_dir = Path.cwd() / "cache" / re.sub(r'[^\w\d-]', '_', target.lower())
+        lc = datasets.prepare_lc_for_target_sector(target, sector, sector_cfg, fits_dir, True)
+
+        file_stem = f"model-testing-{re.sub(r'[^\w\d-]', '-', target.lower())}-{sector:03d}"
+        for file in jktebop.get_jktebop_dir().glob(f"{file_stem}.*"):
+            file.unlink()
+        in_file = jktebop.get_jktebop_dir() / f"{file_stem}.in"
+        dat_file = jktebop.get_jktebop_dir() / f"{file_stem}.dat"
+
+        pe = lightcurve.to_lc_time(sector_cfg["primary_epoch"], lc)
+        params = {
+            **base_jktebop_task3_params(sector_cfg["period"], pe.value, dat_file.name, file_stem),
+            **t_preds
+        }
+
+        # Add instructions for scale-factor poly fitting and chi^2 adjustment (to 1.0)
+        segments = lightcurve.find_lightcurve_segments(lc, 0.5, return_times=True)
+        append_lines = jktebop.build_poly_instructions(segments, "sf", 1) + ["", "chif", ""]
+
+        jktebop.write_in_file(in_file, task=3, append_lines=append_lines, **params)
+        jktebop.write_light_curve_to_dat_file(
+                    lc, dat_file, column_formats=[lambda t: f"{t.value:.6f}", "%.6f", "%.6f"])
+
+        # Don't consume the output files so they're available for subsequent plotting
+        print(f"Fitting {target} sector {sector:03d} with JKTEBOP task 3...")
+        par_filename = jktebop.get_jktebop_dir() / f"{file_stem}.par"
+        list(jktebop.run_jktebop_task(in_file, par_filename, stdout_to=sys.stdout))
+        fitted_params += [jktebop.read_fitted_params_from_par_file(par_filename, l_names)]
+
+    with open(results_dir / "fitting_vs_labels_mc.txt", "w", encoding="utf8") as of:
+        table_of_predictions_vs_labels(labels, fitted_params, estimator, ids, l_names, to=of)
+
+    if plot_results:
+        plot_file = results_dir / "fitting_vs_labels_mc.eps"
+        plot_predictions_vs_labels(labels, fitted_params, transit_flags, plot_file)
+
+
+def base_jktebop_task3_params(period: float,
+                                 primary_epoch: float,
+                                 dat_file_name: str,
+                                 file_name_stem: str) -> Dict[str, any]:
+    """
+    Get the basic testing set of JKTEBOP task3 in file parameters.
+    This sets up mainly fixed values for qphot, grav darkening, LD algo & coeffs
+    and fitting.
+    """
+    return {
+        "qphot": 0.,
+        "gravA": 0.,        "gravB": 0.,
+        "L3": 0.,
+        "LDA": "quad",      "LDB": "quad",
+        "LDA1": 0.25,       "LDB1": 0.25,
+        "LDA2": 0.22,       "LDB2": 0.22,
+        "reflA": 0.,        "reflB": 0.,
+        "period": period,
+        "primary_epoch": primary_epoch,
+
+        "ecosw_fit": 1,     "esinw_fit": 1,
+        "L3_fit": 1,
+        "LDA1_fit": 1,      "LDB1_fit": 1,
+        "LDA2_fit": 0,      "LDB2_fit": 0,
+        "period_fit": 1,
+        "primary_epoch_fit": 1,
+        "data_file_name": dat_file_name,
+        "file_name_stem": file_name_stem,
+    }
 
 
 def predictions_vs_labels_to_csv(
