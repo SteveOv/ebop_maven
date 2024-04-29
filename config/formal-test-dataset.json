@@ -611,7 +611,7 @@
         "transits": false,
         "eclipses_similar": false,
         "components_similar": false,
-        "notes": "e=0 & ω=0 & L3=0 (fixed); bP derived from rA, inc, e & esinw;",
+        "notes": "e=0 & ω=0 & L3=0 (fixed); bP derived from rA, inc, e & esinw; lrat required for better fit (from paper)",
         "period": 1.900888340,
         "labels": { 
             "rA_plus_rB": 0.31715,  "rA_plus_rB_err": 0.00057,
@@ -627,7 +627,8 @@
             "18": {
                 "quality_bitmask": "hardest",
                 "quality_masks": [[58790.6, 58792.5], [58801.0, 58804.7]],
-                "primary_epoch": 1808.958835302
+                "primary_epoch": 1808.958835302,
+                "lrat": ["1809.434 0.703 0.057"]
             }
         }
     },
