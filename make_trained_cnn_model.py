@@ -193,4 +193,5 @@ if __name__ == "__main__":
     FORMAL_RESULTS_DIR = SAVE_DIR / \
         f"results/{MODEL_NAME}/{TRAINSET_NAME}/{deb_example.pub_mags_key}/"
     FORMAL_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    model_testing.test_with_estimator(model_save_file, results_dir=FORMAL_RESULTS_DIR)
+    model_testing.test_model_against_formal_test_dataset(model_save_file,
+                                                         results_dir=FORMAL_RESULTS_DIR)
