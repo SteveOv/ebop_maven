@@ -1,7 +1,7 @@
 """
 Searches for the best set of hyperparams for the Mags/Extra-Features model
 """
-# pylint: disable=too-many-arguments
+# pylint: disable=too-many-arguments, too-many-locals
 from typing import Callable, Union, List, Dict, Tuple
 from pathlib import Path
 from contextlib import redirect_stdout
@@ -61,32 +61,15 @@ print(f"Found {len(tf.config.list_physical_devices('GPU'))} GPU(s)\n")
 
 
 # -----------------------------------------------------------
-# Set up the training/validation/test datasets
+# Set up the test datasets - we don't need to recreate per trial
 # -----------------------------------------------------------
-ds_titles = ["training", "validation", "testing", "formal testing"]
-ds_dirs = [TRAINSET_DIR, VALIDSET_DIR, TESTSET_DIR, FORMAL_TESTSET_DIR]
-datasets = [tf.data.TFRecordDataset] * len(ds_titles)
-counts = [int] * len(ds_titles)
-for ds_ix, (label, set_dir) in enumerate(zip(ds_titles, ds_dirs)):
-    files = list(set_dir.glob("**/*.tfrecord"))
-    if ds_ix < 3:
-        map_func = deb_example.create_map_func(labels=CHOSEN_LABELS,
-                                        noise_stddev=lambda: 0.005,
-                                        roll_steps=lambda: tf.random.uniform([], -9, 10, tf.int32))
-        if ds_ix == 0:
-            (datasets[ds_ix], counts[ds_ix]) = \
-                deb_example.create_dataset_pipeline(files, BATCH_FRACTION, map_func,
-                                                    shuffle=True, reshuffle_each_iteration=True,
-                                                    max_buffer_size=MAX_BUFFER_SIZE,
-                                                    prefetch=1, seed=SEED)
-        else:
-            (datasets[ds_ix], counts[ds_ix]) = \
-                deb_example.create_dataset_pipeline(files, BATCH_FRACTION, map_func)
-    else:
-        # For the formal test dataset simple pipeline with no noise/roll and a single batch
-        map_func = deb_example.create_map_func(labels=CHOSEN_LABELS) # No added noise or roll
-        datasets[ds_ix], counts[ds_ix] = deb_example.create_dataset_pipeline(files, 10000, map_func)
-    print(f"Found {counts[ds_ix]:,} {label} instances over {len(files)} tfrecord files in", set_dir)
+test_map_func = deb_example.create_map_func(labels=CHOSEN_LABELS) # No added noise or roll
+test_ds, test_ct = [tf.data.TFRecordDataset] * 2, [int] * 2
+for ti, (tname, tdir) in enumerate(zip(["test", "formal-test"], [TESTSET_DIR, FORMAL_TESTSET_DIR])):
+    tfiles = list(tdir.glob("**/*.tfrecord"))
+    (test_ds[ti], test_ct[ti]) = \
+        deb_example.create_dataset_pipeline(tfiles, BATCH_FRACTION, test_map_func)
+    print(f"Found {test_ct[ti]:,} {tname} insts in {len(tfiles)} tfrecord files in", tdir)
 
 
 # -----------------------------------------------------------
@@ -429,7 +412,26 @@ def train_and_test_model(trial_kwargs):
     """
     print("\n" + "-"*80 + "\n",
           "Evaluating model and hyperparameters based on the following trial_kwargs:\n",
-          json.dumps(trial_kwargs, indent=4, sort_keys=False, default=str))
+          json.dumps(trial_kwargs, indent=4, sort_keys=False, default=str) + "\n")
+
+    # Reset so shuffling & other "random" behaviour is repeated got each trial
+    np.random.seed(SEED)
+    python_random.seed(SEED)
+    tf.random.set_seed(SEED)
+
+    # Set up the training and validation dataset pipelines
+    # Redo this every trial so we can potentially include these pipeline params in the search
+    noise_lambda = 0.005
+    roll_max = 9
+    tr_map_func = deb_example.create_map_func(labels=CHOSEN_LABELS,
+                    noise_stddev=lambda: noise_lambda,
+                    roll_steps=lambda: tf.random.uniform([], -roll_max, roll_max+1, tf.int32))
+    train_ds, train_ct = [tf.data.TFRecordDataset] * 2, [int] * 2
+    for ix, (dn, dd) in enumerate(zip(["training", "validation"],[TRAINSET_DIR, VALIDSET_DIR])):
+        files = list(dd.glob("**/*.tfrecord"))
+        (train_ds[ix], train_ct[ix]) = deb_example.create_dataset_pipeline(
+                    files, BATCH_FRACTION, tr_map_func, True, True, MAX_BUFFER_SIZE, 1, SEED)
+        print(f"Found {train_ct[ix]:,} {dn} instances over {len(files)} tfrecord files in", dd)
 
     weighted_loss = candidate = history = None
     status = STATUS_FAIL
@@ -439,38 +441,29 @@ def train_and_test_model(trial_kwargs):
     if not isinstance(loss_function, List):
         loss_function = [loss_function]
     fixed_metrics = ["mae", "mse", "r2_score"]
-
     try:
         # Build and Compile the trial model
         # always use the same metrics as we use them for trial evaluation
         candidate = get_trial_value(trial_kwargs, "model", False)
         candidate.compile(optimizer=optimizer, loss=loss_function, metrics=fixed_metrics)
-
-        # Reset the tf random seed so shuffling & other "random" behaviour is repeated
-        tf.random.set_seed(SEED)
-
-        print(f"\nTraining the following model against {counts[0]} {ds_titles[0]} instances:")
         candidate.summary(line_length=120, show_trainable=True)
         print()
-        history = candidate.fit(x = datasets[0],
-                                epochs = TRAINING_EPOCHS,
-                                callbacks = [cb.EarlyStopping("val_loss", restore_best_weights=True,
-                                                              patience=PATIENCE, verbose=1)],
-                                validation_data = datasets[1],
-                                verbose=2)
+        ecb = cb.EarlyStopping("val_loss", restore_best_weights=True, patience=PATIENCE, verbose=1)
+        history = candidate.fit(x = train_ds[0], epochs = TRAINING_EPOCHS, callbacks = [ecb],
+                                validation_data = train_ds[1], verbose=2)
 
-        print(f"\nEvaluating model against {counts[2]} {ds_titles[2]} dataset test instances.")
-        candidate.evaluate(x=datasets[2], y=None, verbose=2)
+        print(f"\nEvaluating model against {test_ct[0]} test dataset instances.")
+        candidate.evaluate(x=test_ds[0], y=None, verbose=2)
 
-        print(f"\nFull evaluation against {counts[3]} {ds_titles[3]} dataset instances.")
-        results = candidate.evaluate(x=datasets[3], y=None, verbose=2)
+        print(f"\nFull evaluation against {test_ct[1]} formal-tes dataset instances.")
+        results = candidate.evaluate(x=test_ds[1], y=None, verbose=2)
 
         # Out final loss is always MAE from metrics. This allows us to vary the
         # training loss function while using a consistent metric for trial evaluation.
         mae = results[1 + fixed_metrics.index("mae")]
         mse = results[1 + fixed_metrics.index("mse")]
 
-        # The trial is evaluated on a "weighted loss"; the loss modified with a penalty
+        # The trial can be evaluated on a "weighted loss"; the loss modified with a penalty
         # on model complexity/#params (which is approximated from the number of trainable params).
         weights = int(sum(np.prod(s) for s in [w.shape for w in candidate.trainable_weights]))
         params = np.log(weights)
