@@ -263,7 +263,7 @@
         "eclipses_similar": false,
         "components_similar": true,
         "notes": "e=0.0 & ω=0.0 & L3=0 (fixed);",
-        "period": 2.525087,
+        "period": 2.5250191,
         "labels": {
             "rA_plus_rB": 0.3118,   "rA_plus_rB_err": 0.0009,
             "k": 0.996,             "k_err": 0.041,
