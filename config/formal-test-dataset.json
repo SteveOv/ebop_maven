@@ -194,7 +194,8 @@
         "sectors": {
             "42": {
                 "quality_bitmask": "hardest",
-                "primary_epoch": 2464.982832
+                "primary_epoch": 2464.982832,
+                "lrat": ["2465.75 0.328 0.011"]
             }
         }
     },
