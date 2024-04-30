@@ -91,7 +91,8 @@ def test_fitting_against_formal_test_dataset(
         test_dataset_config: Path=Path("./config/formal-test-dataset.json"),
         results_dir: Path=None,
         plot_results: bool=True,
-        iterations: int=1000):
+        mc_iterations: int=1000,
+        skip_ids: List[str]=None):
     """
     Will test the indicated model file by making predictions against the formal
     test dataset and then using these predictions to fit the corresponding
@@ -105,6 +106,8 @@ def test_fitting_against_formal_test_dataset(
     :results_dir: the parent location to write the results csv file(s) or, if
     None, the /results/{model.name}/{trainset_name} subdirectory of the model location is used
     :plot_results: whether to produce a plot of the results vs labels
+    :mc_iterations: the number of MC Dropout iterations
+    :skip_ids: list of target ids to not fit
     """
     # Create our Estimator. It will tell us which labels it (& the model) can predict.
     estimator = Estimator(model)
@@ -112,8 +115,8 @@ def test_fitting_against_formal_test_dataset(
     f_names = estimator.input_feature_names
 
     # Gets the target details, labels (unscaled) and the mags/ext features make preds from
-    ids, labels, features = \
-        _get_dataset_labels_and_features(test_dataset_dir, estimator, l_names, f_names, False)
+    ids, labels, features = _get_dataset_labels_and_features(
+                                test_dataset_dir, estimator, l_names, f_names, False, skip_ids)
     inst_count = len(ids)
 
     # Read additional target data from the config file
@@ -133,7 +136,7 @@ def test_fitting_against_formal_test_dataset(
     # We don't want to unscale predictions so we get the values predicted by the model,
     # and which match the labels & are consistent with model.evaluate().
     print(f"\nUsing an Estimator to make predictions on {inst_count} formal test instances.")
-    estimator_predictions = estimator.predict(features, iterations)
+    estimator_predictions = estimator.predict(features, mc_iterations)
     fitted_params = []
     for counter, ((target, sector), t_preds) in enumerate(zip(targets, estimator_predictions), 1):
         print(f"\nProcessing target {counter} of {len(targets)}: {target} / {sector}")
@@ -415,7 +418,8 @@ def _get_dataset_labels_and_features(
     estimator: Estimator,
     label_names: List[str]=None,
     feature_names: List[str]=None,
-    scale_labels: bool=True):
+    scale_labels: bool=True,
+    skip_ids: List[str]=None):
     """
     Gets the ids, labels and features of the requested dataset.
 
@@ -423,6 +427,8 @@ def _get_dataset_labels_and_features(
     :estimator: Estimator instance which publishes the full set of label/feature names supported
     :label_names: the names of the labels to return, or all suuported by estimatory if None
     :feature_names: the names of the features to return, or all suuported by estimatory if None
+    :scale_labels: if True labels will be scaled
+    :skip_ids: List of ids to match on which we skip
     :returns: Tuple[List[ids], List[labels dict], List[features dict]]
     """
     if not label_names:
@@ -440,12 +446,13 @@ def _get_dataset_labels_and_features(
     ids, labels, features = [], [], []
     for (targ, lrow, mrow, frow) in datasets.inspect_dataset(tfrecord_files,
                                                              scale_labels=scale_labels):
-        ids += [targ]
-        labels += [{ ln: lrow[ln] for ln in label_names }]
-        features += [{
-            "mags": mrow[deb_example.pub_mags_key], 
-            **{ fn: frow[fn] for fn in feature_names if fn not in ["mags"] }}
-        ]
+        if not skip_ids or targ not in skip_ids:
+            ids += [targ]
+            labels += [{ ln: lrow[ln] for ln in label_names }]
+            features += [{
+                "mags": mrow[deb_example.pub_mags_key], 
+                **{ fn: frow[fn] for fn in feature_names if fn not in ["mags"] }}
+            ]
     return ids, labels, features
 
 
@@ -497,4 +504,11 @@ if __name__ == "__main__":
     TRAINSET_NAME = "formal-training-dataset"   # Assume the usual training set
     the_model = modelling.load_model(Path("./drop/cnn_ext_model.keras"))
     out_dir = Path(f"./drop/results/{the_model.name}/{TRAINSET_NAME}/{deb_example.pub_mags_key}")
+
+    print("\n\nTesting the model's estimates")
     test_model_against_formal_test_dataset(the_model, results_dir=out_dir, plot_results=True)
+
+    print("\n\nTesting the JKTEBOP fitting derived from the model's estimates")
+    skip = ["V402 Lac/0016", "V456 Cyg/0015"] # Neither are suitable for JKTEBOP fitting
+    test_fitting_against_formal_test_dataset(the_model, results_dir=out_dir, plot_results=True,
+                                             skip_ids=skip)
