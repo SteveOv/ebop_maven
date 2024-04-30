@@ -150,10 +150,12 @@ def test_fitting_against_formal_test_dataset(
         in_file = jktebop.get_jktebop_dir() / f"{file_stem}.in"
         dat_file = jktebop.get_jktebop_dir() / f"{file_stem}.dat"
 
-        pe = lightcurve.to_lc_time(sector_cfg["primary_epoch"], lc)
+        pe = lightcurve.to_lc_time(sector_cfg["primary_epoch"], lc).value
+        period = sector_cfg["period"]
+        l3 = sector_cfg["labels"].get("L3", 0)
         params = {
-            **base_jktebop_task3_params(sector_cfg["period"], pe.value, dat_file.name, file_stem),
-            **t_preds
+            **base_jktebop_task3_params(period, pe, dat_file.name, file_stem, l3),
+            **t_preds,
         }
 
         # Add instructions for scale-factor poly fitting and chi^2 adjustment (to 1.0)
@@ -179,18 +181,28 @@ def test_fitting_against_formal_test_dataset(
 
 
 def base_jktebop_task3_params(period: float,
-                                 primary_epoch: float,
-                                 dat_file_name: str,
-                                 file_name_stem: str) -> Dict[str, any]:
+                              primary_epoch: float,
+                              dat_file_name: str,
+                              file_name_stem: str,
+                              l3: int=None) -> Dict[str, any]:
     """
     Get the basic testing set of JKTEBOP task3 in file parameters.
     This sets up mainly fixed values for qphot, grav darkening, LD algo & coeffs
     and fitting.
+
+    Has some logic around l3; will set if to not fit if it's a natural zero
     """
+    if l3 is not None:
+        l3_fit = 0 if l3 == 0 else 1
+        l3 = max(0, l3)
+    else:
+        l3_fit = 1
+        l3 = 0
+
     return {
         "qphot": 0.,
         "gravA": 0.,        "gravB": 0.,
-        "L3": 0.,
+        "L3": l3,
         "LDA": "quad",      "LDB": "quad",
         "LDA1": 0.25,       "LDB1": 0.25,
         "LDA2": 0.22,       "LDB2": 0.22,
@@ -199,7 +211,7 @@ def base_jktebop_task3_params(period: float,
         "primary_epoch": primary_epoch,
 
         "ecosw_fit": 1,     "esinw_fit": 1,
-        "L3_fit": 1,
+        "L3_fit": l3_fit,
         "LDA1_fit": 1,      "LDB1_fit": 1,
         "LDA2_fit": 0,      "LDB2_fit": 0,
         "period_fit": 0,
