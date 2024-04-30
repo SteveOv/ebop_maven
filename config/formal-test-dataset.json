@@ -235,7 +235,8 @@
         "sectors": {
             "40": {
                 "quality_bitmask": "hardest",
-                "primary_epoch": 2416.259790
+                "primary_epoch": 2416.259790,
+                "lrat": ["2418.23 0.98 0.06"]
             }
         },
         "mission": "HLSP",
