@@ -24,6 +24,7 @@ _template_files = {
 
 _jktebop_directory = \
     Path(os.environ.get("JKTEBOP_DIR", "~/jktebop/")).expanduser().absolute()
+_jktebop_allow_negative_l3 = os.environ.get("JKTEBOP_SUPPORT_NEG_L3", "") == "True"
 
 _regex_pattern_val_and_err = r"^[\s]*(?:{0})[\w\d\s]*[\s]+" \
                              r"(?P<val>[\-\+]?[0-9]+[\.]?[0-9]*)"\
@@ -182,8 +183,8 @@ def write_in_file(file_name: Path,
     # Pre-process the params/tokens to be applied to the .in file.
     in_params = _prepare_params_for_task(task, params)
 
-    if "L3" in in_params and in_params["L3"] < 0.:
-        raise ValueError("Minimum L3 input value is 0.0")
+    if "L3" in in_params and in_params["L3"] < 0. and not _jktebop_allow_negative_l3:
+        raise ValueError("Minimum supported L3 input value is 0.0")
     if "rA_plus_rB" in in_params and in_params["rA_plus_rB"] > 0.8:
         raise ValueError("Maximum rA_plus_rB input value is 0.8")
 

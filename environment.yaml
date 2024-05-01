@@ -14,4 +14,5 @@ dependencies:
     - -r requirements.txt
 variables:
   JKTEBOP_DIR: ~/jktebop/
+  JKTEBOP_SUPPORT_NEG_L3: false
   TF_CPP_MIN_LOG_LEVEL: 2         # Suppress TF info/warn messages
