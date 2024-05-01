@@ -309,7 +309,7 @@ Selected targets are:               {', '.join(target_names) if target_names els
 
             fits_dir = fits_cache_dir / re.sub(r'[^\w\d-]', '_', target.lower())
             for sector in [int(s) for s in target_cfg["sectors"].keys() if s.isdigit()]:
-                inst_id = f"{target}/{sector:0>4}"
+                inst_id = f"{target}/{sector:d}"
                 sector_cfg = sector_config_from_target(sector, target_cfg)
 
                 # These are mandatory, so error if missing
