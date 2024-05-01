@@ -200,7 +200,8 @@ def base_jktebop_task3_params(period: float,
     """
     if l3 is not None:
         l3_fit = 0 if l3 == 0 else 1
-        l3 = max(0, l3)
+        if not jktebop.get_jktebop_support_neg_l3():
+            l3 = max(0, l3)
     else:
         l3_fit = 1
         l3 = 0
