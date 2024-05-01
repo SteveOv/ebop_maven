@@ -116,6 +116,7 @@
         "sectors": {
             "65": {
                 "quality_bitmask": "hardest",
+                "quality_masks": [[3087.0, 3090.3]],
                 "primary_epoch": 3091.573672
             }
         }
