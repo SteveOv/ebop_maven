@@ -9,11 +9,13 @@ from pathlib import Path
 import json
 import math
 import re
+from contextlib import redirect_stdout
 
 import matplotlib.pyplot as plt
 import numpy as np
 from keras.models import Model
 
+from ebop_maven.libs.tee import Tee
 from ebop_maven.libs import deb_example, lightcurve, jktebop
 from ebop_maven.estimator import Estimator
 from ebop_maven import modelling, datasets
@@ -504,11 +506,13 @@ if __name__ == "__main__":
     TRAINSET_NAME = "formal-training-dataset"   # Assume the usual training set
     the_model = modelling.load_model(Path("./drop/cnn_ext_model.keras"))
     out_dir = Path(f"./drop/results/{the_model.name}/{TRAINSET_NAME}/{deb_example.pub_mags_key}")
+    with redirect_stdout(Tee(open(out_dir / "model_testing.log", "w", encoding="utf8"))):
+        the_model = modelling.load_model(Path("./drop/cnn_ext_model.keras"))
 
-    print("\n\nTesting the model's estimates")
-    test_model_against_formal_test_dataset(the_model, results_dir=out_dir, plot_results=True)
+        print("\nTesting the model's estimates\n" + "-"*80)
+        test_model_against_formal_test_dataset(the_model, results_dir=out_dir, plot_results=True)
 
-    print("\n\nTesting the JKTEBOP fitting derived from the model's estimates")
-    skip = ["V402 Lac/16", "V456 Cyg/15"] # Neither are suitable for JKTEBOP fitting
-    test_fitting_against_formal_test_dataset(the_model, results_dir=out_dir, plot_results=True,
-                                             skip_ids=skip)
+        print("\n\nTesting the JKTEBOP fitting derived from the model's estimates\n" + "-"*80)
+        skip = ["V402 Lac/16", "V456 Cyg/15"] # Neither are suitable for JKTEBOP fitting
+        test_fitting_against_formal_test_dataset(the_model, results_dir=out_dir, plot_results=True,
+                                                skip_ids=skip)
