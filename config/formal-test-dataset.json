@@ -1009,6 +1009,7 @@
         "sectors": {
             "45": {
                 "quality_bitmask": "hard",
+                "lrat": ["2533.0 1.8448 0.0053"],
                 "primary_epoch": 2526.2961006
             }
         }
