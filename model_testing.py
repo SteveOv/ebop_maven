@@ -68,7 +68,7 @@ def test_model_against_formal_test_dataset(
 
         results_file = results_dir / f"formal.test.{suffix}.csv"
         with open(results_file, mode="w", encoding="utf8") as of:
-            predictions_vs_labels_to_csv(labels, predictions, estimator, t_names, l_names, to=of)
+            predictions_vs_labels_to_csv(labels, predictions, estimator, ids, l_names, to=of)
 
         print(f"\nSaved predictions and associated loss information to '{results_file}'")
         (_, _, _, ocs) = _get_label_and_prediction_raw_values(labels, predictions)
@@ -78,7 +78,7 @@ def test_model_against_formal_test_dataset(
         print("--------------------------------\n")
 
         with open(results_file.parent / f"{results_file.stem}.txt", "w", encoding="utf8") as of:
-            table_of_predictions_vs_labels(labels, predictions, estimator, t_names, l_names, to=of)
+            table_of_predictions_vs_labels(labels, predictions, estimator, ids, l_names, to=of)
 
         if plot_results:
             plot_file = results_file.parent / f"predictions_vs_labels_{suffix}.eps"
@@ -262,24 +262,24 @@ def predictions_vs_labels_to_csv(
         = _get_label_and_prediction_raw_values(labels, predictions, keys, reverse_scaling)
 
     # Headings row
-    to.write(f"{'Target':>10s}, ")
+    to.write(f"{'Target':>12s}, ")
     to.writelines(f"{k+'_lbl':>15s}, {k:>15s}, {k+'_res':>15s}, " for k in keys)
     to.write(f"{'MAE':>15s}, {'MSE':>15s}\n")
 
     # The instance's predictions, labels & O-Cs and its MAE & MSE
     for row_head, rlb, rnm, roc in zip(row_headings, raw_labels, pred_noms, ocs):
         row_mae, row_mse = np.mean(np.abs(roc)), np.mean(np.power(roc, 2))
-        to.write(f"{row_head:>10s}, ")
+        to.write(f"{row_head:>12s}, ")
         to.writelines(f"{rlb[c]:15.9f}, {rnm[c]:15.9f}, {roc[c]:15.9f}, " for c in range(num_keys))
         to.write(f"{row_mae:15.9f}, {row_mse:15.9f}\n")
 
     # final MAE and then MSE rows
     lbl_maes = [np.mean(np.abs(ocs[:, c])) for c in range(num_keys)]
     lbl_mses = [np.mean(np.power(ocs[:, c], 2)) for c in range(num_keys)]
-    to.write(f"{'MAE':>10s}, ")
+    to.write(f"{'MAE':>12s}, ")
     to.writelines(f"{' '*15}, {' '*15}, {lbl_maes[c]:15.9f}, " for c in range(num_keys))
     to.write(f"{np.mean(np.abs(ocs)):15.9f}, {' '*15}\n")
-    to.write(f"{'MSE':>10s}, ")
+    to.write(f"{'MSE':>12s}, ")
     to.writelines(f"{' '*15}, {' '*15}, {lbl_mses[c]:15.9f}, " for c in range(num_keys))
     to.write(f"{' '*15}, {np.mean(np.power(ocs, 2)):15.9f}\n")
 
@@ -317,23 +317,23 @@ def table_of_predictions_vs_labels(
     (raw_labels, pred_noms, _, ocs) \
         = _get_label_and_prediction_raw_values(labels, predictions, keys, reverse_scaling)
 
-    line_len = 13 + (11 * len(keys))-1 + 22
+    line_len = 15 + (11 * len(keys))-1 + 22
     for heading, rlabs, rpreds, rocs in zip(block_headings, raw_labels, pred_noms, ocs):
         # Plot a sub table for each row of labels/predictions/ocs
         to.write("-"*line_len + "\n")
-        to.write(f"{heading:<10s} | " + " ".join(f"{k:>10s}" for k in keys + ["MAE", "MSE"]))
+        to.write(f"{heading:<12s} | " + " ".join(f"{k:>10s}" for k in keys + ["MAE", "MSE"]))
         to.write("\n")
         rocs = np.concatenate([rocs, [np.mean(np.abs(rocs)), np.mean(np.power(rocs, 2))]])
         to.write("-"*line_len + "\n")
         for row_head, vals in zip(["Label", "Prediction", "O-C"], [rlabs, rpreds, rocs]):
-            to.write(f"{row_head:<10s} | " + " ".join(f"{v:10.6f}" for v in vals))
+            to.write(f"{row_head:<12s} | " + " ".join(f"{v:10.6f}" for v in vals))
             to.write("\n")
 
     # Summary rows for aggregate stats over all of the rows
     to.write("="*line_len + "\n")
-    to.write(f"{'MAE':<10s} | " + " ".join(f"{v:10.6f}" for v in np.mean(np.abs(ocs), 0)) +
+    to.write(f"{'MAE':<12s} | " + " ".join(f"{v:10.6f}" for v in np.mean(np.abs(ocs), 0)) +
                  f" {np.mean(np.abs(ocs)):10.6f}\n")
-    to.write(f"{'MSE':<10s} | " + " ".join([f"{v:10.6f}" for v in np.mean(np.power(ocs, 2), 0)]) +
+    to.write(f"{'MSE':<12s} | " + " ".join([f"{v:10.6f}" for v in np.mean(np.power(ocs, 2), 0)]) +
                  " "*11 + f" {np.mean(np.power(ocs, 2)):10.6f}\n")
 
 
@@ -509,6 +509,6 @@ if __name__ == "__main__":
     test_model_against_formal_test_dataset(the_model, results_dir=out_dir, plot_results=True)
 
     print("\n\nTesting the JKTEBOP fitting derived from the model's estimates")
-    skip = ["V402 Lac/0016", "V456 Cyg/0015"] # Neither are suitable for JKTEBOP fitting
+    skip = ["V402 Lac/16", "V456 Cyg/15"] # Neither are suitable for JKTEBOP fitting
     test_fitting_against_formal_test_dataset(the_model, results_dir=out_dir, plot_results=True,
                                              skip_ids=skip)
