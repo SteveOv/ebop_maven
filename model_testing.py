@@ -94,7 +94,8 @@ def test_fitting_against_formal_test_dataset(
         results_dir: Path=None,
         plot_results: bool=True,
         mc_iterations: int=1000,
-        skip_ids: List[str]=None):
+        skip_ids: List[str]=None,
+        apply_fit_overrides: bool=False):
     """
     Will test the indicated model file by making predictions against the formal
     test dataset and then using these predictions to fit the corresponding
@@ -110,6 +111,7 @@ def test_fitting_against_formal_test_dataset(
     :plot_results: whether to produce a plot of the results vs labels
     :mc_iterations: the number of MC Dropout iterations
     :skip_ids: list of target ids to not fit
+    :apply_fit_overrides: apply any fit_overrides from the target's config
     """
     # Create our Estimator. It will tell us which labels it (& the model) can predict.
     estimator = Estimator(model)
@@ -137,7 +139,8 @@ def test_fitting_against_formal_test_dataset(
     # Make our prediction which will return [{"name": value, "name_sigma": sigma_value}]*insts
     # We don't want to unscale predictions so we get the values predicted by the model,
     # and which match the labels & are consistent with model.evaluate().
-    print(f"\nUsing an Estimator to make predictions on {inst_count} formal test instances.")
+    print(f"\nUsing an Estimator to make predictions on {inst_count} formal test instances",
+          f"with {mc_iterations} MC iterations (1 == no MC Dropout)")
     estimator_predictions = estimator.predict(features, mc_iterations)
     fitted_params = []
     for counter, ((target, sector), t_preds) in enumerate(zip(targets, estimator_predictions), 1):
@@ -158,10 +161,14 @@ def test_fitting_against_formal_test_dataset(
         pe = lightcurve.to_lc_time(sector_cfg["primary_epoch"], lc).value
         period = sector_cfg["period"]
         l3 = sector_cfg["labels"].get("L3", 0)
+
+        # published fitting params that may be needed for good fit
+        fit_overrides = sector_cfg.get("fit_overrides", {}) if apply_fit_overrides else {}
+
         params = {
             **base_jktebop_task3_params(period, pe, dat_file.name, file_stem, l3),
             **t_preds,
-            **sector_cfg.get("fit_overrides", {}),  # published fitting params needed for good fit
+            **fit_overrides,
         }
 
         # Add instructions for scale-factor poly fitting and chi^2 adjustment (to 1.0)
@@ -518,4 +525,6 @@ if __name__ == "__main__":
         print("\n\nTesting the JKTEBOP fitting derived from the model's estimates\n" + "-"*80)
         skip = ["V402 Lac/16", "V456 Cyg/15"] # Neither are suitable for JKTEBOP fitting
         test_fitting_against_formal_test_dataset(the_model, results_dir=out_dir, plot_results=True,
-                                                skip_ids=skip)
+                                                 skip_ids=skip,
+                                                 mc_iterations=1,
+                                                 apply_fit_overrides=True)
