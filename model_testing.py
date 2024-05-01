@@ -506,6 +506,7 @@ if __name__ == "__main__":
     TRAINSET_NAME = "formal-training-dataset"   # Assume the usual training set
     the_model = modelling.load_model(Path("./drop/cnn_ext_model.keras"))
     out_dir = Path(f"./drop/results/{the_model.name}/{TRAINSET_NAME}/{deb_example.pub_mags_key}")
+    out_dir.mkdir(parents=True, exist_ok=True)
     with redirect_stdout(Tee(open(out_dir / "model_testing.log", "w", encoding="utf8"))):
         the_model = modelling.load_model(Path("./drop/cnn_ext_model.keras"))
 
