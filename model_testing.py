@@ -161,6 +161,7 @@ def test_fitting_against_formal_test_dataset(
         params = {
             **base_jktebop_task3_params(period, pe, dat_file.name, file_stem, l3),
             **t_preds,
+            **sector_cfg.get("fit_overrides", {}),  # published fitting params needed for good fit
         }
 
         # Add instructions for scale-factor poly fitting and chi^2 adjustment (to 1.0)
