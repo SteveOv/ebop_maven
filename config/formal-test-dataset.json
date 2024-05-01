@@ -37,6 +37,14 @@
                 "quality_bitmask": "hardest",
                 "primary_epoch": 1813.201149
             }
+        },
+        "fit_overrides": {
+            "LDA": "quad",
+            "LDB": "quad",
+            "LDA1": 0.046,
+            "LDB1": 0.046,
+            "LDA2": 0.22,
+            "LDB2": 0.22
         }
     },
     "V539 Ara": {
