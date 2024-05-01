@@ -1,7 +1,7 @@
 """
 Formal testing of the regression TF Model trained by train_*_estimator.py
 """
-# pylint: disable=too-many-arguments, too-many-locals
+# pylint: disable=too-many-arguments, too-many-locals, no-member, import-error
 from typing import Union, List, Dict, Tuple
 from io import TextIOBase
 import sys
@@ -11,12 +11,13 @@ import math
 import re
 from contextlib import redirect_stdout
 
+import astropy.units as u
 import matplotlib.pyplot as plt
 import numpy as np
 from keras.models import Model
 
 from ebop_maven.libs.tee import Tee
-from ebop_maven.libs import deb_example, lightcurve, jktebop
+from ebop_maven.libs import deb_example, lightcurve, jktebop, stellar, limb_darkening
 from ebop_maven.estimator import Estimator
 from ebop_maven import modelling, datasets
 
@@ -166,7 +167,7 @@ def test_fitting_against_formal_test_dataset(
         fit_overrides = sector_cfg.get("fit_overrides", {}) if apply_fit_overrides else {}
 
         params = {
-            **base_jktebop_task3_params(period, pe, dat_file.name, file_stem, l3),
+            **base_jktebop_task3_params(period, pe, dat_file.name, file_stem, sector_cfg),
             **t_preds,
             **fit_overrides,
         }
@@ -197,29 +198,38 @@ def base_jktebop_task3_params(period: float,
                               primary_epoch: float,
                               dat_file_name: str,
                               file_name_stem: str,
-                              l3: int=None) -> Dict[str, any]:
+                              sector_cfg: Dict[str, any]) -> Dict[str, any]:
     """
     Get the basic testing set of JKTEBOP task3 in file parameters.
-    This sets up mainly fixed values for qphot, grav darkening, LD algo & coeffs
-    and fitting.
+    This sets up mainly fixed values for qphot, grav darkening etc.
 
-    Has some logic around l3; will set if to not fit if it's a natural zero
+    However, quad limb darkening algo and coeffs are found by lookup based
+    on the stars' masses, radii and effective temps
+    
+    L3 is taken from the labels as we currently don't estimate this.
+    If the L3 is zero we set it to fixed too.
     """
-    if l3 is not None:
-        l3_fit = 0 if l3 == 0 else 1
-        if not jktebop.get_jktebop_support_neg_l3():
-            l3 = max(0, l3)
-    else:
-        l3_fit = 1
-        l3 = 0
+    # Calculate star specific LD params
+    ld_params = {}
+    for star in ["A", "B"]:
+        logg = stellar.log_g(sector_cfg[f"M{star}"] * u.solMass, sector_cfg[f"R{star}"] * u.solRad)
+        coeffs = limb_darkening.lookup_tess_quad_ld_coeffs(logg, sector_cfg[f"Teff{star}"] * u.K)
+        ld_params[f"LD{star}"] = "quad"
+        ld_params[f"LD{star}1"] = coeffs[0]
+        ld_params[f"LD{star}2"] = coeffs[1]
+
+    l3 = sector_cfg["labels"].get("L3", 0)
+    l3_fit = 0 if l3 == 0 else 1
+    if not jktebop.get_jktebop_support_neg_l3():
+        l3 = max(0, l3)
 
     return {
         "qphot": 0.,
         "gravA": 0.,        "gravB": 0.,
         "L3": l3,
-        "LDA": "quad",      "LDB": "quad",
-        "LDA1": 0.28,       "LDB1": 0.28,
-        "LDA2": 0.22,       "LDB2": 0.22,
+
+        **ld_params,
+
         "reflA": 0.,        "reflB": 0.,
         "period": period,
         "primary_epoch": primary_epoch,
@@ -526,5 +536,5 @@ if __name__ == "__main__":
         skip = ["V402 Lac/16", "V456 Cyg/15"] # Neither are suitable for JKTEBOP fitting
         test_fitting_against_formal_test_dataset(the_model, results_dir=out_dir, plot_results=True,
                                                  skip_ids=skip,
-                                                 mc_iterations=1,
+                                                 mc_iterations=1000,
                                                  apply_fit_overrides=True)
