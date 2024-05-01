@@ -206,6 +206,16 @@
                 "primary_epoch": 2464.982832,
                 "lrat": ["2465.75 0.328 0.011"]
             }
+        },
+        "fit_overrides": {
+            "LDA": "pow2",
+            "LDB": "pow2",
+            "LDA1": 0.52,
+            "LDB1": 0.52,
+            "LDA2": 0.45,
+            "LDB2": 0.45,
+            "LDA1_fit": 0,
+            "LDB1_fit": 0
         }
     },
     "V889 Aql": {
