@@ -96,7 +96,7 @@
         "logLB": 1.2,           "logLB_err": 0.1,
         "rA": 0.043984,         "rA_err": 0.000045,
         "rB": 0.021877,         "rB_err": 0.000032,
-        "desc": "An eccentric orbit with transit depths of ~0.25 and ~0.15 mag and the secondary after phase 0.8. The period of 38.8 d is longer than a TESS sector so here we use two (38 & 65).",
+        "desc": "An eccentric orbit with transit depths of ~0.25 and ~0.15 mag and the secondary after phase 0.8. The period of 38.8 d is longer than a single TESS sector; we use both 38 & 65 to give better coverage. We also fix qphot, gravA and gravB for fitting, mirroring the source article.",
         "transits": true,
         "eclipses_similar": false,
         "components_similar": false,
