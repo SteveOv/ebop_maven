@@ -5,6 +5,7 @@ from pathlib import Path
 from abc import ABC
 
 import numpy as np
+import tensorflow as tf
 from keras.models import Model
 
 from . import modelling
@@ -102,7 +103,8 @@ class Estimator(ABC):
     def predict(self,
                 instances: List[Dict[str, any]],
                 iterations: int=None,
-                unscale: bool=True) -> List[Dict[str, float]]:
+                unscale: bool=True,
+                seed: int=42) -> List[Dict[str, float]]:
         """
         Make predictions on one or more instances' features. The instances are
         in the form of a List of dicts.
@@ -115,6 +117,7 @@ class Estimator(ABC):
         :iterations: the number of MC Dropout iterations (overriding the instance default)
         :unscale: indicates whether to undo the scaling of the predicted values. For example,
         the model may predict inc*0.01 and unscale would undo this returning inc as prediction/0.01
+        :seed: random seed for Tensorflow
         :returns: a list dictionaries, each row the predicted labels for the matching input instance
         """
         iterations = self._iterations if iterations is None else iterations
@@ -158,6 +161,7 @@ class Estimator(ABC):
         # If dropout, we make multiple predictions for each inst with training switched on so that
         # each prediction is with a statistically unique subset of the model's net: the MC Dropout
         # algorithm. Stacked predictions are output in shape (#iterations, #insts, #labels)
+        tf.random.set_seed(seed)
         stkd_prds = np.stack([
             self._model((mags_features, extra_values), training=is_mc)
             for _ in range(iterations)

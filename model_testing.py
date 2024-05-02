@@ -95,7 +95,7 @@ def test_fitting_against_formal_test_dataset(
         test_dataset_config: Path=Path("./config/formal-test-dataset.json"),
         results_dir: Path=None,
         plot_results: bool=True,
-        mc_iterations: int=1000,
+        mc_iterations: int=1,
         skip_ids: List[str]=None,
         apply_fit_overrides: bool=False):
     """
@@ -127,16 +127,12 @@ def test_fitting_against_formal_test_dataset(
     targets, labels, features = _get_dataset_labels_and_features(
                                     test_dataset_dir, estimator, l_names, f_names, False, skip_ids)
     target_count = len(targets)
-
     with open(test_dataset_config, mode="r", encoding="utf8") as f:
         targets_config = json.load(f)
-        transit_flags = [targets_config[tn].get("transits", False) for tn in targets]
 
     # Estimator prediction will return [{"name": value, "name_sigma": sigma_value}]*insts
     # We'll be using these is inputs to fitting so we need to let estimator do its scaling.
-    print(f"\nEstimating the input params for {target_count} targets ({mc_iterations} iterations)")
-    estimator_predictions = estimator.predict(features, mc_iterations)
-    for ix, (target, t_preds) in enumerate(zip(targets, estimator_predictions)):
+    for ix, (target, t_labels, t_feats) in enumerate(zip(targets, labels, features)):
         target_cfg = targets_config[target]
         print(f"\n\nProcessing target {ix+1} of {target_count}: {target}\n" + "-"*40)
         print(tw.fill(target_cfg.get("desc", "")) + "\n")
@@ -152,6 +148,10 @@ def test_fitting_against_formal_test_dataset(
             file.unlink()
         in_fname = file_parent / f"{file_stem}.in"
         dat_fname = file_parent / f"{file_stem}.dat"
+
+        print("\nThe Estimator's unscaled predictions for", target)
+        t_preds = estimator.predict([t_feats], iterations=mc_iterations)[0]
+        table_of_predictions_vs_labels([t_labels], [t_preds], estimator, [target])
 
         # published fitting params that may be needed for good fit
         fit_overrides = target_cfg.get("fit_overrides", {}) if apply_fit_overrides else {}
@@ -176,13 +176,15 @@ def test_fitting_against_formal_test_dataset(
         print(f"\nFitting {target} (with {sector_count} sector(s) of data) using JKTEBOP task 3...")
         par_fname = file_parent / f"{file_stem}.par"
         par_contents = list(jktebop.run_jktebop_task(in_fname, par_fname, stdout_to=sys.stdout))
-        fitted_params += [jktebop.read_fitted_params_from_par_lines(par_contents, l_names)]
-        table_of_predictions_vs_labels([labels[ix]], [fitted_params[ix]], estimator, [target])
+        t_params = jktebop.read_fitted_params_from_par_lines(par_contents, l_names)
+        table_of_predictions_vs_labels([t_labels], [t_params], estimator, [target])
+        fitted_params.append(t_params)
 
     with open(results_dir / "fitting_vs_labels_mc.txt", "w", encoding="utf8") as of:
         table_of_predictions_vs_labels(labels, fitted_params, estimator, targets, l_names, to=of)
 
     if plot_results:
+        transit_flags = [targets_config[tn].get("transits", False) for tn in targets]
         plot_file = results_dir / "fitting_vs_labels_mc.eps"
         plot_predictions_vs_labels(labels, fitted_params, transit_flags, plot_file)
 
@@ -541,5 +543,5 @@ if __name__ == "__main__":
         skip = ["V402 Lac", "V456 Cyg"] # Neither are suitable for JKTEBOP fitting
         test_fitting_against_formal_test_dataset(the_model, results_dir=out_dir, plot_results=True,
                                                  skip_ids=skip,
-                                                 mc_iterations=1000,
+                                                 mc_iterations=1,
                                                  apply_fit_overrides=True)
