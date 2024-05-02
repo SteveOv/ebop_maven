@@ -154,7 +154,7 @@
         "logLB": 1.91,          "logLB_err": 0.04,
         "rA": 0.1315,           "rA_err": 0.0018,
         "rB": 0.1304,           "rB_err": 0.0014,
-        "desc": "A highly eccentric orbit. The secondary is beyond phase 0.6 and significantly shallower than primary despite the similar radii. Very similar radii making k and J difficult to predict (degenerate; comment in paper)",
+        "desc": "An eccentric orbit where the secondary is beyond phase 0.6 and significantly shallower than primary despite the similar radii. Very similar radii make k and J difficult to predict. Baroch & Gimenez fit with WD.",
         "transits": false,
         "eclipses_similar": false,
         "components_similar": true,
