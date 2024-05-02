@@ -441,7 +441,7 @@
         "logLB": 0.78,          "logLB_err": 0.05,
         "rA": 0.2701,           "rA_err": 0.0015,
         "rB": 0.2563,           "rB_err": 0.0019,
-        "desc": "A tight circular orbit of just 0.9 d. Variability due to pulsations. Distinct eclipses at 0.6 and 0.4 mag. Beyond range normal for JKTEBOP (rA+rB~0.53) but it was used in Van Reeth et al.",
+        "desc": "A tight circular orbit of just 0.9 d with distinct eclipses at 0.6 and 0.4 mag. Variability is seen in the light curve from pulsations dicussed in the source article. Both fractional radii are > 0.2, outside the range normally deemed suitable for fitting with JKTEBOP, but it was used in the source article and we are able to achieve a similar fit.",
         "transits": false,
         "eclipses_similar": false,
         "components_similar": true,
