@@ -19,8 +19,8 @@
         "eclipses_similar": false,
         "components_similar": false,
         "notes": "bP derived from rA, inc, e & esinw;",
-        "primary_epoch": 1813.201149,
-        "period": 25.935953,
+        "primary_epoch": 1813.200983878,
+        "period": 25.972980161,
         "ecc": 0.3835,          "ecc_err": 0.0018,
         "omega": 109.56,        "omega_err": 0.11,
         "labels": {
@@ -35,7 +35,8 @@
         },
         "sectors": {
             "18": {
-                "quality_bitmask": "hardest"
+                "quality_bitmask": "hardest",
+                "quality_masks": [[1790.0, 1792.0]]
             }
         },
         "fit_overrides": {
