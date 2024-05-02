@@ -678,13 +678,13 @@
         "logLB": 0.839,         "logLB_err": 0.046,
         "rA": 0.047920,         "rA_err": 0.000077,
         "rB": 0.058739,         "rB_err": 0.000032,
-        "desc": "A highly eccentric orbit with the secondary eclipse near phase 0.8. Southworth's analysis with observations of 1800 s cadence, here we use sector 52 (subsequent to publication) which has a cadence of 600 s.",
+        "desc": "A highly eccentric orbit with the secondary eclipse near phase 0.8. The analysis in the source article used early TESS FFI observations of 1800 s cadence, here we use sectors 52 and 53 timeseries data (subsequent to publication) which has a cadence of 600 s.",
         "transits": false,
         "eclipses_similar": false,
         "components_similar": false,
         "notes": "L3=0 (fixed); bP derived from rA, inc, e & esinw;",
-        "primary_epoch": 2726.965431,
-        "period": 20.998420,
+        "primary_epoch": 2726.954040600,
+        "period": 20.999132275,
         "ecc": 0.4676,          "ecc_err": 0.0002,
         "omega": 14.97,         "omega_err": 0.11,
         "labels": { 
@@ -699,8 +699,10 @@
         },
         "sectors": {
             "52": {
-                "quality_bitmask": "hardest",
-                "quality_masks": [[2742.0, 2743.0]]
+                "quality_bitmask": "hardest"
+            },
+            "53": {
+                "quality_bitmask": "hardest"
             }
         },
         "author": "TESS-SPOC",
