@@ -14,7 +14,7 @@
         "logLB": 3.471,         "logLB_err": 0.079,
         "rA": 0.03822,          "rA_err": 0.00051,
         "rB": 0.04191,          "rB_err": 0.00029,
-        "desc": "An eccentric orbit showing SLF pulsations. The long period means only one of each eclipse is observed with gap in observations near phase 0.15.",
+        "desc": "An eccentric orbit with the secondary eclipse near phase 0.4 and depths of ~0.4 and ~0.15 mag. The long period means only one of each eclipse is observed. Star B is both larger (k~1.1) and more luminous (J~1.04) than Star A which, coupled with partial eclipses and SLF variability, will likely make this difficult to predict.",
         "transits": false,
         "eclipses_similar": false,
         "components_similar": false,
@@ -38,14 +38,6 @@
                 "quality_bitmask": "hardest",
                 "quality_masks": [[1790.0, 1792.0]]
             }
-        },
-        "fit_overrides": {
-            "LDA": "quad",
-            "LDB": "quad",
-            "LDA1": 0.046,
-            "LDB1": 0.046,
-            "LDA2": 0.22,
-            "LDB2": 0.22
         }
     },
     "V539 Ara": {
