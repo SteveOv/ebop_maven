@@ -843,7 +843,7 @@
         "logLB": 0.713,         "logLB_err": null,
         "rA": 0.037688,         "rA_err": 0.000032,
         "rB": 0.061263,         "rB_err": 0.000074,
-        "desc": "An eccentric orbit with the secondary occuring before phase 0.5. Only sector 2 shows both transits. Star B is larger and evolved (k~1.6).",
+        "desc": "An eccentric orbit with the secondary occuring before phase 0.5. Star B is significantly larger and evolved with k~1.6. Only sector 2 shows both transits with sectors 29 and 69 having incomplete transits.",
         "transits": true,
         "eclipses_similar": false,
         "components_similar": false,
