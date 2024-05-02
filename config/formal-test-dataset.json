@@ -636,13 +636,13 @@
         "logLB": 0.483,         "logLB_err": 0.024,
         "rA": 0.1690,           "rA_err": 0.0028,
         "rB": 0.1482,           "rB_err": 0.0035,
-        "desc": "An inclined circular orbit with variability due to starspots, evidence of the ellipsoidal effect and shallow eclipses at approximately 0.11 & 0.1 mag.",
+        "desc": "An inclined circular orbit with variability due to starspots, evidence of the ellipsoidal effect and shallow eclipses at approximately 0.11 & 0.1 mag. In the source article a spectroscopic light ratio was used to constrain the fit, and we adopt the published value here.",
         "transits": false,
         "eclipses_similar": false,
         "components_similar": false,
         "notes": "e=0 & ω=0 & L3=0 (fixed); bP derived from rA, inc, e & esinw; lrat required for better fit (from paper)",
-        "primary_epoch": 1808.958835302,
-        "period": 1.900888340,
+        "primary_epoch": 1808.957210950,
+        "period": 1.900938300,
         "labels": { 
             "rA_plus_rB": 0.31715,  "rA_plus_rB_err": 0.00057,
             "k": 0.877,             "k_err": 0.036,
@@ -660,7 +660,7 @@
             }
         },
         "fit_overrides": {
-            "lrat": ["1809.434 0.703 0.057"]
+            "lrat": ["1809.40 0.703 0.057"]
         }
     },
     "AN Cam": {
