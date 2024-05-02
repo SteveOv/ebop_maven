@@ -724,7 +724,7 @@
         "logLB": 0.651,         "logLB_err": 0.027,
         "rA": 0.10791,          "rA_err": 0.00013,
         "rB": 0.10777,          "rB_err": 0.00014,
-        "desc": "An eccentric orbit with low inclination. The light curves show similar primary and secondary eclipses, although the depth varies by sector probably as a result of spacecraft orientation.",
+        "desc": "An eccentric orbit with low inclination and similar eclipses of approximately 0.7 mag depth. The two components are similar and it expected the k and J will be challenging to predict and fit. The source article recommends fitting the sectors separately due to systematic variation in eclipse depths between sectors; we use only sector 17 for fitting and labels.",
         "transits": false,
         "eclipses_similar": true,
         "components_similar": true,
