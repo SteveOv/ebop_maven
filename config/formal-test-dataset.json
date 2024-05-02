@@ -479,11 +479,11 @@
         "logLB": 1.11,          "logLB_err": 0.02,
         "rA": 0.11971,          "rA_err": 0.00101,
         "rB": 0.11760,          "rB_err": 0.00098,
-        "desc": "An inclined circuler orbit showing partial eclipses of similar depths at approximately 0.27 mag. Like V889 Aql, the radii are very similar making k & J difficult to predict.",
+        "desc": "An inclined circuler orbit with partial eclipses of similar depths at approximately 0.27 mag. With the stars have similar radii and luminosities, predicting and fitting k & J will be challenging.",
         "transits": false,
         "eclipses_similar": true,
         "components_similar": true,
-        "notes": "e=0 & ω=0 (fixed); rA_plus_rB & k derived from rA & rB in table 8; J from JKTEBOP fit; bP derived from rA, inc, e & esinw;",
+        "notes": "e=0 & ω=0 (fixed); rA_plus_rB & k derived from rA & rB in table 8; J from trial JKTEBOP fit; bP derived from rA, inc, e & esinw;",
         "primary_epoch": 1454.347141832,
         "period": 3.658635226,
         "labels": { 
