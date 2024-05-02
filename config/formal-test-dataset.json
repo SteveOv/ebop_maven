@@ -146,7 +146,7 @@
         "logLB": 1.91,          "logLB_err": 0.04,
         "rA": 0.1315,           "rA_err": 0.0018,
         "rB": 0.1304,           "rB_err": 0.0014,
-        "desc": "An eccentric orbit where the secondary is beyond phase 0.6 and significantly shallower than primary despite the similar radii. Very similar radii make k and J difficult to predict. Baroch & Gimenez fit with WD.",
+        "desc": "An eccentric orbit with the secondary beyond phase 0.6 and significantly shallower than primary despite their similar radii. This will make k and J difficult to predict. Baroch & Gimenez used the WD code for fitting as they considered the components too distorted for JKTEBOP.",
         "transits": false,
         "eclipses_similar": false,
         "components_similar": true,
