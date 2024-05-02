@@ -765,7 +765,7 @@
         "logLB": 0.419,         "logLB_err": 0.055,
         "rA": 0.1130,           "rA_err": 0.0009,
         "rB": 0.1072,           "rB_err": 0.0011,
-        "desc": "An inclined orbit with a non-eclipsing third body in 4200 d orbit. The light curve shows eclipses of approximately 0.33 and 0.3 mag.",
+        "desc": "A slightly eccentric, inclined orbit with eclipse depths of approximately 0.33 and 0.3 mag and a third non-eclipsing component in 4200 d orbit. While the eclipsing components are of similar radius their luminosities differ, with the source article publishing a light ratio of 0.859±0.031.",
         "transits": false,
         "eclipses_similar": true,
         "components_similar": true,
