@@ -55,7 +55,7 @@
         "logLB": 2.993,         "logLB_err": 0.052,
         "rA": 0.22171,          "rA_err": 0.00055,
         "rB": 0.1742,           "rB_err": 0.0016,
-        "desc": "An eccentric orbit with eclipses of approximate depth 0.45 and 0.40 mag and evidence of SLF pulsations. Primary fractional radius of 0.22 is at the edge of JKTEBOP's usable range.",
+        "desc": "An eccentric orbit with eclipses of approximate depth 0.45 and 0.40 mag and the secondary near phase 0.45. Primary fractional radius of 0.22 is beyond JKTEBOP's recommended maximum (0.2). This and the presence of SLF variability make it difficult to fit.",
         "transits": false,
         "eclipses_similar": false,
         "components_similar": false,
