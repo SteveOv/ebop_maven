@@ -598,7 +598,7 @@
         "logLB": 0.943,         "logLB_err": 0.026,
         "rA": 0.11440,          "rA_err": 0.00011,
         "rB": 0.12230,          "rB_err": 0.00006,
-        "desc": "A circular orbit with similar eclipses at approximately 0.65 mag each.",
+        "desc": "A circular orbit with similar eclipses at approximately 0.65 mag each. With the stars having similar size and luminosity, predicting and fitting k and J is expected to be a challenge.",
         "transits": false,
         "eclipses_similar": true,
         "components_similar": true,
