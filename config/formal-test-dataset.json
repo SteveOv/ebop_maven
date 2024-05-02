@@ -361,7 +361,7 @@
         "logLB": 0.795,         "logLB_err": 0.049,
         "rA": 0.08720,          "rA_err": 0.00063,
         "rB": 0.05486,          "rB_err": 0.00045,
-        "desc": "An eccentric orbit with eclipses of approximately 0.35 and 0.25 mag and the secondary near phase 0.45. Evidence of delta-Scut & gamma-Dor pulsations.",
+        "desc": "An eccentric orbit with eclipses of approximately 0.35 and 0.25 mag and the secondary near phase 0.45. Evidence of delta-Scuti & gamma-Dor pulsations. Our labels are taken from the solution with third light.",
         "transits": false,
         "eclipses_similar": false,
         "components_similar": false,
