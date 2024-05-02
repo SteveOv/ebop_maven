@@ -10,6 +10,7 @@ import json
 import math
 import re
 from contextlib import redirect_stdout
+from textwrap import TextWrapper
 
 import astropy.units as u
 import matplotlib.pyplot as plt
@@ -118,76 +119,68 @@ def test_fitting_against_formal_test_dataset(
     estimator = Estimator(model)
     l_names = list(estimator.label_names_and_scales.keys())
     f_names = estimator.input_feature_names
+    results_dir.mkdir(parents=True, exist_ok=True)
+    tw = TextWrapper(100)
 
     # Gets the target details, labels (unscaled) and the mags/ext features make preds from
-    ids, labels, features = _get_dataset_labels_and_features(
-                                test_dataset_dir, estimator, l_names, f_names, False, skip_ids)
-    inst_count = len(ids)
+    fitted_params = []
+    targets, labels, features = _get_dataset_labels_and_features(
+                                    test_dataset_dir, estimator, l_names, f_names, False, skip_ids)
+    target_count = len(targets)
 
-    # Read additional target data from the config file
-    # Get a tuple of (target, sector) from the formal testset ids which have are "target/sector"
-    targets = [i.split("/") for i in ids]
     with open(test_dataset_config, mode="r", encoding="utf8") as f:
         targets_config = json.load(f)
-        transit_flags = [targets_config.get(tn[0], {}).get("transits", False) for tn in targets]
+        transit_flags = [targets_config[tn].get("transits", False) for tn in targets]
 
-    # Make the results directory
-    if results_dir is None:
-        parent = model.parent if isinstance(model, Path) else Path("./drop")
-        results_dir = parent / f"results/{estimator.name}/formal-training-dataset"
-    results_dir.mkdir(parents=True, exist_ok=True)
-
-    # Make our prediction which will return [{"name": value, "name_sigma": sigma_value}]*insts
-    # We don't want to unscale predictions so we get the values predicted by the model,
-    # and which match the labels & are consistent with model.evaluate().
-    print(f"\nUsing an Estimator to make predictions on {inst_count} formal test instances",
-          f"with {mc_iterations} MC iterations (1 == no MC Dropout)")
+    # Estimator prediction will return [{"name": value, "name_sigma": sigma_value}]*insts
+    # We'll be using these is inputs to fitting so we need to let estimator do its scaling.
+    print(f"\nEstimating the input params for {target_count} targets ({mc_iterations} iterations)")
     estimator_predictions = estimator.predict(features, mc_iterations)
-    fitted_params = []
-    for counter, ((target, sector), t_preds) in enumerate(zip(targets, estimator_predictions), 1):
-        print(f"\nProcessing target {counter} of {len(targets)}: {target} / {sector}")
-        sector = int(sector)
-        sector_cfg = datasets.sector_config_from_target(sector, targets_config[target])
+    for ix, (target, t_preds) in enumerate(zip(targets, estimator_predictions)):
+        target_cfg = targets_config[target]
+        print(f"\n\nProcessing target {ix+1} of {target_count}: {target}\n" + "-"*40)
+        print(tw.fill(target_cfg.get("desc", "")) + "\n")
 
         # The basic lightcurve data read, rectified & extended with delta_mag and delta_mag_err cols
-        fits_dir = Path.cwd() / "cache" / re.sub(r'[^\w\d-]', '_', target.lower())
-        lc = datasets.prepare_lc_for_target_sector(target, sector, sector_cfg, fits_dir, True)
+        (lc, sector_count) = datasets.prepare_lightcurve_for_target(target, target_cfg, True)
+        pe = lightcurve.to_lc_time(target_cfg["primary_epoch"], lc).value
+        period = target_cfg["period"]
 
-        file_stem = f"model-testing-{re.sub(r'[^\w\d-]', '-', target.lower())}-{sector:03d}"
-        for file in jktebop.get_jktebop_dir().glob(f"{file_stem}.*"):
+        file_stem = f"model-testing-{re.sub(r'[^\w\d-]', '-', target.lower())}"
+        file_parent = jktebop.get_jktebop_dir()
+        for file in file_parent.glob(f"{file_stem}.*"):
             file.unlink()
-        in_file = jktebop.get_jktebop_dir() / f"{file_stem}.in"
-        dat_file = jktebop.get_jktebop_dir() / f"{file_stem}.dat"
-
-        pe = lightcurve.to_lc_time(sector_cfg["primary_epoch"], lc).value
-        period = sector_cfg["period"]
-        l3 = sector_cfg["labels"].get("L3", 0)
+        in_fname = file_parent / f"{file_stem}.in"
+        dat_fname = file_parent / f"{file_stem}.dat"
 
         # published fitting params that may be needed for good fit
-        fit_overrides = sector_cfg.get("fit_overrides", {}) if apply_fit_overrides else {}
+        fit_overrides = target_cfg.get("fit_overrides", {}) if apply_fit_overrides else {}
+        lrats = fit_overrides.pop("lrat", [])
 
         params = {
-            **base_jktebop_task3_params(period, pe, dat_file.name, file_stem, sector_cfg),
+            **base_jktebop_task3_params(period, pe, dat_fname.name, file_stem, target_cfg),
             **t_preds,
             **fit_overrides,
         }
 
-        # Add instructions for scale-factor poly fitting and chi^2 adjustment (to 1.0)
+        # Add scale-factor poly fitting, chi^2 adjustment (to 1.0) or light-ratio instructions
         segments = lightcurve.find_lightcurve_segments(lc, 0.5, return_times=True)
-        append_lines = jktebop.build_poly_instructions(segments, "sf", 1) + ["", "chif", ""]
+        append_lines = jktebop.build_poly_instructions(segments, "sf", 1)
+        append_lines += ["", "chif", ""] + [ f"lrat {l}" for l in lrats ]
 
-        jktebop.write_in_file(in_file, task=3, append_lines=append_lines, **params)
+        jktebop.write_in_file(in_fname, task=3, append_lines=append_lines, **params)
         jktebop.write_light_curve_to_dat_file(
-                    lc, dat_file, column_formats=[lambda t: f"{t.value:.6f}", "%.6f", "%.6f"])
+                    lc, dat_fname, column_formats=[lambda t: f"{t.value:.6f}", "%.6f", "%.6f"])
 
         # Don't consume the output files so they're available for subsequent plotting
-        print(f"Fitting {target} sector {sector:03d} with JKTEBOP task 3...")
-        par_filename = jktebop.get_jktebop_dir() / f"{file_stem}.par"
-        list(jktebop.run_jktebop_task(in_file, par_filename, stdout_to=sys.stdout))
-        fitted_params += [jktebop.read_fitted_params_from_par_file(par_filename, l_names)]
+        print(f"\nFitting {target} (with {sector_count} sector(s) of data) using JKTEBOP task 3...")
+        par_fname = file_parent / f"{file_stem}.par"
+        par_contents = list(jktebop.run_jktebop_task(in_fname, par_fname, stdout_to=sys.stdout))
+        fitted_params += [jktebop.read_fitted_params_from_par_lines(par_contents, l_names)]
+        table_of_predictions_vs_labels([labels[ix]], [fitted_params[ix]], estimator, [target])
 
     with open(results_dir / "fitting_vs_labels_mc.txt", "w", encoding="utf8") as of:
-        table_of_predictions_vs_labels(labels, fitted_params, estimator, ids, l_names, to=of)
+        table_of_predictions_vs_labels(labels, fitted_params, estimator, targets, l_names, to=of)
 
     if plot_results:
         plot_file = results_dir / "fitting_vs_labels_mc.eps"
@@ -338,23 +331,23 @@ def table_of_predictions_vs_labels(
     (raw_labels, pred_noms, _, ocs) \
         = _get_label_and_prediction_raw_values(labels, predictions, keys, reverse_scaling)
 
-    line_len = 15 + (11 * len(keys))-1 + 22
+    line_len = 13 + (11 * len(keys))-1 + 22
     for heading, rlabs, rpreds, rocs in zip(block_headings, raw_labels, pred_noms, ocs):
         # Plot a sub table for each row of labels/predictions/ocs
         to.write("-"*line_len + "\n")
-        to.write(f"{heading:<12s} | " + " ".join(f"{k:>10s}" for k in keys + ["MAE", "MSE"]))
+        to.write(f"{heading:<10s} | " + " ".join(f"{k:>10s}" for k in keys + ["MAE", "MSE"]))
         to.write("\n")
         rocs = np.concatenate([rocs, [np.mean(np.abs(rocs)), np.mean(np.power(rocs, 2))]])
         to.write("-"*line_len + "\n")
         for row_head, vals in zip(["Label", "Prediction", "O-C"], [rlabs, rpreds, rocs]):
-            to.write(f"{row_head:<12s} | " + " ".join(f"{v:10.6f}" for v in vals))
+            to.write(f"{row_head:<10s} | " + " ".join(f"{v:10.6f}" for v in vals))
             to.write("\n")
 
     # Summary rows for aggregate stats over all of the rows
     to.write("="*line_len + "\n")
-    to.write(f"{'MAE':<12s} | " + " ".join(f"{v:10.6f}" for v in np.mean(np.abs(ocs), 0)) +
+    to.write(f"{'MAE':<10s} | " + " ".join(f"{v:10.6f}" for v in np.mean(np.abs(ocs), 0)) +
                  f" {np.mean(np.abs(ocs)):10.6f}\n")
-    to.write(f"{'MSE':<12s} | " + " ".join([f"{v:10.6f}" for v in np.mean(np.power(ocs, 2), 0)]) +
+    to.write(f"{'MSE':<10s} | " + " ".join([f"{v:10.6f}" for v in np.mean(np.power(ocs, 2), 0)]) +
                  " "*11 + f" {np.mean(np.power(ocs, 2)):10.6f}\n")
 
 
@@ -457,7 +450,7 @@ def _get_dataset_labels_and_features(
     if not feature_names:
         feature_names = estimator.input_feature_names
 
-    print(f"Looking for the test dataset in '{dataset_dir}'...", end="False")
+    print(f"Looking for the test dataset in '{dataset_dir}'...", end="")
     tfrecord_files = list(dataset_dir.glob("**/*.tfrecord"))
     if len(tfrecord_files) > 0:
         print(f"found {len(tfrecord_files)} dataset file(s).")
@@ -529,11 +522,11 @@ if __name__ == "__main__":
     with redirect_stdout(Tee(open(out_dir / "model_testing.log", "w", encoding="utf8"))):
         the_model = modelling.load_model(Path("./drop/cnn_ext_model.keras"))
 
-        print("\nTesting the model's estimates\n" + "-"*80)
+        print("\nTesting the model's estimates\n" + "="*29)
         test_model_against_formal_test_dataset(the_model, results_dir=out_dir, plot_results=True)
 
-        print("\n\nTesting the JKTEBOP fitting derived from the model's estimates\n" + "-"*80)
-        skip = ["V402 Lac/16", "V456 Cyg/15"] # Neither are suitable for JKTEBOP fitting
+        print("\n\nTesting the JKTEBOP fitting derived from the model's estimates\n" + "="*62)
+        skip = ["V402 Lac", "V456 Cyg"] # Neither are suitable for JKTEBOP fitting
         test_fitting_against_formal_test_dataset(the_model, results_dir=out_dir, plot_results=True,
                                                  skip_ids=skip,
                                                  mc_iterations=1000,

@@ -127,7 +127,6 @@ with redirect_stdout(Tee(open(dataset_dir / "dataset.log", "w", encoding="utf8")
     # & labels (from published works). Build the dataset directly by downloading fits & folding LCs.
     formal_testset_file = datasets.make_formal_test_dataset(config_file=targets_config_file,
                                                             output_dir=dataset_dir,
-                                                            fits_cache_dir=Path(".") / "cache",
                                                             target_names=None,
                                                             verbose=True,
                                                             simulate=False)

@@ -2,8 +2,8 @@
 Functions for building TensorFlow datasets.
 """
 # Use ucase variable names where they match the equivalent symbol and pylint can't find units alias
-# pylint: disable=invalid-name, no-member
-from typing import Iterator, Dict, List, Union
+# pylint: disable=invalid-name, no-member, too-many-arguments, too-many-locals
+from typing import Iterator, Dict, List, Union, Tuple
 from pathlib import Path
 import random
 import traceback
@@ -225,7 +225,6 @@ def make_dataset_file(trainset_file: Path,
 
 def make_formal_test_dataset(config_file: Path,
                              output_dir: Path,
-                             fits_cache_dir: Path,
                              target_names: Iterator[str]=None,
                              verbose: bool=True,
                              simulate: bool=True) -> Path:
@@ -269,7 +268,6 @@ def make_formal_test_dataset(config_file: Path,
 
     :input_file: the input json file containing the parameters for one or more targets
     :output_dir: the directory to write the output dataset tfrecord file
-    :fits_cache_dir: the parent directory under which to cache downloaded fits files
     :target_names: a list of targets to select from input_file, or None for all
     :verbose: whether to print verbose progress/diagnostic messages
     :simulate: whether to simulate the process, skipping only file/directory actions
@@ -277,8 +275,6 @@ def make_formal_test_dataset(config_file: Path,
     """
     # pylint: disable=invalid-name
     start_time = default_timer()
-    fits_cache_dir = fits_cache_dir if fits_cache_dir else output_dir
-    smooth_fit = False
 
     if verbose:
         print(f"""
@@ -286,7 +282,6 @@ Build formal test dataset based on downloaded lightcurves from TESS targets.
 ----------------------------------------------------------------------------
 The input configuration files is:   {config_file}
 Output dataset will be written to:  {output_dir}
-Downloaded fits are cached in:      {fits_cache_dir}
 Selected targets are:               {', '.join(target_names) if target_names else 'all'}\n""")
         if simulate:
             print("Simulate requested so no dataset will be written, however fits are cached.\n")
@@ -307,70 +302,62 @@ Selected targets are:               {', '.join(target_names) if target_names els
             if verbose:
                 print(f"\nProcessing target {target_counter} of {len(targets)}: {target}")
 
-            fits_dir = fits_cache_dir / re.sub(r'[^\w\d-]', '_', target.lower())
-            for sector in [int(s) for s in target_cfg["sectors"].keys() if s.isdigit()]:
-                inst_id = f"{target}/{sector:d}"
-                sector_cfg = sector_config_from_target(sector, target_cfg)
+            # Open and concat all of the sector lightcurves for this target
+            (lc, _) = prepare_lightcurve_for_target(target, target_cfg, verbose)
 
-                # These are mandatory, so error if missing
-                labels = sector_cfg["labels"]
-                period = sector_cfg["period"] * u.d
-                pe = sector_cfg["primary_epoch"]
+            # These are mandatory, so error if missing
+            labels = target_cfg["labels"]
+            pe = lightcurve.to_lc_time(target_cfg["primary_epoch"], lc)
+            period = target_cfg["period"] * u.d
 
-                # Get the Lightcurve that matches the target & sector criteria and preprocess it.
-                # Will attempt to service the request from previously downloaded fits if present.
-                lc = prepare_lc_for_target_sector(target, sector, sector_cfg, fits_dir, verbose)
-                pe = lightcurve.to_lc_time(pe, lc)
+            # Produce multiple mags set (varying #bins & wrap phase) available for serialization
+            if verbose:
+                print(f"{target}: Creating phase normalized, folded lightcurves about",
+                        f"{pe.format} {pe} & {period}.")
+            mags_features = {}
+            for mag_name, (mags_bins, wrap_phase) in deb_example.stored_mags_features.items():
+                # Phase folding the light-curve, then interpolate for the mags features
+                wrap_phase = u.Quantity(wrap_phase)
+                fold_lc = lc.fold(period, pe, wrap_phase=wrap_phase, normalize_phase=True)
+                _, mags = lightcurve.get_reduced_folded_lc(fold_lc, mags_bins, wrap_phase)
+                mags_features[mag_name] = mags
 
-                # Produce multiple mags set (varying #bins & wrap phase) available for serialization
+            # omega & ecc are not used as labels but we need them for phiS and impact params
+            ecosw, esinw = labels["ecosw"], labels["esinw"]
+            omega = target_cfg.get("omega", None) \
+                or np.rad2deg(np.arctan(np.divide(esinw, ecosw))) if ecosw else 0
+            ecc = target_cfg.get("ecc", None) \
+                or np.divide(ecosw, np.cos(np.deg2rad(omega))) if ecosw else 0
+
+            # May need to calculate sini and cosi if not present
+            inc_rad = np.deg2rad(labels["inc"])
+            labels.setdefault("sini", np.sin(inc_rad))
+            labels.setdefault("cosi", np.cos(inc_rad))
+
+            # May need to calculate the primary impact parameter label as it's rarely published.
+            bP = labels.get("bP", None)
+            if bP is None:
+                rA = np.divide(labels["rA_plus_rB"], np.add(1, labels["k"]))
+                labels["bP"] = orbital.impact_parameter(rA, labels["inc"] * u.deg, ecc, None,
+                                                        esinw, orbital.EclipseType.PRIMARY)
                 if verbose:
-                    print(f"{inst_id}: Creating phase normalized, folded lightcurves about",
-                          f"{pe.format} {pe} & {period}.")
-                mags_features = {}
-                for mag_name, (mags_bins, wrap_phase) in deb_example.stored_mags_features.items():
-                    # Phase folding the light-curve, then interpolate for the mags features
-                    wrap_phase = u.Quantity(wrap_phase)
-                    fold_lc = lc.fold(period, pe, wrap_phase=wrap_phase, normalize_phase=True)
-                    _, mags = lightcurve.get_reduced_folded_lc(fold_lc, mags_bins, wrap_phase,
-                                                                smooth_fit=smooth_fit)
-                    mags_features[mag_name] = mags
+                    print(f"{target}: No impact parameter (bP) supplied;",
+                            f"calculated rA = {rA} and then bP = {labels['bP']}")
 
-                # omega & ecc are not used as labels but we need them for phiS and impact params
-                ecosw, esinw = labels["ecosw"], labels["esinw"]
-                omega = sector_cfg.get("omega", None) \
-                    or np.rad2deg(np.arctan(np.divide(esinw, ecosw))) if ecosw else 0
-                ecc = sector_cfg.get("ecc", None) \
-                    or np.divide(ecosw, np.cos(np.deg2rad(omega))) if ecosw else 0
+            # Now assemble the extra features needed: phiS (phase secondary) and dS_over_dP
+            extra_features = {
+                "phiS": lightcurve.expected_secondary_phase(ecosw, ecc),
+                "dS_over_dP": lightcurve.expected_ratio_of_eclipse_duration(esinw)
+            }
 
-                # May need to calculate sini and cosi if not present
-                inc_rad = np.deg2rad(labels["inc"])
-                labels.setdefault("sini", np.sin(inc_rad))
-                labels.setdefault("cosi", np.cos(inc_rad))
-
-                # May need to calculate the primary impact parameter label as it's rarely published.
-                bP = labels.get("bP", None)
-                if bP is None:
-                    rA = np.divide(labels["rA_plus_rB"], np.add(1, labels["k"]))
-                    labels["bP"] = orbital.impact_parameter(rA, labels["inc"] * u.deg, ecc, None,
-                                                            esinw, orbital.EclipseType.PRIMARY)
-                    if verbose:
-                        print(f"{inst_id}: No impact parameter (bP) supplied;",
-                                f"calculated rA = {rA} and then bP = {labels['bP']}")
-
-                # Now assemble the extra features needed: phiS (phase secondary) and dS_over_dP
-                extra_features = {
-                    "phiS": lightcurve.expected_secondary_phase(labels["ecosw"], ecc),
-                    "dS_over_dP": lightcurve.expected_ratio_of_eclipse_duration(labels["esinw"])
-                }
-
-                # Serialize the labels, folded mags (lc) & extra_features as a deb_example and write
-                if not simulate:
-                    if verbose:
-                        print(f"{inst_id}: Saving serialized instance to dataset:", out_file)
-                    ds.write(deb_example.serialize(inst_id, labels, mags_features, extra_features))
-                elif verbose:
-                    print(f"{inst_id}: Simulated saving serialized instance to dataset:", out_file)
-                inst_counter += 1
+            # Serialize the labels, folded mags (lc) & extra_features as a deb_example and write
+            if not simulate:
+                if verbose:
+                    print(f"{target}: Saving serialized instance to dataset:", out_file)
+                ds.write(deb_example.serialize(target, labels, mags_features, extra_features))
+            elif verbose:
+                print(f"{target}: Simulated saving serialized instance to dataset:", out_file)
+            inst_counter += 1
     finally:
         if ds:
             ds.close()
@@ -466,6 +453,13 @@ def plot_dataset_instance_model_feature(dataset_files: Union[Path, Iterator[Path
         plt.close()
 
 
+def list_sectors_in_target_config(target_cfg: Dict[str, any]) -> List[int]:
+    """
+    Returns a list of the sectors configured for this target.
+    """
+    return [int(s) for s in target_cfg["sectors"].keys() if s.isdigit()]
+
+
 def sector_config_from_target(sector: int, target_cfg: Dict[str, any]) -> Dict[str, any]:
     """
     Get the sector specific config from the passed target config. The sector config
@@ -514,3 +508,40 @@ def prepare_lc_for_target_sector(target: str,
                                                  config.get("detrend_sigma_clip", 1.0),
                                                  verbose=verbose)
     return lc
+
+
+def prepare_lightcurve_for_target(target: str,
+                                  target_cfg: Dict[str, any],
+                                  verbose: bool=True) \
+                                    -> Tuple[LightCurve, int]:
+    """
+    Will prepare a lightcurve for the passed test target.
+    If the target has multiple sectors configured, these will be downloaded
+    separately and stitched into a single Lightcurve
+
+    :target: the name/search term for the target
+    :target_cfg: the configuration dictionary for the target
+    :verbose: whether to print progress messages
+    :returns: a tuple of the combined LightCurve for the configured sectors and the sector count
+    """
+    sectors = list_sectors_in_target_config(target_cfg)
+    if verbose:
+        print(f"Downloading and stitching the lightcurves for {target} sector(s)",
+              ", ".join(f"{s}" for s in sectors))
+
+    # This will download and pre-cache the timeseries fits files. We don't open
+    # them here as we may have to apply different settings per sector.
+    fits_dir = Path.cwd() / "cache" / re.sub(r'[^\w\d-]', '_', target.lower())
+    lightcurve.find_lightcurves(target, fits_dir, sectors,
+                                mission = target_cfg.get("mission", "TESS"),
+                                author=target_cfg.get("author", "SPOC"),
+                                exptime=target_cfg.get("exptime", None),
+                                verbose=False)
+    lcs = []
+    for sector in sectors:
+        # The basic LC data read, rectified & extended with delta_mag and delta_mag_err cols
+        sector_cfg = sector_config_from_target(sector, target_cfg)
+        lcs +=[prepare_lc_for_target_sector(target, sector, sector_cfg, fits_dir, verbose)]
+    if len(lcs) > 1:
+        return (lightcurve.LightCurveCollection(lcs).stitch(), len(sectors))
+    return (lcs[0], 1)

@@ -19,6 +19,7 @@
         "eclipses_similar": false,
         "components_similar": false,
         "notes": "bP derived from rA, inc, e & esinw;",
+        "primary_epoch": 1813.201149,
         "period": 25.935953,
         "ecc": 0.3835,          "ecc_err": 0.0018,
         "omega": 109.56,        "omega_err": 0.11,
@@ -34,8 +35,7 @@
         },
         "sectors": {
             "18": {
-                "quality_bitmask": "hardest",
-                "primary_epoch": 1813.201149
+                "quality_bitmask": "hardest"
             }
         },
         "fit_overrides": {
@@ -67,6 +67,7 @@
         "eclipses_similar": false,
         "components_similar": false,
         "notes": "bP derived from rA, inc, e & esinw;",
+        "primary_epoch": 2384.208649309,
         "period": 3.168604135,
         "ecc": 0.0555,              "ecc_err": 0.0011,
         "omega": 214.2,             "omega_err": 1.1,
@@ -82,8 +83,7 @@
         },
         "sectors": {
             "39": {
-                "quality_bitmask": "hardest",
-                "primary_epoch": 2384.208649309
+                "quality_bitmask": "hardest"
             }
         }
     },
@@ -104,6 +104,7 @@
         "rA": 0.043984,         "rA_err": 0.000045,
         "rB": 0.021877,         "rB_err": 0.000032,
         "desc": "A slightly eccentric orbit with eclipses of approximate depth of 0.45 and 0.40 mag and evidence of SLF pulsations. Primary fractional radius > 0.2 (0.22).",
+        "primary_epoch": 3091.573672,
         "transits": true,
         "eclipses_similar": false,
         "components_similar": false,
@@ -124,8 +125,7 @@
         "sectors": {
             "65": {
                 "quality_bitmask": "hardest",
-                "quality_masks": [[3087.0, 3090.3]],
-                "primary_epoch": 3091.573672
+                "quality_masks": [[3087.0, 3090.3]]
             }
         }
     },
@@ -149,6 +149,7 @@
         "eclipses_similar": false,
         "components_similar": true,
         "notes": "e=0.376 (fixed); rA_plus_rB & k & ecosw & esinw derived from table 11; J approximated from Teff; bP derived from rA, inc, e & esinw;",
+        "primary_epoch": 1754.160254,
         "period": 3.782043,
         "ecc": 0.376,           "ecc_err": null,
         "omega": 58.1,          "omega_err": 1.4,
@@ -164,8 +165,7 @@
         },
         "sectors": {
             "16": {
-                "quality_bitmask": "hardest",
-                "primary_epoch": 1754.160254
+                "quality_bitmask": "hardest"
             }
         }
     },
@@ -185,6 +185,7 @@
         "rA": 0.1494,           "rA_err": 0.0016,
         "rB": 0.1171,           "rB_err": 0.0017,
         "desc": "HD 23642 has an inclined, circular orbit with distinct primary (~0.10 mag) and secondary (~0.05 mag) eclipses. Delta Scutti pulsations are evident.",
+        "primary_epoch": 2464.982832,
         "transits": false,
         "eclipses_similar": false,
         "components_similar": false,
@@ -202,9 +203,7 @@
         },
         "sectors": {
             "42": {
-                "quality_bitmask": "hardest",
-                "primary_epoch": 2464.982832,
-                "lrat": ["2465.75 0.328 0.011"]
+                "quality_bitmask": "hardest"
             }
         },
         "fit_overrides": {
@@ -215,7 +214,8 @@
             "LDA2": 0.45,
             "LDB2": 0.45,
             "LDA1_fit": 0,
-            "LDB1_fit": 0
+            "LDB1_fit": 0,
+            "lrat": ["2465.75 0.328 0.011"]
         }
     },
     "V889 Aql": {
@@ -238,6 +238,7 @@
         "eclipses_similar": false,
         "components_similar": true,
         "notes": "e=0.3750 (fixed); ecosw & esinw derived from table 9; bP derived from rA, inc, e & esinw;",
+        "primary_epoch": 2416.259790,
         "period": 11.120757,
         "ecc": 0.3750,          "ecc_err": null,
         "omega": 126.1,         "omega_err": 0.2,
@@ -253,14 +254,15 @@
         },
         "sectors": {
             "40": {
-                "quality_bitmask": "hardest",
-                "primary_epoch": 2416.259790,
-                "lrat": ["2418.23 0.98 0.06"]
+                "quality_bitmask": "hardest"
             }
         },
         "mission": "HLSP",
         "author": "TESS-SPOC",
-        "exptime": 600
+        "exptime": 600,
+        "fit_overrides": {
+            "lrat": ["2418.23 0.98 0.06"]
+        }
     },
     "WW Aur": {
         "source": "DEBCat and Southworth et al. (2005) who use EBOP (with mods to fit rA+rB & k and to use MRQMIN) for fitting of observations from the 1970s. We use V-band fitting results (Table 10). Available TESS sectors 29, 43-45, 60 & 71-73 at 120 s cadence.",
@@ -282,6 +284,7 @@
         "eclipses_similar": false,
         "components_similar": true,
         "notes": "e=0.0 & ω=0.0 & L3=0 (fixed);",
+        "primary_epoch": 2511.2697083,
         "period": 2.5250191,
         "labels": {
             "rA_plus_rB": 0.3118,   "rA_plus_rB_err": 0.0009,
@@ -295,8 +298,7 @@
         },
         "sectors": {
             "44": {
-                "quality_bitmask": "hardest",
-                "primary_epoch": 2511.2697083
+                "quality_bitmask": "hardest"
             }
         }
     },
@@ -320,6 +322,7 @@
         "eclipses_similar": false,
         "components_similar": false,
         "notes": "e=0.0 & ω=0.0 fixed; rA_plus_rB & k derived from rA & rB in table 8; J from JKTEBOP fit; bP derived from rA, inc, e & esinw;",
+        "primary_epoch": 1588.923728350,
         "period": 4.966268262,
         "labels": { 
             "rA_plus_rB": 0.235,    "rA_plus_rB_err": 0.005,
@@ -333,8 +336,7 @@
         },
         "sectors": {
             "10": {
-                "quality_bitmask": "hardest",
-                "primary_epoch": 1588.923728350
+                "quality_bitmask": "hardest"
             }
         }
     },
@@ -358,6 +360,7 @@
         "eclipses_similar": false,
         "components_similar": false,
         "notes": "bP derived from rA, inc, e & esinw; period set from trial fit;",
+        "primary_epoch": 1851.927737130,
         "period": 9.9451266,
         "ecc": 0.078078,        "ecc_err": 0.000076,
         "omega": 178.8,         "omega_err": 2.3,
@@ -373,8 +376,7 @@
         },
         "sectors": {
             "20": {
-                "quality_bitmask": "hardest",
-                "primary_epoch": 1851.927737130
+                "quality_bitmask": "hardest"
             }
         }
     },
@@ -398,6 +400,7 @@
         "eclipses_similar": false,
         "components_similar": false,
         "notes": "J from JKTEBOP fit; rA_plus_rB & k derived from rA & rB in table 8; bP derived from rA, inc, e & esinw;",
+        "primary_epoch": 1664.39587906,
         "period": 2.74843680,
         "ecc": 0.0014,          "ecc_err": 0.0004,
         "omega": 283,           "omega_err": 16,
@@ -413,8 +416,7 @@
         },
         "sectors": {
             "13": {
-                "quality_bitmask": "hardest",
-                "primary_epoch": 1664.39587906
+                "quality_bitmask": "hardest"
             }
         }
     },
@@ -438,6 +440,7 @@
         "eclipses_similar": false,
         "components_similar": true,
         "notes": "e=0 & ω=0 (fixed); logLB=0.78(5) from from Bakis+ logLA and Van Reeth+ Light Ratio;",
+        "primary_epoch": 1712.409949,
         "period": 0.891195,
         "labels": { 
             "rA_plus_rB": 0.5228,   "rA_plus_rB_err": 0.0010,
@@ -451,8 +454,7 @@
         },
         "sectors": {
             "15": {
-                "quality_bitmask": "hardest",
-                "primary_epoch": 1712.409949
+                "quality_bitmask": "hardest"
             }
         }
     },
@@ -476,6 +478,7 @@
         "eclipses_similar": true,
         "components_similar": true,
         "notes": "e=0 & ω=0 (fixed); rA_plus_rB & k derived from rA & rB in table 8; J from JKTEBOP fit; bP derived from rA, inc, e & esinw;",
+        "primary_epoch": 1454.347141832,
         "period": 3.658635226,
         "labels": { 
             "rA_plus_rB": 0.237,    "rA_plus_rB_err": 0.001, 
@@ -489,8 +492,7 @@
         },
         "sectors": {
             "5": {
-                "quality_bitmask": "hardest",
-                "primary_epoch": 1454.347141832
+                "quality_bitmask": "hardest"
             }
         }
     },
@@ -510,6 +512,7 @@
         "rA": 0.16107,          "rA_err": 0.00028,
         "rB": 0.14489,          "rB_err": 0.00039,
         "desc": "A circular orbit with clear primary and secondary eclipses of approximately 0.38 and 0.35 mag.",
+        "primary_epoch": 2813.984151,
         "transits": false,
         "eclipses_similar": true,
         "components_similar": false,
@@ -527,8 +530,7 @@
         },
         "sectors": {
             "55": {
-                "quality_bitmask": "hard",
-                "primary_epoch": 2813.984151
+                "quality_bitmask": "hard"
             }
         },
         "author": "TESS-SPOC",
@@ -555,6 +557,7 @@
         "eclipses_similar": false,
         "components_similar": false,
         "notes": "bP derived from rA, inc, e & esinw;",
+        "primary_epoch": 2163.057026533,
         "period": 2.728420258,
         "ecc": 0.01310,         "ecc_err": 0.00067,
         "omega": 292.4,         "omega_err": 1.7,
@@ -570,8 +573,7 @@
         },
         "sectors": {
             "31": {
-                "quality_bitmask": "hardest",
-                "primary_epoch": 2163.057026533
+                "quality_bitmask": "hardest"
             }
         }
     },
@@ -595,6 +597,7 @@
         "eclipses_similar": true,
         "components_similar": true,
         "notes": "e=0 & ω=0 (fixed); bP derived from rA, inc, e & esinw;",
+        "primary_epoch": 1942.301590525,
         "period": 4.99176522,
         "labels": { 
             "rA_plus_rB": 0.23669,  "rA_plus_rB_err": 0.00008,
@@ -608,8 +611,7 @@
         },
         "sectors": {
             "23": {
-                "quality_bitmask": "default",
-                "primary_epoch": 1942.301590525
+                "quality_bitmask": "default"
             }
         }
     },
@@ -633,6 +635,7 @@
         "eclipses_similar": false,
         "components_similar": false,
         "notes": "e=0 & ω=0 & L3=0 (fixed); bP derived from rA, inc, e & esinw; lrat required for better fit (from paper)",
+        "primary_epoch": 1808.958835302,
         "period": 1.900888340,
         "labels": { 
             "rA_plus_rB": 0.31715,  "rA_plus_rB_err": 0.00057,
@@ -647,10 +650,11 @@
         "sectors": {
             "18": {
                 "quality_bitmask": "hardest",
-                "quality_masks": [[58790.6, 58792.5], [58801.0, 58804.7]],
-                "primary_epoch": 1808.958835302,
-                "lrat": ["1809.434 0.703 0.057"]
+                "quality_masks": [[58790.6, 58792.5], [58801.0, 58804.7]]
             }
+        },
+        "fit_overrides": {
+            "lrat": ["1809.434 0.703 0.057"]
         }
     },
     "AN Cam": {
@@ -673,6 +677,7 @@
         "eclipses_similar": false,
         "components_similar": false,
         "notes": "L3=0 (fixed); bP derived from rA, inc, e & esinw;",
+        "primary_epoch": 2726.965431,
         "period": 20.998420,
         "ecc": 0.4676,          "ecc_err": 0.0002,
         "omega": 14.97,         "omega_err": 0.11,
@@ -689,8 +694,7 @@
         "sectors": {
             "52": {
                 "quality_bitmask": "hardest",
-                "quality_masks": [[2742.0, 2743.0]],
-                "primary_epoch": 2726.965431
+                "quality_masks": [[2742.0, 2743.0]]
             }
         },
         "author": "TESS-SPOC",
@@ -710,30 +714,31 @@
         "TeffB": 6740,          "TeffB_err": 105,
         "logLA": 0.653,         "logLA_err": 0.027,
         "logLB": 0.651,         "logLB_err": 0.027,
+        "rA": 0.10791,          "rA_err": 0.00013,
+        "rB": 0.10777,          "rB_err": 0.00014,
         "desc": "An eccentric orbit with low inclination. The light curves show similar primary and secondary eclipses, although the depth varies by sector probably as a result of spacecraft orientation.",
         "transits": false,
         "eclipses_similar": true,
         "components_similar": true,
+        "notes": "Using values from table II, Sector 17; bP derived from rA, inc, e & esinw;",
+        "primary_epoch": 1778.309129340,
+        "period": 3.896651299,
+        "ecc": 0.08867,         "ecc_err": 0.00013,
+        "omega": 335.74,        "omega_err": 0.19,
+
+        "labels": { 
+            "rA_plus_rB": 0.21568,  "rA_plus_rB_err": 0.00014,
+            "k": 0.9986,            "k_err": 0.0021,
+            "bP": 0.048,            "bP_err": 0.003,
+            "inc": 89.714,          "inc_err": 0.015,
+            "ecosw": 0.080838,      "ecosw_err": 0.000007,
+            "esinw": -0.03644,      "esinw_err": 0.00032,
+            "J": 0.99963,           "J_err": 0.00054,
+            "L3": 0.0481,           "L3_err": 0.0030
+        },
         "sectors": {
             "17": {
-                "notes": "Using values from table II, Sector 17; bP derived from rA, inc, e & esinw;",
-                "quality_bitmask": "hardest",
-                "primary_epoch": 1778.309129340,
-                "period": 3.896651299,
-                "ecc": 0.08867,
-                "omega": 335.74,
-                "rA": 0.10791,          "rA_err": 0.00013,
-                "rB": 0.10777,          "rB_err": 0.00014,
-                "labels": { 
-                    "rA_plus_rB": 0.21568,  "rA_plus_rB_err": 0.00014,
-                    "k": 0.9986,            "k_err": 0.0021,
-                    "bP": 0.048,            "bP_err": 0.003,
-                    "inc": 89.714,          "inc_err": 0.015,
-                    "ecosw": 0.080838,      "ecosw_err": 0.000007,
-                    "esinw": -0.03644,      "esinw_err": 0.00032,
-                    "J": 0.99963,           "J_err": 0.00054,
-                    "L3": 0.0481,           "L3_err": 0.0030
-                }
+                "quality_bitmask": "hardest"
             }
         }
     },
@@ -757,6 +762,7 @@
         "eclipses_similar": true,
         "components_similar": true,
         "notes": "bP derived from rA, inc, e & esinw;",
+        "primary_epoch": 1847.488017872,
         "period": 3.145795630,
         "ecc": 0.00985,         "ecc_err": 0.00027,
         "omega": 133.7,         "omega_err": 1.5,
@@ -772,8 +778,7 @@
         },
         "sectors": {
             "20": {
-                "quality_bitmask": "hardest",
-                "primary_epoch": 1847.488017872
+                "quality_bitmask": "hardest"
             }
         }
     },
@@ -797,6 +802,7 @@
         "eclipses_similar": true,
         "components_similar": true,
         "notes": "e=0 & ω=0 & L3=0 (fixed); bP derived from rA, inc, e & esinw;",
+        "primary_epoch": 1806.9611680,
         "period": 4.2220216,
         "labels": { 
             "rA_plus_rB": 0.170906,     "rA_plus_rB_err": 0.000035,
@@ -810,8 +816,7 @@
         },
         "sectors": {
             "18": {
-                "quality_bitmask": "hardest",
-                "primary_epoch": 1806.9611680
+                "quality_bitmask": "hardest"
             }
         }
     },
@@ -835,6 +840,7 @@
         "eclipses_similar": false,
         "components_similar": false,
         "notes": "J from a JKTEBOP fit with fixed params from run K; bP derived from rA, inc, e & esinw;",
+        "primary_epoch": 1362.82834,
         "period": 24.59240,
         "ecc": 0.1881,          "ecc_err": 0.0008,
         "omega": 110.27,        "omega_err": 0.09,
@@ -850,8 +856,7 @@
         },
         "sectors": {
             "2": {
-                "quality_bitmask": "hardest",
-                "primary_epoch": 1362.82834
+                "quality_bitmask": "hardest"
             }
         }
     },
@@ -871,6 +876,7 @@
         "rA": 0.15305,          "rA_err": 0.00067,
         "rB": 0.11453,          "rB_err": 0.00043,
         "desc": "A circular orbit with transits and further variability due to starspot activity.",
+        "primary_epoch": 1893.502047218,
         "transits": true,
         "eclipses_similar": false,
         "components_similar": false,
@@ -888,8 +894,7 @@
         },
         "sectors": {
             "21": {
-                "quality_bitmask": "hardest",
-                "primary_epoch": 1893.502047218
+                "quality_bitmask": "hardest"
             }
         }
     },
@@ -913,6 +918,7 @@
         "eclipses_similar": true,
         "components_similar": true,
         "notes": "L3=0 (fixed); rA_plus_rB & k derived from rA & rB in table 8; J from JKTEBOP fit; bP derived from rA, inc, e & esinw;",
+        "primary_epoch": 1559.4571181,
         "period": 5.0058710,
         "ecc": 0.0001,          "ecc_err": 0.0001,
         "omega": 217,           "omega_err": 11,
@@ -928,8 +934,7 @@
         },
         "sectors": {
             "9": {
-                "quality_bitmask": "hardest",
-                "primary_epoch": 1559.4571181
+                "quality_bitmask": "hardest"
             }
         }
     },
@@ -953,6 +958,7 @@
         "eclipses_similar": false,
         "components_similar": true,
         "notes": "rA_plus_rB & k derived from rA & rB in table 8; bP derived from rA, inc, e & esinw;",
+        "primary_epoch": 2341.077182,
         "period": 15.269303,
         "ecc": 0.4223,          "ecc_err": 0.0016,
         "omega": 140.10,        "omega_err": 0.03,
@@ -968,8 +974,7 @@
         },
         "sectors": {
             "38": {
-                "quality_bitmask": "hardest",
-                "primary_epoch": 2341.077182
+                "quality_bitmask": "hardest"
             }
         }
     },
@@ -993,6 +998,7 @@
         "eclipses_similar": false,
         "components_similar": false,
         "notes": "L3=0 (fixed); bP derived from rA, inc, e & esinw;",
+        "primary_epoch": 2526.2961006,
         "period": 27.0198177,
         "ecc": 0.38056,         "ecc_err": 0.00017,
         "omega": 49.562,        "omega_err": 0.025,
@@ -1007,10 +1013,11 @@
             "L3": 0.0,                  "L3_err": null
         },
         "sectors": {
+            "44": {
+                "quality_bitmask": "hard"
+            },
             "45": {
-                "quality_bitmask": "hard",
-                "lrat": ["2533.0 1.8448 0.0053"],
-                "primary_epoch": 2526.2961006
+                "quality_bitmask": "hard"
             }
         }
     },
@@ -1034,6 +1041,7 @@
         "eclipses_similar": true,
         "components_similar": true,
         "notes": "Martin values; L3=0 (fixed)",
+        "primary_epoch": 2844.696709,
         "period": 1.268389,
         "ecc": 0.00527,         "ecc_err": 0.00021,
         "omega": 107.98,        "omega_err": 0.70,
@@ -1049,8 +1057,7 @@
         },
         "sectors": {
             "56": {
-                "quality_bitmask": "hard",
-                "primary_epoch": 2844.696709
+                "quality_bitmask": "hard"
             }
         },
         "author": "TESS-SPOC",

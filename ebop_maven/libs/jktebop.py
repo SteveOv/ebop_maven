@@ -1,6 +1,6 @@
 """ Module for interacting with the JKTEBOP dEB light-curve fitting tool. """
 # pylint: disable=invalid-name
-from typing import Union, Dict, List, Tuple, Callable, Generator
+from typing import Union, Dict, List, Tuple, Callable, Generator, Iterable
 import os
 import threading
 import subprocess
@@ -281,7 +281,6 @@ def read_fitted_params_from_par_file(par_filename: Path,
     :params: the list of params to read (see _param_file_line_beginswith for those supported)
     :returns: a dict with the value and any associated error for those parameters found
     """
-    results = {}
     def yield_lines_after(filename: Path, magic: str):
         with open(filename, mode="r", encoding="utf8") as par:
             do_read = False
@@ -291,12 +290,27 @@ def read_fitted_params_from_par_file(par_filename: Path,
                 elif magic in line:
                     do_read = True
 
-    final_result_lines = list(yield_lines_after(par_filename, "Final values of the parameters:"))
+    return read_fitted_params_from_par_lines(
+        yield_lines_after(par_filename, "Final values of the parameters:"), params)
+
+
+def read_fitted_params_from_par_lines(par_lines: Iterable[str],
+                                      params: List[str]) -> Dict[str, Tuple[float, float]]:
+    """
+    Will retrieve the final values of the requested parameters from the
+    passed on contents of a JKTEBOP Task 3 parameter output file (par)
+
+    :par_lines: the content of the file
+    :params: the list of params to read (see _param_file_line_beginswith for those supported)
+    :returns: a dict with the value and any associated error for those parameters found
+    """
+    results = {}
+    lines = list(par_lines)  # Get them out of a generator as we need to go through more than once
     for param in params:
         beginswith = re.escape(_param_file_line_beginswith.get(param, ""))
         if beginswith:
             pattern = re.compile(_regex_pattern_val_and_err.format(beginswith), re.IGNORECASE)
-            for line in final_result_lines:
+            for line in lines:
                 match = pattern.match(line)
                 if match and "val" in match.groupdict():
                     val, err = match.group("val"), match.group("err") or 0
