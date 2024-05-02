@@ -62,12 +62,12 @@
         "logLB": 2.993,         "logLB_err": 0.052,
         "rA": 0.22171,          "rA_err": 0.00055,
         "rB": 0.1742,           "rB_err": 0.0016,
-        "desc": "A slightly eccentric orbit with eclipses of approximate depth of 0.45 and 0.40 mag and evidence of SLF pulsations. Primary fractional radius > 0.2 (0.22).",
+        "desc": "An eccentric orbit with eclipses of approximate depth 0.45 and 0.40 mag and evidence of SLF pulsations. Primary fractional radius of 0.22 is at the edge of JKTEBOP's usable range.",
         "transits": false,
         "eclipses_similar": false,
         "components_similar": false,
         "notes": "bP derived from rA, inc, e & esinw;",
-        "primary_epoch": 2384.208649309,
+        "primary_epoch": 1671.16681549,
         "period": 3.168604135,
         "ecc": 0.0555,              "ecc_err": 0.0011,
         "omega": 214.2,             "omega_err": 1.1,
@@ -82,7 +82,7 @@
             "L3": 0.0328,               "L3_err": 0.0028
         },
         "sectors": {
-            "39": {
+            "13": {
                 "quality_bitmask": "hardest"
             }
         }
