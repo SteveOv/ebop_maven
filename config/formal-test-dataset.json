@@ -285,7 +285,7 @@
         "logLB": 1.023,         "logLB_err": 0.093,
         "rA": 0.1562,           "rA_err": 0.0034,
         "rB": 0.1556,           "rB_err": 0.0029,
-        "desc": "An inclined circular orbit showing partial eclipses of approximately 0.64 and 0.55 mag. The components are of similar size.",
+        "desc": "An inclined circular orbit showing partial eclipses of approximately 0.64 and 0.55 mag. The combination of partial eclipses and stars of similar radius makes predicting and fitting k and J a challenge. Published work based on legacy photometry wheras we have used TESS data.",
         "transits": false,
         "eclipses_similar": false,
         "components_similar": true,
