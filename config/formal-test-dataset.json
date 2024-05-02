@@ -211,7 +211,7 @@
                 "quality_bitmask": "hardest"              
             },
             "44": {
-                "quality_bitmask": "hardest"
+                "quality_bitmask": "hardest"              
             }
         },
         "fit_overrides": {
@@ -309,7 +309,7 @@
         }
     },
     "V788 Cen": {
-        "source": "DEBCat and Graczyk et al. (2022) who use WD for fitting (Table 8).",
+        "source": "DEBCat and Graczyk et al. (2022) who use WD for fitting sectors 10 and 37 (Table 8).",
         "reference": "GraczykPietrzynski+22aa",
         "aka": "TIC 258314976, HD 105509",
         "SpT": "A2mA5-F2",
