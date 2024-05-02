@@ -239,7 +239,7 @@
         "logLB": 1.32,          "logLB_err": 0.03,
         "rA": 0.0549,           "rA_err": 0.00012,
         "rB": 0.0544,           "rB_err": 0.00012,
-        "desc": "A highly eccentric orbit. The light curve shows long term trends which detrending isn't removing - may make it a challange to predict. Sector 54 better. Very similar radii making k and J difficult to predict (degenerate; comment in paper)",
+        "desc": "A highly eccentric orbit with the secondary eclipse before phase 0.4. This coupled with the stars having similar radii make k and J difficult to predict and fit. As with the published work, we use sector 40 and their spectroscopic light-ratio for fitting. Sector 40 shows some long term trends which our detrending is not removing however this does not appear to be overly detrimental to the predictions or fitting.",
         "transits": false,
         "eclipses_similar": false,
         "components_similar": true,
