@@ -104,13 +104,13 @@
         "logLB": 1.2,           "logLB_err": 0.1,
         "rA": 0.043984,         "rA_err": 0.000045,
         "rB": 0.021877,         "rB_err": 0.000032,
-        "desc": "A slightly eccentric orbit with eclipses of approximate depth of 0.45 and 0.40 mag and evidence of SLF pulsations. Primary fractional radius > 0.2 (0.22).",
-        "primary_epoch": 3091.573672,
+        "desc": "An eccentric orbit with transit depths of ~0.25 and ~0.15 mag and the secondary after phase 0.8. The period of 38.8 d is longer than a TESS sector so here we use two (38 & 65).",
         "transits": true,
         "eclipses_similar": false,
         "components_similar": false,
-        "notes": "logLA & logLB derived from R and Teff;",
-        "period": 38.812522,
+        "notes": "logLA & logLB derived from R and Teff; qphot, gravA & gravB from paper (pp 654)",
+        "primary_epoch": 2354.145650402,
+        "period": 38.811922892,
         "ecc": 0.55408,             "ecc_err": 0.00024,
         "omega": 20.095,            "omega_err": 0.098,
         "labels": {
@@ -124,10 +124,19 @@
             "L3": 0.0,                  "L3_err": null
         },
         "sectors": {
+            "38": {
+                "quality_bitmask": "hardest",
+                "quality_masks":[[2347.0, 2350.0]]
+            },
             "65": {
                 "quality_bitmask": "hardest",
                 "quality_masks": [[3087.0, 3090.3]]
             }
+        },
+        "fit_overrides": {
+            "qphot": 0.65,
+            "gravA": 1.0,
+            "gravB": 1.0
         }
     },
     "V402 Lac": {
