@@ -3,7 +3,7 @@ Formal testing of the regression TF Model trained by train_*_estimator.py
 """
 # pylint: disable=too-many-arguments, too-many-locals, no-member, import-error
 from typing import Union, List, Dict, Tuple
-from io import TextIOBase
+from io import TextIOBase, StringIO
 import sys
 from pathlib import Path
 import json
@@ -245,7 +245,7 @@ def predictions_vs_labels_to_csv(
         row_headings: List[str]=None,
         selected_labels: List[str]=None,
         reverse_scaling: bool=False,
-        to: TextIOBase=sys.stdout):
+        to: TextIOBase=None):
     """
     Will write a csv of the predicted nominal values vs the labels
     with O-C, MAE and MSE metrics, to the requested output.
@@ -275,6 +275,10 @@ def predictions_vs_labels_to_csv(
     (raw_labels, pred_noms, _, ocs) \
         = _get_label_and_prediction_raw_values(labels, predictions, keys, reverse_scaling)
 
+    print_it = not to
+    if print_it:
+        to = StringIO()
+
     # Headings row
     to.write(f"{'Target':>12s}, ")
     to.writelines(f"{k+'_lbl':>15s}, {k:>15s}, {k+'_res':>15s}, " for k in keys)
@@ -296,6 +300,8 @@ def predictions_vs_labels_to_csv(
     to.write(f"{'MSE':>12s}, ")
     to.writelines(f"{' '*15}, {' '*15}, {lbl_mses[c]:15.9f}, " for c in range(num_keys))
     to.write(f"{' '*15}, {np.mean(np.power(ocs, 2)):15.9f}\n")
+    if print_it:
+        print(to.getvalue())
 
 
 def table_of_predictions_vs_labels(
@@ -305,7 +311,7 @@ def table_of_predictions_vs_labels(
         block_headings: List[str],
         selected_labels: List[str]=None,
         reverse_scaling: bool=False,
-        to: TextIOBase=sys.stdout):
+        to: TextIOBase=None):
     """
     Will write a text table of the predicted nominal values vs the label values
     with O-C, MAE and MSE metrics, to the requested output.
@@ -318,7 +324,7 @@ def table_of_predictions_vs_labels(
     field names and scales
     :selected_labels: a subset of the full list of labels/prediction names to render
     :reverse_scaling: whether to reverse the scaling of the values to represent the model output
-    :to: the output to write the table to. Defaults to stdout.
+    :to: the output to write the table to. Defaults to printing.
     """
     # pylint: disable=too-many-arguments, too-many-locals
     # We plot the keys common to the labels & preds, & optionally the input list
@@ -330,6 +336,10 @@ def table_of_predictions_vs_labels(
     # Extracts the raw values from the label and prediction List[Dict]s
     (raw_labels, pred_noms, _, ocs) \
         = _get_label_and_prediction_raw_values(labels, predictions, keys, reverse_scaling)
+
+    print_it = not to
+    if print_it:
+        to = StringIO()
 
     line_len = 13 + (11 * len(keys))-1 + 22
     for heading, rlabs, rpreds, rocs in zip(block_headings, raw_labels, pred_noms, ocs):
@@ -349,6 +359,8 @@ def table_of_predictions_vs_labels(
                  f" {np.mean(np.abs(ocs)):10.6f}\n")
     to.write(f"{'MSE':<10s} | " + " ".join([f"{v:10.6f}" for v in np.mean(np.power(ocs, 2), 0)]) +
                  " "*11 + f" {np.mean(np.power(ocs, 2)):10.6f}\n")
+    if print_it:
+        print(to.getvalue())
 
 
 def plot_predictions_vs_labels(
