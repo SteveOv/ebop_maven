@@ -805,7 +805,7 @@
         "logLB": 0.399,         "logLB_err": 0.013,
         "rA": 0.086370,         "rA_err": 0.000078,
         "rB": 0.084536,         "rB_err": 0.000091,
-        "desc": "A circular orbit with similar primary and secondary eclipses similar of approximately 0.45 mag. Some distortion of the light curve near BTJD 1791.",
+        "desc": "An incloned circular orbit with similar primary and secondary eclipses of approximately 0.5 mag. The similarity of the components' radii will likely make predicting and fitting k and J challenging. There is some distortion of the light curve near BTJD 1791.",
         "transits": false,
         "eclipses_similar": true,
         "components_similar": true,
