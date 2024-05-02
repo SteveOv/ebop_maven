@@ -401,7 +401,7 @@
         "logLB": -0.41,         "logLB_err": 0.07,
         "rA": 0.18817,          "rA_err": 0.00061,
         "rB": 0.07231,          "rB_err": 0.00044,
-        "desc": "An inclined slightly eccentric orbit with shallow transits of approximately 0.2 and 0.03 mag. Star B is signifantly smaller and less massive.",
+        "desc": "An inclined slightly eccentric orbit with shallow transits of approximately 0.2 and 0.03 mag and clear ellipsoidal effect. Star B is signifantly smaller, less luminous and less massive. The published parameters include a significant negative third light value.",
         "transits": true,
         "eclipses_similar": false,
         "components_similar": false,
