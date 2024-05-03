@@ -809,9 +809,9 @@
         "transits": false,
         "eclipses_similar": true,
         "components_similar": true,
-        "notes": "e=0 & ω=0 & L3=0 (fixed); bP derived from rA, inc, e & esinw;",
-        "primary_epoch": 1806.9611680,
-        "period": 4.2220216,
+        "notes": "e=0 & ω=0 & L3=0 (fixed); bP derived from rA, inc, e & esinw; control fit on S18 gives MAE~0.0027 (distortion nr BTJD 1791 doesn't affect fit);",
+        "primary_epoch": 1806.960762116,
+        "period": 4.222017264,
         "labels": { 
             "rA_plus_rB": 0.170906,     "rA_plus_rB_err": 0.000035,
             "k": 0.9788,                "k_err": 0.0019,
