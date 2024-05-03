@@ -925,9 +925,9 @@
         "transits": false,
         "eclipses_similar": true,
         "components_similar": true,
-        "notes": "L3=0 (fixed); rA_plus_rB & k derived from rA & rB in table 8; J from JKTEBOP fit; bP derived from rA, inc, e & esinw;",
-        "primary_epoch": 1559.4571181,
-        "period": 5.0058710,
+        "notes": "L3=0 (fixed); rA_plus_rB & k derived from rA & rB in table 8; J from trial JKTEBOP fit; bP derived from rA, inc, e & esinw; control fit with S9 gives MAE~0.027;",
+        "primary_epoch": 1559.457666802,
+        "period": 5.005887473,
         "ecc": 0.0001,          "ecc_err": 0.0001,
         "omega": 217,           "omega_err": 11,
         "labels": { 
