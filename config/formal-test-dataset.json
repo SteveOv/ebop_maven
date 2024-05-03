@@ -988,7 +988,7 @@
         }
     },
     "V454 Aur": {
-        "source": "Early sight of Rediscussion XIX, Table II.  TESS sectors 20, 43, 44, 45, 60, 71, 72 and 73 SAP photometry analysed with JKTEBOP version 43.",
+        "source": "Rediscussion XIX, Table II.  TESS sectors 20, 43, 44, 45, 60, 71, 72 and 73 SAP photometry analysed with JKTEBOP version 43.",
         "reference": "Southworth24obsR19",
         "aka": "TIC 138333980, HD 44192",
         "SpT": "F8 V + G1-2 V", 
@@ -1002,13 +1002,13 @@
         "logLB": 0.281,         "logLB_err": 0.028,
         "rA": 0.019875,         "rA_err": 0.000039,
         "rB": 0.024582,         "rB_err": 0.000010,
-        "desc": "A highly eccentric 27.2 d orbit with eclipses of approximately 0.4 and 0.3 mag, although some sectors don't have both. Very narrow eclipses not well represented with 1024 data points. Primary less massive and cooler.",
+        "desc": "A highly eccentric 27.2 d orbit with eclipses of approximately 0.4 and 0.3 mag and the secondary after phase 0.65. It is in an unusual configuration with Star A both smaller and cooler than Star B, as the primary eclipse (of Star A) occurs when the stars are closer in their orbits than the secondary. We use sectors 43-45 to get sufficient coverage for a reliable control fit.",
         "transits": false,
         "eclipses_similar": false,
         "components_similar": false,
-        "notes": "L3=0 (fixed); bP derived from rA, inc, e & esinw;",
-        "primary_epoch": 2526.2961006,
-        "period": 27.0198177,
+        "notes": "L3=0 (fixed); bP derived from rA, inc, e & esinw; a very difficult fit - need R19 LD algo+coeffs and multiple sectors to get a reliable fit & prevent JKTEBOP gaussj warnings;",
+        "primary_epoch": 2526.296860413,
+        "period": 27.019855062,
         "ecc": 0.38056,         "ecc_err": 0.00017,
         "omega": 49.562,        "omega_err": 0.025,
         "labels": { 
@@ -1022,14 +1022,25 @@
             "L3": 0.0,                  "L3_err": null
         },
         "sectors": {
+            "43": {
+                "quality_bitmask": "hard"
+            },
             "44": {
                 "quality_bitmask": "hard"
             },
             "45": {
                 "quality_bitmask": "hard"
             }
+        },
+        "fit_overrides": {
+            "LDA": "pow2",
+            "LDB": "pow2",
+            "LDA1": 0.623,
+            "LDB1": 0.623,
+            "LDA2": 0.545,
+            "LDB2": 0.545
         }
-    },
+    },  
     "CM Dra": {
         "source": "DEBCAT and Martin et al. (2024), Table I. TESS Sectors 16, 19, 22-26, 49-52 (all slow) and 56-59 (200 s) analysed with EXOPLANET. SpT, Teff & logL from Morales et al. (2009).",
         "reference": "MartinSethi+24mnras, MoralesRibas+09apj",
