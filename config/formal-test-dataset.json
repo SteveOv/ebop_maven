@@ -947,7 +947,7 @@
         }
     },
     "V963 Cen": {
-        "source": "DEBCat and Graczyk et al. (2022) who use WD for fitting.",
+        "source": "DEBCat and Graczyk et al. (2022) who use WD for fitting. Assuming TESS sector 38 was used. Sectors 64 and 65 have since been released.",
         "reference": "GraczykPietrzynski+22aa",
         "aka": "TIC 262126225, HD 115496",
         "SpT": "G2 V",
@@ -961,13 +961,13 @@
         "logLB": 0.32,          "logLB_err": 0.02,
         "rA": 0.04320,          "rA_err": 0.00015,
         "rB": 0.04248,          "rB_err": 0.00020,
-        "desc": "A highly eccentric orbit with eclipses of approximately 0.4 and 0.15 mag. The secondary eclipse is near phase 0.3. Some variability in LC means fold and fit is approximate.",
+        "desc": "A highly eccentric orbit showing partial eclipses of approximately 0.4 and 0.15 mag with the secondary near phase 0.3. Some long period variability is seen in the light curve. The two components are very similar in radius and luminosity which will make predicting and fitting in k and J challenging.",
         "transits": false,
         "eclipses_similar": false,
         "components_similar": true,
         "notes": "rA_plus_rB & k derived from rA & rB in table 8; bP derived from rA, inc, e & esinw;",
-        "primary_epoch": 2341.077182,
-        "period": 15.269303,
+        "primary_epoch": 2341.076359237,
+        "period": 15.269040674,
         "ecc": 0.4223,          "ecc_err": 0.0016,
         "omega": 140.10,        "omega_err": 0.03,
         "labels": { 
@@ -982,7 +982,8 @@
         },
         "sectors": {
             "38": {
-                "quality_bitmask": "hardest"
+                "quality_bitmask": "hardest",
+                "quality_masks": [[2346.0, 2346.5]]
             }
         }
     },
