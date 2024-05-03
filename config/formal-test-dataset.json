@@ -965,9 +965,9 @@
         "transits": false,
         "eclipses_similar": false,
         "components_similar": true,
-        "notes": "rA_plus_rB & k derived from rA & rB in table 8; bP derived from rA, inc, e & esinw;",
-        "primary_epoch": 2341.076359237,
-        "period": 15.269040674,
+        "notes": "rA_plus_rB & k derived from rA & rB in table 8; bP derived from rA, inc, e & esinw; could not get a good control fit with S38 (MAE~0.3) - best with S65 (MAE~0.02);",
+        "primary_epoch": 3074.002814764,
+        "period": 15.269532884,
         "ecc": 0.4223,          "ecc_err": 0.0016,
         "omega": 140.10,        "omega_err": 0.03,
         "labels": { 
@@ -981,9 +981,8 @@
             "L3": -0.028,           "L3_err": 0.004
         },
         "sectors": {
-            "38": {
-                "quality_bitmask": "hardest",
-                "quality_masks": [[2346.0, 2346.5]]
+            "65": {
+                "quality_bitmask": "hardest"
             }
         }
     },
