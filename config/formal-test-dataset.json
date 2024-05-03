@@ -1060,9 +1060,9 @@
         "transits": false,
         "eclipses_similar": true,
         "components_similar": true,
-        "notes": "Martin values; L3=0 (fixed)",
-        "primary_epoch": 2844.696709,
-        "period": 1.268389,
+        "notes": "Martin values; L3=0 (fixed); just a single sector needed for a good fit as the period is so short;",
+        "primary_epoch": 2872.601497313,
+        "period": 1.268388816,
         "ecc": 0.00527,         "ecc_err": 0.00021,
         "omega": 107.98,        "omega_err": 0.70,
         "labels": { 
@@ -1076,7 +1076,7 @@
             "L3": 0.0,              "L3_err": null
         },
         "sectors": {
-            "56": {
+            "57": {
                 "quality_bitmask": "hard"
             }
         },
