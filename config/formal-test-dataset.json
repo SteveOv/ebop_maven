@@ -769,9 +769,9 @@
         "transits": false,
         "eclipses_similar": true,
         "components_similar": true,
-        "notes": "bP derived from rA, inc, e & esinw;",
-        "primary_epoch": 1847.488017872,
-        "period": 3.145795630,
+        "notes": "bP derived from rA, inc, e & esinw; control fit on S20 gives MAE~0.002477;",
+        "primary_epoch": 1847.487096393,
+        "period": 3.145776615,
         "ecc": 0.00985,         "ecc_err": 0.00027,
         "omega": 133.7,         "omega_err": 1.5,
         "labels": { 
