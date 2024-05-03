@@ -907,7 +907,7 @@
         }
     },
     "QR Hya": {
-        "source": "DEBCat and Graczyk et al. (2022) table 8 who use WD for fitting. Sectors 9 & 36 would have been available with 63 released subsequent to publication.",
+        "source": "DEBCat and Graczyk et al. (2022) table 8 who use WD for fitting TESS sector 9. Sectors 36 and 63 released subsequent to publication.",
         "reference": "GraczykPietrzynski+22aa",
         "aka": "TIC 49003142, HD 94853",
         "SpT": "G1 V",
@@ -921,7 +921,7 @@
         "logLB": 0.18,          "logLB_err": 0.02,
         "rA": 0.08059,          "rA_err": 0.00025,
         "rB": 0.07547,          "rB_err": 0.00034,
-        "desc": "A slightly eccentric and inclined orbit with eclipses of approximately 0.30 and 0.28 mag.",
+        "desc": "An inclined orbit with partial eclipses of approximately 0.30 and 0.28 mag. ",
         "transits": false,
         "eclipses_similar": true,
         "components_similar": true,
