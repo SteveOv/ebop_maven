@@ -722,31 +722,31 @@
         "TeffB": 6740,          "TeffB_err": 105,
         "logLA": 0.653,         "logLA_err": 0.027,
         "logLB": 0.651,         "logLB_err": 0.027,
-        "rA": 0.10791,          "rA_err": 0.00013,
-        "rB": 0.10777,          "rB_err": 0.00014,
-        "desc": "An eccentric orbit with low inclination and similar eclipses of approximately 0.7 mag depth. The two components are similar and it expected the k and J will be challenging to predict and fit. The source article recommends fitting the sectors separately due to systematic variation in eclipse depths between sectors; we use only sector 17 for fitting and labels.",
+        "rA": 0.10798,          "rA_err": 0.00020,
+        "rB": 0.10737,          "rB_err": 0.00024,
+        "desc": "An eccentric orbit with low inclination and similar eclipses of approximately 0.7 mag depth. The two components are similar and it expected the k and J will be challenging to predict and fit.",
         "transits": false,
         "eclipses_similar": true,
         "components_similar": true,
-        "notes": "Using values from table II, Sector 17; bP derived from rA, inc, e & esinw;",
-        "primary_epoch": 1778.309129340,
-        "period": 3.896651299,
-        "ecc": 0.08867,         "ecc_err": 0.00013,
-        "omega": 335.74,        "omega_err": 0.19,
-
+        "notes": "Using values from table II, Sector 24; best control fit with S24, including clipped regions from source article, gives MAE~0.0033;",
+        "primary_epoch": 1977.037849879,
+        "period": 3.896637360,
+        "ecc": 0.08878,         "ecc_err": 0.00015,
+        "omega": 335.64,        "omega_err": 0.23,
         "labels": { 
-            "rA_plus_rB": 0.21568,  "rA_plus_rB_err": 0.00014,
-            "k": 0.9986,            "k_err": 0.0021,
-            "bP": 0.048,            "bP_err": 0.003,
-            "inc": 89.714,          "inc_err": 0.015,
-            "ecosw": 0.080838,      "ecosw_err": 0.000007,
-            "esinw": -0.03644,      "esinw_err": 0.00032,
-            "J": 0.99963,           "J_err": 0.00054,
-            "L3": 0.0481,           "L3_err": 0.0030
+            "rA_plus_rB": 0.21535,  "rA_plus_rB_err": 0.00023,
+            "k": 0.9944,            "k_err": 0.0035,
+            "bP": null,            "bP_err": null,
+            "inc": 89.679,          "inc_err": 0.022,
+            "ecosw": 0.080887,      "ecosw_err": 0.000010,
+            "esinw": -0.03662,      "esinw_err": 0.00039,
+            "J": 0.99995,           "J_err": 0.00083,
+            "L3": 0.0222,           "L3_err": 0.0044
         },
         "sectors": {
-            "17": {
-                "quality_bitmask": "hardest"
+            "24": {
+                "quality_bitmask": "hardest",
+                "quality_masks": [[1955.0, 1958.0], [1969.0, 1972.0]]
             }
         }
     },
@@ -769,7 +769,7 @@
         "transits": false,
         "eclipses_similar": true,
         "components_similar": true,
-        "notes": "bP derived from rA, inc, e & esinw; control fit on S20 gives MAE~0.002477;",
+        "notes": "bP derived from rA, inc, e & esinw; control fit on S20 gives MAE~0.0025 & cannot be bettered with newer sectors;",
         "primary_epoch": 1847.487096393,
         "period": 3.145776615,
         "ecc": 0.00985,         "ecc_err": 0.00027,
