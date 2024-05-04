@@ -518,12 +518,12 @@
         "rA": 0.16107,          "rA_err": 0.00028,
         "rB": 0.14489,          "rB_err": 0.00039,
         "desc": "A circular orbit with clear primary and secondary eclipses of approximately 0.38 and 0.35 mag.",
-        "primary_epoch": 2813.984151,
         "transits": false,
         "eclipses_similar": true,
         "components_similar": false,
-        "notes": "e=0 & ω=0 (fixed);",
-        "period": 2.98465593,
+        "notes": "e=0 & ω=0 (fixed); control fit on S55, with masked range from source article, yields MAE~0.028;",
+        "primary_epoch": 2813.984145622,
+        "period": 2.984658266,
         "labels": { 
             "rA_plus_rB": 0.30576,  "rA_plus_rB_err": 0.00020,
             "k": 0.8983,            "k_err": 0.0038,
@@ -536,7 +536,8 @@
         },
         "sectors": {
             "55": {
-                "quality_bitmask": "hard"
+                "quality_bitmask": "hard",
+                "quality_masks": [[2804.25, 2811.7]]
             }
         },
         "author": "TESS-SPOC",
