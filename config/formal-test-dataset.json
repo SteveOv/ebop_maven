@@ -225,7 +225,7 @@
         }
     },
     "V889 Aql": {
-        "source": "DEBCAT and Baroch et al. (2022) Tables 9 and 10. TESS sector 40 analysed with JKTEBOP and all params published",
+        "source": "DEBCAT and Baroch et al. (2022) Tables 9 and 10. Used SAP flux extracted from TESS sectors 14 and 40 FFIs analysed with JKTEBOP and all params published. TESS sector 40 & 54 600 s timeseries data now available.",
         "reference": "BarochGimenez+22aa",
         "aka": "TIC 300000680, HD 181166",
         "SpT": "B9.5 V",
@@ -239,13 +239,13 @@
         "logLB": 1.32,          "logLB_err": 0.03,
         "rA": 0.0549,           "rA_err": 0.00012,
         "rB": 0.0544,           "rB_err": 0.00012,
-        "desc": "A highly eccentric orbit with the secondary eclipse before phase 0.4. This coupled with the stars having similar radii make k and J difficult to predict and fit. As with the published work, we use sector 40 and their spectroscopic light-ratio for fitting. Sector 40 shows some long term trends which our detrending is not removing however this does not appear to be overly detrimental to the predictions or fitting.",
+        "desc": "A highly eccentric orbit with the secondary eclipse before phase 0.4. This coupled with the stars having similar radii make k and J difficult to predict and fit. We use sector 40 timeseries data and the published spectroscopic light-ratio for fitting. Sector 40 shows some long term trends which our detrending is not removing however this does not appear to be overly detrimental to the predictions or fitting.",
         "transits": false,
         "eclipses_similar": false,
         "components_similar": true,
-        "notes": "e=0.3750 (fixed); ecosw & esinw derived from table 9; bP derived from rA, inc, e & esinw;",
-        "primary_epoch": 2416.259790,
-        "period": 11.120757,
+        "notes": "e=0.3750 (fixed); ecosw & esinw derived from table 9; bP derived from rA, inc, e & esinw; best control fit with sector 40 SAP flux and published lrat yields MAE~0.0063 (Long term trends in the LC don't appear too detrimental to the fit. S54 is slightly better, but S40 is more representative of the published work);",
+        "primary_epoch": 2416.260030764,
+        "period": 11.120710471,
         "ecc": 0.3750,          "ecc_err": null,
         "omega": 126.1,         "omega_err": 0.2,
         "labels": { 
@@ -267,7 +267,7 @@
         "author": "TESS-SPOC",
         "exptime": 600,
         "fit_overrides": {
-            "lrat": ["2418.23 0.98 0.06"]
+            "lrat": ["2407.106 0.98 0.06"]
         }
     },
     "WW Aur": {
