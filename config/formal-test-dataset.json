@@ -598,13 +598,13 @@
         "logLB": 0.943,         "logLB_err": 0.026,
         "rA": 0.11440,          "rA_err": 0.00011,
         "rB": 0.12230,          "rB_err": 0.00006,
-        "desc": "A circular orbit with similar eclipses at approximately 0.65 mag each. With the stars having similar size and luminosity, predicting and fitting k and J is expected to be a challenge.",
+        "desc": "A circular orbit with similar eclipses at approximately 0.65 mag each. With the stars having similar size and luminosity, predicting and fitting k, J and inc is expected to be a challenge.",
         "transits": false,
         "eclipses_similar": true,
         "components_similar": true,
-        "notes": "e=0 & ω=0 (fixed); bP derived from rA, inc, e & esinw;",
-        "primary_epoch": 1942.301590525,
-        "period": 4.99176522,
+        "notes": "e=0 & ω=0 (fixed); bP derived from rA, inc, e & esinw; control fit uses quality flags from source article, with sector 23 & 50 giving an MAE~0.00085;",
+        "primary_epoch": 1942.300643521,
+        "period": 4.991765215,
         "labels": { 
             "rA_plus_rB": 0.23669,  "rA_plus_rB_err": 0.00008,
             "k": 1.0691,            "k_err": 0.0014,
@@ -617,7 +617,10 @@
         },
         "sectors": {
             "23": {
-                "quality_bitmask": "default"
+                "quality_bitmask": "none"
+            },
+            "50": {
+                "quality_bitmask": "hardest"                
             }
         }
     },
