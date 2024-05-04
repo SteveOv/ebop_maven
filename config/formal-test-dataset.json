@@ -309,7 +309,7 @@
         }
     },
     "V788 Cen": {
-        "source": "DEBCat and Graczyk et al. (2022) who use WD for fitting sectors 10 and 37 (Table 8).",
+        "source": "DEBCat and Graczyk et al. (2022) (Table 8) who use WD for fitting SAP flux of 2nd half of sector 37 (as least affected by starspots), leaving sector 10 unused.",
         "reference": "GraczykPietrzynski+22aa",
         "aka": "TIC 258314976, HD 105509",
         "SpT": "A2mA5-F2",
@@ -327,9 +327,9 @@
         "transits": false,
         "eclipses_similar": false,
         "components_similar": false,
-        "notes": "e=0.0 & ω=0.0 fixed; rA_plus_rB & k derived from rA & rB in table 8; J from JKTEBOP fit; bP derived from rA, inc, e & esinw;",
-        "primary_epoch": 1588.923728350,
-        "period": 4.966268262,
+        "notes": "e=0.0 & ω=0.0 fixed; J from trial JKTEBOP fit; bP derived from rA, inc, e & esinw; control fit on SAP flux of 2nd half of S37 yields MAE~0.034",
+        "primary_epoch": 2323.949317858,
+        "period": 4.966388646,
         "labels": { 
             "rA_plus_rB": 0.235,    "rA_plus_rB_err": 0.005,
             "k": 0.60,              "k_err": 0.02,
@@ -341,8 +341,9 @@
             "L3": 0.021,            "L3_err": 0.002
         },
         "sectors": {
-            "10": {
-                "quality_bitmask": "hardest"
+            "37": {
+                "quality_bitmask": "default",
+                "quality_masks": [[2307.0, 2319.5]]
             }
         }
     },
