@@ -41,7 +41,7 @@
         }
     },
     "V539 Ara": {
-        "source": "DEBCat and Southworth & Bowman (2022) Table 3. Tess sectors 13 and 39 analysed with JKTEBOP. Teffs reproduced from Clausen (1996).",
+        "source": "DEBCat and Southworth & Bowman (2022) Table 3. Tess sectors 13 and 39 SAP data separately analysed with JKTEBOP (due to apsidal motion). Teffs reproduced from Clausen (1996).",
         "reference": "SouthworthBowman22mnras",
         "aka": "TIC 396903513, HD 161783",
         "SpT": "B3 V + B4 V",
@@ -59,9 +59,9 @@
         "transits": false,
         "eclipses_similar": false,
         "components_similar": false,
-        "notes": "bP derived from rA, inc, e & esinw;",
-        "primary_epoch": 1671.16681549,
-        "period": 3.168604135,
+        "notes": "bP derived from rA, inc, e & esinw; control fit of sector 13 SAP data yields MAE~0.061 (S39 worse);",
+        "primary_epoch": 1671.167003858,
+        "period": 3.169080048,
         "ecc": 0.0555,              "ecc_err": 0.0011,
         "omega": 214.2,             "omega_err": 1.1,
         "labels": {
