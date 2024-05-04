@@ -445,9 +445,9 @@
         "transits": false,
         "eclipses_similar": false,
         "components_similar": true,
-        "notes": "e=0 & ω=0 (fixed); logLB=0.78(5) from from Bakis+ logLA and Van Reeth+ Light Ratio;",
-        "primary_epoch": 1712.409949,
-        "period": 0.891195,
+        "notes": "e=0 & ω=0 (fixed); logLB=0.78(5) from from Bakis+ logLA and Van Reeth+ Light Ratio; control fit of sectors 14 and 15 yields MAE~0.012;",
+        "primary_epoch": 1712.409315791,
+        "period": 0.891193163,
         "labels": { 
             "rA_plus_rB": 0.5228,   "rA_plus_rB_err": 0.0010,
             "k": 0.935,             "k_err": 0.012,
@@ -459,8 +459,11 @@
             "L3": -0.0344,          "L3_err": 0.0059
         },
         "sectors": {
+            "14": {
+                "quality_bitmask": "default"
+            },
             "15": {
-                "quality_bitmask": "hardest"
+                "quality_bitmask": "default"
             }
         }
     },
