@@ -271,7 +271,7 @@
         }
     },
     "WW Aur": {
-        "source": "DEBCat and Southworth et al. (2005) who use EBOP (with mods to fit rA+rB & k and to use MRQMIN) for fitting of observations from the 1970s. We use V-band fitting results (Table 10). Available TESS sectors 29, 43-45, 60 & 71-73 at 120 s cadence.",
+        "source": "DEBCat and Southworth et al. (2005) who use EBOP (with mods to fit rA+rB & k and to use MRQMIN) for fitting of observations from the 1970s. We use V-band fitting results (Table 10). Available TESS sectors 20, 43-45, 60 & 71-73 at 120 s cadence.",
         "reference": "SouthworthSMalley+05mnras",
         "aka": "TIC 172171873, HD 46052",
         "SpT": "A4 m + A5 m",
@@ -285,13 +285,13 @@
         "logLB": 1.023,         "logLB_err": 0.093,
         "rA": 0.1562,           "rA_err": 0.0034,
         "rB": 0.1556,           "rB_err": 0.0029,
-        "desc": "An inclined circular orbit showing partial eclipses of approximately 0.64 and 0.55 mag. The combination of partial eclipses and stars of similar radius makes predicting and fitting k and J a challenge. Published work based on legacy photometry wheras we have used TESS data.",
+        "desc": "An inclined circular orbit showing partial eclipses of approximately 0.64 and 0.55 mag. The combination of partial eclipses and stars of similar radius makes predicting and fitting k, J & inc a challenge. Published work based on legacy photometry whereas we have used TESS data.",
         "transits": false,
         "eclipses_similar": false,
         "components_similar": true,
-        "notes": "e=0.0 & ω=0.0 & L3=0 (fixed);",
-        "primary_epoch": 2511.2697083,
-        "period": 2.5250191,
+        "notes": "e=0.0 & ω=0.0 & L3=0 (fixed); best control fit is sector 20 only SAP flux which yields MAE~0.018;",
+        "primary_epoch": 1862.339276176,
+        "period": 2.525018489,
         "labels": {
             "rA_plus_rB": 0.3118,   "rA_plus_rB_err": 0.0009,
             "k": 0.996,             "k_err": 0.041,
@@ -303,8 +303,9 @@
             "L3": 0.0,               "L3_err": null
         },
         "sectors": {
-            "44": {
-                "quality_bitmask": "hardest"
+            "20": {
+                "quality_bitmask": "hard",
+                "quality_masks": [[1856.0, 1857.0]]
             }
         }
     },
