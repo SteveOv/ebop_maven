@@ -678,11 +678,11 @@
         "logLB": 0.839,         "logLB_err": 0.046,
         "rA": 0.047920,         "rA_err": 0.000077,
         "rB": 0.058739,         "rB_err": 0.000032,
-        "desc": "A highly eccentric orbit with the secondary eclipse near phase 0.8. The analysis in the source article used early TESS FFI observations of 1800 s cadence, here we use sectors 52 and 53 timeseries data (subsequent to publication) which has a cadence of 600 s.",
+        "desc": "A highly eccentric 20.1 d orbit with the secondary eclipse near phase 0.8 and eclipse depths of approximately 0.6 and 0.5 mag.  The analysis in the source article used early TESS FFI observations of 1800 s cadence, here we use sectors 52 and 53 timeseries data (subsequent to publication) which has a cadence of 600 s.",
         "transits": false,
         "eclipses_similar": false,
         "components_similar": false,
-        "notes": "L3=0 (fixed); bP derived from rA, inc, e & esinw;",
+        "notes": "L3=0 (fixed); bP derived from rA, inc, e & esinw; source article based sectors 19, 25 & 26 FFIs - we use sectors 52 & 53 @ 600 s cadence to get full coverage of the orbit giving MAE~0.014;",
         "primary_epoch": 2726.954040600,
         "period": 20.999132275,
         "ecc": 0.4676,          "ecc_err": 0.0002,
@@ -702,7 +702,8 @@
                 "quality_bitmask": "hardest"
             },
             "53": {
-                "quality_bitmask": "hardest"
+                "quality_bitmask": "hardest",
+                "quality_masks": [[2743.9, 2744.7]]
             }
         },
         "author": "TESS-SPOC",
