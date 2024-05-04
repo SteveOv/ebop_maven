@@ -387,7 +387,7 @@
         }
     },
     "V362 Pav": {
-        "source": "DEBCat and Graczyk et al. (2022) Table 8 who use WD for fitting.",
+        "source": "DEBCat and Graczyk et al. (2022) Table 8 who use WD for fitting of SAP fluxes of 2nd half of Sector 13.",
         "reference": "GraczykPietrzynski+22aa",
         "aka": "TIC 464422047, HD 173344",
         "SpT": "A2mA5-A9",
@@ -405,9 +405,9 @@
         "transits": true,
         "eclipses_similar": false,
         "components_similar": false,
-        "notes": "J from JKTEBOP fit; rA_plus_rB & k derived from rA & rB in table 8; bP derived from rA, inc, e & esinw;",
-        "primary_epoch": 1664.39587906,
-        "period": 2.74843680,
+        "notes": "J from JKTEBOP fit; rA_plus_rB & k derived from rA & rB in table 8; bP derived from rA, inc, e & esinw; control fit of S13 SAP fluxes yields MAE~0.072 (use whole sector as restricting to 2nd half gives worse fit);",
+        "primary_epoch": 1675.389224513,
+        "period": 2.748420962,
         "ecc": 0.0014,          "ecc_err": 0.0004,
         "omega": 283,           "omega_err": 16,
         "labels": { 
