@@ -172,7 +172,7 @@
         }
     },
     "V1229 Tau": {
-        "source": "DEBCat and Southworth et al. (2023), Table I. TESS sectors 42-44 analysed with JKTEBOP version 43.",
+        "source": "DEBCat and Southworth et al. (2023), Table I. TESS sectors 42-44 SAP flux analysed with JKTEBOP version 43.",
         "reference": "SouthworthMurphy+23mnrasl",
         "aka": "TIC 125754991, HD 23642",
         "SpT": "F5",
@@ -186,13 +186,13 @@
         "logLB": 0.792,         "logLB_err": 0.023,
         "rA": 0.1494,           "rA_err": 0.0016,
         "rB": 0.1171,           "rB_err": 0.0017,
-        "desc": "An inclined, circular orbit with shallow primary (~0.10 mag) and secondary (~0.05 mag) partial eclipses and δ Scuti pulsations. These shallow, partial eclipses present a challange to predicting and fitting k. We use the published spectroscopic light-ratio and LD parameters from Southworth et al. (2023) with sectors 42 to 44 for fitting.",
+        "desc": "An inclined, circular orbit with shallow primary (~0.10 mag) and secondary (~0.05 mag) partial eclipses, reflection and ellipsoidal effects. These shallow, partial eclipses present a challange to predicting and fitting k. We use the published spectroscopic light-ratio and LD parameters from Southworth et al. (2023) with sectors 42 to 44 for fitting.",
         "transits": false,
         "eclipses_similar": false,
         "components_similar": false,
-        "notes": "e=0.0 & ω=0.0 (fixed);",
-        "primary_epoch": 2464.982832,
-        "period": 2.461132,
+        "notes": "e=0.0 & ω=0.0 (fixed); best fit using SAP photometry on sectors 42-44 and fixing the published lrat and LD params yields MAE~0.061",
+        "primary_epoch": 2464.981949127,
+        "period": 2.461132246,
         "labels": {
             "rA_plus_rB": 0.2664,   "rA_plus_rB_err": 0.0011,
             "k": 0.784,             "k_err": 0.012,
@@ -218,10 +218,12 @@
             "LDA": "pow2",
             "LDB": "pow2",
             "LDA1": 0.52,
-            "LDB1": 0.52,
+            "LDB1": 0.63,
             "LDA2": 0.45,
-            "LDB2": 0.45,
-            "lrat": ["2465.75 0.328 0.011"]
+            "LDB2": 0.42,
+            "LDA1_fit": 0,
+            "LDB1_fit": 0,
+            "lrat": ["2465.60 0.328 0.011"]
         }
     },
     "V889 Aql": {
