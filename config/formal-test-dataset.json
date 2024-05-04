@@ -365,9 +365,9 @@
         "transits": false,
         "eclipses_similar": false,
         "components_similar": false,
-        "notes": "bP derived from rA, inc, e & esinw; period set from trial fit;",
-        "primary_epoch": 1851.927737130,
-        "period": 9.9451266,
+        "notes": "bP derived from rA, inc, e & esinw; control fit on sector 20 yields MAE~0.0089;",
+        "primary_epoch": 1851.926234608,
+        "period": 9.945126564,
         "ecc": 0.078078,        "ecc_err": 0.000076,
         "omega": 178.8,         "omega_err": 2.3,
         "labels": { 
