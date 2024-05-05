@@ -501,12 +501,23 @@ def prepare_lc_for_target_sector(target: str,
         lightcurve.bin_lightcurve(lc, time_bin_seconds, verbose)
 
     lightcurve.append_magnitude_columns(lc, "delta_mag", "delta_mag_err")
-    lc["delta_mag"] -= lightcurve.fit_polynomial(lc.time,
-                                                 lc["delta_mag"],
-                                                 config.get("detrend_order", 2),
-                                                 config.get("detrend_iterations", 2),
-                                                 config.get("detrend_sigma_clip", 1.0),
-                                                 verbose=verbose)
+
+    # Detrending and rectifying to differential mags
+    gap_th = config.get("detrend_gap_threshold", None)
+    detrend_ranges = [*lightcurve.find_lightcurve_segments(lc, gap_th or 10000, return_times=True)]
+    if verbose:
+        print("Will detrend (and rectify by subracting trends) over the following range" +
+              (f"(s) (detected on gaps > {gap_th} d)" if gap_th else "") +
+              f" [{lc.time.format}]: " +
+              ", ".join(f"{r[0].value:.6f}-{r[1].value:.6f}" for r in detrend_ranges))
+    for detrend_range in detrend_ranges:
+        mask = (lc.time >= np.min(detrend_range)) & (lc.time <= np.max(detrend_range))
+        lc["delta_mag"][mask] -= lightcurve.fit_polynomial(lc.time[mask],
+                                                          lc["delta_mag"][mask],
+                                                          config.get("detrend_order", 2),
+                                                          config.get("detrend_iterations", 2),
+                                                          config.get("detrend_sigma_clip", 1.0),
+                                                          verbose=verbose)
     return lc
 
 

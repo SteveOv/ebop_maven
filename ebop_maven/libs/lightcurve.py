@@ -344,7 +344,7 @@ def fit_polynomial(times: Time,
             poly_func = np.polynomial.Polynomial(coeffs)
             fit_ydata = poly_func(time_values) * ydata.unit
             if verbose:
-                c_list = ", ".join(f'c{ix} = {c}' for ix, c in enumerate(poly_func.coef))
+                c_list = ", ".join(f'c{ix}={c:.6e}' for ix, c in enumerate(poly_func.coef))
                 print(f"\tGenerated polynomial; y = poly(x, {c_list})",
                       f"(sigma(fit_ydata)={np.std(fit_ydata):.6e})")
 
