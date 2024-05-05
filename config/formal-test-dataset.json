@@ -1,6 +1,6 @@
 {
     "V436 Per": {
-        "source": "DEBCat and Southworth & Bowman (2022) Table 3. Tess sector 18 analysed with JKTEBOP. Teffs reproduced from Janik et al. (2003)",
+        "source": "DEBCat and Southworth & Bowman (2022) Table 3. Tess sector 18 SAP data analysed with JKTEBOP. Teffs reproduced from Janik et al. (2003)",
         "reference": "SouthworthBowman22mnras",
         "aka": "TIC 403625251, HD 11241",
         "SpT": "B1.5 V",
@@ -18,9 +18,9 @@
         "transits": false,
         "eclipses_similar": false,
         "components_similar": false,
-        "notes": "bP derived from rA, inc, e & esinw;",
-        "primary_epoch": 1813.200983878,
-        "period": 25.972980161,
+        "notes": "bP derived from rA, inc, e & esinw; control fit of S18 SAP data (period, PE and LD params set to published values) yields MAE~0.0090;",
+        "primary_epoch": 1813.2011,
+        "period": 25.935953,
         "ecc": 0.3835,          "ecc_err": 0.0018,
         "omega": 109.56,        "omega_err": 0.11,
         "labels": {
@@ -38,6 +38,15 @@
                 "quality_bitmask": "hardest",
                 "quality_masks": [[1790.0, 1792.0]]
             }
+        },
+        "fit_overrides": {
+            "period_fit": 0,
+            "LDA": "quad",
+            "LDB": "quad",
+            "LDA1": 0.046,
+            "LDB1": 0.046,
+            "LDA2": 0.22,
+            "LDB2": 0.22
         }
     },
     "V539 Ara": {
