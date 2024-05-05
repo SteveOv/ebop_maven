@@ -187,7 +187,7 @@ def test_fitting_against_formal_test_dataset(
         table_of_predictions_vs_labels([t_labels], [t_params], estimator, [target])
         fitted_params.append(t_params)
 
-    output_stem = "fitted_params_vs_labels" + "_control" if fit_with_labels else ""
+    output_stem = "fitted_params_vs_labels" + ("_control" if fit_with_labels else "")
     with open(results_dir / f"{output_stem}.txt", "w", encoding="utf8") as of:
         table_of_predictions_vs_labels(labels, fitted_params, estimator, targets, l_names, to=of)
 
