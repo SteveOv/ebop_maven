@@ -90,7 +90,7 @@ def __tess_quad_ld_coeffs_table() -> DataFrame:
     data_file = _this_dir / "data/limb_darkening/quad/J_A+A_618_A20/table5.dat"
     return pd.read_csv(data_file,
                        comment="#",
-                       delim_whitespace=True,
+                       sep=r"\s+",
                        usecols=[0, 1, 2, 4, 5, 9],
                        names=["logg", "Teff", "Z", "a", "b", "Sys"],
                        index_col=["logg", "Teff"])
@@ -103,7 +103,7 @@ def __tess_power2_coeffs_table() -> DataFrame:
     data_file = _this_dir / "data/limb_darkening/pow-2/J_A+A_674_A63/table1.dat"
     return pd.read_csv(data_file,
                     comment="#",
-                    delim_whitespace=True,
+                    sep=r"\s+",
                     usecols=[0, 1, 2, 8, 14],
                     names=["logg", "Teff", "Z", "g", "h"],
                     index_col=["logg", "Teff"])
