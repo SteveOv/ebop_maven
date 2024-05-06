@@ -1,6 +1,8 @@
 """ Matplotlib plotting helper functions. """
 from typing import Tuple, List, Dict, Union
 import math
+from pathlib import Path
+import json
 
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
@@ -143,3 +145,110 @@ def plot_predictions_vs_labels(
         ax.set_aspect("equal", "box")
         ax.set_yticks([t for t in ax.get_xticks() if diag[0] < t < diag[1]])
     return fig
+
+
+def plot_formal_test_dataset_hr_diagrams(verbose: bool=True):
+    """
+    :yields: the Figures
+    """
+    # TODO: temp code - probably pass this data in
+    with open(Path.cwd() / "config/formal-test-dataset.json", mode="r", encoding="utf8") as f:
+        targets = json.load(f)
+
+    # Read in the MIST isochrone which we'll use to plot the ZAMS data
+    if verbose:
+        print("First loading MIST isochrone for ZAMS data")
+    isos = _read_mist_isos()
+
+    plot_labels = {
+        "logTeff": r"$\log{(\mathrm{T_{eff}\,/\,K})}$",
+        "logL": r"$\log{(\mathrm{L\,/\,L_{\odot}})}$",
+        "logM": r"$\log{(\mathrm{M\,/\,M_{\odot}})}$",
+        "logR": r"$\log{(\mathrm{R\,/\,R_{\odot}})}$"
+    }
+
+    for xcol, ycol, xzams, yzams, xlim, ylim in [
+            ("Teff", "logL", "log_Teff", "log_L", (4.45, 3.35), (-2.6, 4.5)),
+            ("M", "R", "star_mass", "log_R", (0.9, -0.75), (-0.75, 0.9)),
+        ]:
+        if verbose:
+            print(f"Plotting {ycol} vs {xcol} 'H-R' diagram (axes will be forced to log-log scale)")
+        figure = plt.figure(figsize=(6, 4), constrained_layout=False)
+        ax = figure.add_subplot(1, 1, 1)
+
+        for comp, fillstyle in [("A", "full"), ("B", "none") ]:
+            # Get the x & y data and get it into log space if it isn't already.
+            # Don't bother with error bars as this is just an indicative distribution.
+            x = [cfg.get(f"{xcol}{comp}", None) or 0 for _, cfg in targets.items()]
+            if not xcol.startswith("log"):
+                x = np.log10(x)
+                xlabel = plot_labels["log" + xcol]
+            else:
+                xlabel = plot_labels[xcol]
+
+            y = [cfg.get(f"{ycol}{comp}", None) or 0 for _, cfg in targets.items()]
+            if not ycol.startswith("log"):
+                y = np.log10(y)
+                ylabel = plot_labels["log" + ycol]
+            else:
+                ylabel = plot_labels[ycol]
+
+            ax.errorbar(x, y, fmt = "o", fillstyle = fillstyle, linewidth = 0.5,
+                        ms = 5., markeredgewidth=0.5, c='tab:blue', label=f"Star{comp}")
+
+            if verbose:
+                print(f"Star {comp}: log({xcol.strip('log')}) range [{min(x):.3f}, {max(x):.3f}]")
+                print(f"Star {comp}: log({ycol.strip('log')}) range [{min(y):.3f}, {max(y):.3f}]")
+
+        # Now plot a ZAMS line from the MIST on the same criteria
+        x = [eep[eep["phase"] == 0][0][xzams] for eep in isos]
+        if not xzams.startswith("log"):
+            x = np.log10(x)
+        y = [eep[eep["phase"] == 0][0][yzams] for eep in isos]
+        if not yzams.startswith("log"):
+            y = np.log10(y)
+        ax.plot(x, y, c="k", ls=(0, (15, 5)), linewidth=0.5, label="ZAMS", zorder=-10)
+
+        format_axes(ax, xlim=xlim, ylim=ylim, xlabel=xlabel, ylabel=ylabel )
+        yield figure
+
+
+def _read_mist_isos(file_name: Path=None) -> List:
+    """
+    Read in a MIST iso file and return an isos list.
+    Just a cut down copy of the sample MIST code.
+    """
+    if not file_name:
+        file_name = Path.cwd() / "config/MIST_v1.2_feh_p0.00_afe_p0.0_vvcrit0.0_basic.iso"
+
+    isos = []
+    with open(file_name, mode="r", encoding="utf8") as f:
+        content = [line.split() for line in f]
+
+        #read one block for each isochrone
+        counter = 0
+        data = content[8:]
+        num_ages = int(content[6][-1])
+        for _ in range(num_ages):
+            # grab info for each isochrone
+            num_eeps = int(data[counter][-2])
+            num_cols = int(data[counter][-1])
+            hdr_list = data[counter+2][1:]
+            formats = tuple([np.int32]+[np.float64 for i in range(num_cols-1)])
+            iso = np.zeros((num_eeps),{'names':tuple(hdr_list),'formats':tuple(formats)})
+
+            # read through EEPs for each isochrone
+            for eep in range(num_eeps):
+                iso_chunk = data[3+counter+eep]
+                iso[eep]=tuple(iso_chunk)
+            isos.append(iso)
+            counter+=3+num_eeps+2
+    return isos
+
+
+if __name__ == "__main__":
+    # Now we're going to plot a H-R diagram of the test systems' components
+    print("\nPlotting H-R diagrams of the targets' components")
+    for fig in plot_formal_test_dataset_hr_diagrams():
+        fig.show()
+    print("hello")
