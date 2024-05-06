@@ -50,6 +50,8 @@ class Testjktebop(unittest.TestCase):
                             "L3_fit": 1,
         "LDA1_fit": 1,      "LDB1_fit": 1,
         "LDA2_fit": 0,      "LDB2_fit": 0,
+        "period_fit": 1,
+        "primary_epoch_fit": 1,
         "data_file_name": "cw_eri_s0004.dat"
     }
 
@@ -57,12 +59,14 @@ class Testjktebop(unittest.TestCase):
     def setUpClass(cls):
         """ Make sure JKTEBOP_DIR is corrected up as tests may modify it. """
         jktebop._jktebop_directory = Path(os.environ.get("JKTEBOP_DIR", "~/jktebop/")).expanduser().absolute()
+        jktebop._jktebop_support_negative_l3 = os.environ.get("JKTEBOP_SUPPORT_NEG_L3", "") == "True"
         return super().setUpClass()
 
     @classmethod
     def tearDownClass(cls):
         """ Make sure JKTEBOP_DIR is corrected up as tests may modify it. """
         jktebop._jktebop_directory = Path(os.environ.get("JKTEBOP_DIR", "~/jktebop/")).expanduser().absolute()
+        jktebop._jktebop_support_negative_l3 = os.environ.get("JKTEBOP_SUPPORT_NEG_L3", "") == "True"
         return super().tearDownClass()
 
     #
@@ -190,12 +194,26 @@ class Testjktebop(unittest.TestCase):
     def test_write_in_file_validation_rules(self):
         """ Testwrite_in_file(some invalid param values) raises ValueError """
         file_name = th.TEST_DATA_DIR / "any_old_file_will_do.dat"
-        for param, value in [("L3", -0.1),
-                             ("rA_plus_rB", 0.9)]:
+        for param, value in [("rA_plus_rB", 0.9)]:
             params = self._task3_params.copy()
             params[param] = value
             with self.assertRaises(ValueError, msg=f"{param} == {value}"):
                 write_in_file(file_name, 3, None, **params)
+
+    def test_write_in_file_L3_configurable_validation_rules(self):
+        """ Testwrite_in_file(some invalid param values) raises ValueError """
+        file_name = th.TEST_DATA_DIR / "any_old_file_will_do.dat"
+        params = self._task3_params.copy()
+        params["L3"] = -0.1
+
+        # Off - we expect an error
+        jktebop._jktebop_support_negative_l3 = False
+        with self.assertRaises(ValueError, msg="L3 == -0.1"):
+            write_in_file(file_name, 3, None, **params)
+
+        # On - no error
+        jktebop._jktebop_support_negative_l3 = True
+        write_in_file(file_name, 3, None, **params)
 
     def test_write_in_file_full_set_of_task2_params(self):
         """ Test write_in_file(full set of task2 template params) asserts file is written """
