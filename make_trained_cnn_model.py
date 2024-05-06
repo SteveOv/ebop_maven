@@ -13,7 +13,7 @@ import tensorflow as tf
 import tensorboard
 import keras
 from keras import layers, initializers, optimizers, callbacks, metrics
-from keras.utils import plot_model
+from keras.utils import plot_model      # pylint: disable=import-error
 
 from ebop_maven import modelling
 from ebop_maven.libs import deb_example
@@ -193,5 +193,5 @@ if __name__ == "__main__":
     FORMAL_RESULTS_DIR = SAVE_DIR / \
         f"results/{MODEL_NAME}/{TRAINSET_NAME}/{deb_example.pub_mags_key}/"
     FORMAL_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    model_testing.test_model_against_formal_test_dataset(model_save_file,
-                                                         results_dir=FORMAL_RESULTS_DIR)
+    model_testing.test_model_against_formal_test_dataset(model_save_file, FORMAL_RESULTS_DIR, 1)
+    model_testing.test_model_against_formal_test_dataset(model_save_file, FORMAL_RESULTS_DIR, 1000)

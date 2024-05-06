@@ -24,10 +24,12 @@ from ebop_maven import modelling, datasets
 
 def test_model_against_formal_test_dataset(
         model: Union[Model, Path],
-        test_dataset_dir: Path=Path("./datasets/formal-test-dataset"),
-        test_dataset_config: Path=Path("./config/formal-test-dataset.json"),
         results_dir: Path=None,
-        plot_results: bool=True):
+        mc_iterations: int=1,
+        skip_ids: List[str]=None,
+        plot_results: bool=True,
+        test_dataset_dir: Path=Path("./datasets/formal-test-dataset"),
+        test_dataset_config: Path=Path("./config/formal-test-dataset.json")):
     """
     Will test the indicated model file against the contents of the formal
     test dataset. The results for MC and non-MC estimates will be written
@@ -35,58 +37,59 @@ def test_model_against_formal_test_dataset(
     to the config for the formal test dataset so that it can retrieve flags.
 
     :model: the save model to test
-    :test_dataset_dir: the location of the formal test dataset
-    :test_dataset_config: Path to the config that created the test dataset
     :results_dir: the parent location to write the results csv file(s) or, if
     None, the /results/{model.name}/{trainset_name} subdirectory of the model location is used
+    :mc_iterations: the number of MC Dropout iterations
+    :skip_ids: list of target ids to not fit    
     :plot_results: whether to produce a plot of the results vs labels
+    :test_dataset_dir: the location of the formal test dataset
+    :test_dataset_config: Path to the config that created the test dataset
     """
     # Create our Estimator. It will tell us which labels it (& the model) can predict.
     estimator = Estimator(model)
     l_names = list(estimator.label_names_and_scales.keys())
     f_names = estimator.input_feature_names
-
-    ids, labels, features = \
-        _get_dataset_labels_and_features(test_dataset_dir, estimator, l_names, f_names, True)
-    inst_count = len(ids)
-
-    # Read additional target data from the config file
-    t_names = [i.split("/")[0] for i in ids] # formal test set has these as target/sector
-    with open(test_dataset_config, mode="r", encoding="utf8") as f:
-        targets_config = json.load(f)
-        transit_flags = [targets_config.get(tn, {}).get("transits", False) for tn in t_names]
-
-    # Make the results directory
-    if results_dir is None:
-        parent = model.parent if isinstance(model, Path) else Path("./drop")
-        results_dir = parent / f"results/{estimator.name}/formal-training-dataset"
     results_dir.mkdir(parents=True, exist_ok=True)
 
-    # Run the predictions twice; with and without using MC Dropout enabled.
-    for iterations, suffix in [(1, "nonmc"), (1000, "mc")]:
-        # Make our prediction which will return [{"name": value, "name_sigma": sigma_value}]*insts
-        # We don't want to unscale predictions so we get the values predicted by the model,
-        # and which match the labels & are consistent with model.evaluate().
-        print(f"\nUsing an Estimator to make predictions on {inst_count} formal test instances.")
-        predictions = estimator.predict(features, iterations, unscale=False)
+    # Gets the target details, labels (scaled) and the mags/ext features make preds from
+    targets, labels, features = _get_dataset_labels_and_features(
+                                test_dataset_dir, estimator, l_names, f_names, True, skip_ids)
+    inst_count = len(targets)
 
-        results_file = results_dir / f"formal.test.{suffix}.csv"
-        with open(results_file, mode="w", encoding="utf8") as of:
-            predictions_vs_labels_to_csv(labels, predictions, estimator, ids, l_names, to=of)
+    prediction_type = "nonmc" if mc_iterations <= 1 else "mc"
+    results_stem = "predictions_vs_labels_" + prediction_type
 
-        print(f"\nSaved predictions and associated loss information to '{results_file}'")
-        (_, _, _, ocs) = _get_label_and_prediction_raw_values(labels, predictions)
-        print("--------------------------------")
-        print(f"Total MAE ({suffix}): {np.mean(np.abs(ocs)):.9f}")
-        print(f"Total MSE ({suffix}): {np.mean(np.power(ocs, 2)):.9f}")
-        print("--------------------------------\n")
+    # Make our prediction which will return [{"name": value, "name_sigma": sigma_value}]*insts
+    # We don't want to unscale predictions so we get the values predicted by the model,
+    # and which match the labels & are consistent with model.evaluate().
+    print(f"\nThe Estimator is making predictions on the {inst_count} formal test instances",
+          f"with {mc_iterations} iteration(s) (iterations >1 triggers MC Dropout algorithm).")
+    predictions = estimator.predict(features, mc_iterations, unscale=False)
 
-        with open(results_file.parent / f"{results_file.stem}.txt", "w", encoding="utf8") as of:
-            table_of_predictions_vs_labels(labels, predictions, estimator, ids, l_names, to=of)
+    with open(results_dir / f"{results_stem}.csv", mode="w", encoding="utf8") as of:
+        predictions_vs_labels_to_csv(labels, predictions, estimator, targets, l_names, to=of)
+        print(f"Saved predictions and associated loss csv to '{of.name}'")
 
-        if plot_results:
-            plot_file = results_file.parent / f"predictions_vs_labels_{suffix}.eps"
-            plot_predictions_vs_labels(labels, predictions, transit_flags, plot_file)
+    with open(results_dir / f"{results_stem}.txt", "w", encoding="utf8") as of:
+        table_of_predictions_vs_labels(labels, predictions, estimator, targets, l_names, to=of)
+        print(f"Saved predictions and associated loss information to '{of.name}'")
+
+    if plot_results:
+        # Find out which systems exhibit full transits so they can be highlighted
+        with open(test_dataset_config, mode="r", encoding="utf8") as f:
+            targets_config = json.load(f)
+            transit_flags = [targets_config.get(t, {}).get("transits", False) for t in targets]
+
+        plot_file = results_dir / f"{results_stem}.eps"
+        plot_predictions_vs_labels(labels, predictions, transit_flags, plot_file)
+        print(f"SAved plot of the predictions vs labels to '{plot_file.name}'")
+
+    # "Underline" this test by echoing some summary statistics
+    (_, _, _, ocs) = _get_label_and_prediction_raw_values(labels, predictions)
+    print("\n--------------------------------")
+    print(f"Total MAE ({prediction_type}): {np.mean(np.abs(ocs)):.9f}")
+    print(f"Total MSE ({prediction_type}): {np.mean(np.power(ocs, 2)):.9f}")
+    print("--------------------------------\n")
 
 
 def test_fitting_against_formal_test_dataset(
@@ -542,27 +545,27 @@ def _get_label_and_prediction_raw_values(
 if __name__ == "__main__":
     TRAINSET_NAME = "formal-training-dataset"   # Assume the usual training set
     the_model = modelling.load_model(Path("./drop/cnn_ext_model.keras"))
-    out_dir = Path(f"./drop/results/{the_model.name}/{TRAINSET_NAME}/{deb_example.pub_mags_key}")
-    out_dir.mkdir(parents=True, exist_ok=True)
-    with redirect_stdout(Tee(open(out_dir / "model_testing.log", "w", encoding="utf8"))):
-        the_model = modelling.load_model(Path("./drop/cnn_ext_model.keras"))
-
-        print("\nTesting the model's estimates\n" + "="*29)
-        test_model_against_formal_test_dataset(the_model, results_dir=out_dir, plot_results=True)
-
-        # Now look at fitting the format-test-dataset
+    save_dir = Path(f"./drop/results/{the_model.name}/{TRAINSET_NAME}/{deb_example.pub_mags_key}")
+    save_dir.mkdir(parents=True, exist_ok=True)
+    with redirect_stdout(Tee(open(save_dir / "model_testing.log", "w", encoding="utf8"))):
         skip = ["V402 Lac", "V456 Cyg"] # Neither are suitable for JKTEBOP fitting
 
+        # Report on the performance of the model/Estimator predictions vs labels
+        print("\nTesting the model's estimates\n" + "="*29)
+        test_model_against_formal_test_dataset(the_model, save_dir, 1, skip, plot_results=True)
+        test_model_against_formal_test_dataset(the_model, save_dir, 1000, skip, plot_results=True)
+
+        # Now look at fitting the format-test-dataset with JKTEBOP
         # Uses the estimator/model inputs to the fitting
         print("\n\nTesting the JKTEBOP fitting derived from the model's estimates\n" + "="*62)
-        test_fitting_against_formal_test_dataset(the_model, out_dir, 1,
+        test_fitting_against_formal_test_dataset(the_model, save_dir, 1,
                                                  skip_ids=skip,
                                                  apply_fit_overrides=True,
                                                  fit_with_labels=False)
 
         # Use the labels as the inputs so we have control data
         print("\n\nTesting the JKTEBOP fitting using the labels as inputs\n" + "="*54)
-        test_fitting_against_formal_test_dataset(the_model, out_dir, 1,
+        test_fitting_against_formal_test_dataset(the_model, save_dir, 1,
                                                  skip_ids=skip,
                                                  apply_fit_overrides=True,
                                                  fit_with_labels=True)
