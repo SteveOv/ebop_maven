@@ -7,13 +7,11 @@ from io import TextIOBase, StringIO
 import sys
 from pathlib import Path
 import json
-import math
 import re
 from contextlib import redirect_stdout
 from textwrap import TextWrapper
 
 import astropy.units as u
-import matplotlib.pyplot as plt
 import numpy as np
 from keras.models import Model
 
@@ -21,6 +19,7 @@ from ebop_maven.libs.tee import Tee
 from ebop_maven.libs import deb_example, lightcurve, jktebop, stellar, limb_darkening
 from ebop_maven.estimator import Estimator
 from ebop_maven import modelling, datasets
+import plots
 
 def test_model_against_formal_test_dataset(
         model: Union[Model, Path],
@@ -52,7 +51,7 @@ def test_model_against_formal_test_dataset(
     results_dir.mkdir(parents=True, exist_ok=True)
 
     # Gets the target details, labels (scaled) and the mags/ext features make preds from
-    targets, labels, features = _get_dataset_labels_and_features(
+    targets, labels, features = get_dataset_labels_and_features(
                                 test_dataset_dir, estimator, l_names, f_names, True, skip_ids)
     inst_count = len(targets)
 
@@ -81,11 +80,11 @@ def test_model_against_formal_test_dataset(
             transit_flags = [targets_config.get(t, {}).get("transits", False) for t in targets]
 
         plot_file = results_dir / f"{results_stem}.eps"
-        plot_predictions_vs_labels(labels, predictions, transit_flags, plot_file)
-        print(f"SAved plot of the predictions vs labels to '{plot_file.name}'")
+        plots.plot_predictions_vs_labels(labels, predictions, transit_flags).savefig(plot_file, dpi=300)
+        print(f"Saved plot of the predictions vs labels to '{plot_file.name}'")
 
     # "Underline" this test by echoing some summary statistics
-    (_, _, _, ocs) = _get_label_and_prediction_raw_values(labels, predictions)
+    (_, _, _, ocs) = get_label_and_prediction_raw_values(labels, predictions)
     print("\n--------------------------------")
     print(f"Total MAE ({prediction_type}): {np.mean(np.abs(ocs)):.9f}")
     print(f"Total MSE ({prediction_type}): {np.mean(np.power(ocs, 2)):.9f}")
@@ -130,7 +129,7 @@ def test_fitting_against_formal_test_dataset(
 
     # Gets the target details, labels (unscaled) and the mags/ext features make preds from
     fitted_params = []
-    targets, labels, features = _get_dataset_labels_and_features(
+    targets, labels, features = get_dataset_labels_and_features(
                                     test_dataset_dir, estimator, l_names, f_names, False, skip_ids)
     target_count = len(targets)
     with open(test_dataset_config, mode="r", encoding="utf8") as f:
@@ -196,8 +195,8 @@ def test_fitting_against_formal_test_dataset(
 
     if plot_results:
         transit_flags = [targets_config[tn].get("transits", False) for tn in targets]
-        plot_file = results_dir / f"{output_stem}.eps"
-        plot_predictions_vs_labels(labels, fitted_params, transit_flags, plot_file)
+        fig = plots.plot_predictions_vs_labels(labels, fitted_params, transit_flags)
+        fig.savefig(results_dir / f"{output_stem}.eps", dpi=300)
 
 
 def base_jktebop_task3_params(period: float,
@@ -286,7 +285,7 @@ def predictions_vs_labels_to_csv(
 
     # Extracts the raw values from the label and prediction List[Dict]s
     (raw_labels, pred_noms, _, ocs) \
-        = _get_label_and_prediction_raw_values(labels, predictions, keys, reverse_scaling)
+        = get_label_and_prediction_raw_values(labels, predictions, keys, reverse_scaling)
 
     print_it = not to
     if print_it:
@@ -348,7 +347,7 @@ def table_of_predictions_vs_labels(
 
     # Extracts the raw values from the label and prediction List[Dict]s
     (raw_labels, pred_noms, _, ocs) \
-        = _get_label_and_prediction_raw_values(labels, predictions, keys, reverse_scaling)
+        = get_label_and_prediction_raw_values(labels, predictions, keys, reverse_scaling)
 
     print_it = not to
     if print_it:
@@ -376,83 +375,7 @@ def table_of_predictions_vs_labels(
         print(to.getvalue())
 
 
-def plot_predictions_vs_labels(
-        labels: List[Dict[str, float]],
-        predictions: List[Union[Dict[str, float], Dict[str, Tuple[float, float]]]],
-        transit_flags: List[bool],
-        plot_file: Path,
-        selected_labels: List[str]=None,
-        reverse_scaling: bool=False):
-    """
-    Will create a plot with a grid of axes, one per label, showing the
-    predictions vs label values.
-
-    :labels: the labels values as a dict of labels per instance
-    :predictions: the prediction values as a dict of predictions per instance.
-    All the dicts may either be as { "key": val, "key_sigma": err } or { "key":(val, err) }
-    :transit_flags: the associated transit flags; points where the transit flag is True
-    are plotted as a filled shape otherwise as an empty shape
-    :plot_File: the file to save the plot to
-    :selected_labels: a subset of the full list of labels/prediction names to render
-    :reverse_scaling: whether to reverse the scaling of the values to represent the model output
-    """
-    # pylint: disable=too-many-arguments, too-many-locals
-    all_pub_labels = {
-        "rA_plus_rB": "$r_A+r_B$",
-        "k": "$k$",
-        "inc": "$i$",
-        "J": "$J$",
-        "ecosw": r"$e\cos{\omega}$",
-        "esinw": r"$e\sin{\omega}$",
-        "L3": "$L_3$",
-        "bP": "$b_P$"
-    }
-
-    # We plot the keys common to the labels & preds, & optionally the input list
-    # of names. Avoiding using set() as we want names or the labels to set order
-    if not selected_labels:
-        selected_labels = list(all_pub_labels.keys())
-    pub_labels = { k: all_pub_labels[k] for k in selected_labels if k in labels[0].keys() }
-
-    cols = 2
-    rows = math.ceil(len(pub_labels) / cols)
-    _, axes = plt.subplots(rows, cols, figsize=(cols * 3, rows * 2.9), constrained_layout=True)
-    axes = axes.flatten()
-
-    if not transit_flags:
-        transit_flags = [False] * len(labels)
-
-    print(f"Plotting scatter plot {rows}x{cols} grid for: {', '.join(pub_labels.keys())}")
-    for ax_ix, (lbl_name, ax_label) in enumerate(pub_labels.items()):
-        (lbl_vals, pred_vals, pred_sigmas, _) \
-            = _get_label_and_prediction_raw_values(labels, predictions, [lbl_name], reverse_scaling)
-
-        # Plot a diagonal line for exact match
-        dmin, dmax = min(lbl_vals.min(), pred_vals.min()), max(lbl_vals.max(), pred_vals.max()) # pylint: disable=nested-min-max
-        dmore = 0.1 * (dmax - dmin)
-        diag = [dmin - dmore, dmax + dmore]
-        ax = axes[ax_ix]
-        ax.plot(diag, diag, color="gray", linestyle="-", linewidth=0.5)
-
-        # Plot the preds vs labels, with those with transits highlighted
-        # We want to set the fillstyle by transit flag which means plotting each item alone
-        for x, y, yerr, transiting in zip(lbl_vals, pred_vals, pred_sigmas, transit_flags):
-            (f, z) = ("full", 10) if transiting else ("none", 0)
-            if max(np.abs(pred_sigmas)) > 0:
-                ax.errorbar(x=x, y=y, yerr=yerr, fmt="o", c="tab:blue", ms=5.0, lw=1.0,
-                            capsize=2.0, markeredgewidth=0.5, fillstyle=f, zorder=z)
-            else:
-                ax.errorbar(x=x, y=y, fmt="o", c="tab:blue", ms=5.0, lw=1.0, fillstyle=f, zorder=z)
-
-        ax.set_ylabel(f"predicted {ax_label}")
-        ax.set_xlabel(f"label {ax_label}")
-        ax.tick_params(axis="both", which="both", direction="in",
-                       top=True, bottom=True, left=True, right=True)
-    plt.savefig(plot_file, dpi=300)
-    plt.close()
-
-
-def _get_dataset_labels_and_features(
+def get_dataset_labels_and_features(
     dataset_dir: Path,
     estimator: Estimator,
     label_names: List[str]=None,
@@ -495,7 +418,7 @@ def _get_dataset_labels_and_features(
     return ids, labels, features
 
 
-def _get_label_and_prediction_raw_values(
+def get_label_and_prediction_raw_values(
         labels: Dict[str, float],
         predictions: Union[Dict[str, float], Dict[str, Tuple[float, float]]],
         selected_labels: List[str]=None,
