@@ -169,9 +169,10 @@ if __name__ == "__main__":
                             callbacks = CALLBACKS,
                             validation_data = datasets[1])
         # Plot the learning curves
-        pd.DataFrame(history.history).plot(figsize=(8, 5))
+        ax = pd.DataFrame(history.history).plot(figsize=(6, 4), xlabel="Epoch", ylabel="Loss")
+        ax.get_figure().tight_layout()
         PLOTS_DIR.mkdir(parents=True, exist_ok=True)
-        plt.savefig(PLOTS_DIR / f"{MODEL_FILE_NAME}_learning_curves.png", dpi=300)
+        plt.savefig(PLOTS_DIR / f"{MODEL_FILE_NAME}_learning_curves.eps", dpi=300)
     except tf.errors.InvalidArgumentError as exc:
         if ("lc" in exc.message or "mags" in exc.message) \
                 and "Can't parse serialized" in exc.message:
