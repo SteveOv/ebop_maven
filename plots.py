@@ -147,70 +147,44 @@ def plot_predictions_vs_labels(
     return fig
 
 
-def plot_formal_test_dataset_hr_diagrams(verbose: bool=True):
+def plot_formal_test_dataset_hr_diagram(targets_cfg: Dict[str, any],
+                                        verbose: bool=True):
     """
-    :yields: the Figures
-    """
-    # TODO: temp code - probably pass this data in
-    with open(Path.cwd() / "config/formal-test-dataset.json", mode="r", encoding="utf8") as f:
-        targets = json.load(f)
+    Plots a log(L) vs log(Teff) H-R diagram with ZAMS line. Returns the figure
+    of the plot and it is up to calling code to show or save this.
 
-    # Read in the MIST isochrone which we'll use to plot the ZAMS data
+    :targets_cfg: the config data to plot from
+    :verbose: whether to print out progress messages
+    :returns: the Figure
+    """
     if verbose:
-        print("First loading MIST isochrone for ZAMS data")
+        print("Plotting log(Teff) vs log(L) 'H-R' diagram")
+    if verbose:
+        print("Loading MIST isochrone for ZAMS data")
     isos = _read_mist_isos()
 
-    plot_labels = {
-        "logTeff": r"$\log{(\mathrm{T_{eff}\,/\,K})}$",
-        "logL": r"$\log{(\mathrm{L\,/\,L_{\odot}})}$",
-        "logM": r"$\log{(\mathrm{M\,/\,M_{\odot}})}$",
-        "logR": r"$\log{(\mathrm{R\,/\,R_{\odot}})}$"
-    }
+    fig = plt.figure(figsize=(6, 4), tight_layout=True)
+    ax = fig.add_subplot(1, 1, 1)
+    for comp, fillstyle in [("A", "full"), ("B", "none") ]:
+        # Don't bother with error bars as this is just an indicative distribution.
+        x = np.log10([cfg.get(f"Teff{comp}", None) or 0 for _, cfg in targets_cfg.items()])
+        y = [cfg.get(f"logL{comp}", None) or 0 for _, cfg in targets_cfg.items()]
 
-    for xcol, ycol, xzams, yzams, xlim, ylim in [
-            ("Teff", "logL", "log_Teff", "log_L", (4.45, 3.35), (-2.6, 4.5)),
-            ("M", "R", "star_mass", "log_R", (0.9, -0.75), (-0.75, 0.9)),
-        ]:
+        ax.errorbar(x, y, fmt = "o", fillstyle = fillstyle, linewidth = 0.5,
+                    ms = 7., markeredgewidth=0.5, c='tab:blue', label=f"Star{comp}")
+
         if verbose:
-            print(f"Plotting {ycol} vs {xcol} 'H-R' diagram (axes will be forced to log-log scale)")
-        figure = plt.figure(figsize=(6, 4), constrained_layout=False)
-        ax = figure.add_subplot(1, 1, 1)
+            print(f"Star {comp}: log(x) range [{min(x):.3f}, {max(x):.3f}],",
+                               f"log(y) range [{min(y):.3f}, {max(y):.3f}]")
 
-        for comp, fillstyle in [("A", "full"), ("B", "none") ]:
-            # Get the x & y data and get it into log space if it isn't already.
-            # Don't bother with error bars as this is just an indicative distribution.
-            x = [cfg.get(f"{xcol}{comp}", None) or 0 for _, cfg in targets.items()]
-            if not xcol.startswith("log"):
-                x = np.log10(x)
-                xlabel = plot_labels["log" + xcol]
-            else:
-                xlabel = plot_labels[xcol]
-
-            y = [cfg.get(f"{ycol}{comp}", None) or 0 for _, cfg in targets.items()]
-            if not ycol.startswith("log"):
-                y = np.log10(y)
-                ylabel = plot_labels["log" + ycol]
-            else:
-                ylabel = plot_labels[ycol]
-
-            ax.errorbar(x, y, fmt = "o", fillstyle = fillstyle, linewidth = 0.5,
-                        ms = 5., markeredgewidth=0.5, c='tab:blue', label=f"Star{comp}")
-
-            if verbose:
-                print(f"Star {comp}: log({xcol.strip('log')}) range [{min(x):.3f}, {max(x):.3f}]")
-                print(f"Star {comp}: log({ycol.strip('log')}) range [{min(y):.3f}, {max(y):.3f}]")
-
-        # Now plot a ZAMS line from the MIST on the same criteria
-        x = [eep[eep["phase"] == 0][0][xzams] for eep in isos]
-        if not xzams.startswith("log"):
-            x = np.log10(x)
-        y = [eep[eep["phase"] == 0][0][yzams] for eep in isos]
-        if not yzams.startswith("log"):
-            y = np.log10(y)
-        ax.plot(x, y, c="k", ls=(0, (15, 5)), linewidth=0.5, label="ZAMS", zorder=-10)
-
-        format_axes(ax, xlim=xlim, ylim=ylim, xlabel=xlabel, ylabel=ylabel )
-        yield figure
+    # Now plot a ZAMS line from the MIST on the same criteria
+    x = [eep[eep["phase"] == 0][0]["log_Teff"] for eep in isos]
+    y = [eep[eep["phase"] == 0][0]["log_L"] for eep in isos]
+    ax.plot(x, y, c="k", ls=(0, (15, 5)), linewidth=0.5, label="ZAMS", zorder=-10)
+    format_axes(ax, xlim=(4.45, 3.35), ylim=(-2.6, 4.5),
+                xlabel= r"$\log{(\mathrm{T_{eff}\,/\,K})}$",
+                ylabel=r"$\log{(\mathrm{L\,/\,L_{\odot}})}$")
+    return fig
 
 
 def _read_mist_isos(file_name: Path=None) -> List:
@@ -222,8 +196,8 @@ def _read_mist_isos(file_name: Path=None) -> List:
         file_name = Path.cwd() / "config/MIST_v1.2_feh_p0.00_afe_p0.0_vvcrit0.0_basic.iso"
 
     isos = []
-    with open(file_name, mode="r", encoding="utf8") as f:
-        content = [line.split() for line in f]
+    with open(file_name, mode="r", encoding="utf8") as isof:
+        content = [line.split() for line in isof]
 
         #read one block for each isochrone
         counter = 0
@@ -247,8 +221,10 @@ def _read_mist_isos(file_name: Path=None) -> List:
 
 
 if __name__ == "__main__":
-    # Now we're going to plot a H-R diagram of the test systems' components
-    print("\nPlotting H-R diagrams of the targets' components")
-    for fig in plot_formal_test_dataset_hr_diagrams():
-        fig.show()
-    print("hello")
+
+    skip = ["V402 Lac", "V456 Cyg"] # Neither are suitable for JKTEBOP fitting
+    with open(Path.cwd() / "config/formal-test-dataset.json", mode="r", encoding="utf8") as f:
+        targets_config = { t_name: v for (t_name, v) in json.load(f).items() if t_name not in skip }
+
+    plot_formal_test_dataset_hr_diagram(targets_config, True).savefig(
+                                                    Path.cwd() / "drop/plots/hr-logl-vs-teff.eps")
