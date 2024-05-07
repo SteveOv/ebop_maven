@@ -189,7 +189,8 @@ def test_fitting_against_formal_test_dataset(
         table_of_predictions_vs_labels([t_labels], [t_params], estimator, [target])
         fitted_params.append(t_params)
 
-    output_stem = "fitted_params_vs_labels" + ("_control" if fit_with_labels else "")
+    suffix = "control" if fit_with_labels else "mc" if mc_iterations > 1 else "nonmc"
+    output_stem = "fitted_params_vs_labels_" + suffix
     with open(results_dir / f"{output_stem}.txt", "w", encoding="utf8") as of:
         table_of_predictions_vs_labels(labels, fitted_params, estimator, targets, l_names, to=of)
 
@@ -479,16 +480,23 @@ if __name__ == "__main__":
         test_model_against_formal_test_dataset(the_model, save_dir, 1000, skip, plot_results=True)
 
         # Now look at fitting the format-test-dataset with JKTEBOP
-        # Uses the estimator/model inputs to the fitting
+        # Uses the estimator/model non dropout predictions as inputs to the fitting
         print("\n\nTesting the JKTEBOP fitting derived from the model's estimates\n" + "="*62)
         test_fitting_against_formal_test_dataset(the_model, save_dir, 1,
                                                  skip_ids=skip,
                                                  apply_fit_overrides=True,
                                                  fit_with_labels=False)
 
+        # Use the estimator/model MC Dropout predictions as inputs to the fitting
+        print("\n\nTesting the JKTEBOP fitting derived from MC Dropout estimates\n" + "="*62)
+        test_fitting_against_formal_test_dataset(the_model, save_dir, 1000,
+                                                 skip_ids=skip,
+                                                 apply_fit_overrides=True,
+                                                 fit_with_labels=False)
+
         # Use the labels as the inputs so we have control data
         print("\n\nTesting the JKTEBOP fitting using the labels as inputs\n" + "="*54)
-        test_fitting_against_formal_test_dataset(the_model, save_dir, 1,
+        test_fitting_against_formal_test_dataset(the_model, save_dir,
                                                  skip_ids=skip,
                                                  apply_fit_overrides=True,
                                                  fit_with_labels=True)
