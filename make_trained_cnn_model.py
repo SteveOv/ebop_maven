@@ -190,9 +190,7 @@ if __name__ == "__main__":
     # -----------------------------------------------------------
     # Tests the newly saved model, within an Estimator, against a dataset of real systems.
     # -----------------------------------------------------------
+    # We use scaled prediction so the MAE/MSE is comperable with model.fit() and model.evaluate()
     print("\n *** Running formal test against real data ***")
-    FORMAL_RESULTS_DIR = SAVE_DIR / \
-        f"results/{MODEL_NAME}/{TRAINSET_NAME}/{deb_example.pub_mags_key}/"
-    FORMAL_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    model_testing.test_model_against_formal_test_dataset(model_save_file, FORMAL_RESULTS_DIR, 1)
-    model_testing.test_model_against_formal_test_dataset(model_save_file, FORMAL_RESULTS_DIR, 1000)
+    model_testing.test_model_against_formal_test_dataset(model_save_file, 1, scaled=True)
+    model_testing.test_model_against_formal_test_dataset(model_save_file, 1000, scaled=True)
