@@ -28,7 +28,8 @@ def test_model_against_formal_test_dataset(
         skip_ids: List[str]=None,
         plot_results: bool=True,
         test_dataset_dir: Path=Path("./datasets/formal-test-dataset"),
-        test_dataset_config: Path=Path("./config/formal-test-dataset.json")):
+        test_dataset_config: Path=Path("./config/formal-test-dataset.json")) \
+            -> List[Dict[str, float]]:
     """
     Will test the indicated model file against the contents of the formal
     test dataset. The results for MC and non-MC estimates will be written
@@ -43,6 +44,7 @@ def test_model_against_formal_test_dataset(
     :plot_results: whether to produce a plot of the results vs labels
     :test_dataset_dir: the location of the formal test dataset
     :test_dataset_config: Path to the config that created the test dataset
+    :returns: the predictions made
     """
     # Create our Estimator. It will tell us which labels it (& the model) can predict.
     estimator = Estimator(model)
@@ -55,7 +57,7 @@ def test_model_against_formal_test_dataset(
                                 test_dataset_dir, estimator, l_names, f_names, True, skip_ids)
     inst_count = len(targets)
 
-    prediction_type = "nonmc" if mc_iterations <= 1 else "mc"
+    prediction_type = "mc" if mc_iterations > 1 else "nonmc"
     results_stem = "predictions_vs_labels_" + prediction_type
 
     # Make our prediction which will return [{"name": value, "name_sigma": sigma_value}]*insts
@@ -79,9 +81,8 @@ def test_model_against_formal_test_dataset(
             targets_config = json.load(f)
             transit_flags = [targets_config.get(t, {}).get("transits", False) for t in targets]
 
-        plot_file = results_dir / f"{results_stem}.eps"
-        plots.plot_predictions_vs_labels(labels, predictions, transit_flags).savefig(plot_file, dpi=300)
-        print(f"Saved plot of the predictions vs labels to '{plot_file.name}'")
+        fig = plots.plot_predictions_vs_labels(labels, predictions, transit_flags)
+        fig.savefig(results_dir / f"{results_stem}.eps", dpi=300)
 
     # "Underline" this test by echoing some summary statistics
     (_, _, _, ocs) = get_label_and_prediction_raw_values(labels, predictions)
@@ -89,6 +90,7 @@ def test_model_against_formal_test_dataset(
     print(f"Total MAE ({prediction_type}): {np.mean(np.abs(ocs)):.9f}")
     print(f"Total MSE ({prediction_type}): {np.mean(np.power(ocs, 2)):.9f}")
     print("--------------------------------\n")
+    return predictions
 
 
 def test_fitting_against_formal_test_dataset(
@@ -100,7 +102,8 @@ def test_fitting_against_formal_test_dataset(
         fit_with_labels: bool=False,
         plot_results: bool=True,
         test_dataset_dir: Path=Path("./datasets/formal-test-dataset"),
-        test_dataset_config: Path=Path("./config/formal-test-dataset.json")):
+        test_dataset_config: Path=Path("./config/formal-test-dataset.json")) \
+            -> Tuple[List[Dict[str, float]], List[Dict[str, float]]]:
     """
     Will test the indicated model file by making predictions against the formal
     test dataset and then using these predictions to fit the corresponding
@@ -119,6 +122,7 @@ def test_fitting_against_formal_test_dataset(
     :plot_results: whether to produce a plot of the results vs labels
     :test_dataset_dir: the location of the formal test dataset
     :test_dataset_config: Path to the config that created the test dataset
+    :returns: a tuple of the input params for the fit and the equivalent fitted params
     """
     # Create our Estimator. It will tell us which labels it (& the model) can predict.
     estimator = Estimator(model)
@@ -128,10 +132,10 @@ def test_fitting_against_formal_test_dataset(
     tw = TextWrapper(100)
 
     # Gets the target details, labels (unscaled) and the mags/ext features make preds from
-    fitted_params = []
+    predicted_params, fitted_params = [], []
     targets, labels, features = get_dataset_labels_and_features(
                                     test_dataset_dir, estimator, l_names, f_names, False, skip_ids)
-    target_count = len(targets)
+
     with open(test_dataset_config, mode="r", encoding="utf8") as f:
         targets_config = json.load(f)
 
@@ -139,7 +143,7 @@ def test_fitting_against_formal_test_dataset(
     # We'll be using these is inputs to fitting so we need to let estimator do its scaling.
     for ix, (target, t_labels, t_feats) in enumerate(zip(targets, labels, features)):
         target_cfg = targets_config[target]
-        print(f"\n\nProcessing target {ix+1} of {target_count}: {target}\n" + "-"*40)
+        print(f"\n\nProcessing target {ix+1} of {len(targets)}: {target}\n" + "-"*40)
         print(tw.fill(target_cfg.get("desc", "")) + "\n")
 
         # The basic lightcurve data read, rectified & extended with delta_mag and delta_mag_err cols
@@ -147,27 +151,28 @@ def test_fitting_against_formal_test_dataset(
         pe = lightcurve.to_lc_time(target_cfg["primary_epoch"], lc).value
         period = target_cfg["period"]
 
-        file_stem = f"model-testing-{re.sub(r'[^\w\d-]', '-', target.lower())}"
-        file_parent = jktebop.get_jktebop_dir()
-        for file in file_parent.glob(f"{file_stem}.*"):
+        fit_stem = f"model-testing-{re.sub(r'[^\w\d-]', '-', target.lower())}"
+        fit_dir = jktebop.get_jktebop_dir()
+        for file in fit_dir.glob(f"{fit_stem}.*"):
             file.unlink()
-        in_fname = file_parent / f"{file_stem}.in"
-        dat_fname = file_parent / f"{file_stem}.dat"
+        in_fname = fit_dir / f"{fit_stem}.in"
+        dat_fname = fit_dir / f"{fit_stem}.dat"
 
         if not fit_with_labels:
-            print("\nUsing the Estimator's unscaled predictions as the input params to fit", target)
+            print(f"\nEstimator's predictions (iters={mc_iterations}) as the input to fit", target)
             input_params = estimator.predict([t_feats], iterations=mc_iterations)[0]
         else:
-            print(f"\n***Warning: Using the labels as the input params to fit {target}***")
+            print(f"\n***Warning: Using the training labels as a control input to fit {target}***")
             input_params = t_labels
         table_of_predictions_vs_labels([t_labels], [input_params], estimator, [target])
+        predicted_params.append(input_params)
 
         # published fitting params that may be needed for good fit
         fit_overrides = target_cfg.get("fit_overrides", {}) if apply_fit_overrides else {}
         lrats = fit_overrides.pop("lrat", [])
 
         params = {
-            **base_jktebop_task3_params(period, pe, dat_fname.name, file_stem, target_cfg),
+            **base_jktebop_task3_params(period, pe, dat_fname.name, fit_stem, target_cfg),
             **input_params,
             **fit_overrides,
         }
@@ -183,21 +188,22 @@ def test_fitting_against_formal_test_dataset(
 
         # Don't consume the output files so they're available for subsequent plotting
         print(f"\nFitting {target} (with {sector_count} sector(s) of data) using JKTEBOP task 3...")
-        par_fname = file_parent / f"{file_stem}.par"
+        par_fname = fit_dir / f"{fit_stem}.par"
         par_contents = list(jktebop.run_jktebop_task(in_fname, par_fname, stdout_to=sys.stdout))
         t_params = jktebop.read_fitted_params_from_par_lines(par_contents, l_names)
         table_of_predictions_vs_labels([t_labels], [t_params], estimator, [target])
         fitted_params.append(t_params)
 
     suffix = "control" if fit_with_labels else "mc" if mc_iterations > 1 else "nonmc"
-    output_stem = "fitted_params_vs_labels_" + suffix
-    with open(results_dir / f"{output_stem}.txt", "w", encoding="utf8") as of:
+    results_stem = "fitted_params_vs_labels_" + suffix
+    with open(results_dir / f"{results_stem}.txt", "w", encoding="utf8") as of:
         table_of_predictions_vs_labels(labels, fitted_params, estimator, targets, l_names, to=of)
 
     if plot_results:
         transit_flags = [targets_config[tn].get("transits", False) for tn in targets]
         fig = plots.plot_predictions_vs_labels(labels, fitted_params, transit_flags)
-        fig.savefig(results_dir / f"{output_stem}.eps", dpi=300)
+        fig.savefig(results_dir / f"{results_stem}.eps", dpi=300)
+    return (predicted_params, fitted_params)
 
 
 def base_jktebop_task3_params(period: float,
@@ -482,21 +488,21 @@ if __name__ == "__main__":
         # Now look at fitting the format-test-dataset with JKTEBOP
         # Uses the estimator/model non dropout predictions as inputs to the fitting
         print("\n\nTesting the JKTEBOP fitting derived from the model's estimates\n" + "="*62)
-        test_fitting_against_formal_test_dataset(the_model, save_dir, 1,
-                                                 skip_ids=skip,
-                                                 apply_fit_overrides=True,
-                                                 fit_with_labels=False)
+        (preds_nomc, fit_nomc) = test_fitting_against_formal_test_dataset(the_model, save_dir, 1,
+                                                                          skip_ids=skip,
+                                                                          apply_fit_overrides=True,
+                                                                          fit_with_labels=False)
 
         # Use the estimator/model MC Dropout predictions as inputs to the fitting
         print("\n\nTesting the JKTEBOP fitting derived from MC Dropout estimates\n" + "="*62)
-        test_fitting_against_formal_test_dataset(the_model, save_dir, 1000,
-                                                 skip_ids=skip,
-                                                 apply_fit_overrides=True,
-                                                 fit_with_labels=False)
+        (preds_mc, fit_mc) = test_fitting_against_formal_test_dataset(the_model, save_dir, 1000,
+                                                                      skip_ids=skip,
+                                                                      apply_fit_overrides=True,
+                                                                      fit_with_labels=False)
 
-        # Use the labels as the inputs so we have control data
+        # Use the labels as the inputs so we have control data, so preds_ctrl == labels
         print("\n\nTesting the JKTEBOP fitting using the labels as inputs\n" + "="*54)
-        test_fitting_against_formal_test_dataset(the_model, save_dir,
-                                                 skip_ids=skip,
-                                                 apply_fit_overrides=True,
-                                                 fit_with_labels=True)
+        (preds_ctrl, fit_ctrl) = test_fitting_against_formal_test_dataset(the_model, save_dir,
+                                                                          skip_ids=skip,
+                                                                          apply_fit_overrides=True,
+                                                                          fit_with_labels=True)
