@@ -3,7 +3,8 @@ import unittest
 import astropy.units as u
 from astropy.units.core import UnitsError
 
-from ebop_maven.libs.orbital import orbital_period, semi_major_axis, impact_parameter
+from ebop_maven.libs.orbital import orbital_period, semi_major_axis
+from ebop_maven.libs.orbital import impact_parameter, orbital_inclination
 from ebop_maven.libs.orbital import EclipseType
 
 # pylint: disable=too-many-public-methods, no-member, line-too-long
@@ -201,6 +202,58 @@ class Testorbital(unittest.TestCase):
         kwargs["inc"] = 45 * u.deg
         b = impact_parameter(**kwargs, eclipse=EclipseType.PRIMARY)
         self.assertTrue(b > 3.)
+
+    #
+    # Test orbital_inclination(r1, b, e, esinw, [eclipse=EclipseType]) -> inc * u.deg
+    #
+    def test_orbital_inclination_args_validations(self):
+        """ Tests orbital_inclination(invalid argument units) raises UnitsError """
+        self.assertRaises(UnitsError, orbital_inclination, self._r1_sol_earth, 0, 0, 90 * u.K)
+        self.assertRaises(TypeError, orbital_inclination, self._r1_sol_earth, 0, 0, 90)
+
+    def test_orbital_inclination_args_none(self):
+        """ Tests orbital_inclination(r1, b or e is None) raises TypeError """
+        self.assertRaises(TypeError, orbital_inclination, None, 0, 0, 90 * u.deg)
+        self.assertRaises(TypeError, orbital_inclination, self._r1_sol_earth, None, 0, 90 * u.deg)
+        self.assertRaises(TypeError, orbital_inclination, self._r1_sol_earth, 0, None, 90 * u.deg)
+
+    def test_orbital_inclination_args_either_omega_or_esinw(self):
+        """ Tests orbital_inclination(omega and esinw) raises ValueError when both None """
+        self.assertRaises(ValueError, orbital_inclination, self._r1_sol_earth, 0, 0, omega=None, esinw=None)
+        orbital_inclination(self._r1_sol_earth, 0, 0, None, 0.5)
+        orbital_inclination(self._r1_sol_earth, 0, 0, 0 * u.deg)
+
+    def test_orbital_inclination_args_eclipse_both(self):
+        """ Tests orbital_inclination(eclipse=EclipseType.BOTH) raises ValueError when both None """
+        self.assertRaises(ValueError, orbital_inclination, self._r1_sol_earth, 0, 0, 90 * u.deg, eclipse=EclipseType.BOTH)
+
+    def test_orbital_inclination_both_omega_and_esinw_given(self):
+        """ Tests impact_parameter(both omega and esinw given) given esinw used """
+        # We have two potential values for esinw; the esinw = 0 argument and the product of the
+        # result of the e and omega (e*sin(omega) = 0.5) arguments. They will yield different
+        # results which allows us to assert that if both given, the esinw argument takes precedent.
+        # - with esinw = 0      we expect an inc of 89.2894 deg
+        # - e*sin(omega) = 0.5  we expect an inc of 88.9341 deg
+        inc = orbital_inclination(r1=self._r1_sol_earth, b=2, e=0.5, omega=90 * u.deg, esinw=0.0, eclipse=EclipseType.PRIMARY)
+        self.assertAlmostEqual(inc.to(u.deg).value, 89.2894, 4, "inc != 89.2894 deg (the value expected when esinw==0)")
+
+    def test_orbital_inclination_on_edge_on_orbit(self):
+        """ Tests orbital_inclination(b=0) returns inc = 90 deg """
+        kwargs = { "r1": self._r1_sol_earth, "b": 0.0 }
+        for e, esinw, eclipe in [(0, 0, EclipseType.PRIMARY), (0, 0, EclipseType.SECONDARY)]:
+            inc = orbital_inclination(**kwargs, e=e, esinw=esinw, eclipse=eclipe)
+            self.assertEqual(inc.value, 90)
+
+    def test_orbital_inclination_known_impact_parameters(self):
+        """ Tests orbital_inclination(known r1, b, e, omega) -> known inc values from fitting """
+        for kwargs in [self._cw_eri.copy(), self._v570_per.copy(), self._zeta_phe.copy()]:
+            (bp, bs) = impact_parameter(**kwargs, eclipse=EclipseType.BOTH)
+            exp_inc = kwargs.pop("inc").to(u.deg).value
+
+            for b, eclipse in [(bp, EclipseType.PRIMARY), (bs, EclipseType.SECONDARY)]:
+                inc = orbital_inclination(**kwargs, b=b, eclipse=eclipse)
+                self.assertAlmostEqual(exp_inc, inc.to(u.deg).value, 6)
+
 
 if __name__ == "__main__":
     unittest.main()
