@@ -417,9 +417,11 @@ def get_label_and_prediction_raw_values(
             errors = np.zeros_like(nominals)
 
     # Coalesce any None values to zero otherwise we'll get failures below
-    label_values[label_values is None] = 0.
-    nominals[nominals is None] = 0.
-    errors[errors is None] = 0.
+    # pylint: disable=singleton-comparison
+    label_values[label_values == None] = 0.
+    nominals[nominals == None] = 0.
+    errors[errors == None] = 0.
+    # pylint: enable=singleton-comparison
 
     # Optionally reverse any scaling of the values to get them in to the scale used by the ML model
     if reverse_scaling:
