@@ -14,16 +14,23 @@ class Testlightcurve(unittest.TestCase):
     #   TEST expected_secondary_phase(esinw, ecc) -> float
     #
     def test_expected_secondary_phase_gg_lup(self):
-        """ Tests expected_secondary_phase(values for GG Lup from Hilditch) """
+        """ Tests expected_secondary_phase(values for GG Lup from Hilditch pp238) """
         ecosw = 0.0098
+        esinw = 0.15
         ecc = 0.15
-        phi_s = lightcurve.expected_secondary_phase(ecosw, ecc)
+        phi_s = lightcurve.expected_secondary_phase(ecosw, ecc=ecc)
+        self.assertAlmostEqual(phi_s, 0.5064, 3)
+        phi_s = lightcurve.expected_secondary_phase(ecosw, esinw=esinw)
         self.assertAlmostEqual(phi_s, 0.5064, 3)
 
     def test_expected_secondary_phase_cw_eri(self):
         """ Tests expected_secondary_phase(values for CW Eri from Overall & Southworth 2024) """
         target = th.KNOWN_TARGETS["CW Eri"]
+
         phi_s = lightcurve.expected_secondary_phase(target.ecosw, target.ecc)
+        self.assertAlmostEqual(phi_s, target.expect_phase2, 3)
+
+        phi_s = lightcurve.expected_secondary_phase(target.ecosw, esinw=target.esinw)
         self.assertAlmostEqual(phi_s, target.expect_phase2, 3)
 
     #

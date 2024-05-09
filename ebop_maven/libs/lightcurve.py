@@ -141,13 +141,21 @@ def expected_ratio_of_eclipse_duration(esinw: float) -> float:
     return (esinw + 1)/(1 - esinw)
 
 
-def expected_secondary_phase(ecosw: float, ecc: float) -> float:
+def expected_secondary_phase(ecosw: float, ecc: float=None, esinw: float=None) -> float:
     """
-    Calculates the expected secondary (normalized) phase from e*cos(omega) and e
+    Calculates the expected secondary (normalized) phase from e*cos(omega) and
+    either e directly or e*sin(omega) which is used to derive e.
 
     Uses eqn 5.67 and 5.68 from Hilditch, setting P=1 (normalized) & t_pri=0
     to give phi_sec = t_sec = (X-sinX)/2pi where X=pi+2*atan(ecosw/sqrt(1-e^2))
     """
+    if esinw is None and ecc is None:
+        raise ValueError("One of esinw or ecc is required")
+
+    if ecc is None:
+        # Using: cos^2(w) + sin^2(w) = 1, therefore (ecosw)^2 + (esinw)^2 = e^2
+        ecc = math.sqrt(ecosw**2 + esinw**2)
+
     x = math.pi + (2*math.atan(ecosw/np.sqrt(1-np.power(ecc, 2))))
     return (x - math.sin(x)) / (2 * math.pi)
 
