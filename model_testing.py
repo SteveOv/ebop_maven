@@ -411,9 +411,15 @@ def get_label_and_prediction_raw_values(
     else:
         nominals = np.array([[pd[l] for l in selected_labels] for pd in predictions])
         if f"{selected_labels[0]}_sigma" in predictions[0]:
-            errors = np.array([[pd[f"{l}_sigma"] for l in selected_labels] for pd in predictions])
+            errors = [[pd.get(f"{l}_sigma", 0) for l in selected_labels] for pd in predictions]
+            errors = np.array(errors)
         else:
             errors = np.zeros_like(nominals)
+
+    # Coalesce any None values to zero otherwise we'll get failures below
+    label_values[label_values is None] = 0.
+    nominals[nominals is None] = 0.
+    errors[errors is None] = 0.
 
     # Optionally reverse any scaling of the values to get them in to the scale used by the ML model
     if reverse_scaling:
