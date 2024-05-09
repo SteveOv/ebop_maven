@@ -10,6 +10,7 @@ import json
 import re
 from contextlib import redirect_stdout
 from textwrap import TextWrapper, fill
+import copy
 
 import astropy.units as u
 import numpy as np
@@ -440,7 +441,7 @@ if __name__ == "__main__":
 
         # Now report using the predictions as input to fitting the format-test-dataset with JKTEBOP
         # First we add a control item - this allows us to fit against the labels to get control fits
-        all_preds["control"] = all_labels.copy()
+        all_preds["control"] = copy.deepcopy(all_labels)
         for ptype in ["control", "nonmc", "mc"]:
             print(f"\n\nTesting JKTEBOP fitting based on the model's {ptype} estimates\n" + "="*80)
             all_fits[ptype] = fit_against_formal_test_dataset(
