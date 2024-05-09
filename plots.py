@@ -103,7 +103,7 @@ def plot_predictions_vs_labels(
 
     # We plot the keys common to the labels & preds, & optionally the input list
     # of names. Avoiding using set() as we want names or the labels to set order
-    if not selected_labels:
+    if selected_labels is None:
         selected_labels = list(all_pub_labels.keys())
     pub_labels = { k: all_pub_labels[k] for k in selected_labels if k in labels[0].keys() }
 
@@ -112,7 +112,7 @@ def plot_predictions_vs_labels(
     fig, axes = plt.subplots(rows, cols, figsize=(cols * 3, rows * 2.9), constrained_layout=True)
     axes = axes.flatten()
 
-    if not transit_flags:
+    if transit_flags is None:
         transit_flags = [False] * len(labels)
 
     print(f"Plotting scatter plot {rows}x{cols} grid for: {', '.join(pub_labels.keys())}")

@@ -391,7 +391,7 @@ def inspect_dataset(dataset_files: Union[Path, Iterator[Path]],
         # We know the id is encoded as a utf8 str in a bytes feature
         example = tf.io.parse_single_example(raw_record, deb_example.description)
         identifier = example["id"].numpy().decode(encoding="utf8")
-        if not identifiers or identifier in identifiers:
+        if identifiers is None or identifier in identifiers:
             if scale_labels:
                 labels = { k: example[k].numpy()*sc for k, sc in label_names_and_scales.items() }
             else:
