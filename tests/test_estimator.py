@@ -63,13 +63,17 @@ class TestEstimator(unittest.TestCase):
     #
     def test_init_model_argument_errors(self):
         """ Tests __init__(invalid model values) -> correct error raised """
-        self.assertRaises(ValueError, Estimator, None, 1)
         self.assertRaises(ValueError, Estimator, self._this_dir / "what.h5", 1)
         self.assertRaises(TypeError, Estimator, "I'm not a Path or Model", 1)
 
         valid_file = self._this_dir / "cnn_ext_model.h5"
         self.assertRaises(TypeError, Estimator, valid_file, iterations=None)
         self.assertRaises(ValueError, Estimator, valid_file, iterations=0)
+
+    def test_init_with_none(self):
+        """ Tests __init__(model is None) -> inits with default ./data/estimator/*.keras model """
+        estimator = Estimator()
+        self.assertIn("Estimator", estimator.name)
 
     def test_init_with_path(self):
         """ Tests __init__(valid model path) -> correct initialization """

@@ -3,10 +3,11 @@ from typing import List, Dict, Union
 from datetime import datetime
 from pathlib import Path
 from abc import ABC
+from inspect import getsourcefile
 
 import numpy as np
 import tensorflow as tf
-from keras.models import Model
+from keras import Model
 
 from . import modelling
 from .libs import deb_example
@@ -14,15 +15,20 @@ from .libs import deb_example
 class Estimator(ABC):
     """ An estimator for the CNN model """
 
-    def __init__(self, model: Union[Model, Path], iterations: int=1):
+    def __init__(self, model: Union[Model, Path]=None, iterations: int=1):
         """
         Initialize a new instance of this class.
 
         :model: a model file or a model - if None will attempt to load default
         :iterations: set to >1 to control MC Dropout iterations per prediction
         """
-        if not model:
-            raise ValueError("Model must be a valid keras Model or the Path of a saved model")
+        if model is None:
+            models = list((Path(getsourcefile(lambda:0)).parent / "data/estimator").glob("*.keras"))
+            if models:
+                model = models[0]
+            else:
+                raise ValueError("No default model found, so must be a valid" \
+                                 + " keras Model or the Path of a saved model")
         if iterations is None:
             raise TypeError("iterations must be a positive integer")
         if iterations < 1:
