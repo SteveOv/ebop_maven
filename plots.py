@@ -94,11 +94,11 @@ def plot_predictions_vs_labels(
         "rA_plus_rB": "$r_A+r_B$",
         "k": "$k$",
         "inc": "$i$",
+        "bP": "$b_P$",
         "J": "$J$",
         "ecosw": r"$e\cos{\omega}$",
         "esinw": r"$e\sin{\omega}$",
         "L3": "$L_3$",
-        "bP": "$b_P$"
     }
 
     # We plot the keys common to the labels & preds, & optionally the input list

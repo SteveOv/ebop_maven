@@ -115,9 +115,8 @@ def orbital_inclination(r1: float,
     :e: the orbital eccentricity
     :omega: the argument of periastron
     :esinw: the e*sin(omega) Poincare element
-    :eclipse: the type of eclipse to calculate for PRIMARY, SECONDARY or BOTH.
-    :returns: either a single value where type is PRIMARY or SECONDARY or a
-    tuple holding both values where type is BOTH.
+    :eclipse: the type of eclipse the impact parameter is from; PRIMARY or SECONDARY (not BOTH).
+    :returns: The inclination as a Quantity in degrees
     """
     # From primary eclipse/impact param:  i = arccos(bP * r1 * (1+esinw)/(1-e^2))
     # From secodary eclipse/impact param: i = arccos(bS * r1 * (1-esinw)/(1-e^2))

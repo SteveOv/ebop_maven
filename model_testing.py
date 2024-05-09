@@ -17,7 +17,7 @@ import numpy as np
 from keras import Model
 
 from ebop_maven.libs.tee import Tee
-from ebop_maven.libs import deb_example, lightcurve, jktebop, stellar, limb_darkening
+from ebop_maven.libs import deb_example, lightcurve, jktebop, stellar, limb_darkening, orbital
 from ebop_maven.estimator import Estimator
 from ebop_maven import datasets
 import plots
@@ -118,6 +118,12 @@ def fit_against_formal_test_dataset(
         print(f"\nWill fit {target} with the following input params")
         table_of_predictions_vs_labels([target_labels], [target_input_params], [target])
 
+        # Handle the estimator predicting bP rather than inc directly
+        if not "inc" in target_input_params and "bP" in target_input_params:
+            inc = calculate_inc_from_other_predictions(target_input_params)
+            print(f"Input param calculated from other predictions; inc = {inc:.6f}")
+            target_input_params["inc"] = inc.to(u.deg).value
+
         # published fitting params that may be needed for good fit
         fit_overrides = target_cfg.get("fit_overrides", {}) if apply_fit_overrides else {}
         lrats = fit_overrides.pop("lrat", [])
@@ -198,6 +204,25 @@ def base_jktebop_task3_params(period: float,
         "data_file_name": dat_file_name,
         "file_name_stem": file_name_stem,
     }
+
+
+def calculate_inc_from_other_predictions(preds: Dict[str, float]) -> u.deg:
+    """
+    Calculate inc from the impact parameter and other supporting prediced values.
+
+    :preds: the prediction dictionary for this instance
+    :returns: the calculated inc (as a Quantity in deg)
+    """
+    required_preds = ["k", "rA_plus_rB", "bP", "esinw", "ecosw"]
+    missing_preds= [k for k in required_preds if k not in preds]
+    if missing_preds:
+        raise KeyError("These required predicted values are missing:", ", ".join(missing_preds))
+
+    b = preds["bP"]
+    r = preds["rA_plus_rB"] / (1 + preds["k"])
+    esinw = preds["esinw"]
+    e = np.sqrt(np.add(np.power(preds["ecosw"], 2), np.power(esinw, 2)))
+    return orbital.orbital_inclination(r, b, e, None, esinw)
 
 
 def predictions_vs_labels_to_csv(
