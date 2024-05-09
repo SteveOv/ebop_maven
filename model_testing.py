@@ -226,10 +226,10 @@ def calculate_inc_from_other_predictions(preds: Dict[str, float]) -> u.deg:
 
 
 def predictions_vs_labels_to_csv(
-        labels: Dict[str, float],
-        predictions: Union[Dict[str, float], Dict[str, Tuple[float, float]]],
+        labels: List[Dict[str, float]],
+        predictions: List[Union[Dict[str, float], Dict[str, Tuple[float, float]]]],
         row_headings: List[str]=None,
-        selected_labels: List[str]=None,
+        selected_label_names: List[str]=None,
         reverse_scaling: bool=False,
         to: TextIOBase=None):
     """
@@ -240,16 +240,16 @@ def predictions_vs_labels_to_csv(
     :predictions: the prediction values as a dict of predictions per instance.
     All the dicts may either be as { "key": val, "key_sigma": err } or { "key":(val, err) }
     :row_headings: the optional heading for each row
-    :selected_labels: a subset of the full list of labels/prediction names to render
+    :selected_label_names: a subset of the full list of labels/prediction names to render
     :reverse_scaling: whether to reverse the scaling of the values to represent the model output
     :to: the output to write the table to. Defaults to stdout.
     """
     # pylint: disable=too-many-arguments, too-many-locals
-    # We output the labels common to the all labels & those requested
-    if selected_labels is None:
-        keys = list(labels[0].keys())
+    # We output the labels common to the all labels & predictions or those requested
+    if selected_label_names is None:
+        keys = [k for k in labels[0].keys() if k in predictions[0]]
     else:
-        keys = [s for s in selected_labels if s in labels]
+        keys = selected_label_names
     num_keys = len(keys)
 
     if row_headings is None:
@@ -289,10 +289,10 @@ def predictions_vs_labels_to_csv(
 
 
 def table_of_predictions_vs_labels(
-        labels: Dict[str, float],
-        predictions: Union[Dict[str, float], Dict[str, Tuple[float, float]]],
+        labels: List[Dict[str, float]],
+        predictions: List[Union[Dict[str, float], Dict[str, Tuple[float, float]]]],
         block_headings: List[str],
-        selected_labels: List[str]=None,
+        selected_label_names: List[str]=None,
         reverse_scaling: bool=False,
         to: TextIOBase=None):
     """
@@ -303,18 +303,19 @@ def table_of_predictions_vs_labels(
     :predictions: the prediction values as a dict of predictions per instance.
     All the dicts may either be as { "key": val, "key_sigma": err } or { "key":(val, err) }
     :block_headings: the heading for each block of preds-vs-labels
-    :selected_labels: a subset of the full list of labels/prediction names to render
+    :selected_label_names: a subset of the full list of labels/prediction names to render
     :reverse_scaling: whether to reverse the scaling of the values to represent the model output
     :to: the output to write the table to. Defaults to printing.
     """
     # pylint: disable=too-many-arguments, too-many-locals
-    # We output the labels common to the all labels & those requested
-    if selected_labels is None:
-        keys = list(labels[0].keys())
+    # We output the labels common to the all labels & predictions or those requested
+    if selected_label_names is None:
+        keys = [k for k in labels[0].keys() if k in predictions[0]]
     else:
-        keys = [s for s in selected_labels if s in labels]
+        keys = selected_label_names
 
     # Extracts the raw values from the label and prediction List[Dict]s
+    # Expected to error if selected_label_names contains an unknown label/pred name
     (raw_labels, pred_noms, _, ocs) \
         = get_label_and_prediction_raw_values(labels, predictions, keys, reverse_scaling)
 
