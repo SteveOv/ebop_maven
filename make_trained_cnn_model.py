@@ -182,6 +182,20 @@ if __name__ == "__main__":
     print(f"\nEvaluating the model on {counts[2]} test instances.")
     model.evaluate(datasets[2], verbose=1)
 
+    # Evaluate against the test dataset filtered to various subsets
+    if "bP" in CHOSEN_LABELS:
+        ix_bp = CHOSEN_LABELS.index("bP")
+        ix_k = CHOSEN_LABELS.index("k")
+        files = list(TESTSET_DIR.glob("**/*.tfrecord"))
+        for msg, filter_func in [
+                    ("Transiting systems",     lambda _, lab: lab[ix_bp] < (1-lab[ix_k])),
+                    ("Non-transiting systems", lambda _, lab: lab[ix_bp] >= (1-lab[ix_k]))
+            ]:
+            print("\nEvaluatiing model on the following subset of the test dataset;", msg)
+            (ds_filtered, _) = deb_example.create_dataset_pipeline(files, BATCH_FRACTION,
+                                                                   map_func, filter_func)
+            model.evaluate(ds_filtered, verbose=1)
+
     # Save the newly trained model
     model_save_file = SAVE_DIR / f"{MODEL_FILE_NAME}.keras"
     modelling.save_model(model_save_file, model)
