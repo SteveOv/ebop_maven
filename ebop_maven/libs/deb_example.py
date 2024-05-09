@@ -155,6 +155,7 @@ def create_map_func(ext_features: List[str] = None,
 def create_dataset_pipeline(dataset_files: Iterable[str],
                             batch_size: float=100,
                             map_func: Callable=create_map_func(),
+                            filter_func: Callable=None,
                             shuffle: bool=False,
                             reshuffle_each_iteration: bool=False,
                             max_buffer_size: int=1000000,
@@ -167,12 +168,14 @@ def create_dataset_pipeline(dataset_files: Iterable[str],
     :batch_size: the relative size of each batch. May be set to 0 (no batch, effectively all rows),
     <1 (this fraction of all rows) or >=1 this size (will be rounded)
     :map_func: the map function to use to deserialize each row
+    :filter_func: an optional func to filter the results (must be a tf.function)
     :shuffle: whether to include a shuffle step in the pipeline
     :reshuffle_each_iteration: whether the shuffle step suffles on each epoch
     :max_buffer_size: the maximum size of the shuffle buffer
     :prefetch: the number of prefetch operations to perform
     :seed: seed for any random behaviour
-    :returns: a tuple of (dataset pipeline, row count)
+    :returns: a tuple of (dataset pipeline, row count). The row count is the total
+    rows without any optional filtering applied.
     """
     # Read through once to get the total number of records
     ds = tf.data.TFRecordDataset(list(dataset_files), num_parallel_reads=100)
@@ -184,6 +187,9 @@ def create_dataset_pipeline(dataset_files: Iterable[str],
         ds = ds.shuffle(buffer_size, seed, reshuffle_each_iteration=reshuffle_each_iteration)
 
     ds = ds.map(map_func)
+
+    if filter_func:
+        ds = ds.filter(filter_func)
 
     if batch_size:
         if batch_size < 1:
