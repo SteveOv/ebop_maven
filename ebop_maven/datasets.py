@@ -322,12 +322,9 @@ Selected targets are:               {', '.join(target_names) if target_names els
                 _, mags = lightcurve.get_reduced_folded_lc(fold_lc, mags_bins, wrap_phase)
                 mags_features[mag_name] = mags
 
-            # omega & ecc are not used as labels but we need them for phiS and impact params
+            # ecc is not used as a label but is needed to calculate phiS and impact params
             ecosw, esinw = labels["ecosw"], labels["esinw"]
-            omega = target_cfg.get("omega", None) \
-                or np.rad2deg(np.arctan(np.divide(esinw, ecosw))) if ecosw else 0
-            ecc = target_cfg.get("ecc", None) \
-                or np.divide(ecosw, np.cos(np.deg2rad(omega))) if ecosw else 0
+            ecc = np.sqrt(np.add(np.power(ecosw, 2), np.power(esinw, 2)))
 
             # May need to calculate sini and cosi if not present
             inc_rad = np.deg2rad(labels["inc"])
