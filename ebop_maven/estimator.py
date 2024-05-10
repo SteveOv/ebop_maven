@@ -48,19 +48,20 @@ class Estimator(ABC):
         else:
             raise TypeError("Expected model to be a Path or a tf.keras.models.Model.")
 
-        # Find out about what we're predicting - it should be in the output layer
+        # The output layer should hold model metadata with details of inputs and outputs
         output_layer = self._model.get_layer("Output")
-        if output_layer \
-                and isinstance(output_layer, modelling.OutputLayer) \
-                and output_layer.label_names_and_scales:
-            self._label_names_and_scales = output_layer.label_names_and_scales
+        if output_layer and isinstance(output_layer, modelling.OutputLayer):
+            self._metadata = output_layer.metadata
         else:
-            self._label_names_and_scales = deb_example.labels_and_scales
+            self._metadata = {}
 
-        # Now set up the names for the predictions (these include 1-sigma values)
-        self._prediction_names = [*self._label_names_and_scales] \
-                                + [f"{k}_sigma" for k in self._label_names_and_scales]
+        # Not published
+        self._extra_features_and_defaults = self._metadata.pop("extra_features_and_defaults",
+                                                    deb_example.extra_features_and_defaults)
+        self._labels_and_scales = self._metadata.pop("labels_and_scales",
+                                                    deb_example.labels_and_scales)
 
+        # Now set up the names for the inputs and predictions (these include 1-sigma values)
         print("Expects each input dict to hold:", ", ".join(self.input_feature_names))
         print(f"\tThe mags feature to be of {self.mags_feature_bins} bins length,",
               f"wrapped after phase {self.mags_feature_wrap_phase}")
@@ -79,14 +80,23 @@ class Estimator(ABC):
     @property
     def mags_feature_wrap_phase(self) -> float:
         """ The expected phase after which the mags feature is wrapped. """
-        # TODO: it would be better to be able to read this from the model
-        return deb_example.mags_wrap_phase
+        return self._metadata.get("mags_wrap_phase", deb_example.default_mags_wrap_phase)
 
     @property
     def input_feature_names(self) -> List[str]:
         """ The names to give the input features """
-        # TODO: it would be better to be able to read this from the model
-        return ["mags"] + list(deb_example.extra_features_and_defaults.keys())
+        return ["mags"] + [*self._extra_features_and_defaults.keys()]
+
+    @property
+    def prediction_names(self) -> List[str]:
+        """ Gets the ordered list of the names of the predicted values, including error bars. """
+        return [*self._labels_and_scales.keys()] \
+                + [f"{k}_sigma" for k in self._labels_and_scales.keys()]
+
+    @property
+    def metadata(self) -> Dict[str, any]:
+        """ Publish the metadata stored in the underlying model. """
+        return self._metadata
 
     @property
     def iterations(self) -> int:
@@ -95,16 +105,6 @@ class Estimator(ABC):
         The MC Dropout algorithm will be used if this is greater than 1.
         """
         return self._iterations
-
-    @property
-    def label_names_and_scales(self) -> Dict[str, float]:
-        """ Names and scaling applied to the labels to be predicted """
-        return self._label_names_and_scales
-
-    @property
-    def prediction_names(self) -> List[str]:
-        """ Gets the ordered list of the names of the predicted values. """
-        return self._prediction_names
 
     def predict(self,
                 instances: List[Dict[str, any]],
@@ -155,7 +155,7 @@ class Estimator(ABC):
         # We need the extra_features values in an ndarray of shape (#insts, #extra_features, 1)
         # in the correct order. Read the expected features from the input dicts, falling back
         # on the default value if not found, and ignore any unexpected key/values.
-        efd = deb_example.extra_features_and_defaults
+        efd = self._extra_features_and_defaults
         extra_values = [[inst_dict.get(k, df) for k, df in efd.items()] for inst_dict in instances]
         extra_values = np.array(extra_values).reshape((inst_count, len(efd), 1))
 
@@ -175,7 +175,7 @@ class Estimator(ABC):
 
         # Undo any scaling applied to the labels (e.g. the model predicts inc/100)
         if unscale:
-            stkd_prds /= [*self.label_names_and_scales.values()]
+            stkd_prds /= [*self._labels_and_scales.values()]
 
         # Summarize the label predictions & append 1-sigma values to each inst
         # We go from shape (#iters, #insts, #labels) to shape (#insts, #labels*2)

@@ -9,20 +9,20 @@ from .libs import deb_example
 
 
 class OutputLayer(layers.Dense):
-    """ A custom OutputLayer which can store metadata about the labels being predicted. """
+    """ A custom OutputLayer which can store metadata about the layer and model. """
     # pylint: disable=abstract-method, too-many-ancestors, too-many-arguments
 
     @property
-    def label_names_and_scales(self) -> Dict[str, float]:
-        """ The names and any scaling which needs to be undone. """
-        return self._label_names_and_scales
+    def metadata(self) -> Dict[str, any]:
+        """ Generic metadata associated with this layer and the model as a whole"""
+        return self._metadata
 
     def __init__(self,
                  units:int,
                  kernel_initializer: str="he_uniform",
                  activation: str="linear",
                  name: str="Output",
-                 label_names_and_scales: Dict[str, float] = None,
+                 metadata: Dict[str, any]=None,
                  **kwargs):
         """
         Initializes a new OutputLayer
@@ -31,13 +31,9 @@ class OutputLayer(layers.Dense):
         :kernel_initializer: dictates how the neurons are initialized
         :activation: the activation function to use
         :name: the name of the layer
-        :label_names_and_scales: dictionary giving the output labels' names and any scaling applied
+        :metadata: dictionary of metadata to store with the layer
         """
-        if label_names_and_scales:
-            num_name = len(label_names_and_scales)
-            if num_name != units:
-                raise ValueError(f"len(label_names_and_scales)!={units} units. Actually {num_name}")
-        self._label_names_and_scales = label_names_and_scales
+        self._metadata = metadata if metadata else {}
         super().__init__(units,
                          kernel_initializer=kernel_initializer,
                          activation=activation,
@@ -46,7 +42,7 @@ class OutputLayer(layers.Dense):
 
     def get_config(self):
         """ Serializes this layer. """
-        return { **super().get_config(), "label_names_and_scales": self.label_names_and_scales }
+        return { **super().get_config(), "metadata": self._metadata }
 
 
 def conv1d_layers(num_layers: int=1,
@@ -187,7 +183,7 @@ def hidden_layers(num_layers: int=1,
     return layers_func
 
 
-def mags_input_layer(shape: Tuple[int, int]=(deb_example.mags_bins, 1),
+def mags_input_layer(shape: Tuple[int, int]=(deb_example.default_mags_bins, 1),
                      name: str="Mags-Input",
                      verbose: bool=False) -> KerasTensor:
     """
@@ -219,7 +215,7 @@ def ext_input_layer(shape: Tuple[int, int]=(len(deb_example.extra_features_and_d
     return layers.Input(shape=shape, name=name)
 
 
-def output_layer(label_names_and_scales: Dict[str, any]=None,
+def output_layer(metadata: Dict[str, any]=None,
                  kernel_initializer: str="glorot_uniform",
                  activation: str="linear",
                  name: str="Output",
@@ -227,26 +223,31 @@ def output_layer(label_names_and_scales: Dict[str, any]=None,
     """
     Builds the requested output layer, returning its output tensor.
 
-    :label_names_and_scales: the dictionary of labels we will be predicting
+    :metadata: the dictionary of metadata about the layer and model
     :kernel_initializer: the initializer
     :activation: the activation function
     :name: the name of the layer
     :verbose: print out info of what's happening
     :returns: the output tensor of the new layer
     """
-    if not label_names_and_scales:
-        label_names_and_scales = deb_example.labels_and_scales
+    if not metadata:
+        metadata = {}
+    metadata.setdefault("labels_and_scales", deb_example.labels_and_scales)
+    metadata.setdefault("extra_features_and_defaults", deb_example.extra_features_and_defaults)
+    metadata.setdefault("mags_bins", deb_example.default_mags_bins)
+    metadata.setdefault("mags_wrap_phase", deb_example.default_mags_wrap_phase)
+
     def layer_func(input_tensor: KerasTensor) -> KerasTensor:
-        units = len(label_names_and_scales)
+        units = len(metadata["labels_and_scales"])
         output_tensor = OutputLayer(units=units,
                                     kernel_initializer=kernel_initializer,
                                     activation=activation,
-                                    label_names_and_scales=label_names_and_scales,
+                                    metadata=metadata,
                                     name=name)(input_tensor)
         if verbose:
             print(f"Creating OutputLayer('{name}', units={units},",
                   f"kernel_initializer={kernel_initializer}, activation={activation},",
-                  f"label_names_and_scales={label_names_and_scales})",
+                  f"metadata={metadata})",
                   f"({input_tensor.shape}) -> {output_tensor.shape}")
         return output_tensor
     return layer_func

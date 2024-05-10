@@ -25,6 +25,12 @@ from ebop_maven.libs.tee import Tee
 
 import make_trained_cnn_model
 
+# Configure the inputs and outputs of the model
+CHOSEN_FEATURES = ["phiS", "dS_over_dP"]
+MAGS_BINS = 1024
+MAGS_WRAP_PHASE = 0.75
+CHOSEN_LABELS = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "inc"]
+
 TRAINSET_NAME = "formal-training-dataset/"
 TRAINSET_DIR = Path(".") / "datasets" / TRAINSET_NAME / "training"
 VALIDSET_DIR = Path(".") / "datasets" / TRAINSET_NAME / "validation"
@@ -32,9 +38,6 @@ TESTSET_DIR = Path(".") / "datasets" / "synthetic-mist-tess-dataset"
 FORMAL_TESTSET_DIR = Path(".") / "datasets/formal-test-dataset/"
 
 MODEL_FILE_NAME = "parameter-search-model"
-
-# The subset of all available labels which we will train to predict
-CHOSEN_LABELS = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "inc"]
 
 MAX_HYPEROPT_EVALS = 500        # Maximum number of distinct Hyperopt evals to run
 HYPEROPT_LOSS_TH = 0.01         # Will stop search in the unlikely event we get below this loss
@@ -63,7 +66,9 @@ print(f"Found {len(tf.config.list_physical_devices('GPU'))} GPU(s)\n")
 # -----------------------------------------------------------
 # Set up the test datasets - we don't need to recreate per trial
 # -----------------------------------------------------------
-test_map_func = deb_example.create_map_func(labels=CHOSEN_LABELS) # No added noise or roll
+ # No added noise or roll
+test_map_func = deb_example.create_map_func(mags_bins=MAGS_BINS, mags_wrap_phase=MAGS_WRAP_PHASE,
+                                            ext_features=CHOSEN_FEATURES, labels=CHOSEN_LABELS)
 test_ds, test_ct = [tf.data.TFRecordDataset] * 2, [int] * 2
 for ti, (tname, tdir) in enumerate(zip(["test", "formal-test"], [TESTSET_DIR, FORMAL_TESTSET_DIR])):
     tfiles = list(tdir.glob("**/*.tfrecord"))
@@ -256,16 +261,41 @@ sgd_lr_qlogu_kwargs = { "low": -8, "high": -1, "q": 1e-4 }
 # Genuinely shared choice between DNN layers and output layer
 dnn_kernel_initializer_choice = hp.choice("dnn_init", ["he_uniform", "he_normal", "glorot_uniform"])
 
+metadata = { # This will augment the model, giving an Estimator context information
+    "extra_features_and_defaults": 
+                {f: deb_example.extra_features_and_defaults[f] for f in CHOSEN_FEATURES },
+    "mags_bins": MAGS_BINS,
+    "mags_wrap_phase": MAGS_WRAP_PHASE,
+    "labels_and_scales": {l: deb_example.labels_and_scales[l] for l in CHOSEN_LABELS},
+    "trainset_name": TRAINSET_NAME
+}
+
 trials_pspace = hp.pchoice("train_and_test_model", [
     (0.01, {
         # The current best performing model/training params we know, for use as a control
-        "model": { "func": make_trained_cnn_model.make_best_model, "verbose": True },
+        "model": { 
+            "func": make_trained_cnn_model.make_best_model,
+            "chosen_features": CHOSEN_FEATURES,
+            "mags_bins": MAGS_BINS,
+            "mags_wrap_phase": MAGS_WRAP_PHASE,
+            "chosen_labels": CHOSEN_LABELS,
+            "trainset_name": TRAINSET_NAME,
+            "verbose": True
+        },
         "optimizer": { "class": optimizers.Nadam, "learning_rate": 5e-4 },
         "loss_function": make_trained_cnn_model.LOSS,
     }),
     (0.09, {
         # The current best performing model we know, but lets vary the training
-        "model": { "func": make_trained_cnn_model.make_best_model, "verbose": True },
+        "model": { 
+            "func": make_trained_cnn_model.make_best_model,
+            "chosen_features": CHOSEN_FEATURES,
+            "mags_bins": MAGS_BINS,
+            "mags_wrap_phase": MAGS_WRAP_PHASE,
+            "chosen_labels": CHOSEN_LABELS,
+            "trainset_name": TRAINSET_NAME,
+            "verbose": True
+        },
         "optimizer": hp.choice("best_optimizer", [
             { "class": optimizers.Adam, "learning_rate": hp.qloguniform("best_lr_adam", **lr_qlogu_kwargs) },
             { "class": optimizers.Nadam, "learning_rate": hp.qloguniform("best_lr_nadam", **lr_qlogu_kwargs) },
@@ -349,7 +379,7 @@ trials_pspace = hp.pchoice("train_and_test_model", [
             ]),
             "output": {
                 "func": modelling.output_layer,
-                "label_names_and_scales": { l: deb_example.labels_and_scales[l] for l in CHOSEN_LABELS },
+                "metadata": metadata,
                 "kernel_initializer": dnn_kernel_initializer_choice,
                 "activation": "linear"
             },
@@ -423,14 +453,15 @@ def train_and_test_model(trial_kwargs):
     # Redo this every trial so we can potentially include these pipeline params in the search
     noise_lambda = 0.005
     roll_max = 9
-    tr_map_func = deb_example.create_map_func(labels=CHOSEN_LABELS,
-                    noise_stddev=lambda: noise_lambda,
-                    roll_steps=lambda: tf.random.uniform([], -roll_max, roll_max+1, tf.int32))
+    tr_map_func = deb_example.create_map_func(mags_bins=MAGS_BINS, mags_wrap_phase=MAGS_WRAP_PHASE,
+                                              ext_features=CHOSEN_FEATURES, labels=CHOSEN_LABELS,
+                                              noise_stddev=lambda: noise_lambda,
+                          roll_steps=lambda: tf.random.uniform([], -roll_max, roll_max+1, tf.int32))
     train_ds, train_ct = [tf.data.TFRecordDataset] * 2, [int] * 2
     for ix, (dn, dd) in enumerate(zip(["training", "validation"],[TRAINSET_DIR, VALIDSET_DIR])):
         files = list(dd.glob("**/*.tfrecord"))
         (train_ds[ix], train_ct[ix]) = deb_example.create_dataset_pipeline(
-                    files, BATCH_FRACTION, tr_map_func, True, True, MAX_BUFFER_SIZE, 1, SEED)
+                    files, BATCH_FRACTION, tr_map_func, None, True, True, MAX_BUFFER_SIZE, 1, SEED)
         print(f"Found {train_ct[ix]:,} {dn} instances over {len(files)} tfrecord files in", dd)
 
     weighted_loss = candidate = history = None
@@ -518,8 +549,11 @@ def early_stopping_to_report_progress(this_trials, *early_stop_args):
                 print(f"Saving model to {model_file}\nSaving summary to {summary_file}")
                 modelling.save_model(model_file, best_model)
                 with open(summary_file, mode="w", encoding="utf8") as f:
+                    # Careful here. There's been a recent change to hyperopt. Previously print_fn
+                    # expected a line_break arg, but it appears to have been dropped at some point.
+                    # Depending on the version it may expect; lambda line, line_break: f.write(...)
                     best_model.summary(show_trainable=True,
-                                       print_fn=lambda line, line_break: f.write(line + "\n"))
+                                       print_fn=lambda line: f.write(line + "\n"))
                 del br["model"] # Now it's save we don't need this in memory
 
             # We have to convert the misc vals dict, which has items like "activation": [2]

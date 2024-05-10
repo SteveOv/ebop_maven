@@ -13,8 +13,9 @@ stored_mags_features = {
     "mags_2048_0.75": (2048, 0.75),
     "mags_2048_1.0": (2048, 1.0)
 }
-pub_mags_key = "mags_1024_0.75"                                     # pylint: disable=invalid-name
-(mags_bins, mags_wrap_phase) = stored_mags_features[pub_mags_key]   # pylint: disable=invalid-name
+default_mags_key = "mags_1024_0.75"                                                     # pylint: disable=invalid-name
+(default_mags_bins, default_mags_wrap_phase) = stored_mags_features[default_mags_key]   # pylint: disable=invalid-name
+
 
 # Python 3.7+ language spec ensures dictionary order is preserved
 # The full set of stored labels and any scaling applied to them when read
@@ -53,6 +54,10 @@ description = {
                         for k, v in extra_features_and_defaults.items() },
 }
 
+def create_mags_key(mags_bins: int, mags_wrap_phase: float) -> str:
+    """ Helper function to format a key to the stored_mags_features dict """
+    return f"mags_{int(mags_bins)}_{float(mags_wrap_phase)}"
+
 def serialize(identifier: str,
               labels: Dict[str, float],
               mags_features: Dict[str, List[float]],
@@ -66,8 +71,8 @@ def serialize(identifier: str,
     :extra_features: single value features associated with the light-curve
     :returns: a bytearray containing the serialized data
     """
-    if pub_mags_key not in mags_features:
-        raise ValueError(f"The published {pub_mags_key} item found in mags_features.")
+    if default_mags_key not in mags_features:
+        raise ValueError(f"The published {default_mags_key} not found in mags_features.")
 
     features = {
         "id": _to_bytes_feature(identifier),
@@ -88,7 +93,9 @@ def serialize(identifier: str,
     return example.SerializeToString()
 
 
-def create_map_func(ext_features: List[str] = None,
+def create_map_func(mags_bins: int = default_mags_bins,
+                    mags_wrap_phase: float = default_mags_wrap_phase,
+                    ext_features: List[str] = None,
                     labels: List[str] = None,
                     noise_stddev: Callable[[], float] = None,
                     roll_steps: Callable[[], int] = None) -> Callable:
@@ -106,6 +113,8 @@ def create_map_func(ext_features: List[str] = None,
 
     roll_steps = lambda: tf.random.uniform([], -3, 4, tf.int32)
 
+    :mags_bins: the width of the mags to publish
+    :mags_wrap_phase: the wrap phase of the mags to publish
     :ext_features: a chosen subset of the available ext_features,
     in the requested order, or all if None
     :labels: a chosen subset of the available labels, in requested order, or all if None
@@ -114,6 +123,7 @@ def create_map_func(ext_features: List[str] = None,
     negative values roll to the left and positive values to the right
     :returns: the configured map function
     """
+    mags_key = create_mags_key(mags_bins, mags_wrap_phase)
     if ext_features is not None:
         chosen_ext_feat_and_defs = { ef: extra_features_and_defaults[ef] for ef in ext_features}
     else:
@@ -129,7 +139,7 @@ def create_map_func(ext_features: List[str] = None,
 
         # Need to adjust the model mags slightly to get it into a shape for the model
         # so basically a change from (#bins,) to (#bins, 1)
-        mags_feature = tf.reshape(example[pub_mags_key], shape=(mags_bins, 1))
+        mags_feature = tf.reshape(example[mags_key], shape=(mags_bins, 1))
 
         # Apply any perturbations to the model mags
         if noise_stddev:

@@ -13,12 +13,22 @@ class Test_deb_example(unittest.TestCase):
     # These tests may fiddle with the description so should not be run parallel
     lock = Lock()
 
+    def test_create_mags_key_integers(self):
+        """ Tests create_map_key() make sure that int values are formatted as mags_int_float"""
+        self.assertEqual("mags_1024_2.0", deb_example.create_mags_key(1024, 2))
+
+    def test_create_mags_key_floats(self):
+        """ Tests create_map_key() make sure that float values are formatted as mags_int_float"""
+        self.assertEqual("mags_1024_0.2", deb_example.create_mags_key(1024.0, 0.2))
+        self.assertEqual("mags_1024_0.75", deb_example.create_mags_key(1024.1, 0.75))
+        self.assertEqual("mags_1024_0.666", deb_example.create_mags_key(1024.9, 0.666))
+
     def test_create_map_func_default_behaviour(self):
         """ Test that the resulting map_func accurately deserializes a deb_example """
         with self.__class__.lock:
             # Set up a feature (light-curve) amd labels and with tracable values
             input_labels = { k: v for v, k in enumerate(deb_example.labels_and_scales) }
-            input_lc_feature =  { deb_example.pub_mags_key: np.arange(deb_example.mags_bins) }
+            input_lc_feature =  { deb_example.default_mags_key: np.arange(deb_example.default_mags_bins) }
             input_ext_features = { "phiS": 0.6, "dS_over_dP": 0.96 }
             deb = deb_example.serialize("t1", input_labels, input_lc_feature, input_ext_features)
 
@@ -28,9 +38,9 @@ class Test_deb_example(unittest.TestCase):
             ((lc_feature, ext_features), labels) = map_parse_fn(deb)
 
             # lc output should be a Tensor of shape (len, 1) with content unchanged from the input
-            self.assertEqual(lc_feature.shape, (len(input_lc_feature[deb_example.pub_mags_key]), 1))
+            self.assertEqual(lc_feature.shape, (len(input_lc_feature[deb_example.default_mags_key]), 1))
             for lb_bin, input_lc_bin in zip(lc_feature.numpy()[:, 0],
-                                            input_lc_feature[deb_example.pub_mags_key]):
+                                            input_lc_feature[deb_example.default_mags_key]):
                 self.assertEqual(lb_bin, input_lc_bin)
 
             # features output should be a Tensor of the shape (#features, 1)
@@ -53,7 +63,7 @@ class Test_deb_example(unittest.TestCase):
             # Set up a feature (light-curve) amd labels and with tracable values
             input_labels_and_scales = deb_example.labels_and_scales.copy()
             input_labels = { k: v for v, k in enumerate(input_labels_and_scales) }
-            input_mags_feature =  { deb_example.pub_mags_key: np.arange(deb_example.mags_bins) }
+            input_mags_feature =  { deb_example.default_mags_key: np.arange(deb_example.default_mags_bins) }
             input_ext_features = { "phiS": 0.6, "dS_over_dP": 0.96 }
             deb = deb_example.serialize("t1", input_labels, input_mags_feature, input_ext_features)
 
@@ -72,7 +82,7 @@ class Test_deb_example(unittest.TestCase):
                 self.assertEqual(feature, exp_value)
 
             # Check no effect on the other values
-            self.assertEqual(mags_feature.shape, (deb_example.mags_bins, 1))
+            self.assertEqual(mags_feature.shape, (deb_example.default_mags_bins, 1))
             self.assertEqual(len(labels), len(input_labels))
 
     def test_create_map_func_with_selected_labels(self):
@@ -81,7 +91,7 @@ class Test_deb_example(unittest.TestCase):
             # Set up a feature (light-curve) amd labels and with tracable values
             input_labels_and_scales = deb_example.labels_and_scales.copy()
             input_labels = { k: v for v, k in enumerate(input_labels_and_scales) }
-            input_lc_feature =  { deb_example.pub_mags_key: np.arange(deb_example.mags_bins) }
+            input_lc_feature =  { deb_example.default_mags_key: np.arange(deb_example.default_mags_bins) }
             input_ext_features = { "phiS": 0.6, "dS_over_dP": 0.96 }
             deb = deb_example.serialize("t1", input_labels, input_lc_feature, input_ext_features)
 
@@ -108,7 +118,7 @@ class Test_deb_example(unittest.TestCase):
         with self.__class__.lock:
             # Set up a feature (light-curve) amd labels and with tracable values
             input_labels = { k: v for v, k in enumerate(deb_example.labels_and_scales) }
-            input_lc_feature = { deb_example.pub_mags_key: np.arange(deb_example.mags_bins) }
+            input_lc_feature = { deb_example.default_mags_key: np.arange(deb_example.default_mags_bins) }
             deb = deb_example.serialize("t1", input_labels, input_lc_feature, {})
 
             for roll_by in [-5, 0, 5]:
@@ -121,14 +131,14 @@ class Test_deb_example(unittest.TestCase):
                 lc_feature = lc_feature.numpy()[:, 0]
                 for lb_ix in np.arange(500, 600, 1):
                     self.assertEqual(lc_feature[lb_ix + roll_by],
-                                     input_lc_feature[deb_example.pub_mags_key][lb_ix])
+                                     input_lc_feature[deb_example.default_mags_key][lb_ix])
 
     def test_create_map_func_with_noise(self):
         """ Tests the created map_func's roll functionality """
         with self.__class__.lock:
             # Set up a feature (light-curve) amd labels and with tracable values
             input_labels = { k: v for v, k in enumerate(deb_example.labels_and_scales) }
-            input_lc_feature = { deb_example.pub_mags_key: [1] * deb_example.mags_bins } # all the same, so stddev==0
+            input_lc_feature = { deb_example.default_mags_key: [1] * deb_example.default_mags_bins } # all the same, so stddev==0
             deb = deb_example.serialize("t1", input_labels, input_lc_feature, {})
 
             # Execute a graph instance of the map_func (with roll) to mimic a Dateset pipeline.
@@ -145,7 +155,7 @@ class Test_deb_example(unittest.TestCase):
         with self.__class__.lock:
             # Set up a feature (light-curve) amd labels and with tracable values
             input_labels = { k: v for v, k in enumerate(deb_example.labels_and_scales) }
-            input_lc_feature = { deb_example.pub_mags_key: np.arange(deb_example.mags_bins) }
+            input_lc_feature = { deb_example.default_mags_key: np.arange(deb_example.default_mags_bins) }
             deb = deb_example.serialize("t1", input_labels, input_lc_feature, {})
 
             def random_roll():

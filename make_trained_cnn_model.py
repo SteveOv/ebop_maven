@@ -19,8 +19,11 @@ from ebop_maven import modelling
 from ebop_maven.libs import deb_example
 import model_testing
 
-MAGS_BINS = deb_example.mags_bins
-NUM_EXT_INPUTS = len(deb_example.extra_features_and_defaults)
+# Configure the inputs and outputs of the model
+CHOSEN_FEATURES = ["phiS", "dS_over_dP"]
+MAGS_BINS = 1024
+MAGS_WRAP_PHASE = 0.75
+CHOSEN_LABELS = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "inc"]
 
 # We can now specify paths to train/val/test datasets separately for greater flexibility.
 TRAINSET_NAME = "formal-training-dataset"
@@ -31,9 +34,6 @@ MODEL_FILE_NAME = "cnn_ext_model"
 MODEL_NAME = "CNN-Ext-Estimator"
 SAVE_DIR = Path(".") / "drop/"
 PLOTS_DIR = SAVE_DIR / "plots"
-
-# The subset of all available labels which we will train to predict
-CHOSEN_LABELS = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "inc"]
 
 TRAINING_EPOCHS = 100           # Set high if we're using early stopping
 BATCH_FRACTION = 0.001          # larger -> quicker training per epoch but more to converge
@@ -61,16 +61,29 @@ DNN_INITIALIZER = "he_uniform"
 DNN_NUM_FULL_LAYERS = 2
 DNN_DROPOUT_RATE=0.5
 
-def make_best_model(verbose: bool=False):
+def make_best_model(chosen_features: list[str],
+                    mags_bins: int,
+                    mags_wrap_phase: float,
+                    chosen_labels: list[str],
+                    trainset_name: str,
+                    verbose: bool=False):
     """
     Helper function for building the current best performing model. 
     Publish model from a function, rather than inline, so it can be shared with model_search.
     """
-    print("\nBuilding the best known CNN model for predicting:", ", ".join(CHOSEN_LABELS))
+    print("\nBuilding the best known CNN model for predicting:", ", ".join(chosen_labels))
+    metadata = { # This will augment the model, giving an Estimator context information
+        "extra_features_and_defaults": 
+                    {f: deb_example.extra_features_and_defaults[f] for f in chosen_features },
+        "mags_bins": mags_bins,
+        "mags_wrap_phase": mags_wrap_phase,
+        "labels_and_scales": {l: deb_example.labels_and_scales[l] for l in chosen_labels},
+        "trainset_name": trainset_name
+    }
     best_model = modelling.build_mags_ext_model(
         name=MODEL_NAME,
         mags_input=modelling.mags_input_layer(shape=(MAGS_BINS, 1), verbose=verbose),
-        ext_input=modelling.ext_input_layer(shape=(NUM_EXT_INPUTS, 1), verbose=verbose),
+        ext_input=modelling.ext_input_layer(shape=(len(chosen_features), 1), verbose=verbose),
         mags_layers=[
             modelling.conv1d_layers(2, 64, 4, 2, CNN_PADDING, CNN_ACTIVATE, "Conv-1-", verbose),
             modelling.pooling_layer(layers.MaxPool1D, 2, 2, "Pool-1", verbose),
@@ -87,8 +100,9 @@ def make_best_model(verbose: bool=False):
             # consistently gives a small, but significant improvement to the trained loss.
             modelling.hidden_layers(1, 64, DNN_INITIALIZER, DNN_ACTIVATE, 0, ("Taper-",), verbose)
         ],
-        output=modelling.output_layer({l: deb_example.labels_and_scales[l] for l in CHOSEN_LABELS},
-                                      DNN_INITIALIZER, "linear", "Output"), verbose=verbose)
+        output=modelling.output_layer(metadata, DNN_INITIALIZER, "linear", "Output", verbose),
+        verbose=verbose
+    )
     if verbose:
         print(f"Have built the model {best_model.name}\n")
     return best_model
@@ -110,8 +124,11 @@ if __name__ == "__main__":
     print("Picking up training/validation/test datasets.")
     datasets = [tf.data.TFRecordDataset] * 3
     counts = [int] * 3
-    map_func = deb_example.create_map_func(labels=CHOSEN_LABELS,
-                                        noise_stddev=lambda: 0.005,
+    map_func = deb_example.create_map_func(mags_bins=MAGS_BINS,
+                                           mags_wrap_phase=MAGS_WRAP_PHASE,
+                                           ext_features=CHOSEN_FEATURES,
+                                           labels=CHOSEN_LABELS,
+                                           noise_stddev=lambda: 0.005,
                                         roll_steps=lambda: tf.random.uniform([], -9, 10, tf.int32))
     for ds_ix, (label, set_dir) in enumerate([("training", TRAINSET_DIR),
                                             ("valiation", VALIDSET_DIR),
@@ -131,7 +148,8 @@ if __name__ == "__main__":
     # -----------------------------------------------------------
     # Define the model
     # -----------------------------------------------------------
-    model = make_best_model(verbose=True)
+    model = make_best_model(CHOSEN_FEATURES, MAGS_BINS, MAGS_WRAP_PHASE, CHOSEN_LABELS,
+                            TRAINSET_NAME, verbose=True)
     model.compile(loss=LOSS, optimizer=OPTIMIZER, metrics=METRICS)
     model.summary()
 

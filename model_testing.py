@@ -41,15 +41,20 @@ def test_model_against_formal_test_dataset(
     :returns: a tuple of List[predictions dicts], List[labels dicts],
     one row per target instance in the order of the dataset
     """
-    # Create our Estimator. It will tell us which labels it (& the model) can predict.
+    # Create our Estimator. It will tell us what its inputs should look like
+    # and which labels it (& the underlying model) can predict.
     if not isinstance(use_estimator, Estimator):
         use_estimator = Estimator(use_estimator)
-    label_names = list(use_estimator.label_names_and_scales.keys())
-    feature_names = list(use_estimator.input_feature_names)
 
-    # Gets the target ids (names), labels (scaled) and the mags/ext features to make preds from
+    # Gets the target ids (names), labels and mags/ext features to predict on
     ids, labels, features = get_dataset_labels_and_features(
-                                test_dataset_dir, label_names, feature_names, scaled, include_ids)
+                test_dataset_dir,
+                label_names=[n for n in use_estimator.prediction_names if not n.endswith("sigma")],
+                feature_names=use_estimator.input_feature_names,
+                mags_bins=use_estimator.mags_feature_bins,
+                mags_wrap_phase=use_estimator.mags_feature_wrap_phase,
+                scaled_labels=scaled,
+                include_ids=include_ids)
     if include_ids is not None:
         assert len(include_ids) == len(ids)
 
@@ -349,6 +354,8 @@ def get_dataset_labels_and_features(
     dataset_dir: Path,
     label_names: List[str],
     feature_names: List[str],
+    mags_bins: int,
+    mags_wrap_phase: float,
     scaled_labels: bool=True,
     include_ids: List[str]=None):
     """
@@ -357,6 +364,8 @@ def get_dataset_labels_and_features(
     :dataset_dir: the directory within which it lives
     :label_names: the names of the labels to retrieve
     :feature_names: the names of the features to retrieve (in addition to mags)
+    :mags_bins: the size of the mags features we require
+    :mags_wrap_phase: the phase at which the mags feature is wrapped
     :scaled_labels: if True labels will be scaled
     :include_ids: List of ids to restrict results to, or all if None/empty
     :returns: Tuple[List[ids], List[labels dict], List[features dict]]
@@ -375,7 +384,7 @@ def get_dataset_labels_and_features(
         ids += [targ]
         ds_labels += [{ ln: lrow[ln] for ln in label_names}]
         ds_features += [{
-            "mags": mrow[deb_example.pub_mags_key], 
+            "mags": mrow[deb_example.create_mags_key(mags_bins, mags_wrap_phase)], 
             **{ fn: frow[fn] for fn in feature_names if fn not in ["mags"] }}
         ]
     return ids, ds_labels, ds_features
@@ -436,9 +445,10 @@ def get_label_and_prediction_raw_values(
 
 
 if __name__ == "__main__":
-    TRAINSET_NAME = "formal-training-dataset"   # Assume the usual training set
     estimator = Estimator(Path("./drop/cnn_ext_model.keras"))
-    save_dir = Path(f"./drop/results/{estimator.name}/{TRAINSET_NAME}/{deb_example.pub_mags_key}")
+    trainset_name = estimator.metadata["trainset_name"]
+    mags_key = f"mags_{estimator.mags_feature_bins}_{estimator.mags_feature_wrap_phase}"
+    save_dir = Path(f"./drop/results/{estimator.name}/{trainset_name}/{mags_key}")
     save_dir.mkdir(parents=True, exist_ok=True)
 
     with open("./config/formal-test-dataset.json", mode="r", encoding="utf8") as tf:
