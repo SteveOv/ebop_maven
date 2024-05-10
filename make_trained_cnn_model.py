@@ -1,6 +1,7 @@
 """
 Trains a regression CNN to estimate fitting parameters from folded dEB light curves
 """
+#pylint: disable=line-too-long
 from pathlib import Path
 import os
 import random as python_random
@@ -25,15 +26,16 @@ MAGS_BINS = 1024
 MAGS_WRAP_PHASE = 0.75
 CHOSEN_LABELS = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "inc"]
 
+MODEL_NAME = f"CNN-Ext{len(CHOSEN_FEATURES)}-{'-'.join(CHOSEN_LABELS[5:])}-{MAGS_BINS}-{MAGS_WRAP_PHASE}"
+MODEL_FILE_NAME = MODEL_NAME.lower()
+SAVE_DIR = Path(".") / "drop/"
+PLOTS_DIR = SAVE_DIR / "plots"
+
 # We can now specify paths to train/val/test datasets separately for greater flexibility.
 TRAINSET_NAME = "formal-training-dataset"
 TRAINSET_DIR = Path(".") / "datasets" / TRAINSET_NAME / "training"
 VALIDSET_DIR = Path(".") / "datasets" / TRAINSET_NAME / "validation"
 TESTSET_DIR = Path(".") / "datasets" / "synthetic-mist-tess-dataset"
-MODEL_FILE_NAME = "cnn_ext_model"
-MODEL_NAME = "CNN-Ext-Estimator"
-SAVE_DIR = Path(".") / "drop/"
-PLOTS_DIR = SAVE_DIR / "plots"
 
 TRAINING_EPOCHS = 100           # Set high if we're using early stopping
 BATCH_FRACTION = 0.001          # larger -> quicker training per epoch but more to converge
@@ -190,7 +192,7 @@ if __name__ == "__main__":
         ax = pd.DataFrame(history.history).plot(figsize=(6, 4), xlabel="Epoch", ylabel="Loss")
         ax.get_figure().tight_layout()
         PLOTS_DIR.mkdir(parents=True, exist_ok=True)
-        plt.savefig(PLOTS_DIR / f"{MODEL_FILE_NAME}_learning_curves.eps", dpi=300)
+        plt.savefig(PLOTS_DIR / f"{MODEL_FILE_NAME}-learning-curves.eps", dpi=300)
     except tf.errors.InvalidArgumentError as exc:
         if ("lc" in exc.message or "mags" in exc.message) \
                 and "Can't parse serialized" in exc.message:
