@@ -162,7 +162,7 @@ if __name__ == "__main__":
         PLOTS_DIR.mkdir(parents=True, exist_ok=True)
         plot_model(model, to_file=PLOTS_DIR / f"{MODEL_FILE_NAME}.png",
                 show_layer_names=True, show_shapes=True, show_layer_activations=True,
-                show_dtype=False, show_trainable=False, rankdir="LR", dpi=300)
+                show_dtype=False, show_trainable=False, rankdir="TB", dpi=300)
     except ImportError:
         print("Unable to plot_model() without pydot and/or graphviz.")
 
