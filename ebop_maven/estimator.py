@@ -88,6 +88,11 @@ class Estimator(ABC):
         return ["mags"] + [*self._extra_features_and_defaults.keys()]
 
     @property
+    def label_names(self) -> List[str]:
+        """ Gets the ordered list of the names of the labels used to train the model. """
+        return [*self._labels_and_scales.keys()]
+
+    @property
     def prediction_names(self) -> List[str]:
         """ Gets the ordered list of the names of the predicted values, including error bars. """
         return [*self._labels_and_scales.keys()] \
