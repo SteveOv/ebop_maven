@@ -12,18 +12,21 @@ from contextlib import redirect_stdout
 from textwrap import TextWrapper, fill
 import copy
 
+from uncertainties import ufloat
+from uncertainties.umath import sqrt, acos, degrees # pylint: disable=no-name-in-module
+
 import astropy.units as u
 import numpy as np
 from keras import Model
 
 from ebop_maven.libs.tee import Tee
-from ebop_maven.libs import deb_example, lightcurve, jktebop, stellar, limb_darkening, orbital
+from ebop_maven.libs import deb_example, lightcurve, jktebop, stellar, limb_darkening
 from ebop_maven.estimator import Estimator
 from ebop_maven import datasets
 import plots
 
 def test_model_against_formal_test_dataset(
-        use_estimator: Union[Model, Estimator],
+        estimator: Union[Model, Estimator],
         mc_iterations: int=1,
         include_ids: List[str]=None,
         scaled: bool=False,
@@ -43,16 +46,22 @@ def test_model_against_formal_test_dataset(
     """
     # Create our Estimator. It will tell us what its inputs should look like
     # and which labels it (& the underlying model) can predict.
-    if not isinstance(use_estimator, Estimator):
-        use_estimator = Estimator(use_estimator)
+    if not isinstance(estimator, Estimator):
+        estimator = Estimator(estimator)
+
+    # The estimator may not predict inc but we will need it later when fitting
+    label_names = estimator.label_names
+    calculated_inc = "inc" not in label_names
+    if calculated_inc:
+        label_names += ["inc"]
 
     # Gets the target ids (names), labels and mags/ext features to predict on
     ids, labels, features = get_dataset_labels_and_features(
                 test_dataset_dir,
-                label_names=[n for n in use_estimator.prediction_names if not n.endswith("sigma")],
-                feature_names=use_estimator.input_feature_names,
-                mags_bins=use_estimator.mags_feature_bins,
-                mags_wrap_phase=use_estimator.mags_feature_wrap_phase,
+                label_names=label_names,
+                feature_names=estimator.input_feature_names,
+                mags_bins=estimator.mags_feature_bins,
+                mags_wrap_phase=estimator.mags_feature_wrap_phase,
                 scaled_labels=scaled,
                 include_ids=include_ids)
     if include_ids is not None:
@@ -61,11 +70,14 @@ def test_model_against_formal_test_dataset(
     # Make our prediction which will return [{"name": value, "name_sigma": sigma_value}]*insts
     print(f"\nThe Estimator is making predictions on the {len(ids)} formal test instances",
           f"with {mc_iterations} iteration(s) (iterations >1 triggers MC Dropout algorithm).")
-    predictions = use_estimator.predict(features, mc_iterations, unscale=not scaled)
+    predictions = estimator.predict(features, mc_iterations, unscale=not scaled)
+    if calculated_inc:
+        for pred in predictions:
+            append_calculated_inc_prediction(pred)
 
-    # Echo some summary statistics
+    # Echo some summary statistics - only report on the directly predicted labels
     prediction_type = "mc" if mc_iterations > 1 else "nonmc"
-    (_, _, _, ocs) = get_label_and_prediction_raw_values(labels, predictions)
+    (_, _, _, ocs) = get_label_and_prediction_raw_values(labels, predictions, estimator.label_names)
     print("\n--------------------------------")
     print(f"Total MAE ({prediction_type}): {np.mean(np.abs(ocs)):.9f}")
     print(f"Total MSE ({prediction_type}): {np.mean(np.power(ocs, 2)):.9f}")
@@ -99,7 +111,9 @@ def fit_against_formal_test_dataset(
         selected_targets = list(targets_config.keys())
     assert len(selected_targets) == len(input_params)
     assert len(selected_targets) == len(labels)
-    l_names = list(input_params[0].keys())
+
+    # We'll only show and summarise the inputs/outputs that JKTEBOP supports directly
+    show_names = [n for n in input_params[0].keys() if n not in ["bP"]]
 
     for ix, (target, target_input_params, target_labels) in enumerate(zip(selected_targets,
                                                                           input_params,
@@ -121,13 +135,7 @@ def fit_against_formal_test_dataset(
         dat_fname = fit_dir / f"{fit_stem}.dat"
 
         print(f"\nWill fit {target} with the following input params")
-        table_of_predictions_vs_labels([target_labels], [target_input_params], [target])
-
-        # Handle the estimator predicting bP rather than inc directly
-        if not "inc" in target_input_params and "bP" in target_input_params:
-            inc = calculate_inc_from_other_predictions(target_input_params)
-            print(f"Input param calculated from other predictions; inc = {inc:.6f}")
-            target_input_params["inc"] = inc.to(u.deg).value
+        table_of_predictions_vs_labels([target_labels], [target_input_params], [target], show_names)
 
         # published fitting params that may be needed for good fit
         fit_overrides = target_cfg.get("fit_overrides", {}) if apply_fit_overrides else {}
@@ -152,10 +160,10 @@ def fit_against_formal_test_dataset(
         print(f"\nFitting {target} (with {sector_count} sector(s) of data) using JKTEBOP task 3...")
         par_fname = fit_dir / f"{fit_stem}.par"
         par_contents = list(jktebop.run_jktebop_task(in_fname, par_fname, stdout_to=sys.stdout))
-        fit_params = jktebop.read_fitted_params_from_par_lines(par_contents, l_names)
+        fit_params = jktebop.read_fitted_params_from_par_lines(par_contents, show_names)
 
         print(f"\nHave fitted {target} resulting in the following fitted params")
-        table_of_predictions_vs_labels([target_labels], [fit_params], [target])
+        table_of_predictions_vs_labels([target_labels], [fit_params], [target], show_names)
         fitted_params.append(fit_params)
     return np.array(fitted_params)
 
@@ -211,23 +219,30 @@ def base_jktebop_task3_params(period: float,
     }
 
 
-def calculate_inc_from_other_predictions(preds: Dict[str, float]) -> u.deg:
+def append_calculated_inc_prediction(predictions: Dict[str, float]):
     """
-    Calculate inc from the impact parameter and other supporting prediced values.
+    Calculate the predicted inc value (in degrees) from the primary impact param
+    and other supporting predicted values and append to the predictions.
 
     :preds: the prediction dictionary for this instance
-    :returns: the calculated inc (as a Quantity in deg)
     """
     required_preds = ["k", "rA_plus_rB", "bP", "esinw", "ecosw"]
-    missing_preds= [k for k in required_preds if k not in preds]
+    missing_preds= [k for k in required_preds if k not in predictions]
     if missing_preds:
         raise KeyError("These required predicted values are missing:", ", ".join(missing_preds))
 
-    b = preds["bP"]
-    r = preds["rA_plus_rB"] / (1 + preds["k"])
-    esinw = preds["esinw"]
-    e = np.sqrt(np.add(np.power(preds["ecosw"], 2), np.power(esinw, 2)))
-    return orbital.orbital_inclination(r, b, e, esinw, orbital.EclipseType.PRIMARY)
+    def pred_to_ufloat(key: str):
+        return ufloat(predictions[key], predictions[f"{key}_sigma"])
+
+    # From primary impact param:  i = arccos(bP * r1 * (1+esinw)/(1-e^2))
+    b = pred_to_ufloat("bP")
+    r = pred_to_ufloat("rA_plus_rB") / (1 + pred_to_ufloat("k"))
+    esinw = pred_to_ufloat("esinw")
+    e = sqrt(pred_to_ufloat("ecosw")**2 + esinw**2)
+    inc = degrees(acos(b * r * (1 + esinw) / (1 - e**2)))
+
+    predictions["inc"] = inc.nominal_value
+    predictions["inc_sigma"] = inc.std_dev
 
 
 def predictions_vs_labels_to_csv(
@@ -315,7 +330,7 @@ def table_of_predictions_vs_labels(
     # pylint: disable=too-many-arguments, too-many-locals
     # We output the labels common to the all labels & predictions or those requested
     if selected_label_names is None:
-        keys = [k for k in labels[0].keys() if k in predictions[0]]
+        keys = [k for k in predictions[0].keys() if k in labels[0]]
     else:
         keys = selected_label_names
 
@@ -406,7 +421,7 @@ def get_label_and_prediction_raw_values(
     :returns: a tuple of (label_values, prediction_values, prediction_errs, O-Cs)
     """
     if selected_labels is None:
-        selected_labels = list(labels[0].keys())
+        selected_labels = [k for k in predictions[0].keys() if not k.endswith("sigma")]
 
     # The make 2d lists for the label and prediction values
     # There are two format we expect for the predictions, either
@@ -445,10 +460,10 @@ def get_label_and_prediction_raw_values(
 
 
 if __name__ == "__main__":
-    estimator = Estimator() # If no model, will load the default model under ebop_maven/data
-    trainset_name = estimator.metadata["trainset_name"]
-    mags_key = f"mags_{estimator.mags_feature_bins}_{estimator.mags_feature_wrap_phase}"
-    save_dir = Path(f"./drop/results/{estimator.name}/{trainset_name}/{mags_key}")
+    the_estimator = Estimator() # If no model, will load the default model under ebop_maven/data
+    trainset_name = the_estimator.metadata["trainset_name"]
+    mags_key = f"mags_{the_estimator.mags_feature_bins}_{the_estimator.mags_feature_wrap_phase}"
+    save_dir = Path(f"./drop/results/{the_estimator.name}/{trainset_name}/{mags_key}")
     save_dir.mkdir(parents=True, exist_ok=True)
 
     with open("./config/formal-test-dataset.json", mode="r", encoding="utf8") as tf:
@@ -460,13 +475,13 @@ if __name__ == "__main__":
     all_labels, all_preds, all_fits = None, {}, {}
 
     with redirect_stdout(Tee(open(save_dir / "model_testing.log", "w", encoding="utf8"))):
-        print("\n"+fill(f"Testing {estimator.name} against targets: {', '.join(targets)}", 100))
+        print("\n"+fill(f"Testing {the_estimator.name} against targets: {', '.join(targets)}", 100))
 
         # Report on the performance of the model/Estimator predictions vs labels
         for ptype, iters in [("nonmc", 1), ("mc", 1000)]:
             print(f"\n\nTesting the model's {ptype} estimates (where iters={iters})\n" + "="*80)
             (all_preds[ptype], all_labels) = test_model_against_formal_test_dataset(
-                                                                        estimator, iters, targets)
+                                                                    the_estimator, iters, targets)
 
             results_stem = "predictions_vs_labels_" + ptype # pylint: disable=invalid-name
             fig = plots.plot_predictions_vs_labels(all_labels, all_preds[ptype], trans_flags)
