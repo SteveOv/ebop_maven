@@ -227,7 +227,7 @@ def calculate_inc_from_other_predictions(preds: Dict[str, float]) -> u.deg:
     r = preds["rA_plus_rB"] / (1 + preds["k"])
     esinw = preds["esinw"]
     e = np.sqrt(np.add(np.power(preds["ecosw"], 2), np.power(esinw, 2)))
-    return orbital.orbital_inclination(r, b, e, None, esinw)
+    return orbital.orbital_inclination(r, b, e, esinw, orbital.EclipseType.PRIMARY)
 
 
 def predictions_vs_labels_to_csv(

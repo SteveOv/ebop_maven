@@ -101,31 +101,23 @@ def impact_parameter(r1: float,
 def orbital_inclination(r1: float,
                         b: float,
                         e: float,
-                        omega: Quantity=None,
                         esinw: float=None,
                         eclipse: EclipseType=EclipseType.PRIMARY)\
                             -> u.deg:
     """
     Calculate the orbital inclination from an impact parameter. This uses
-    the primary star's fractional radius, orbital eccentricity and one of either
-    omega or esinw [e*sin(omega)] along with the supplied impact parameter.
+    the primary star's fractional radius, orbital eccentricity and the
+    e*sin(omega) Poincare element along with the supplied impact parameter.
 
     :r1: fractional radius of the primary star
     :b: the chosen impact parameter
     :e: the orbital eccentricity
-    :omega: the argument of periastron
     :esinw: the e*sin(omega) Poincare element
     :eclipse: the type of eclipse the impact parameter is from; PRIMARY or SECONDARY (not BOTH).
     :returns: The inclination as a Quantity in degrees
     """
     # From primary eclipse/impact param:  i = arccos(bP * r1 * (1+esinw)/(1-e^2))
     # From secodary eclipse/impact param: i = arccos(bS * r1 * (1-esinw)/(1-e^2))
-
-    # Must have either esinw or omega with esinw taking precedent if both given.
-    if esinw is None:
-        if omega is None:
-            raise ValueError("Must provide a value for either omega or esinw")
-        esinw = np.multiply(e, np.sin(omega.to(u.rad).value))
 
     if eclipse == EclipseType.PRIMARY:
         dividend = np.add(1, esinw)
