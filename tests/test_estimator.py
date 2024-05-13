@@ -73,7 +73,7 @@ class TestEstimator(unittest.TestCase):
     def test_init_with_none(self):
         """ Tests __init__(model is None) -> inits with default ./data/estimator/*.keras model """
         estimator = Estimator()
-        self.assertIn("Estimator", estimator.name)
+        self.assertIn("rA_plus_rB", estimator.label_names)
 
     def test_init_with_path(self):
         """ Tests __init__(valid model path) -> correct initialization """

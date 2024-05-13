@@ -23,12 +23,7 @@ class Estimator(ABC):
         :iterations: set to >1 to control MC Dropout iterations per prediction
         """
         if model is None:
-            models = list((Path(getsourcefile(lambda:0)).parent / "data/estimator").glob("*.keras"))
-            if models:
-                model = models[0]
-            else:
-                raise ValueError("No default model found, so must be a valid" \
-                                 + " keras Model or the Path of a saved model")
+            model = Path(getsourcefile(lambda:0)).parent / "data/estimator/default-model.keras"
         if iterations is None:
             raise TypeError("iterations must be a positive integer")
         if iterations < 1:
