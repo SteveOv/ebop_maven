@@ -445,7 +445,7 @@ def get_label_and_prediction_raw_values(
 
 
 if __name__ == "__main__":
-    estimator = Estimator(Path("./drop/cnn_ext_model.keras"))
+    estimator = Estimator() # If no model, will load the default model under ebop_maven/data
     trainset_name = estimator.metadata["trainset_name"]
     mags_key = f"mags_{estimator.mags_feature_bins}_{estimator.mags_feature_wrap_phase}"
     save_dir = Path(f"./drop/results/{estimator.name}/{trainset_name}/{mags_key}")
@@ -460,7 +460,7 @@ if __name__ == "__main__":
     all_labels, all_preds, all_fits = None, {}, {}
 
     with redirect_stdout(Tee(open(save_dir / "model_testing.log", "w", encoding="utf8"))):
-        print(fill(f"Testing {estimator.name} against targets: {', '.join(targets)}", 100))
+        print("\n"+fill(f"Testing {estimator.name} against targets: {', '.join(targets)}", 100))
 
         # Report on the performance of the model/Estimator predictions vs labels
         for ptype, iters in [("nonmc", 1), ("mc", 1000)]:

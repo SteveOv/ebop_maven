@@ -105,7 +105,7 @@ def plot_predictions_vs_labels(
     # of names. Avoiding using set() as we want names or the labels to set order
     if selected_labels is None:
         selected_labels = list(all_pub_labels.keys())
-    pub_labels = { k: all_pub_labels[k] for k in selected_labels if k in labels[0].keys() }
+    pub_labels = { k: all_pub_labels[k] for k in selected_labels if k in predictions[0].keys() }
 
     cols = 2
     rows = math.ceil(len(pub_labels) / cols)
