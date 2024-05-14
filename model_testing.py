@@ -17,7 +17,7 @@ from uncertainties.umath import sqrt, acos, degrees # pylint: disable=no-name-in
 
 import astropy.units as u
 import numpy as np
-from keras import Model
+from keras import Model, metrics
 
 from ebop_maven.libs.tee import Tee
 from ebop_maven.libs import deb_example, lightcurve, jktebop, stellar, limb_darkening
@@ -77,11 +77,15 @@ def test_model_against_formal_test_dataset(
 
     # Echo some summary statistics - only report on the directly predicted labels
     prediction_type = "mc" if mc_iterations > 1 else "nonmc"
-    (_, _, _, ocs) = get_label_and_prediction_raw_values(labels, predictions, estimator.label_names)
-    print("\n--------------------------------")
-    print(f"Total MAE ({prediction_type}): {np.mean(np.abs(ocs)):.9f}")
-    print(f"Total MSE ({prediction_type}): {np.mean(np.power(ocs, 2)):.9f}")
-    print("--------------------------------\n")
+    (lbl_vals, pred_vals, _, _) = get_label_and_prediction_raw_values(labels, predictions,
+                                                                      estimator.label_names)
+    print("\n-----------------------------------")
+    for metric_identifier in ["MAE", "MSE", "r2_score"]:
+        metric = metrics.get(metric_identifier)
+        metric.update_state(lbl_vals, pred_vals)
+        result = metric.result()
+        print(f"Total {metric_identifier:>8} ({prediction_type}): {result:.9f}")
+    print("-----------------------------------\n")
     return (np.array(predictions), np.array(labels))
 
 
