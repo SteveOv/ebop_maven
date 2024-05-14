@@ -418,7 +418,7 @@
         "transits": true,
         "eclipses_similar": false,
         "components_similar": false,
-        "notes": "J from JKTEBOP fit; rA_plus_rB & k derived from rA & rB in table 8; bP derived from rA, inc, e & esinw; control fit of S13 SAP fluxes yields MAE~0.072 (use whole sector as restricting to 2nd half gives worse fit);",
+        "notes": "J from trial JKTEBOP fit; rA_plus_rB & k derived from rA & rB in table 8; bP derived from rA, inc, e & esinw; control fit of 2nd half of S13 SAP fluxes yields MAE~0.035 (however unable to replicate esinw - always get positive value unless fixed);",
         "primary_epoch": 1675.389224513,
         "period": 2.748420962,
         "ecc": 0.0014,          "ecc_err": 0.0004,
@@ -430,13 +430,18 @@
             "inc": 84.304,          "inc_err": 0.035,
             "ecosw": 0.0003,        "ecosw_err": 0.004,
             "esinw": -0.0014,       "esinw_err": 0.0004,
-            "J": 0.23,              "J_err": null,
+            "J": 0.25,              "J_err": null,
             "L3": -0.054,           "L3_err": 0.005
         },
         "sectors": {
             "13": {
-                "quality_bitmask": "hardest"
+                "quality_bitmask": "hardest",
+                "quality_masks": [[1653.0, 1668.0], [1682.0, 1683.0]]
             }
+        },
+        "fit_overrides": {
+            "qphot": 0.45,
+            "L3_fit": 0
         }
     },
     "V456 Cyg": {
