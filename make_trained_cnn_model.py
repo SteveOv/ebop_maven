@@ -84,7 +84,7 @@ def make_best_model(chosen_features: list[str],
     }
     best_model = modelling.build_mags_ext_model(
         name=MODEL_NAME,
-        mags_input=modelling.mags_input_layer(shape=(MAGS_BINS, 1), verbose=verbose),
+        mags_input=modelling.mags_input_layer(shape=(mags_bins, 1), verbose=verbose),
         ext_input=modelling.ext_input_layer(shape=(len(chosen_features), 1), verbose=verbose),
         mags_layers=[
             modelling.conv1d_layers(2, 64, 4, 2, CNN_PADDING, CNN_ACTIVATE, "Conv-1-", verbose),
