@@ -117,7 +117,7 @@ def fit_against_formal_test_dataset(
     assert len(selected_targets) == len(labels)
 
     # We'll only show and summarise the inputs/outputs that JKTEBOP supports directly
-    show_names = [n for n in input_params[0].keys() if n not in ["bP"]]
+    show_names = [n for n in input_params[0].keys() if n not in ["bP"] and not n.endswith("sigma")]
 
     for ix, (target, target_input_params, target_labels) in enumerate(zip(selected_targets,
                                                                           input_params,
