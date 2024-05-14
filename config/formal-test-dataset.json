@@ -202,9 +202,9 @@
         "transits": false,
         "eclipses_similar": false,
         "components_similar": false,
-        "notes": "e=0.0 & ω=0.0 (fixed); bP derived from rA, inc, e & esinw; best fit using SAP photometry on sectors 42-44 and fixing the published lrat and LD params yields MAE~0.061",
-        "primary_epoch": 2464.981949127,
-        "period": 2.461132246,
+        "notes": "e=0.0 & ω=0.0 (fixed); bP derived from rA, inc, e & esinw; best fit using SAP photometry on sector 42 only and fixing the published lrat and LD params yields MAE~0.028",
+        "primary_epoch": 2464.981943071,
+        "period": 2.461126371,
         "labels": {
             "rA_plus_rB": 0.2664,   "rA_plus_rB_err": 0.0011,
             "k": 0.784,             "k_err": 0.012,
@@ -218,12 +218,6 @@
         "sectors": {
             "42": {
                 "quality_bitmask": "hardest"
-            },
-            "43": {
-                "quality_bitmask": "hardest"              
-            },
-            "44": {
-                "quality_bitmask": "hardest"              
             }
         },
         "fit_overrides": {
@@ -235,7 +229,7 @@
             "LDB2": 0.42,
             "LDA1_fit": 0,
             "LDB1_fit": 0,
-            "lrat": ["2465.60 0.328 0.011"]
+            "lrat": ["2464.20 0.328 0.011", "2465.80 0.328 0.011"]
         }
     },
     "V889 Aql": {
