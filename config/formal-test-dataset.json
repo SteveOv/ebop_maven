@@ -920,9 +920,9 @@
         "transits": true,
         "eclipses_similar": false,
         "components_similar": false,
-        "notes": "e=0 & ω=0 & L3=0 (fixed); bP derived from rA, inc, e & esinw; best control fit with single sector S21, gives MAE~0.037;",
-        "primary_epoch": 1891.20000974,
-        "period": 2.299226860,
+        "notes": "e=0 & ω=0 & L3=0 (fixed); bP derived from rA, inc, e & esinw; best control fit with half of sector S21 (to minimise variability due to star spots) and published LD params (fixed), gives MAE~0.013;",
+        "primary_epoch": 1891.200022448,
+        "period": 2.299352788,
         "labels": { 
             "rA_plus_rB": 0.26756,  "rA_plus_rB_err": 0.00085,
             "k": 0.7484,            "k_err": 0.0040,
@@ -936,8 +936,18 @@
         "sectors": {
             "21": {
                 "quality_bitmask": "hardest",
-                "quality_masks": [[1870.0, 1871.25], [1885.0, 1886.5]]
+                "quality_masks": [[1870.0, 1886.5]]
             }
+        },
+        "fit_overrides": {
+            "LDA": "quad",
+            "LDB": "quad",
+            "LDA1": 0.328,
+            "LDB1": -0.031,
+            "LDA2": 0.30,
+            "LDB2": 0.23,
+            "LDA1_fit": 0,
+            "LDB1_fit": 0
         }
     },
     "QR Hya": {
