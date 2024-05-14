@@ -336,7 +336,7 @@
         "transits": false,
         "eclipses_similar": false,
         "components_similar": false,
-        "notes": "e=0.0 & ω=0.0 fixed; J from trial JKTEBOP fit; bP derived from rA, inc, e & esinw; control fit on SAP flux of 2nd half of S37 yields MAE~0.034",
+        "notes": "e=0.0 & ω=0.0 fixed; J from trial JKTEBOP fit; bP derived from rA, inc, e & esinw; control fit on SAP flux of 2nd half of S37 with L3 fixed at published value yields MAE~0.021",
         "primary_epoch": 2323.949317858,
         "period": 4.966388646,
         "labels": { 
@@ -351,9 +351,12 @@
         },
         "sectors": {
             "37": {
-                "quality_bitmask": "default",
+                "quality_bitmask": "hardest",
                 "quality_masks": [[2307.0, 2319.5]]
             }
+        },
+        "fit_overrides": {
+            "L3_fit": 0
         }
     },
     "RR Lyn": {
