@@ -474,6 +474,7 @@ if __name__ == "__main__":
         targets_cfg = json.load(tf)
 
     exclude_targets = ["V402 Lac", "V456 Cyg"] # Neither are suitable for JKTEBOP fitting
+    exclude_targets += ["psi Cen"] # Unstable fit; deviate from pub params and we get gaussj errors
     targets = np.array([target for target in targets_cfg if target not in exclude_targets])
     trans_flags = np.array([targets_cfg.get(t, {}).get("transits", False) for t in targets])
     all_labels, all_preds, all_fits = None, {}, {}
