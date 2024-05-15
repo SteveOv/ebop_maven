@@ -11,6 +11,7 @@ import re
 from contextlib import redirect_stdout
 from textwrap import TextWrapper, fill
 import copy
+import argparse
 
 from uncertainties import ufloat
 from uncertainties.umath import sqrt, acos, degrees # pylint: disable=no-name-in-module
@@ -483,12 +484,10 @@ def get_label_and_prediction_raw_values(
 
 
 if __name__ == "__main__":
-    the_estimator = Estimator() # If no model, will load the default model under ebop_maven/data
-    trainset_name = the_estimator.metadata["trainset_name"]
-    mags_key = deb_example.create_mags_key(the_estimator.mags_feature_bins,
-                                           the_estimator.mags_feature_wrap_phase)
-    save_dir = Path(f"./drop/results/{the_estimator.name}/{trainset_name}/{mags_key}")
-    save_dir.mkdir(parents=True, exist_ok=True)
+    ap = argparse.ArgumentParser(description="Runs formal testing on trained model files.")
+    ap.add_argument(dest="model_files", type=Path, nargs="*", help="The model file(s) to test.")
+    ap.set_defaults(model_files=[None]) # If None will load the default model under ebop_maven/data
+    args = ap.parse_args()
 
     with open("./config/formal-test-dataset.json", mode="r", encoding="utf8") as tf:
         targets_cfg = json.load(tf)
@@ -497,65 +496,75 @@ if __name__ == "__main__":
     exclude_targets += ["psi Cen"] # Unstable fit; deviate from pub params and we get gaussj errors
     targets = np.array([target for target in targets_cfg if target not in exclude_targets])
     trn_flags = np.array([targets_cfg.get(t, {}).get("transits", False) for t in targets])
-    labs, all_preds, all_fits = None, {}, {}
 
-    with redirect_stdout(Tee(open(save_dir / "model_testing.log", "w", encoding="utf8"))):
-        print("\n"+fill(f"Testing {the_estimator.name} against targets: {', '.join(targets)}", 100))
+    for file_counter, model_file in enumerate(args.model_files, 1):
+        print(f"\nModel file {file_counter} of {len(args.model_files)}: {model_file}\n")
 
-        # Report on the performance of the model/Estimator predictions vs labels
-        for pred_type, iters in [("nonmc", 1), ("mc", 1000)]:
-            print(f"\n\nTesting the model's {pred_type} estimates (where iters={iters})\n" + "="*80)
-            (labs, all_preds[pred_type]) = test_model_against_formal_test_dataset(the_estimator,
-                                                                                  iters, targets)
+        the_estimator = Estimator(model_file)
+        trainset_name = the_estimator.metadata["trainset_name"]
+        mags_key = deb_example.create_mags_key(the_estimator.mags_feature_bins,
+                                               the_estimator.mags_feature_wrap_phase)
+        save_dir = Path(f"./drop/results/{the_estimator.name}/{trainset_name}/{mags_key}")
+        save_dir.mkdir(parents=True, exist_ok=True)
 
-            results_stem = "predictions_vs_labels_" + pred_type # pylint: disable=invalid-name
-            fig = plots.plot_predictions_vs_labels(labs, all_preds[pred_type], trn_flags)
-            fig.savefig(save_dir / f"{results_stem}.eps")
+        labs, all_preds, all_fits = None, {}, {}
+        with redirect_stdout(Tee(open(save_dir / "model_testing.log", "w", encoding="utf8"))):
+            print("\n"+fill(f"Testing {the_estimator.name} against\n{', '.join(targets)}", 100))
 
-            with open(save_dir / f"{results_stem}.csv", mode="w", encoding="utf8") as cf:
-                predictions_vs_labels_to_csv(labs, all_preds[pred_type], targets, to=cf)
+            # Report on the performance of the model/Estimator predictions vs labels
+            for pred_type, iters in [("nonmc", 1), ("mc", 1000)]:
+                print(f"\n\nTesting the model's {pred_type} estimates (iters={iters})\n" + "="*80)
+                (labs, all_preds[pred_type]) = test_model_against_formal_test_dataset(the_estimator,
+                                                                                    iters, targets)
 
-            with open(save_dir / f"{results_stem}.txt", mode="w", encoding="utf8") as tf:
-                for (heading, mask) in [("All targets", [True]*len(targets)),
-                                        ("\n\nTransiting systems only", trn_flags),
-                                        ("\n\nNon-transiting systems only", ~trn_flags)]:
-                    tf.write(f"\n{heading}\n")
-                    if any(mask):
-                        predictions_vs_labels_to_table(labs[mask], all_preds[pred_type][mask],
-                                                       targets[mask], to=tf)
+                results_stem = "predictions_vs_labels_" + pred_type # pylint: disable=invalid-name
+                fig = plots.plot_predictions_vs_labels(labs, all_preds[pred_type], trn_flags)
+                fig.savefig(save_dir / f"{results_stem}.eps")
 
-        # These are the key/values which are set for a JKTEBOP fit. If comparing
-        # models/prediction values it's these six which ultimately matter.
-        fit_keys = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "inc"]
+                with open(save_dir / f"{results_stem}.csv", mode="w", encoding="utf8") as cf:
+                    predictions_vs_labels_to_csv(labs, all_preds[pred_type], targets, to=cf)
 
-        # Now report using the predictions as input to fitting the formal-test-dataset with JKTEBOP
-        # First we add control "preds"; this allows us to fit against the labels to get control fits
-        all_preds["control"] = copy.deepcopy(labs)
-        for pred_type in ["control", "mc", "nonmc"]:
-            print(f"\n\nTesting JKTEBOP fitting based on {pred_type} input values\n" + "="*80)
-            all_fits[pred_type] = fit_against_formal_test_dataset(labs, all_preds[pred_type],
-                                                                  targets_cfg, targets, True)
-
-            # Now summarize how well the fits compare with labels and the control fit
-            for comp, fits, comp_type, comp_heading in [
-                        (labs, all_fits[pred_type], "labels", "Label"),
-                        (all_fits["control"], all_fits[pred_type], "control_fit", "Control")
-                ]:
-                if comp is fits:
-                    break # No point comparing the controls with the controls
-
-                results_stem = f"fitted_params_from_{pred_type}_vs_{comp_type}" # pylint: disable=invalid-name
-                fig = plots.plot_predictions_vs_labels(comp, fits, trn_flags, fit_keys,
-                                                       xlabel_prefix=comp_heading.lower(),
-                                                       ylabel_prefix="fitted")
-                fig.savefig(save_dir / f"{results_stem}.eps", dpi=300)
-
-                with open(save_dir / f"{results_stem}.txt", "w", encoding="utf8") as of:
+                with open(save_dir / f"{results_stem}.txt", mode="w", encoding="utf8") as tf:
                     for (heading, mask) in [("All targets", [True]*len(targets)),
                                             ("\n\nTransiting systems only", trn_flags),
                                             ("\n\nNon-transiting systems only", ~trn_flags)]:
-                        of.write(f"\n{heading}\n")
+                        tf.write(f"\n{heading}\n")
                         if any(mask):
-                            predictions_vs_labels_to_table(comp[mask], fits[mask], targets[mask],
-                                                           fit_keys, comparison_head=comp_heading,
-                                                           prediction_head="Fitted", to=of)
+                            predictions_vs_labels_to_table(labs[mask], all_preds[pred_type][mask],
+                                                           targets[mask], to=tf)
+
+            # These are the key/values which are set for a JKTEBOP fit. If comparing
+            # models/prediction values it's these six which ultimately matter.
+            fit_keys = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "inc"]
+
+            # Report using the predictions as input to fitting the formal-test-dataset with JKTEBOP.
+            # First we add control "preds" from labels, so we can use them to create control fits.
+            all_preds["control"] = copy.deepcopy(labs)
+            for pred_type in ["control", "mc", "nonmc"]:
+                print(f"\n\nTesting JKTEBOP fitting based on {pred_type} input values\n" + "="*80)
+                all_fits[pred_type] = fit_against_formal_test_dataset(labs, all_preds[pred_type],
+                                                                      targets_cfg, targets, True)
+
+                # Now summarize how well the fits compare with labels and the control fit
+                for comp, fits, comp_type, comp_heading in [
+                            (labs, all_fits[pred_type], "labels", "Label"),
+                            (all_fits["control"], all_fits[pred_type], "control_fit", "Control")]:
+                    if comp is fits:
+                        break # No point comparing the controls with the controls
+
+                    results_stem = f"fitted_params_from_{pred_type}_vs_{comp_type}" # pylint: disable=invalid-name
+                    fig = plots.plot_predictions_vs_labels(comp, fits, trn_flags, fit_keys,
+                                                           xlabel_prefix=comp_heading.lower(),
+                                                           ylabel_prefix="fitted")
+                    fig.savefig(save_dir / f"{results_stem}.eps", dpi=300)
+
+                    with open(save_dir / f"{results_stem}.txt", "w", encoding="utf8") as of:
+                        for (heading, mask) in [("All targets", [True]*len(targets)),
+                                                ("\n\nTransiting systems only", trn_flags),
+                                                ("\n\nNon-transiting systems only", ~trn_flags)]:
+                            of.write(f"\n{heading}\n")
+                            if any(mask):
+                                predictions_vs_labels_to_table(comp[mask], fits[mask],
+                                                               targets[mask], fit_keys,
+                                                               comparison_head=comp_heading,
+                                                               prediction_head="Fitted", to=of)
