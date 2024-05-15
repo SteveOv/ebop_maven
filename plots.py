@@ -73,7 +73,9 @@ def plot_predictions_vs_labels(
         transit_flags: List[bool],
         selected_labels: List[str]=None,
         show_errorbars: bool=None,
-        reverse_scaling: bool=False) -> Figure:
+        reverse_scaling: bool=False,
+        xlabel_prefix: str="label",
+        ylabel_prefix: str="predicted") -> Figure:
     """
     Will create a plot figure with a grid of axes, one per label, showing the
     predictions vs label values. It is up to calling code to show or save the figure.
@@ -87,6 +89,8 @@ def plot_predictions_vs_labels(
     :show_errorbars: whether to plot errorbars - if not set the function will plot errorbars
     if there are non-zero error/sigma values in the predictions
     :reverse_scaling: whether to reverse the scaling of the values to represent the model output
+    :xlabel_prefix: the prefix text for the labels/x-axis label
+    :ylabel_prefix: the prefix text for the predictions/y-axis label
     :returns: the Figure
     """
     # pylint: disable=too-many-arguments, too-many-locals
@@ -139,7 +143,7 @@ def plot_predictions_vs_labels(
                 ax.errorbar(x=x, y=y, fmt="o", c="tab:blue", ms=5.0, lw=1.0, fillstyle=f, zorder=z)
 
         format_axes(ax, xlim=diag, ylim=diag,
-                    xlabel=f"label {ax_label}", ylabel=f"predicted {ax_label}")
+                    xlabel=f"{xlabel_prefix} {ax_label}", ylabel=f"{ylabel_prefix} {ax_label}")
 
         # Make sure the plots are squared and have the same ticks
         ax.set_aspect("equal", "box")

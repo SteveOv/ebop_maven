@@ -318,6 +318,8 @@ def predictions_vs_labels_to_table(
         block_headings: List[str],
         selected_label_names: List[str]=None,
         reverse_scaling: bool=False,
+        comparison_head: str="Label",
+        prediction_head: str="Prediction",
         to: TextIOBase=None):
     """
     Will write a text table of the predicted nominal values vs the label values
@@ -329,6 +331,8 @@ def predictions_vs_labels_to_table(
     :block_headings: the heading for each block of preds-vs-labels
     :selected_label_names: a subset of the full list of labels/prediction names to render
     :reverse_scaling: whether to reverse the scaling of the values to represent the model output
+    :comparison_head: the text of the comparison row headings (10 chars or less)
+    :prediction_head: the text of the prediction row headings (10 chars or less)
     :to: the output to write the table to. Defaults to printing.
     """
     # pylint: disable=too-many-arguments, too-many-locals
@@ -355,7 +359,7 @@ def predictions_vs_labels_to_table(
         to.write("\n")
         rocs = np.concatenate([rocs, [np.mean(np.abs(rocs)), np.mean(np.power(rocs, 2))]])
         to.write("-"*line_len + "\n")
-        for row_head, vals in zip(["Label", "Prediction", "O-C"], [rlabs, rpreds, rocs]):
+        for row_head, vals in zip([comparison_head, prediction_head, "O-C"], [rlabs, rpreds, rocs]):
             to.write(f"{row_head:<10s} | " + " ".join(f"{v:10.6f}" for v in vals))
             to.write("\n")
 
@@ -398,6 +402,7 @@ def get_dataset_labels_and_features(
         raise IndexError("No dataset files found")
 
     ids, ds_labels, ds_features = [], [], []
+    # This will yield the records in the order in which they appear in the dataset
     for (targ, lrow, mrow, frow) in datasets.inspect_dataset(tfrecord_files, include_ids,
                                                              scale_labels=scaled_labels):
         ids += [targ]
@@ -406,12 +411,21 @@ def get_dataset_labels_and_features(
             "mags": mrow[deb_example.create_mags_key(mags_bins, mags_wrap_phase)], 
             **{ fn: frow[fn] for fn in feature_names if fn not in ["mags"] }}
         ]
+
+    # Need to sort the data in the order of the requested ids (if given)
+    if include_ids is not None and len(include_ids) > 0:
+        indices = [ids.index(i) for i in include_ids if i in ids]
+        ids = [ids[ix] for ix in indices]
+        ds_labels = [ds_labels[ix] for ix in indices]
+        ds_features = [ds_features[ix] for ix in indices]
+
     return ids, ds_labels, ds_features
 
+
 def get_label_and_prediction_raw_values(
-        labels: List[Dict[str, float]],
+        labels: List[Union[Dict[str, float], Dict[str, Tuple[float, float]]]],
         predictions: List[Union[Dict[str, float], Dict[str, Tuple[float, float]]]],
-        selected_labels: List[str]=None,
+        selected_label_names: List[str]=None,
         reverse_scaling: bool=False) \
             -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
@@ -424,43 +438,48 @@ def get_label_and_prediction_raw_values(
     :reverse_scaling: whether to reapply label scaling to get the model's values
     :returns: a tuple of (label_values, prediction_values, prediction_errs, O-Cs)
     """
-    if selected_labels is None:
-        selected_labels = [k for k in predictions[0].keys() if not k.endswith("sigma")]
+    if selected_label_names is None:
+        selected_label_names = [k for k in predictions[0].keys() if not k.endswith("sigma")]
 
-    # The make 2d lists for the label and prediction values
-    # There are two format we expect for the predictions, either
-    #   - { "key": (value, uncertainty) }
-    #   - { "key": value, "key_sigma": uncertainty }
-    # In either case we need to separate out the error bars
-    label_values = np.array([[ld[l] for l in selected_labels] for ld in labels])
-    if isinstance(predictions[0][selected_labels[0]], tuple):
-        nominals = np.array([[pd[l][0] for l in selected_labels] for pd in predictions])
-        errors = np.array([[pd[l][1] for l in selected_labels] for pd in predictions])
-    else:
-        nominals = np.array([[pd[l] for l in selected_labels] for pd in predictions])
-        if f"{selected_labels[0]}_sigma" in predictions[0]:
-            errors = [[pd.get(f"{l}_sigma", 0) for l in selected_labels] for pd in predictions]
-            errors = np.array(errors)
+    def to_noms_and_errs(inputs, keys) -> np.ndarray:
+        # There are two format we expect for the List of input values;
+        #   - [{ "key": (value, uncertainty) }]
+        #   - [{ "key": value, "key_sigma": uncertainty }]
+        # In either case we need to separate out the nominal value and error bars
+        if isinstance(inputs[0][keys[0]], tuple):
+            # we have tuples of (value, uncertainty) for each key
+            nominals = np.array([[inp[l][0] for l in keys] for inp in inputs])
+            err_bars = np.array([[inp[l][1] for l in keys] for inp in inputs])
         else:
-            errors = np.zeros_like(nominals)
+            # We have single value keys and (optional) separate key_sigma uncertainty values
+            nominals = np.array([[inp[l] for l in keys] for inp in inputs])
+            if f"{keys[0]}_sigma" in inputs[0]:
+                err_bars = [[inp.get(f"{l}_sigma", 0) for l in keys] for inp in inputs]
+                err_bars = np.array(err_bars)
+            else:
+                err_bars = np.zeros_like(nominals)
+        return nominals, err_bars
+
+    label_values, _ = to_noms_and_errs(labels, selected_label_names)
+    pred_noms, pred_errs = to_noms_and_errs(predictions, selected_label_names)
 
     # Coalesce any None values to zero otherwise we'll get failures below
     # pylint: disable=singleton-comparison
     label_values[label_values == None] = 0.
-    nominals[nominals == None] = 0.
-    errors[errors == None] = 0.
+    pred_noms[pred_noms == None] = 0.
+    pred_errs[pred_errs == None] = 0.
     # pylint: enable=singleton-comparison
 
     # Optionally reverse any scaling of the values to get them in to the scale used by the ML model
     if reverse_scaling:
-        scales = [deb_example.labels_and_scales[l] for l in selected_labels]
+        scales = [deb_example.labels_and_scales[l] for l in selected_label_names]
         label_values = np.multiply(label_values, scales)
-        nominals = np.multiply(nominals, scales)
-        errors = np.multiply(errors, scales)
+        pred_noms = np.multiply(pred_noms, scales)
+        pred_errs = np.multiply(pred_errs, scales)
 
     # Currently O-C only considers the nominal values (as that's what we use in estimates)
-    ocs = np.subtract(label_values, nominals)
-    return (label_values, nominals, errors, ocs)
+    ocs = np.subtract(label_values, pred_noms)
+    return (label_values, pred_noms, pred_errs, ocs)
 
 
 if __name__ == "__main__":
@@ -497,12 +516,13 @@ if __name__ == "__main__":
                 predictions_vs_labels_to_csv(labs, all_preds[pred_type], targets, to=cf)
 
             with open(save_dir / f"{results_stem}.txt", mode="w", encoding="utf8") as tf:
-                for (heading, trn_mask) in [("All targets", [True]*len(targets)),
-                                            ("\n\nTransiting systems only", trn_flags),
-                                            ("\n\nNon-transiting systems only", ~trn_flags)]:
+                for (heading, mask) in [("All targets", [True]*len(targets)),
+                                        ("\n\nTransiting systems only", trn_flags),
+                                        ("\n\nNon-transiting systems only", ~trn_flags)]:
                     tf.write(f"\n{heading}\n")
-                    predictions_vs_labels_to_table(labs[trn_mask], all_preds[pred_type][trn_mask],
-                                                   targets[trn_mask], to=tf)
+                    if any(mask):
+                        predictions_vs_labels_to_table(labs[mask], all_preds[pred_type][mask],
+                                                       targets[mask], to=tf)
 
         # These are the key/values which are set for a JKTEBOP fit. If comparing
         # models/prediction values it's these six which ultimately matter.
@@ -511,19 +531,31 @@ if __name__ == "__main__":
         # Now report using the predictions as input to fitting the formal-test-dataset with JKTEBOP
         # First we add control "preds"; this allows us to fit against the labels to get control fits
         all_preds["control"] = copy.deepcopy(labs)
-        for ptype in ["control", "mc", "nonmc"]:
-            print(f"\n\nTesting JKTEBOP fitting based on {ptype} estimates\n" + "="*80)
-            all_fits[ptype] = fit_against_formal_test_dataset(labs, all_preds[ptype],
-                                                              targets_cfg, targets, True)
+        for pred_type in ["control", "mc", "nonmc"]:
+            print(f"\n\nTesting JKTEBOP fitting based on {pred_type} input values\n" + "="*80)
+            all_fits[pred_type] = fit_against_formal_test_dataset(labs, all_preds[pred_type],
+                                                                  targets_cfg, targets, True)
 
-            results_stem = "fitted_params_vs_labels_" + ptype # pylint: disable=invalid-name
-            fig = plots.plot_predictions_vs_labels(labs, all_fits[ptype], trn_flags, fit_keys)
-            fig.savefig(save_dir / f"{results_stem}.eps", dpi=300)
+            # Now summarize how well the fits compare with labels and the control fit
+            for comp, fits, comp_type, comp_heading in [
+                        (labs, all_fits[pred_type], "labels", "Label"),
+                        (all_fits["control"], all_fits[pred_type], "control_fit", "Control")
+                ]:
+                if comp is fits:
+                    break # No point comparing the controls with the controls
 
-            with open(save_dir / f"{results_stem}.txt", "w", encoding="utf8") as of:
-                for (heading, trn_mask) in [("All targets", [True]*len(targets)),
-                                        ("\n\nTransiting systems only", trn_flags),
-                                        ("\n\nNon-transiting systems only", ~trn_flags)]:
-                    of.write(f"\n{heading}\n")
-                    predictions_vs_labels_to_table(labs[trn_mask], all_fits[ptype][trn_mask],
-                                                   targets[trn_mask], fit_keys, to=of)
+                results_stem = f"fitted_params_from_{pred_type}_vs_{comp_type}" # pylint: disable=invalid-name
+                fig = plots.plot_predictions_vs_labels(comp, fits, trn_flags, fit_keys,
+                                                       xlabel_prefix=comp_heading.lower(),
+                                                       ylabel_prefix="fitted")
+                fig.savefig(save_dir / f"{results_stem}.eps", dpi=300)
+
+                with open(save_dir / f"{results_stem}.txt", "w", encoding="utf8") as of:
+                    for (heading, mask) in [("All targets", [True]*len(targets)),
+                                            ("\n\nTransiting systems only", trn_flags),
+                                            ("\n\nNon-transiting systems only", ~trn_flags)]:
+                        of.write(f"\n{heading}\n")
+                        if any(mask):
+                            predictions_vs_labels_to_table(comp[mask], fits[mask], targets[mask],
+                                                           fit_keys, comparison_head=comp_heading,
+                                                           prediction_head="Fitted", to=of)
