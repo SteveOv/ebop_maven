@@ -503,6 +503,10 @@ if __name__ == "__main__":
                     table_of_predictions_vs_labels(
                                     all_labels[mask], all_preds[ptype][mask], targets[mask], to=tf)
 
+        # These are the key/values which are set for a JKTEBOP fit. If comparing
+        # models/prediction values it's these six which ultimately matter.
+        fit_keys = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "inc"]
+
         # Now report using the predictions as input to fitting the format-test-dataset with JKTEBOP
         # First we add a control item - this allows us to fit against the labels to get control fits
         all_preds["control"] = copy.deepcopy(all_labels)
@@ -512,7 +516,8 @@ if __name__ == "__main__":
                                         all_preds[ptype], all_labels, targets_cfg, targets, True)
 
             results_stem = "fitted_params_vs_labels_" + ptype # pylint: disable=invalid-name
-            fig = plots.plot_predictions_vs_labels(all_labels, all_fits[ptype], trans_flags)
+            fig = plots.plot_predictions_vs_labels(
+                                                all_labels, all_fits[ptype], trans_flags, fit_keys)
             fig.savefig(save_dir / f"{results_stem}.eps", dpi=300)
 
             with open(save_dir / f"{results_stem}.txt", "w", encoding="utf8") as of:
@@ -521,4 +526,4 @@ if __name__ == "__main__":
                                         ("\n\nNon-transiting systems only", ~trans_flags)]:
                     of.write(f"\n{heading}\n")
                     table_of_predictions_vs_labels(
-                                    all_labels[mask], all_fits[ptype][mask], targets[mask], to=of)
+                            all_labels[mask], all_fits[ptype][mask], targets[mask], fit_keys, to=of)
