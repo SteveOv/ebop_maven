@@ -1013,7 +1013,7 @@
         "transits": false,
         "eclipses_similar": false,
         "components_similar": true,
-        "notes": "rA_plus_rB & k derived from rA & rB in table 8; bP derived from rA, inc, e & esinw; could not get a good control fit with S38 (MAE~0.3) - best with S65 (MAE~0.02);",
+        "notes": "rA_plus_rB & k derived from rA & rB in table 8; bP derived from rA, inc, e & esinw; could not get a good control fit with S38 (MAE~0.3) - best with S65 (MAE~0.023) however task 8 MC fits show it's unstable with many 'failed to converge' or errors and very large errorbars;",
         "primary_epoch": 3074.002814764,
         "period": 15.269532884,
         "ecc": 0.4223,          "ecc_err": 0.0016,
