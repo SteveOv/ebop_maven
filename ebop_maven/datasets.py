@@ -490,12 +490,17 @@ def prepare_lc_for_target_sector(target: str,
                                      config.get("quality_bitmask", "default"),
                                      verbose=verbose)[0]
 
+    # Here we mask out any "bad" data which may adversely affect detrending and subsequent processes
+    lc = lightcurve.apply_quality_masks(lc, verbose)
     mask_time_ranges = config.get("quality_masks", None) or []
-    lc = lightcurve.apply_quality_masks(lc, mask_time_ranges, verbose)
+    if mask_time_ranges:
+        if verbose:
+            print(f"Applying {len(mask_time_ranges)} quality time range mask(s)...", end="")
+        lc = lightcurve.apply_time_range_masks(lc, mask_time_ranges, verbose)
 
     time_bin_seconds = (config.get("bin_time", None) or 0) * u.s
     if time_bin_seconds > 0 * u.s:
-        lightcurve.bin_lightcurve(lc, time_bin_seconds, verbose)
+        lc = lightcurve.bin_lightcurve(lc, time_bin_seconds, verbose)
 
     lightcurve.append_magnitude_columns(lc, "delta_mag", "delta_mag_err")
 
@@ -515,6 +520,15 @@ def prepare_lc_for_target_sector(target: str,
                                                           config.get("detrend_iterations", 2),
                                                           config.get("detrend_sigma_clip", 1.0),
                                                           verbose=verbose)
+
+    # Rather than being "bad" these are just data we no longer need, however we trim these
+    # after detrending so the polynomial has plenty of "good" data to fit to.
+    mask_time_ranges = config.get("trim_masks", None) or []
+    if mask_time_ranges:
+        if verbose:
+            print(f"Applying {len(mask_time_ranges)} trim time range mask(s)...", end="")
+        lc = lightcurve.apply_time_range_masks(lc, mask_time_ranges, verbose)
+
     return lc
 
 

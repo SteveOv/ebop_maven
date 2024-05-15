@@ -161,15 +161,12 @@ def expected_secondary_phase(ecosw: float, ecc: float=None, esinw: float=None) -
 
 
 def apply_quality_masks(lc: LightCurve,
-                        mask_time_ranges: List[Tuple[Time, Time]] = None,
                         verbose: bool = False) -> LightCurve:
     """
     Will return a copy of the passed LightCurve having first masked
-    any fluxes whose value is NaN or less than Zero, then having masked
-    any requested time ranges.
+    any fluxes whose value is NaN or less than Zero.
 
     :lc: the LightCurve to mask
-    :mask_time_ranges: zero or more (from, to) Time ranges to mask out
     :verbose: whether or not to generate progress messages
     :returns: the masked LightCurve
     """
@@ -180,20 +177,34 @@ def apply_quality_masks(lc: LightCurve,
     count_nan_masked = sum(mask.unmasked)
     if verbose:
         print(f"NaN/negative flux masks match {count_nan_masked} row(s).")
-
-    if mask_time_ranges is not None:
-        if not isinstance(mask_time_ranges, Iterable):
-            raise TypeError(f"mask_time_ranges is {type(mask_time_ranges)}. Expected an Iterable.")
-
-        count_time_masked = 0
-        for tr in mask_time_ranges:
-            mask |= mask_from_time_range(lc, tr)
-        if verbose:
-            count_time_masked = sum(mask.unmasked) - count_nan_masked
-            print(f"Time range mask(s) matched a further {count_time_masked} row(s).")
-
     return lc[~mask]
 
+
+def apply_time_range_masks(lc: LightCurve,
+                           time_ranges: List[Tuple[Time, Time]] = None,
+                           verbose: bool = False) -> LightCurve:
+    """
+    Will return a copy of the passed LightCurve haveing first masked out
+    any indicated time ranges.
+
+    :lc: the LightCurve to mask
+    :mask_time_ranges: one or more (from, to) Time ranges to mask out
+    :verbose: whether or not to generate progress messages
+    """
+    if not isinstance(lc, LightCurve):
+        raise TypeError(f"lc is {type(lc)}. Expected a LightCurve.")
+
+    mask = [False] * len(lc)
+    if time_ranges is not None:
+        if not isinstance(time_ranges, Iterable):
+            raise TypeError(f"mask_time_ranges is {type(time_ranges)}. Expected an Iterable.")
+        for tr in time_ranges:
+            mask |= mask_from_time_range(lc, tr)
+
+    if verbose:
+        print(f"Time range mask(s) matched {sum(mask)} row(s).")
+
+    return lc[~mask]
 
 def mask_from_time_range(lc: LightCurve,
                          time_range: Union[Tuple[Time, Time], Time]) \
