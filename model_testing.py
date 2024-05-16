@@ -14,7 +14,7 @@ import copy
 import argparse
 
 from uncertainties import ufloat
-from uncertainties.umath import sqrt, acos, degrees # pylint: disable=no-name-in-module
+from uncertainties.umath import sqrt, acos, asin, degrees # pylint: disable=no-name-in-module
 
 import astropy.units as u
 import numpy as np
@@ -123,9 +123,6 @@ def fit_against_formal_test_dataset(
     assert len(selected_targets) == len(input_params)
     assert len(selected_targets) == len(labels)
 
-    # We'll only show and summarise the inputs/outputs that JKTEBOP supports directly
-    show_names = [n for n in input_params[0].keys() if n not in ["bP"] and not n.endswith("sigma")]
-
     for ix, (target, target_input_params, target_labels) in enumerate(zip(selected_targets,
                                                                           input_params,
                                                                           labels)):
@@ -233,25 +230,30 @@ def base_jktebop_task3_params(period: float,
 
 def append_calculated_inc_prediction(predictions: Dict[str, float]):
     """
-    Calculate the predicted inc value (in degrees) from the primary impact param
-    and other supporting predicted values and append to the predictions.
+    Calculate the predicted inc value (in degrees) from the primary
+    impact param bP, cosi or sini and append to the predictions.
 
     :preds: the prediction dictionary for this instance
     """
-    required_preds = ["k", "rA_plus_rB", "bP", "esinw", "ecosw"]
-    missing_preds= [k for k in required_preds if k not in predictions]
-    if missing_preds:
-        raise KeyError("These required predicted values are missing:", ", ".join(missing_preds))
-
     def pred_to_ufloat(key: str):
         return ufloat(predictions[key], predictions[f"{key}_sigma"])
 
-    # From primary impact param:  i = arccos(bP * r1 * (1+esinw)/(1-e^2))
-    b = pred_to_ufloat("bP")
-    r = pred_to_ufloat("rA_plus_rB") / (1 + pred_to_ufloat("k"))
-    esinw = pred_to_ufloat("esinw")
-    e = sqrt(pred_to_ufloat("ecosw")**2 + esinw**2)
-    inc = degrees(acos(b * r * (1 + esinw) / (1 - e**2)))
+    if "inc" in predictions:
+        return
+
+    if "bP" in predictions:
+        # From primary impact param:  i = arccos(bP * r1 * (1+esinw)/(1-e^2))
+        b = pred_to_ufloat("bP")
+        r = pred_to_ufloat("rA_plus_rB") / (1 + pred_to_ufloat("k"))
+        esinw = pred_to_ufloat("esinw")
+        e = sqrt(pred_to_ufloat("ecosw")**2 + esinw**2)
+        inc = degrees(acos(b * r * (1 + esinw) / (1 - e**2)))
+    elif "cosi" in predictions:
+        inc = degrees(acos(pred_to_ufloat("cosi")))
+    elif "sini" in predictions:
+        inc = degrees(asin(pred_to_ufloat("sini")))
+    else:
+        raise KeyError("Did not find inc, bP, cosi or sini in predictions to calc orbital inc.")
 
     predictions["inc"] = inc.nominal_value
     predictions["inc_sigma"] = inc.std_dev
