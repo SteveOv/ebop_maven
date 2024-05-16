@@ -95,6 +95,7 @@ def fit_against_formal_test_dataset(
         input_params: List[Dict[str, float]],
         targets_config: Dict[str, any],
         selected_targets: List[str]=None,
+        report_label_names: List[str]=None,
         apply_fit_overrides: bool=True) -> np.ndarray[Dict[str, float]]:
     """
     Will fit members of the formal test dataset, as configured in targets_config,
@@ -107,9 +108,14 @@ def fit_against_formal_test_dataset(
     :input_params: the list of params Dicts to fit with, one per target
     :targets_config: the full config for all targets
     :selected_targets: list of target ids to fit, or all if empty
+    :report_label_names: the names of labels/values that are reported before/after a fit
     :apply_fit_overrides: apply any fit_overrides from each target's config
     :returns: a List of the targets fitted parameter Dicts
     """
+    # We report on  labels common to the all labels & input values or those requested
+    if report_label_names is None:
+        report_label_names = [k for k in labels[0].keys() if k in input_params[0]]
+
     tw = TextWrapper(100)
     fitted_params = []
     if selected_targets is None or len(selected_targets) == 0:
@@ -140,7 +146,8 @@ def fit_against_formal_test_dataset(
         dat_fname = fit_dir / f"{fit_stem}.dat"
 
         print(f"\nWill fit {target} with the following input params")
-        predictions_vs_labels_to_table([target_labels], [target_input_params], [target], show_names)
+        predictions_vs_labels_to_table([target_labels], [target_input_params], [target],
+                                       report_label_names)
 
         # published fitting params that may be needed for good fit
         fit_overrides = target_cfg.get("fit_overrides", {}) if apply_fit_overrides else {}
@@ -165,10 +172,10 @@ def fit_against_formal_test_dataset(
         print(f"\nFitting {target} (with {sector_count} sector(s) of data) using JKTEBOP task 3...")
         par_fname = fit_dir / f"{fit_stem}.par"
         par_contents = list(jktebop.run_jktebop_task(in_fname, par_fname, stdout_to=sys.stdout))
-        fit_params = jktebop.read_fitted_params_from_par_lines(par_contents, show_names)
+        fit_params = jktebop.read_fitted_params_from_par_lines(par_contents, report_label_names)
 
         print(f"\nHave fitted {target} resulting in the following fitted params")
-        predictions_vs_labels_to_table([target_labels], [fit_params], [target], show_names)
+        predictions_vs_labels_to_table([target_labels], [fit_params], [target], report_label_names)
         fitted_params.append(fit_params)
     return np.array(fitted_params)
 
@@ -544,7 +551,8 @@ if __name__ == "__main__":
             for pred_type in ["control", "mc", "nonmc"]:
                 print(f"\n\nTesting JKTEBOP fitting based on {pred_type} input values\n" + "="*80)
                 all_fits[pred_type] = fit_against_formal_test_dataset(labs, all_preds[pred_type],
-                                                                      targets_cfg, targets, True)
+                                                                      targets_cfg, targets,
+                                                                      fit_keys, True)
 
                 # Now summarize how well the fits compare with labels and the control fit
                 for comp, fits, comp_type, comp_heading in [
