@@ -30,6 +30,8 @@ labels_and_scales = {
     "inc": 0.01,
     "bP": 1.,
     "L3": 1.,
+    "cosi": 1.,
+    "sini": 1.
 }
 
 # Extra features other than the light-curve used for predictions
