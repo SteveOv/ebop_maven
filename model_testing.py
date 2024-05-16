@@ -494,6 +494,7 @@ if __name__ == "__main__":
 
     exclude_targets = ["V402 Lac", "V456 Cyg"] # Neither are suitable for JKTEBOP fitting
     exclude_targets += ["psi Cen"] # Unstable fit; deviate from pub params and we get gaussj errors
+    exclude_targets += ["V963 Cen"] # Similar; JKTEBOP task 8 gets lots of failures & large uncerts
     targets = np.array([target for target in targets_cfg if target not in exclude_targets])
     trn_flags = np.array([targets_cfg.get(t, {}).get("transits", False) for t in targets])
 
