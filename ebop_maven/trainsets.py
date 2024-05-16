@@ -117,7 +117,7 @@ def generate_instances_from_distributions(instance_count: int, label: str, verbo
         rA_plus_rB  = np.random.uniform(low=0.001, high=0.45001)
         k           = np.random.normal(loc=0.8, scale=0.4)
         inc         = np.random.uniform(low=50., high=90.00001) * u.deg
-        J           = np.random.normal(loc=0.8, scale=0.2)
+        J           = np.random.normal(loc=0.8, scale=0.4)
 
         # We're once more predicting L3 as JKTEBOP is being updated to support
         # negative L3 input values (so it's now fully trainable)
