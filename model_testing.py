@@ -555,7 +555,7 @@ if __name__ == "__main__":
                         tf.write(f"\n{heading}\n")
                         if any(mask):
                             predictions_vs_labels_to_table(labs[mask], all_preds[pred_type][mask],
-                                                           to=tf)
+                                                           targets[mask], to=tf)
 
             # These are the key/values which are set for a JKTEBOP fit. If comparing
             # models/prediction values it's these six which ultimately matter.
