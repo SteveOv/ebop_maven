@@ -127,7 +127,10 @@ def generate_instances_from_distributions(instance_count: int, label: str, verbo
         # The qphot mass ratio value (MB/MA) affects the lightcurve via the
         # ellipsoidal effect from the distortion of the stars' shape. Generate
         # a value from the ratio of the radii (or set to -1 to force spherical)
-        qphot       = np.random.normal(loc=k, scale=0.1)
+        # The standard homology M-R ratios are a starting point;
+        # - low mass M-S stars;     M \propto R^2.5
+        # - high-mass M-S stars;    M \propto R^1.25
+        qphot       = np.random.normal(loc=k**2, scale=0.1)
 
         # We generate ecc and omega (argument of periastron) from appropriate
         # distributions and then we subsequently calculate the values of
@@ -498,7 +501,7 @@ def _is_usable_system(pset: Dict) -> bool:
         # Physically plausible
         k = pset.get("k", 0)
         usable = k > 0 and pset.get("J", 0) > 0 \
-            and pset.get("qphot", 0) > 0 and pset.get("ecc", 0) < 1
+            and pset.get("qphot", 0) > 0.001 and pset.get("ecc", 0) < 1
 
         # Will eclipse
         if usable:
