@@ -325,11 +325,12 @@ def predictions_vs_labels_to_csv(
 def predictions_vs_labels_to_table(
         labels: List[Dict[str, float]],
         predictions: List[Union[Dict[str, float], Dict[str, Tuple[float, float]]]],
-        block_headings: List[str],
+        block_headings: List[str]=None,
         selected_label_names: List[str]=None,
         reverse_scaling: bool=False,
         comparison_head: str="Label",
         prediction_head: str="Prediction",
+        summary_only: bool=False,
         to: TextIOBase=None):
     """
     Will write a text table of the predicted nominal values vs the label values
@@ -343,6 +344,7 @@ def predictions_vs_labels_to_table(
     :reverse_scaling: whether to reverse the scaling of the values to represent the model output
     :comparison_head: the text of the comparison row headings (10 chars or less)
     :prediction_head: the text of the prediction row headings (10 chars or less)
+    :summary_only: omit the body and just report the summary
     :to: the output to write the table to. Defaults to printing.
     """
     # pylint: disable=too-many-arguments, too-many-locals
@@ -361,20 +363,32 @@ def predictions_vs_labels_to_table(
     if print_it:
         to = StringIO()
 
-    line_len = 13 + (11 * len(keys))-1 + 22
-    for rhead, rlabs, rpreds, rocs in zip(block_headings, raw_labels, pred_noms, ocs):
-        # Plot a sub table for each row of labels/predictions/ocs
-        to.write("-"*line_len + "\n")
-        to.write(f"{rhead:<10s} | " + " ".join(f"{k:>10s}" for k in keys + ["MAE", "MSE"]))
-        to.write("\n")
-        rocs = np.concatenate([rocs, [np.mean(np.abs(rocs)), np.mean(np.power(rocs, 2))]])
-        to.write("-"*line_len + "\n")
-        for row_head, vals in zip([comparison_head, prediction_head, "O-C"], [rlabs, rpreds, rocs]):
-            to.write(f"{row_head:<10s} | " + " ".join(f"{v:10.6f}" for v in vals))
-            to.write("\n")
+    line_length = 13 + (11 * len(keys))-1 + 22
+    def horizontal_line(char):
+        to.write(char*line_length + "\n")
+
+    def header_block(header):
+        horizontal_line("-")
+        to.write(f"{header:<10s} | " + " ".join(f"{k:>10s}" for k in keys + ["MAE", "MSE"]) + "\n")
+
+    if summary_only:
+        header_block("Summary")
+    else:
+        if block_headings is None or len(block_headings) == 0:
+            block_headings = (f"{n:04d}" for n in range(1, len(pred_noms)+1))
+
+        for block_head, b_comp, b_preds, b_ocs in zip(block_headings, raw_labels, pred_noms, ocs):
+            # A sub table for each block/instance with 3 rows; labels|controls, predictions and ocs
+            header_block(block_head)
+            horizontal_line("-")
+            b_ocs = np.concatenate([b_ocs, [np.mean(np.abs(b_ocs)), np.mean(np.power(b_ocs, 2))]])
+            for row_head, row_vals in zip([comparison_head, prediction_head, "O-C"],
+                                          [b_comp, b_preds, b_ocs]):
+                to.write(f"{row_head:<10s} | " + " ".join(f"{v:10.6f}" for v in row_vals))
+                to.write("\n")
 
     # Summary rows for aggregate stats over all of the rows
-    to.write("="*line_len + "\n")
+    horizontal_line("=")
     to.write(f"{'MAE':<10s} | " + " ".join(f"{v:10.6f}" for v in np.mean(np.abs(ocs), 0)) +
                  f" {np.mean(np.abs(ocs)):10.6f}\n")
     to.write(f"{'MSE':<10s} | " + " ".join([f"{v:10.6f}" for v in np.mean(np.power(ocs, 2), 0)]) +
@@ -541,7 +555,7 @@ if __name__ == "__main__":
                         tf.write(f"\n{heading}\n")
                         if any(mask):
                             predictions_vs_labels_to_table(labs[mask], all_preds[pred_type][mask],
-                                                           targets[mask], to=tf)
+                                                           to=tf)
 
             # These are the key/values which are set for a JKTEBOP fit. If comparing
             # models/prediction values it's these six which ultimately matter.
