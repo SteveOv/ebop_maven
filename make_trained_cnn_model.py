@@ -126,12 +126,14 @@ if __name__ == "__main__":
     print("Picking up training/validation/test datasets.")
     datasets = [tf.data.TFRecordDataset] * 3
     counts = [int] * 3
+    ROLL_MAX = int(9 * (MAGS_BINS/1024))
     map_func = deb_example.create_map_func(mags_bins=MAGS_BINS,
                                            mags_wrap_phase=MAGS_WRAP_PHASE,
                                            ext_features=CHOSEN_FEATURES,
                                            labels=CHOSEN_LABELS,
                                            noise_stddev=lambda: 0.005,
-                                        roll_steps=lambda: tf.random.uniform([], -9, 10, tf.int32))
+                                        roll_steps=lambda: tf.random.uniform([], -ROLL_MAX,
+                                                                             ROLL_MAX+1, tf.int32))
     for ds_ix, (label, set_dir) in enumerate([("training", TRAINSET_DIR),
                                             ("valiation", VALIDSET_DIR),
                                             ("testing", TESTSET_DIR)]):
