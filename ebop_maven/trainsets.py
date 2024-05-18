@@ -501,7 +501,7 @@ def _is_usable_system(pset: Dict) -> bool:
         # Physically plausible
         k = pset.get("k", 0)
         usable = k > 0 and pset.get("J", 0) > 0 \
-            and pset.get("qphot", 0) > 0.001 and pset.get("ecc", 0) < 1
+            and pset.get("qphot", 0) > 0 and pset.get("ecc", 0) < 1
 
         # Will eclipse
         if usable:
