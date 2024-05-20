@@ -126,7 +126,7 @@ def fit_against_formal_test_dataset(
     for ix, (target, target_input_params, target_labels) in enumerate(zip(selected_targets,
                                                                           input_params,
                                                                           labels)):
-        target_cfg = targets_config[target]
+        target_cfg = targets_config[target].copy()
         print(f"\n\nProcessing target {ix+1} of {len(selected_targets)}: {target}\n" + "-"*40)
         print(tw.fill(target_cfg.get("desc", "")) + "\n")
 
@@ -148,7 +148,7 @@ def fit_against_formal_test_dataset(
 
         # published fitting params that may be needed for good fit
         fit_overrides = target_cfg.get("fit_overrides", {}) if apply_fit_overrides else {}
-        lrats = fit_overrides.pop("lrat", [])
+        lrats = fit_overrides.get("lrat", [])
 
         params = {
             **base_jktebop_task3_params(period, pe, dat_fname.name, fit_stem, target_cfg),
