@@ -57,10 +57,11 @@ class Estimator(ABC):
                                                     deb_example.labels_and_scales)
 
         # Now set up the names for the inputs and predictions (these include 1-sigma values)
-        print("Expects each input dict to hold:", ", ".join(self.input_feature_names))
-        print(f"\tThe mags feature to be of {self.mags_feature_bins} bins length,",
-              f"wrapped after phase {self.mags_feature_wrap_phase}")
-        print("Each output dict will publish:  ", ", ".join(self.prediction_names))
+        print("Each input dict to contain:   ", ", ".join(self.input_feature_names),
+              f"(with mags to have {self.mags_feature_bins} bins with the",
+              f"phases after {self.mags_feature_wrap_phase} wrapped)")
+        print("Each output dict will publish:", ", ".join(self.label_names),
+              "(and corresponding <key>_sigma uncertainty values)")
 
     @property
     def name(self) -> str:
