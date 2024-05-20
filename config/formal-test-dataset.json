@@ -880,7 +880,7 @@
         "transits": true,
         "eclipses_similar": false,
         "components_similar": false,
-        "notes": "J from a JKTEBOP fit with fixed params from run K; bP derived from rA, inc, e & esinw; control fit required fixed period (as in Maxted paper) for reasonable fit - MAE~0.0086",
+        "notes": "J from a JKTEBOP fit with fixed params from run K; bP derived from rA, inc, e & esinw; control fit required SAP flux, fixed period (as in Maxted paper) and L3 for reasonable and robust fit - MAE~0.0055; predictions need to be especially good on inc for a statisfactory fit;",
         "primary_epoch": 1362.828326117,
         "period": 24.59240,
         "ecc": 0.1881,          "ecc_err": 0.0008,
@@ -897,12 +897,17 @@
         },
         "sectors": {
             "2": {
-                "quality_bitmask": "hardest"
+                "quality_bitmask": "hardest",
+                "quality_masks": [[1353, 1355], [1368, 1370]],
+                "detrend_order": 1,
+                "detrend_gap_threshold": 0.5
             }
         },
         "fit_overrides":{
-            "period_fit": 0
-        }
+            "period_fit": 0,
+            "L3_fit": 0
+        },
+        "flux_column": "sap_flux"
     },
     "ZZ Uma": {
         "source": "DEBCat and Rediscussion XI, Table II. TESS sectors 14, 21, 41, 47 and 48 SAP photometry analysed with JKTEBOP version 42.",
