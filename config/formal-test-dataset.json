@@ -880,7 +880,7 @@
         "transits": true,
         "eclipses_similar": false,
         "components_similar": false,
-        "notes": "J from a JKTEBOP fit with fixed params from run K; bP derived from rA, inc, e & esinw; control fit required SAP flux, fixed period (as in Maxted paper) and L3 for reasonable and robust fit - MAE~0.0055; predictions need to be especially good on inc for a statisfactory fit;",
+        "notes": "J calculated from T_effs and corroborated with JKTEBOP fit with fixed params from run K; bP derived from rA, inc, e & esinw; control fit required SAP flux, fixed period (as in Maxted paper) and L3 for reasonable and robust fit - MAE~0.005; predictions need to be especially good on inc for a statisfactory fit;",
         "primary_epoch": 1362.828326117,
         "period": 24.59240,
         "ecc": 0.1881,          "ecc_err": 0.0008,
@@ -892,7 +892,7 @@
             "inc": 88.359,          "inc_err": 0.007,
             "ecosw": -0.065161,     "ecosw_err": 0.000010,
             "esinw": 0.1765,        "esinw_err": 0.000022,
-            "J": 0.498,             "J_err": null,
+            "J": 0.5,               "J_err": null,
             "L3": 0.0053,           "L3_err": 0.0025
         },
         "sectors": {
