@@ -26,10 +26,10 @@ from ebop_maven.libs.tee import Tee
 import make_trained_cnn_model
 
 # Configure the inputs and outputs of the model
-CHOSEN_FEATURES = ["phiS", "dS_over_dP"]
-MAGS_BINS = 1024
+CHOSEN_FEATURES = []
+MAGS_BINS = 4096
 MAGS_WRAP_PHASE = 0.75
-CHOSEN_LABELS = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "inc"]
+CHOSEN_LABELS = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "bP"]
 
 TRAINSET_NAME = "formal-training-dataset/"
 TRAINSET_DIR = Path(".") / "datasets" / TRAINSET_NAME / "training"

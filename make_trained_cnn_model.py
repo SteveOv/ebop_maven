@@ -21,12 +21,12 @@ from ebop_maven.libs import deb_example
 import model_testing
 
 # Configure the inputs and outputs of the model
-CHOSEN_FEATURES = ["phiS", "dS_over_dP"]
-MAGS_BINS = 1024
+CHOSEN_FEATURES = []
+MAGS_BINS = 4096
 MAGS_WRAP_PHASE = 0.75
-CHOSEN_LABELS = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "inc"]
+CHOSEN_LABELS = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "bP"]
 
-MODEL_NAME = f"CNN-Ext{len(CHOSEN_FEATURES)}-{'-'.join(CHOSEN_LABELS[5:])}-{MAGS_BINS}-{MAGS_WRAP_PHASE}"
+MODEL_NAME = f"CNN-New-Ext{len(CHOSEN_FEATURES)}-{'-'.join(CHOSEN_LABELS[5:])}-{MAGS_BINS}-{MAGS_WRAP_PHASE}"
 MODEL_FILE_NAME = MODEL_NAME.lower()
 SAVE_DIR = Path(".") / "drop/"
 PLOTS_DIR = SAVE_DIR / "plots"
@@ -87,13 +87,13 @@ def make_best_model(chosen_features: list[str],
         mags_input=modelling.mags_input_layer(shape=(mags_bins, 1), verbose=verbose),
         ext_input=modelling.ext_input_layer(shape=(len(chosen_features), 1), verbose=verbose),
         mags_layers=[
-            modelling.conv1d_layers(2, 64, 4, 2, CNN_PADDING, CNN_ACTIVATE, "Conv-1-", verbose),
+            modelling.conv1d_layers(2, 16, 32, 2, CNN_PADDING, CNN_ACTIVATE, "Conv-1-", verbose),
             modelling.pooling_layer(layers.MaxPool1D, 2, 2, "Pool-1", verbose),
-            modelling.conv1d_layers(2, 64, 4, 2, CNN_PADDING, CNN_ACTIVATE, "Conv-2-", verbose),
+            modelling.conv1d_layers(2, 32, 16, 2, CNN_PADDING, CNN_ACTIVATE, "Conv-2-", verbose),
             modelling.pooling_layer(layers.MaxPool1D, 2, 2, "Pool-2", verbose),
-            modelling.conv1d_layers(2, 64, 4, 2, CNN_PADDING, CNN_ACTIVATE, "Conv-3-", verbose),
+            modelling.conv1d_layers(2, 64, 8, 2, CNN_PADDING, CNN_ACTIVATE, "Conv-3-", verbose),
             modelling.pooling_layer(layers.MaxPool1D, 2, 2, "Pool-3", verbose),
-            modelling.conv1d_layers(2, 64, 4, 2, CNN_PADDING, CNN_ACTIVATE, "Conv-4-", verbose)
+            modelling.conv1d_layers(2, 128, 4, 2, CNN_PADDING, CNN_ACTIVATE, "Conv-4-", verbose),
         ],
         dnn_layers=[
             modelling.hidden_layers(DNN_NUM_FULL_LAYERS, 256, DNN_INITIALIZER, DNN_ACTIVATE,
