@@ -972,9 +972,9 @@
         "transits": false,
         "eclipses_similar": true,
         "components_similar": true,
-        "notes": "L3=0 (fixed); rA_plus_rB & k derived from rA & rB in table 8; J from trial JKTEBOP fit; bP derived from rA, inc, e & esinw; control fit with S9 PDCSAP data gives MAE~0.026;",
-        "primary_epoch": 1559.457666802,
-        "period": 5.005887473,
+        "notes": "L3=0 (fixed); rA_plus_rB & k derived from rA & rB in table 8; J from trial JKTEBOP fit; bP derived from rA, inc, e & esinw; control fit with cleanest subset of S9 PDCSAP data gives MAE~0.0057; predictions need to be very good (especially rA_plus_rB) to get a satisfactory fit;",
+        "primary_epoch": 1554.451758289,
+        "period": 5.005804747,
         "ecc": 0.0001,          "ecc_err": 0.0001,
         "omega": 217,           "omega_err": 11,
         "labels": { 
@@ -989,7 +989,9 @@
         },
         "sectors": {
             "9": {
-                "quality_bitmask": "hardest"
+                "quality_bitmask": "hardest",
+                "quality_masks": [[1543.0, 1548.75], [1555.25, 1570.0]],
+                "detrend_order": 1
             }
         },
         "flux_column": "pdcsap_flux"
