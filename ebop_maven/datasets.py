@@ -502,6 +502,13 @@ def prepare_lc_for_target_sector(target: str,
     if time_bin_seconds > 0 * u.s:
         lc = lightcurve.bin_lightcurve(lc, time_bin_seconds, verbose)
 
+    # Optionally apply some smoothing/flatten. We need to mask out the eclipses.
+    flatten_kwargs = config.get("flatten", None)
+    if flatten_kwargs:
+        if "mask_time_ranges" in flatten_kwargs:
+            flatten_kwargs["period"] = config["period"] * u.d
+        lc = lightcurve.flatten_lightcurve(lc, verbose=verbose, **flatten_kwargs)
+
     lightcurve.append_magnitude_columns(lc, "delta_mag", "delta_mag_err")
 
     # Detrending and rectifying to differential mags
