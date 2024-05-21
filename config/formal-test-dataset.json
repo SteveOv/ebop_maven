@@ -204,11 +204,11 @@
         "logLB": 0.792,         "logLB_err": 0.023,
         "rA": 0.1494,           "rA_err": 0.0016,
         "rB": 0.1171,           "rB_err": 0.0017,
-        "desc": "An inclined, circular orbit with shallow primary (~0.10 mag) and secondary (~0.05 mag) partial eclipses, reflection and ellipsoidal effects. These shallow, partial eclipses present a challange to predicting and fitting k. We use the published spectroscopic light-ratio and LD parameters from Southworth et al. (2023) with sectors 42 to 44 for fitting.",
+        "desc": "An inclined, circular orbit with shallow primary (~0.10 mag) and secondary (~0.05 mag) partial eclipses, reflection and ellipsoidal effects. These shallow, partial eclipses present a challange to predicting and fitting k and J. We use the published spectroscopic light-ratio and LD parameters from Southworth et al. (2023) with sectors 42 to 44 for fitting.",
         "transits": false,
         "eclipses_similar": false,
         "components_similar": false,
-        "notes": "e=0.0 & ω=0.0 (fixed); bP derived from rA, inc, e & esinw; best fit using SAP photometry on sector 42 only and fixing the published lrat and LD params yields MAE~0.028",
+        "notes": "e=0.0 & ω=0.0 (fixed); bP derived from rA, inc, e & esinw; best fit using SAP photometry on sector 42 only and fixing the published lrat and LD params yields MAE~0.029",
         "primary_epoch": 2464.981943071,
         "period": 2.461126371,
         "labels": {
@@ -223,7 +223,9 @@
         },
         "sectors": {
             "42": {
-                "quality_bitmask": "hardest"
+                "quality_bitmask": "hardest",
+                "detrend_order": 2,
+                "detrend_gap_threshold": 0.5
             }
         },
         "fit_overrides": {
