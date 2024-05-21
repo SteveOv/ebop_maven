@@ -69,7 +69,7 @@
         "transits": false,
         "eclipses_similar": false,
         "components_similar": false,
-        "notes": "bP derived from rA, inc, e & esinw; control fit of sector 13 SAP data (L3 fixed at published value) yields MAE~0.058 (however fit to inc is poor at 84.830; S39 worse);",
+        "notes": "bP derived from rA, inc, e & esinw; control fit of sector 13 SAP data (L3 fixed at published value) yields MAE~0.06 (however fit to inc is poor at 84.830; S39 worse);",
         "primary_epoch": 1671.167003858,
         "period": 3.169080048,
         "ecc": 0.0555,              "ecc_err": 0.0011,
@@ -86,7 +86,8 @@
         },
         "sectors": {
             "13": {
-                "quality_bitmask": "hardest"
+                "quality_bitmask": "hardest",
+                "detrend_order": 1
             }
         },
         "fit_overrides": {
