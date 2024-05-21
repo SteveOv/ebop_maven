@@ -259,8 +259,8 @@
         "transits": false,
         "eclipses_similar": false,
         "components_similar": true,
-        "notes": "e=0.3750 (fixed); ecosw & esinw derived from table 9; bP derived from rA, inc, e & esinw; best control fit with sector 40 SAP flux and published lrat yields MAE~0.0063 (Long term trends in the LC don't appear too detrimental to the fit. S54 is slightly better, but S40 is more representative of the published work);",
-        "primary_epoch": 2416.260030764,
+        "notes": "e=0.3750 (fixed); ecosw & esinw derived from table 9; bP derived from rA, inc, e & esinw; best control fit with sector 54 SAP flux and published lrat yields MAE~0.0058;",
+        "primary_epoch": 2772.124954368,
         "period": 11.120710471,
         "ecc": 0.3750,          "ecc_err": null,
         "omega": 126.1,         "omega_err": 0.2,
@@ -275,15 +275,17 @@
             "L3": 0.191,            "L3_err": 0.002
         },
         "sectors": {
-            "40": {
-                "quality_bitmask": "hardest"
+            "54": {
+                "quality_bitmask": "hardest",
+                "detrend_order": 1,
+                "detrend_gap_threshold": 0.5               
             }
         },
         "mission": "HLSP",
         "author": "TESS-SPOC",
         "exptime": 600,
         "fit_overrides": {
-            "lrat": ["2407.106 0.98 0.06"]
+            "lrat": ["2774.10 0.98 0.06"]
         }
     },
     "WW Aur": {
