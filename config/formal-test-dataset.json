@@ -36,7 +36,8 @@
         "sectors": {
             "18": {
                 "quality_bitmask": "hardest",
-                "quality_masks": [[1790.0, 1792.0]]
+                "quality_masks": [[1790.0, 1792.0]],
+                "detrend_order": 1
             }
         },
         "fit_overrides": {
