@@ -226,9 +226,8 @@ def _read_mist_isos(file_name: Path=None) -> List:
 
 if __name__ == "__main__":
 
-    skip = ["V402 Lac", "V456 Cyg"] # Neither are suitable for JKTEBOP fitting
     with open(Path.cwd() / "config/formal-test-dataset.json", mode="r", encoding="utf8") as f:
-        targets_config = { t_name: v for (t_name, v) in json.load(f).items() if t_name not in skip }
+        targets_config = { t: c for (t, c) in json.load(f).items() if not c.get("exclude", False) }
 
-    plot_formal_test_dataset_hr_diagram(targets_config, True).savefig(
-                                                    Path.cwd() / "drop/plots/hr-logl-vs-teff.eps")
+    plot_formal_test_dataset_hr_diagram(targets_config, True) \
+                                            .savefig(Path.cwd() / "drop/plots/hr-logl-vs-teff.eps")

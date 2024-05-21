@@ -95,6 +95,8 @@
     "psi Cen": {
         "source": "DEBCat and Bruntt et al. (2006) Table 2 based on WIRE photometry and JKTEBOP. We have access to TESS sectors 38 & 65 120 s SAP photometry (38 has incomplete eclipses).",
         "reference": "BrunttSouthworth+06aa",
+        "exclude": true,
+        "why": "unstable fit - slight deviations from published params and we get gaussj warnings out of JKTEBOP",
         "label": "$\\mathrm{\\psi}$ Cen",
         "aka": "TIC 179958960, HD 125473, HR 5367",
         "SpT": "B9 + A2",
@@ -146,6 +148,8 @@
     "V402 Lac": {
         "source": "DEBCAT and Baroch et al. (2022) Tables 10 and 11. TESS sector 16 SAP flux analysed with WD (with preliminary fit with JKTEBOP).",
         "reference": "BarochGimenez+22aa",
+        "exclude": true,
+        "why": "Unable to get good control fit; likely too distorted form JKTEBOP as stated in the source paper which used WD code for analysis",
         "aka": "TIC 468792279, HD 210405",
         "SpT": "B8 V",
         "MA": 2.80,             "MA_err": 0.05,
@@ -456,6 +460,8 @@
     "V456 Cyg": {
         "source": "DEBCat and Van Reeth et al. (2022) Table 1. TESS sectors 14 and 15 fitted with JKTEBOP version 42. SpT and logLA from Bakis et al. (2014).",
         "reference": "VanReethSouthworth+22aa, BakisHensberge+14aj",
+        "exclude": true,
+        "why": "Components too large, at rA=0.27 and rB=0.26, for JKTEBOP simplified model.",
         "aka": "TIC 15795549",
         "SpT": "A2hA7mA4V + F3V",
         "MA": 1.859,            "MA_err": 0.041,
@@ -1016,6 +1022,8 @@
     "V963 Cen": {
         "source": "DEBCat and Graczyk et al. (2022) who use WD for fitting. Assuming TESS sector 38 was used. Sectors 64 and 65 have since been released.",
         "reference": "GraczykPietrzynski+22aa",
+        "exclude": true,
+        "why": "Unable to get a good and stable control fit",
         "aka": "TIC 262126225, HD 115496",
         "SpT": "G2 V",
         "MA": 1.0812,           "MA_err": 0.0029,

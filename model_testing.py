@@ -514,11 +514,7 @@ if __name__ == "__main__":
 
     with open("./config/formal-test-dataset.json", mode="r", encoding="utf8") as tf:
         targets_cfg = json.load(tf)
-
-    exclude_targets = ["V402 Lac", "V456 Cyg"] # Neither are suitable for JKTEBOP fitting
-    exclude_targets += ["psi Cen"] # Unstable fit; deviate from pub params and we get gaussj errors
-    exclude_targets += ["V963 Cen"] # Similar; JKTEBOP task 8 gets lots of failures & large uncerts
-    targets = np.array([target for target in targets_cfg if target not in exclude_targets])
+    targets = np.array([t for t in targets_cfg if not targets_cfg[t].get("exclude", False)])
     trn_flags = np.array([targets_cfg.get(t, {}).get("transits", False) for t in targets])
 
     for file_counter, model_file in enumerate(args.model_files, 1):
