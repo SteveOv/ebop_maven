@@ -378,7 +378,7 @@
         "transits": false,
         "eclipses_similar": false,
         "components_similar": false,
-        "notes": "bP derived from rA, inc, e & esinw; control fit on sector 20 yields MAE~0.0089;",
+        "notes": "bP derived from rA, inc, e & esinw; control fit on sector 20 using published LD params yields MAE~0.007; predictions need to be very good, especially inc, as there is a nearby fit with inc~86, J~1.3 and MAE~0.36 which is attractive;",
         "primary_epoch": 1851.926234608,
         "period": 9.945126564,
         "ecc": 0.078078,        "ecc_err": 0.000076,
@@ -395,8 +395,17 @@
         },
         "sectors": {
             "20": {
-                "quality_bitmask": "hardest"
+                "quality_bitmask": "hardest",
+                "detrend_order": 1
             }
+        },
+        "fit_overrides":{
+            "LDA": "quad",
+            "LDB": "quad",
+            "LDA1": 0.177,
+            "LDB1": 0.230,
+            "LDA2": 0.25,
+            "LDB2": 0.22
         }
     },
     "V362 Pav": {
