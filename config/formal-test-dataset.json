@@ -715,8 +715,8 @@
         "eclipses_similar": false,
         "components_similar": false,
         "notes": "L3=0 (fixed); bP derived from rA, inc, e & esinw; source article based sectors 19, 25 & 26 FFIs - we use sectors 52 & 53 @ 600 s cadence to get full coverage of the orbit giving MAE~0.014;",
-        "primary_epoch": 2726.954040600,
-        "period": 20.999132275,
+        "primary_epoch": 2726.954043296,
+        "period": 20.999146855,
         "ecc": 0.4676,          "ecc_err": 0.0002,
         "omega": 14.97,         "omega_err": 0.11,
         "labels": { 
@@ -731,11 +731,14 @@
         },
         "sectors": {
             "52": {
-                "quality_bitmask": "hardest"
+                "quality_bitmask": "hardest",
+                "quality_masks": [[2742.5, 2744.0]],
+                "detrend_order": 1
             },
             "53": {
                 "quality_bitmask": "hardest",
-                "quality_masks": [[2743.9, 2744.7]]
+                "quality_masks": [[2743.9, 2744.7], [2767.5, 2769.5]],
+                "detrend_order": 1
             }
         },
         "author": "TESS-SPOC",
