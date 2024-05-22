@@ -779,11 +779,11 @@
         "logLB": 0.651,         "logLB_err": 0.027,
         "rA": 0.10798,          "rA_err": 0.00020,
         "rB": 0.10737,          "rB_err": 0.00024,
-        "desc": "An eccentric orbit with low inclination and similar eclipses of approximately 0.7 mag depth. The two components are similar and it expected the k and J will be challenging to predict and fit.",
+        "desc": "An eccentric orbit with low inclination and similar eclipses of approximately 0.7 mag depth. The two components are similar and it expected that k, J and inc will be challenging to predict and fit.",
         "transits": false,
         "eclipses_similar": true,
         "components_similar": true,
-        "notes": "Using values from table II, Sector 24; bP derived from rA, inc, e & esinw; best control fit with S24, including clipped regions from source article, gives MAE~0.0033;",
+        "notes": "Using values from table II, Sector 24; bP derived from rA, inc, e & esinw; best control fit with S24, including clipped regions from source article, gives MAE~0.0029;",
         "primary_epoch": 1977.037849879,
         "period": 3.896637360,
         "ecc": 0.08878,         "ecc_err": 0.00015,
@@ -801,7 +801,9 @@
         "sectors": {
             "24": {
                 "quality_bitmask": "hardest",
-                "quality_masks": [[1955.0, 1958.0], [1969.0, 1972.0]]
+                "quality_masks": [[1955.0, 1958.0], [1969.0, 1972.0]],
+                "flatten": { "mask_time_ranges": [[1976.8, 1977.2], [1979.0, 1979.35]] },
+                "detrend_order": 1
             }
         }
     },
