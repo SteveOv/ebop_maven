@@ -689,7 +689,7 @@
         "transits": false,
         "eclipses_similar": false,
         "components_similar": false,
-        "notes": "e=0 & ω=0 & L3=0 (fixed); bP derived from rA, inc, e & esinw; control fit includes time masks and lrat from source article - sectors 18 & 58 gives MAE~0.0104",
+        "notes": "e=0 & ω=0 & L3=0 (fixed); bP derived from rA, inc, e & esinw; control fit includes time masks and lrat from source article and sector 18 to give an MAE~0.0102",
         "primary_epoch": 1808.957210950,
         "period": 1.900928407,
         "labels": { 
@@ -705,10 +705,9 @@
         "sectors": {
             "18": {
                 "quality_bitmask": "hardest",
-                "quality_masks": [[58790.6, 58792.5], [58801.0, 58804.7]]
-            },
-            "58": {
-                "quality_bitmask": "hardest"
+                "quality_masks": [[58790.6, 58792.5], [58801.0, 58804.7]],
+                "detrend_order": 1,
+                "detrend_gap_threshold": 0.5
             }
         },
         "fit_overrides": {
