@@ -541,7 +541,9 @@
         },
         "sectors": {
             "31": {
-                "quality_bitmask": "hardest"
+                "quality_bitmask": "hardest",
+                "detrend_gap_threshold": 0.5,
+                "detrend_order": 1
             }
         }
     },
