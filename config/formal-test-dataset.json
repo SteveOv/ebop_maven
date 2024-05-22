@@ -826,7 +826,7 @@
         "transits": false,
         "eclipses_similar": true,
         "components_similar": true,
-        "notes": "bP derived from rA, inc, e & esinw; control fit on S20 gives MAE~0.0025 & cannot be bettered with newer sectors;",
+        "notes": "bP derived from rA, inc, e & esinw; control fit on S20 gives MAE~0.0022;",
         "primary_epoch": 1847.487096393,
         "period": 3.145776615,
         "ecc": 0.00985,         "ecc_err": 0.00027,
@@ -843,7 +843,9 @@
         },
         "sectors": {
             "20": {
-                "quality_bitmask": "hardest"
+                "quality_bitmask": "hardest",
+                "detrend_order": 2,
+                "detrend_gap_threshold": 0.5
             }
         }
     },
