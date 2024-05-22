@@ -1153,7 +1153,7 @@
         "transits": false,
         "eclipses_similar": true,
         "components_similar": true,
-        "notes": "Martin values; L3=0 (fixed); just a single sector needed for a good fit as the period is so short;",
+        "notes": "Martin values; L3=0 (fixed); just a single sector needed for a good fit, as the period is so short, yielding MAE~0.0086;",
         "primary_epoch": 2872.601497313,
         "period": 1.268388816,
         "ecc": 0.00527,         "ecc_err": 0.00021,
@@ -1170,7 +1170,9 @@
         },
         "sectors": {
             "57": {
-                "quality_bitmask": "hard"
+                "quality_bitmask": "hard",
+                "flatten": { "mask_time_ranges": [[2872.5, 2872.65], [2873.2, 2873.3]] },
+                "detrend_order": 1
             }
         },
         "author": "TESS-SPOC",
