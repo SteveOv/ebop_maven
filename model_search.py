@@ -322,6 +322,14 @@ trials_pspace = hp.pchoice("train_and_test_model", [
         "loss_function": hp.choice("free_loss", loss_function_choices),  
         "model": hp.choice("model", [{
             "func": modelling.build_mags_ext_model,
+            "mags_input": {
+                "func": modelling.mags_input_layer,
+                "shape": (MAGS_BINS, 1),
+            },
+            "ext_input": {
+                "func": modelling.ext_input_layer,
+                "shape": (len(CHOSEN_FEATURES), 1),
+            },
             "mags_layers": hp.choice("mags_layers", [
                 {
                     # Pairs of Conv1ds with fixed filters/kernels/strides and optional pooling layers
@@ -383,7 +391,7 @@ trials_pspace = hp.pchoice("train_and_test_model", [
                 "kernel_initializer": dnn_kernel_initializer_choice,
                 "activation": "linear"
             },
-        }]),    
+        }]),
     })
 ])
 
