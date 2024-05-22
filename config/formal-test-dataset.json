@@ -648,9 +648,9 @@
         "transits": false,
         "eclipses_similar": true,
         "components_similar": true,
-        "notes": "e=0 & ω=0 (fixed); bP derived from rA, inc, e & esinw; control fit uses quality flags from source article, with sector 23 & 50 giving an MAE~0.00085;",
-        "primary_epoch": 1942.300643521,
-        "period": 4.991765215,
+        "notes": "e=0 & ω=0 (fixed); bP derived from rA, inc, e & esinw; control fit uses quality flags from source article, with sector 50 giving an MAE~0.001;",
+        "primary_epoch": 2676.090124290,
+        "period": 4.991767756,
         "labels": { 
             "rA_plus_rB": 0.23669,  "rA_plus_rB_err": 0.00008,
             "k": 1.0691,            "k_err": 0.0014,
@@ -662,11 +662,11 @@
             "L3": -0.0001,          "L3_err": 0.0008
         },
         "sectors": {
-            "23": {
-                "quality_bitmask": "none"
-            },
             "50": {
-                "quality_bitmask": "hardest"                
+                "quality_bitmask": "hardest",
+                "quality_masks": [[2665.0, 2666.0]],
+                "detrend_gap_threshold": 0.5,
+                "detrend_order": 1
             }
         }
     },
