@@ -1034,7 +1034,7 @@
         "source": "DEBCat and Graczyk et al. (2022) who use WD for fitting. Assuming TESS sector 38 was used. Sectors 64 and 65 have since been released.",
         "reference": "GraczykPietrzynski+22aa",
         "exclude": true,
-        "why": "Unable to get a good and stable control fit",
+        "why": "Unable to get a reliable and stable control fit",
         "aka": "TIC 262126225, HD 115496",
         "SpT": "G2 V",
         "MA": 1.0812,           "MA_err": 0.0029,
@@ -1051,9 +1051,9 @@
         "transits": false,
         "eclipses_similar": false,
         "components_similar": true,
-        "notes": "rA_plus_rB & k derived from rA & rB in table 8; bP derived from rA, inc, e & esinw; could not get a good control fit with S38 (MAE~0.3) - best with S65 (MAE~0.023) however task 8 MC fits show it's unstable with many 'failed to converge' or errors and very large errorbars;",
-        "primary_epoch": 3074.002814764,
-        "period": 15.269532884,
+        "notes": "rA_plus_rB & k derived from rA & rB in table 8; bP derived from rA, inc, e & esinw; best control fit with S38, with flattening to dampen variability, yields MAE 0.048 (but it's not good, with O-C of 0.14 for k and JKTEBOP Task 8 throwing up many 'failure to converge' retries and giving >15% 1-sigma error bar of k);",
+        "primary_epoch": 2341.076459212,
+        "period": 15.269043383,
         "ecc": 0.4223,          "ecc_err": 0.0016,
         "omega": 140.10,        "omega_err": 0.03,
         "labels": { 
@@ -1067,8 +1067,10 @@
             "L3": -0.028,           "L3_err": 0.004
         },
         "sectors": {
-            "65": {
-                "quality_bitmask": "hardest"
+            "38": {
+                "quality_bitmask": "hardest",
+                "flatten": { "mask_time_ranges": [[3073.8, 3074.2], [3078.2, 3078.65]] },
+                "detrend_order": 1
             }
         }
     },
