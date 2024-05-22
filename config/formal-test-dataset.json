@@ -608,7 +608,7 @@
         "transits": false,
         "eclipses_similar": false,
         "components_similar": false,
-        "notes": "bP derived from rA, inc, e & esinw; control fit on sectors 4 & 31, with masked regions from source article, gives MAE~0.0075",
+        "notes": "bP derived from rA, inc, e & esinw; control fit on sectors 31 gives MAE~0.0075",
         "primary_epoch": 2163.056459177,
         "period": 2.728370923,
         "ecc": 0.01310,         "ecc_err": 0.00067,
@@ -624,10 +624,6 @@
             "L3": -0.0002,          "L3_err": 0.0030
         },
         "sectors": {
-            "4": {
-                "quality_bitmask": "hardest",
-                "quality_masks": [[58420.0, 58423.0]]
-            },
             "31": {
                 "quality_bitmask": "hardest"
             }
