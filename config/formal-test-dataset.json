@@ -864,11 +864,11 @@
         "logLB": 0.399,         "logLB_err": 0.013,
         "rA": 0.086370,         "rA_err": 0.000078,
         "rB": 0.084536,         "rB_err": 0.000091,
-        "desc": "An incloned circular orbit with similar primary and secondary eclipses of approximately 0.5 mag. The similarity of the components' radii will likely make predicting and fitting k and J challenging. There is some distortion of the light curve near BTJD 1791.",
+        "desc": "An incloned circular orbit with similar primary and secondary eclipses of approximately 0.5 mag. The similarity of the components' radii will likely make predicting and fitting k and J challenging. There is some distortion of the light curve near BTJD 1791 which we treat with lightkurve flatten.",
         "transits": false,
         "eclipses_similar": true,
         "components_similar": true,
-        "notes": "e=0 & ω=0 & L3=0 (fixed); bP derived from rA, inc, e & esinw; control fit on S18 gives MAE~0.0027 (distortion nr BTJD 1791 doesn't affect fit);",
+        "notes": "e=0 & ω=0 & L3=0 (fixed); bP derived from rA, inc, e & esinw; control fit on S18 gives MAE~0.0031;",
         "primary_epoch": 1806.960762116,
         "period": 4.222017264,
         "labels": { 
@@ -883,7 +883,9 @@
         },
         "sectors": {
             "18": {
-                "quality_bitmask": "hardest"
+                "quality_bitmask": "hardest",
+                "flatten": { "mask_time_ranges": [[1806.8, 1807.1], [1808.9, 1809.2]] },
+                "detrend_order": 1
             }
         }
     },
