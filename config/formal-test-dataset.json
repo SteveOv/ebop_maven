@@ -1089,11 +1089,11 @@
         "logLB": 0.281,         "logLB_err": 0.028,
         "rA": 0.019875,         "rA_err": 0.000039,
         "rB": 0.024582,         "rB_err": 0.000010,
-        "desc": "A highly eccentric 27.2 d orbit with eclipses of approximately 0.4 and 0.3 mag and the secondary after phase 0.65. It is in an unusual configuration with Star A both smaller and cooler than Star B, as the primary eclipse (of Star A) occurs when the stars are closer in their orbits than the secondary. We use sectors 43-45 to get sufficient coverage for a reliable control fit.",
+        "desc": "A highly eccentric 27.2 d orbit with eclipses of approximately 0.4 and 0.3 mag and the secondary after phase 0.65. It is in an unusual configuration with Star A both smaller and cooler than Star B, as the primary eclipse (of Star A) occurs when the stars are closer in their orbits than the secondary. We use sectors 43-45 to get sufficient coverage for a control fit.",
         "transits": false,
         "eclipses_similar": false,
         "components_similar": false,
-        "notes": "L3=0 (fixed); bP derived from rA, inc, e & esinw; a very difficult fit - need R19 LD algo+coeffs and multiple sectors to get a reliable fit & prevent JKTEBOP gaussj warnings;",
+        "notes": "L3=0 (fixed); bP derived from rA, inc, e & esinw; a very difficult fit - need R19 LD algo+coeffs and multiple sectors to get a fit giving a MAE~0.0032 (however it's not very reliable; we get many 'failed to converge', 'gaussj' or 'haywire' warnings when runing a JKTEBOP task 8 on it);",
         "primary_epoch": 2526.296860413,
         "period": 27.019855062,
         "ecc": 0.38056,         "ecc_err": 0.00017,
@@ -1110,13 +1110,19 @@
         },
         "sectors": {
             "43": {
-                "quality_bitmask": "hard"
+                "quality_bitmask": "hard",
+                "flatten": { "mask_time_ranges": [[2516.7, 2517.5], [2526.1, 2526.5]] },
+                "detrend_order": 1
             },
             "44": {
-                "quality_bitmask": "hard"
+                "quality_bitmask": "hard",
+                "flatten": { "mask_time_ranges": [[2516.7, 2517.5], [2526.1, 2526.5]] },
+                "detrend_order": 1
             },
             "45": {
-                "quality_bitmask": "hard"
+                "quality_bitmask": "hard",
+                "flatten": { "mask_time_ranges": [[2516.7, 2517.5], [2526.1, 2526.5]] },
+                "detrend_order": 1
             }
         },
         "fit_overrides": {
