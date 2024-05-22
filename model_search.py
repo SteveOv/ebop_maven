@@ -19,8 +19,7 @@ from tensorflow.python.framework.errors_impl import OpError # pylint: disable=no
 from hyperopt import fmin, tpe, hp, Trials, space_eval, STATUS_OK, STATUS_FAIL
 from hyperopt.pyll import scope
 
-from ebop_maven.libs import deb_example
-from ebop_maven import modelling
+from ebop_maven import modelling, deb_example
 from ebop_maven.libs.tee import Tee
 
 import make_trained_cnn_model

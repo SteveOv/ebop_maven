@@ -3,8 +3,7 @@ import os
 from pathlib import Path
 from contextlib import redirect_stdout
 
-from ebop_maven import trainsets, datasets
-from ebop_maven.libs import deb_example
+from ebop_maven import trainsets, datasets, deb_example
 from ebop_maven.libs.tee import Tee
 
 RESUME = False

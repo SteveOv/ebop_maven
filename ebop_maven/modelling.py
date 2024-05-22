@@ -5,7 +5,7 @@ from pathlib import Path
 from keras import layers, models, KerasTensor
 from keras.src.layers.pooling.base_pooling import BasePooling
 
-from .libs import deb_example
+from . import deb_example
 
 
 class OutputLayer(layers.Dense):

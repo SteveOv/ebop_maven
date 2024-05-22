@@ -21,7 +21,8 @@ import astropy.units as u
 from lightkurve import LightCurve
 import tensorflow as tf
 
-from .libs import param_sets, jktebop, orbital, lightcurve, deb_example
+from . import deb_example
+from .libs import param_sets, jktebop, orbital, lightcurve
 
 # Common options used when writing a dataset file
 _ds_options = tf.io.TFRecordOptions(compression_type=None)

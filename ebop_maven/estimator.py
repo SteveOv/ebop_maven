@@ -9,8 +9,7 @@ import numpy as np
 import tensorflow as tf
 from keras import Model
 
-from . import modelling
-from .libs import deb_example
+from . import modelling, deb_example
 
 class Estimator(ABC):
     """ An estimator for the CNN model """

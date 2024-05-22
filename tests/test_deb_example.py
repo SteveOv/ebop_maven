@@ -5,7 +5,7 @@ import unittest
 import numpy as np
 import tensorflow as tf
 
-from ebop_maven.libs import deb_example
+from ebop_maven import deb_example
 
 # pylint: disable=invalid-name, too-many-public-methods, line-too-long, protected-access, too-many-locals
 class Test_deb_example(unittest.TestCase):

@@ -13,11 +13,9 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 import tensorboard
 import keras
-from keras import layers, initializers, optimizers, callbacks, metrics
-from keras.utils import plot_model      # pylint: disable=import-error
+from keras import layers, optimizers, callbacks
 
-from ebop_maven import modelling
-from ebop_maven.libs import deb_example
+from ebop_maven import modelling, deb_example
 import model_testing
 
 # Configure the inputs and outputs of the model
@@ -162,7 +160,7 @@ if __name__ == "__main__":
         # With pip I can't get graphviz beyond 0.2.0 which leads to pydot errors here.
         # At least with the try block I can degrade gracefully.
         PLOTS_DIR.mkdir(parents=True, exist_ok=True)
-        plot_model(model, to_file=PLOTS_DIR / f"{MODEL_FILE_NAME}.png",
+        keras.utils.plot_model(model, to_file=PLOTS_DIR / f"{MODEL_FILE_NAME}.png",
                 show_layer_names=True, show_shapes=True, show_layer_activations=True,
                 show_dtype=False, show_trainable=False, rankdir="TB", dpi=300)
     except ImportError:

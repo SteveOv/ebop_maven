@@ -21,9 +21,9 @@ import numpy as np
 from keras import Model, metrics
 
 from ebop_maven.libs.tee import Tee
-from ebop_maven.libs import deb_example, lightcurve, jktebop, stellar, limb_darkening
+from ebop_maven.libs import lightcurve, jktebop, stellar, limb_darkening
 from ebop_maven.estimator import Estimator
-from ebop_maven import datasets
+from ebop_maven import datasets, deb_example
 import plots
 
 def test_model_against_formal_test_dataset(
