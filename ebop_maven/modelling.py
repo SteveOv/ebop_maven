@@ -290,14 +290,16 @@ def build_mags_ext_model(
         if not isinstance(mags_layers, List):
             mags_layers = [mags_layers]
         for buildit in mags_layers:
-            mags_tensor = buildit(mags_tensor)
+            if buildit:
+                mags_tensor = buildit(mags_tensor)
 
     ext_tensor = ext_input
     if ext_layers:
         if not isinstance(ext_layers, List):
             ext_layers = [ext_layers]
         for buildit in ext_layers:
-            ext_tensor = buildit(ext_tensor)
+            if buildit:
+                ext_tensor = buildit(ext_tensor)
 
     output_tensor = layers.Concatenate(axis=1, name="DNN-Input")([
                     layers.Flatten(name="Mags-Reshape")(mags_tensor),
@@ -312,7 +314,8 @@ def build_mags_ext_model(
         if not isinstance(dnn_layers, List):
             dnn_layers = [dnn_layers]
         for buildit in dnn_layers:
-            output_tensor = buildit(output_tensor)
+            if buildit:
+                output_tensor = buildit(output_tensor)
 
     output_tensor = output(output_tensor)
     model = models.Model(inputs=[mags_input, ext_input], outputs=output_tensor, name=name)
