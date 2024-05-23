@@ -16,6 +16,7 @@ import keras
 from keras import layers, optimizers, callbacks
 
 from ebop_maven import modelling, deb_example
+from ebop_maven.libs.keras_custom.metrics import MeanAbsoluteErrorForLabel
 import model_testing
 
 # Configure the inputs and outputs of the model
@@ -47,7 +48,7 @@ tf.random.set_seed(SEED)
 
 OPTIMIZER = optimizers.Nadam(learning_rate=5e-4)
 LOSS = ["mae"]
-METRICS = ["mse"]
+METRICS = ["mse"] + [MeanAbsoluteErrorForLabel(CHOSEN_LABELS.index(l), l) for l in ["k", "J"]]
 
 # ReLU is widely used default for CNN/DNNs.
 # Otherwise, may need to specify each layer separately as dims different.
