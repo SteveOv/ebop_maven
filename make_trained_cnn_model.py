@@ -54,23 +54,35 @@ METRICS = ["mse"]
 # LeakyReLU addresses issue of dead neurons & PReLU similar but trains alpha param
 CNN_PADDING = "same"
 CNN_ACTIVATE = "relu"
-DNN_ACTIVATE = "leaky_relu"
 
 # For the dense layers: "glorot_uniform" (def) "he_normal", "he_uniform" (he_ goes well with ReLU)
 DNN_INITIALIZER = "he_uniform"
+DNN_ACTIVATE = "leaky_relu"
+DNN_NUM_UNITS = 256
 DNN_NUM_FULL_LAYERS = 2
-DNN_DROPOUT_RATE=0.5
+DNN_DROPOUT_RATE = 0.5
+DNN_NUM_TAPER_UNITS = 64
 
-def make_best_model(chosen_features: list[str],
-                    mags_bins: int,
-                    mags_wrap_phase: float,
-                    chosen_labels: list[str],
-                    trainset_name: str,
+def make_best_model(chosen_features: list[str]=CHOSEN_FEATURES,
+                    mags_bins: int=MAGS_BINS,
+                    mags_wrap_phase: float=MAGS_WRAP_PHASE,
+                    chosen_labels: list[str]=CHOSEN_LABELS,
+                    trainset_name: str=TRAINSET_NAME,
+                    cnn_padding: str=CNN_PADDING,
+                    cnn_activation: str=CNN_ACTIVATE,
+                    dnn_num_layers: int=DNN_NUM_FULL_LAYERS,
+                    dnn_num_units: int=DNN_NUM_UNITS,
+                    dnn_initializer: str=DNN_INITIALIZER,
+                    dnn_activation: str=DNN_ACTIVATE,
+                    dnn_dropout_rate: float=DNN_DROPOUT_RATE,
+                    dnn_num_taper_units: int=DNN_NUM_TAPER_UNITS,
+                    model_name: str=MODEL_NAME,
                     verbose: bool=False):
     """
     Helper function for building the current best performing model. 
     Publish model from a function, rather than inline, so it can be shared with model_search.
     """
+    # pylint: disable=too-many-arguments, too-many-locals, dangerous-default-value
     print("\nBuilding the best known CNN model for predicting:", ", ".join(chosen_labels))
     metadata = { # This will augment the model, giving an Estimator context information
         "extra_features_and_defaults": 
@@ -81,26 +93,29 @@ def make_best_model(chosen_features: list[str],
         "trainset_name": trainset_name
     }
     best_model = modelling.build_mags_ext_model(
-        name=MODEL_NAME,
         mags_input=modelling.mags_input_layer(shape=(mags_bins, 1), verbose=verbose),
         ext_input=modelling.ext_input_layer(shape=(len(chosen_features), 1), verbose=verbose),
         mags_layers=[
-            modelling.conv1d_layers(2, 16, 32, 2, CNN_PADDING, CNN_ACTIVATE, "Conv-1-", verbose),
+            modelling.conv1d_layers(2, 16, 32, 2, cnn_padding, cnn_activation, "Conv-1-", verbose),
             modelling.pooling_layer(layers.MaxPool1D, 2, 2, "Pool-1", verbose),
-            modelling.conv1d_layers(2, 32, 16, 2, CNN_PADDING, CNN_ACTIVATE, "Conv-2-", verbose),
+            modelling.conv1d_layers(2, 32, 16, 2, cnn_padding, cnn_activation, "Conv-2-", verbose),
             modelling.pooling_layer(layers.MaxPool1D, 2, 2, "Pool-2", verbose),
-            modelling.conv1d_layers(2, 64, 8, 2, CNN_PADDING, CNN_ACTIVATE, "Conv-3-", verbose),
+            modelling.conv1d_layers(2, 64, 8, 2, cnn_padding, cnn_activation, "Conv-3-", verbose),
             modelling.pooling_layer(layers.MaxPool1D, 2, 2, "Pool-3", verbose),
-            modelling.conv1d_layers(2, 128, 4, 2, CNN_PADDING, CNN_ACTIVATE, "Conv-4-", verbose),
+            modelling.conv1d_layers(2, 128, 4, 2, cnn_padding, cnn_activation, "Conv-4-", verbose),
         ],
         dnn_layers=[
-            modelling.hidden_layers(DNN_NUM_FULL_LAYERS, 256, DNN_INITIALIZER, DNN_ACTIVATE,
-                                    DNN_DROPOUT_RATE, ("Hidden-", "Dropout-"), verbose),
+            modelling.hidden_layers(int(dnn_num_layers), int(dnn_num_units),
+                                    dnn_initializer, dnn_activation,
+                                    dnn_dropout_rate, ("Hidden-", "Dropout-"), verbose),
             # "Buffer" between the DNN+Dropout and the output layer; this non-dropout NN layer
             # consistently gives a small, but significant improvement to the trained loss.
-            modelling.hidden_layers(1, 64, DNN_INITIALIZER, DNN_ACTIVATE, 0, ("Taper-",), verbose)
+            modelling.hidden_layers(1, int(dnn_num_taper_units), dnn_initializer, dnn_activation,
+                                    0, ("Taper-",), verbose) if dnn_num_taper_units else None
         ],
-        output=modelling.output_layer(metadata, DNN_INITIALIZER, "linear", "Output", verbose),
+        output=modelling.output_layer(metadata, dnn_initializer, "linear", "Output", verbose),
+        post_build_step=None,
+        name=model_name,
         verbose=verbose
     )
     if verbose:
@@ -150,8 +165,7 @@ if __name__ == "__main__":
     # -----------------------------------------------------------
     # Define the model
     # -----------------------------------------------------------
-    model = make_best_model(CHOSEN_FEATURES, MAGS_BINS, MAGS_WRAP_PHASE, CHOSEN_LABELS,
-                            TRAINSET_NAME, verbose=True)
+    model = make_best_model(verbose=True)
     model.compile(loss=LOSS, optimizer=OPTIMIZER, metrics=METRICS)
     model.summary()
 
