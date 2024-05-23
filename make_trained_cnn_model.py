@@ -191,7 +191,8 @@ if __name__ == "__main__":
         # Then start a browser and head to http://localhost:6006
         #callbacks.TensorBoard(log_dir="./logs", write_graph=True, write_images=True),
         callbacks.EarlyStopping("val_loss", restore_best_weights=True,
-                                patience=EARLY_STOPPING_PATIENCE, verbose=1)
+                                patience=EARLY_STOPPING_PATIENCE, verbose=1),
+        callbacks.CSVLogger(SAVE_DIR / "training-log.csv")
     ]
 
     print(f"\nTraining the model on {counts[0]} training and {counts[1]} validation",
