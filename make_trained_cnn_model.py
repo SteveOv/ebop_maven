@@ -48,7 +48,10 @@ tf.random.set_seed(SEED)
 
 OPTIMIZER = optimizers.Nadam(learning_rate=5e-4)
 LOSS = ["mae"]
-METRICS = ["mse"] + [MeanAbsoluteErrorForLabel(CHOSEN_LABELS.index(l), l) for l in ["k", "J"]]
+METRICS = ["mse"] + [MeanAbsoluteErrorForLabel(CHOSEN_LABELS.index(l), l) for l in CHOSEN_LABELS]
+
+# This gives the option of tweaking the emphasis across the labels when training/reducing the loss
+CLASS_WEIGHTS = { CHOSEN_LABELS.index(l): 1 for l in CHOSEN_LABELS } # Currently all the same
 
 # ReLU is widely used default for CNN/DNNs.
 # Otherwise, may need to specify each layer separately as dims different.
@@ -203,6 +206,7 @@ if __name__ == "__main__":
         history = model.fit(x = datasets[0],    # pylint: disable=invalid-name
                             epochs = TRAINING_EPOCHS,
                             callbacks = CALLBACKS,
+                            class_weight=CLASS_WEIGHTS,
                             validation_data = datasets[1])
         # Plot the learning curves
         ax = pd.DataFrame(history.history).plot(figsize=(6, 4), xlabel="Epoch", ylabel="Loss")
