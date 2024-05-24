@@ -20,6 +20,7 @@ from hyperopt import fmin, tpe, hp, Trials, space_eval, STATUS_OK, STATUS_FAIL
 from hyperopt.pyll import scope
 
 from ebop_maven import modelling, deb_example
+from ebop_maven.libs.keras_custom.callbacks import TrainingTimeoutCallback
 from ebop_maven.libs.tee import Tee
 
 import make_trained_cnn_model
@@ -43,7 +44,8 @@ HYPEROPT_LOSS_TH = 0.01         # Will stop search in the unlikely event we get 
 TRAINING_EPOCHS = 250           # Set high if we're using early stopping
 BATCH_FRACTION = 0.001          # larger -> quicker training per epoch but more to converge
 MAX_BUFFER_SIZE = 20000000      # Size of Dataset shuffle buffer (in instances)
-PATIENCE = 7                    # Number of epochs w/o improvement before stopping
+PATIENCE = 7                    # Number of epochs w/o improvement before training is stopped
+TRAINING_TIMEOUT = 3600         # Timeout training if not completed within this time (seconds)
 
 ENFORCE_REPEATABILITY = True    # If true, avoid GPU/CUDA cores for repeatable results
 SEED = 42                       # Standard random seed ensures repeatable randomization
@@ -511,9 +513,12 @@ def train_and_test_model(trial_kwargs):
         candidate.compile(optimizer=optimizer, loss=loss_function, metrics=fixed_metrics)
         candidate.summary(line_length=120, show_trainable=True)
         print()
-        ecb = cb.EarlyStopping("val_loss", restore_best_weights=True, patience=PATIENCE, verbose=1)
-        history = candidate.fit(x = train_ds[0], epochs = TRAINING_EPOCHS, callbacks = [ecb],
-                                validation_data = train_ds[1], verbose=2)
+        train_callbacks = [
+            cb.EarlyStopping("val_loss", restore_best_weights=True, patience=PATIENCE, verbose=1),
+            TrainingTimeoutCallback(timeout=TRAINING_TIMEOUT, verbose=1)
+        ]
+        history = candidate.fit(x=train_ds[0], epochs=TRAINING_EPOCHS, callbacks=train_callbacks,
+                                validation_data=train_ds[1], verbose=2)
 
         print(f"\nEvaluating model against {test_ct[0]} test dataset instances.")
         candidate.evaluate(x=test_ds[0], y=None, verbose=2)
