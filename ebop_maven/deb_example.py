@@ -1,7 +1,8 @@
 """
 Functions for reading and writing to deb_example encoded TensorFlow datasets
 """
-from typing import Dict, List, Tuple, Callable, Iterable
+from typing import Dict, List, Tuple, Callable, Iterable, Union
+from pathlib import Path
 
 import numpy as np
 import tensorflow as tf
@@ -57,6 +58,9 @@ description = {
     **{ k: tf.io.FixedLenFeature([], tf.float32, default_value=v)
                         for k, v in extra_features_and_defaults.items() },
 }
+
+# Common options used when reading or writing a deb Example dataset file
+ds_options = tf.io.TFRecordOptions(compression_type=None)
 
 def create_mags_key(mags_bins: int, mags_wrap_phase: float) -> str:
     """ Helper function to format a key to the stored_mags_features dict """
@@ -216,6 +220,62 @@ def create_dataset_pipeline(dataset_files: Iterable[str],
     if prefetch:
         ds = ds.prefetch(prefetch)
     return (ds, row_count)
+
+
+def iterate_dataset(dataset_files: Iterable[str],
+                    mags_bins: int = default_mags_bins,
+                    mags_wrap_phase: float = default_mags_wrap_phase,
+                    ext_features: List[str] = None,
+                    labels: List[str]=None,
+                    identifiers: List[str]=None,
+                    scale_labels: bool=False):
+    """
+    Utility/diagnostics function which will parse a saved dataset yielding 
+    rows, and within the rows labels and features, which match the requested
+    criteria.
+    
+    The rows are yielded in the order in which they appear in the supplied dataset files.
+    
+    The ext_features and labels are listed in the order they have been specified or in the
+    order of extra_features_and_defaults and labels_and_scales if not specified.
+
+    :dataset_files: the set of dataset files to parse
+    :mags_bins: the width of the mags to publish
+    :mags_wrap_phase: the wrap phase of the mags to publish
+    :ext_features: a chosen subset of the available ext_features,
+    in the requested order, or all if None
+    :labels: a chosen subset of the available labels, in requested order, or all if None
+    :identifiers: optional list of ids to yield, or all ids if None
+    :scale_values: if True values will be scaled
+    :returns: for each matching row yields a tuple of (id, mags vals, ext feature vals, label vals)
+    """
+    # pylint: disable=too-many-arguments, too-many-locals
+    mags_key = create_mags_key(mags_bins, mags_wrap_phase)
+    if ext_features is not None:
+        chosen_ext_feats = { f: extra_features_and_defaults[f] for f in ext_features if f != "mags"}
+    else:
+        chosen_ext_feats = extra_features_and_defaults
+    if labels is not None:
+        chosen_labels = { l: labels_and_scales[l] for l in labels }
+    else:
+        chosen_labels = labels_and_scales
+
+    for raw_record in tf.data.TFRecordDataset(dataset_files, ds_options.compression_type):
+        example = tf.io.parse_single_example(raw_record, description)
+
+        # We know the id is encoded as a utf8 str in a bytes feature
+        id_val = example["id"].numpy().decode(encoding="utf8")
+        if identifiers is None or id_val in identifiers:
+            
+            mags_val = example[mags_key].numpy()
+            ext_feat_vals = np.array([example.get(k, d) for (k, d) in chosen_ext_feats.items()])
+
+            if scale_labels:
+                label_vals = np.array([example[k].numpy()*sc for (k, sc) in chosen_labels.items()])
+            else:
+                label_vals = np.array([example[k].numpy() for k in chosen_labels])
+
+            yield (id_val, mags_val, ext_feat_vals, label_vals)
 
 
 #

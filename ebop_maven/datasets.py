@@ -24,9 +24,6 @@ import tensorflow as tf
 from . import deb_example
 from .libs import param_sets, jktebop, orbital, lightcurve
 
-# Common options used when writing a dataset file
-_ds_options = tf.io.TFRecordOptions(compression_type=None)
-
 def make_dataset_files(trainset_files: Iterator[Path],
                        output_dir: Path,
                        valid_ratio: float=0.,
@@ -211,7 +208,7 @@ def make_dataset_file(trainset_file: Path,
             # indices. which are then re-sorted so the rows is written in the original order.
             subset_slice = slice(subset_slice_start, subset_slice_start + subset_count)
             subset_file.parent.mkdir(parents=True, exist_ok=True)
-            with tf.io.TFRecordWriter(f"{subset_file}", _ds_options) as ds:
+            with tf.io.TFRecordWriter(f"{subset_file}", deb_example.ds_options) as ds:
                 for sorted_ix in sorted(row_indices[subset_slice]):
                     ds.write(rows[sorted_ix])
             subset_slice_start = subset_slice.stop
@@ -295,7 +292,7 @@ Selected targets are:               {', '.join(target_names) if target_names els
     out_file = output_dir / f"{config_file.stem}.tfrecord"
     if not simulate:
         out_file.parent.mkdir(parents=True, exist_ok=True)
-        ds = tf.io.TFRecordWriter(f"{out_file}", _ds_options)
+        ds = tf.io.TFRecordWriter(f"{out_file}", deb_example.ds_options)
 
     try:
         inst_counter = 0
@@ -366,50 +363,19 @@ Selected targets are:               {', '.join(target_names) if target_names els
     return out_file
 
 
-def inspect_dataset(dataset_files: Union[Path, Iterator[Path]],
-                    identifiers: List[str]=None,
-                    scale_labels: bool=False):
-    """
-    Utility/diagnostics function which will parse a saved dataset yielding each
-    row that matches the passed list of ids (or every row if ids is None). The
-    rows are yielded in the order in which they appear in the sorted tfrecords.
-
-    :dataset_files: the set of dataset files to parse
-    :identifiers: optional list of ids to yield, or all ids if None
-    :scale_values: if True values will be scaled 
-    """
-
-    if isinstance(dataset_files, Path):
-        dataset_files = [f"{dataset_files.resolve()}"]
-    else:
-        dataset_files = [f"{f.resolve()}" for f in sorted(dataset_files)]
-
-    label_names_and_scales = deb_example.labels_and_scales
-    for raw_record in tf.data.TFRecordDataset(dataset_files, _ds_options.compression_type):
-        # We know the id is encoded as a utf8 str in a bytes feature
-        example = tf.io.parse_single_example(raw_record, deb_example.description)
-        identifier = example["id"].numpy().decode(encoding="utf8")
-        if identifiers is None or identifier in identifiers:
-            if scale_labels:
-                labels = { k: example[k].numpy()*sc for k, sc in label_names_and_scales.items() }
-            else:
-                labels = { k: example[k].numpy() for k in label_names_and_scales }
-            mags = { k: example[k].numpy() for k in deb_example.stored_mags_features }
-            ext_features = { k: example[k].numpy() for k in deb_example.extra_features_and_defaults}
-            yield (identifier, labels, mags, ext_features)
-
-
 def plot_dataset_instance_model_feature(dataset_files: Union[Path, Iterator[Path]],
                                         identifier: str,
                                         output: Union[Path, Axes],
-                                        wrap_phase: float=0.75):
+                                        mags_bins: int=4096,
+                                        mags_wrap_phase: float=0.75):
     """
     Utility function to produce a plot of the requested dataset instance's model feature
 
     :dataset_files: the set of dataset files to parse
     :identifier: the identifier of the instance
     :output: where to send the plot. Either a Path to save to or an existing axes
-    :wrap_phase: where the model was wrapped
+    :mags_bins: the width of the mags to publish
+    :mags_wrap_phase: the wrap phase of the mags to publish
     """
     # If the output is a path then we need to set up a plot and axes which we'll
     # save to the output file, otherwise we'll plot to it as axes
@@ -421,13 +387,14 @@ def plot_dataset_instance_model_feature(dataset_files: Union[Path, Iterator[Path
         output = None
 
     # Will error if nothing found
-    instance = next(inspect_dataset(dataset_files, [identifier]), None)
+    instance = next(deb_example.iterate_dataset(dataset_files, mags_bins, mags_wrap_phase,
+                                                identifiers=[identifier]), None)
     if not instance:
         raise KeyError(f"No match on identifier '{identifier}'")
 
     # Only the mags are stored in the dataset. Infer the x/phase data
-    (_, _, model_feature, _) = instance
-    phases = np.linspace(wrap_phase-1, wrap_phase, len(model_feature))
+    (_, model_feature, _, _) = instance
+    phases = np.linspace(mags_wrap_phase-1, mags_wrap_phase, len(model_feature))
     ax.scatter(x=phases, y=model_feature, marker=".", s=0.25)
 
     # We'll rely on the caller to config the output if it's an Axes

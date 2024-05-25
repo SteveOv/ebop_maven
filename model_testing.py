@@ -419,22 +419,23 @@ def get_dataset_labels_and_features(
     """
 
     print(f"Looking for the test dataset in '{dataset_dir}'...", end="")
-    tfrecord_files = list(dataset_dir.glob("**/*.tfrecord"))
+    tfrecord_files = sorted(dataset_dir.glob("**/*.tfrecord"))
     if len(tfrecord_files) > 0:
         print(f"found {len(tfrecord_files)} dataset file(s).")
     else:
         raise IndexError("No dataset files found")
 
     ids, ds_labels, ds_features = [], [], []
-    # This will yield the records in the order in which they appear in the dataset
-    for (targ, lrow, mrow, frow) in datasets.inspect_dataset(tfrecord_files, include_ids,
-                                                             scale_labels=scaled_labels):
+    for (targ, mrow, frow, lrow) in deb_example.iterate_dataset(tfrecord_files,
+                                                                mags_bins,
+                                                                mags_wrap_phase,
+                                                                feature_names,
+                                                                label_names,
+                                                                include_ids,
+                                                                scale_labels=scaled_labels):
         ids += [targ]
-        ds_labels += [{ ln: lrow[ln] for ln in label_names}]
-        ds_features += [{
-            "mags": mrow[deb_example.create_mags_key(mags_bins, mags_wrap_phase)], 
-            **{ fn: frow[fn] for fn in feature_names if fn not in ["mags"] }}
-        ]
+        ds_labels += [dict(zip(label_names, lrow))]
+        ds_features += [{ "mags": mrow, **dict(zip(feature_names, frow)) }]
 
     # Need to sort the data in the order of the requested ids (if given)
     if include_ids is not None and len(include_ids) > 0:

@@ -129,12 +129,3 @@ with redirect_stdout(Tee(open(dataset_dir / "dataset.log", "w", encoding="utf8")
                                                             target_names=None,
                                                             verbose=True,
                                                             simulate=False)
-
-    # Review the dataset we have just written
-    for (identifier, labels, mags, ext_features) in datasets.inspect_dataset(formal_testset_file):
-        row = { **labels, **ext_features }
-        print(f"{identifier:>15s}: {', '.join(f'{k}={v:6.3f}' for k, v in row.items())}")
-        mags_key = deb_example.default_mags_key
-        pmags = mags[mags_key]
-        print(f"{' '*15}: {mags_key} (min,max)={min(pmags):6.3f}, {max(pmags):.3f}",
-              f"(from: { ', '.join(k for k, v in mags.items() if len(v))})")
