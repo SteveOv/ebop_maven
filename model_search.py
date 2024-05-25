@@ -288,7 +288,7 @@ trials_pspace = hp.pchoice("train_and_test_model", [
         "optimizer": make_trained_cnn_model.OPTIMIZER,
         "loss_function": make_trained_cnn_model.LOSS,
     }),
-    (0.29, {
+    (0.49, {
         "description": "Best: current best model structure with varied dnn and hyperparams",
         "model": { 
             "func": make_trained_cnn_model.make_best_model,
@@ -324,7 +324,7 @@ trials_pspace = hp.pchoice("train_and_test_model", [
         ]),
         "loss_function":                hp.choice("best_loss", loss_function_choices),
     }),
-    (0.70, {
+    (0.50, {
         "description": "Free: explore model structure and hyperparams",
         "model": {
             "func": modelling.build_mags_ext_model,
