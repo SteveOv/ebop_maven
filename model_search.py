@@ -521,10 +521,10 @@ def train_and_test_model(trial_kwargs):
                                 validation_data=train_ds[1], verbose=2)
 
         print(f"\nEvaluating model against {test_ct[0]} test dataset instances.")
-        candidate.evaluate(x=test_ds[0], y=None, verbose=2)
+        results = candidate.evaluate(x=test_ds[0], y=None, verbose=2)
 
-        print(f"\nFull evaluation against {test_ct[1]} formal-tes dataset instances.")
-        results = candidate.evaluate(x=test_ds[1], y=None, verbose=2)
+        print(f"\nFull evaluation against {test_ct[1]} formal-test dataset instances.")
+        candidate.evaluate(x=test_ds[1], y=None, verbose=2)
 
         # Out final loss is always MAE from metrics. This allows us to vary the
         # training loss function while using a consistent metric for trial evaluation.
