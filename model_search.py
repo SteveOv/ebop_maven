@@ -45,7 +45,7 @@ TRAINING_EPOCHS = 250           # Set high if we're using early stopping
 BATCH_FRACTION = 0.001          # larger -> quicker training per epoch but more to converge
 MAX_BUFFER_SIZE = 20000000      # Size of Dataset shuffle buffer (in instances)
 PATIENCE = 7                    # Number of epochs w/o improvement before training is stopped
-TRAINING_TIMEOUT = 3600         # Timeout training if not completed within this time (seconds)
+TRAINING_TIMEOUT = 7200         # Timeout training if not completed within this time (seconds)
 
 ENFORCE_REPEATABILITY = True    # If true, avoid GPU/CUDA cores for repeatable results
 SEED = 42                       # Standard random seed ensures repeatable randomization
@@ -255,8 +255,8 @@ cnn_pooling_type_choices = [layers.AvgPool1D, layers.MaxPool1D, None]
 cnn_padding_choices = ["same", "valid"]
 cnn_activation_choices = ["relu"]
 dnn_initializer_choices = ["he_uniform", "he_normal", "glorot_uniform"]
-dnn_activation_choices = ["relu", "leaky_relu", "elu"]
-loss_function_choices = [["mae"], ["mse"], ["huber"]]
+dnn_activation_choices = ["relu", "leaky_relu", "prelu", "elu"]
+loss_function_choices = [["mae"], ["mse"]] #, ["huber"]]
 lr_qlogu_kwargs = { "low": -12, "high": -3, "q": 1e-6 }
 sgd_momentum_uniform_kwargs = { "low": 0.0, "high": 1.0 }
 sgd_lr_qlogu_kwargs = { "low": -8, "high": -1, "q": 1e-4 }
@@ -299,7 +299,7 @@ trials_pspace = hp.pchoice("train_and_test_model", [
             "trainset_name":            TRAINSET_NAME,
             "cnn_activation":           hp.choice("best_cnn_activation", cnn_activation_choices),
             "dnn_num_layers":           hp.uniformint("best_dnn_num_layers", low=1, high=4),
-            "dnn_num_units":            hp.quniform("best_dnn_num_units", low=64, high=256, q=64),
+            "dnn_num_units":            hp.quniform("best_dnn_num_units", low=128, high=512, q=64),
             "dnn_initializer":          hp.choice("best_dnn_initializer", dnn_initializer_choices),
             "dnn_activation":           hp.choice("best_dnn_activation", dnn_activation_choices),
             "dnn_dropout_rate":         hp.quniform("best_dnn_dropout", low=0.3, high=0.7, q=0.1),
@@ -315,12 +315,12 @@ trials_pspace = hp.pchoice("train_and_test_model", [
                 "class": optimizers.Nadam,
                 "learning_rate":            hp.qloguniform("best_nadam_lr", **lr_qlogu_kwargs)
             },
-            { # Covers both vanilla SGD and Nesterov momentum
-                "class": optimizers.SGD,
-                "learning_rate":            hp.qloguniform("best_sgd_lr", **sgd_lr_qlogu_kwargs), 
-                "momentum":                 hp.uniform("best_sgd_momentum", **sgd_momentum_uniform_kwargs),
-                "nesterov":                 hp.choice("best_sgd_nesterov", [True, False])
-            }
+            # { # Covers both vanilla SGD and Nesterov momentum
+            #     "class": optimizers.SGD,
+            #     "learning_rate":            hp.qloguniform("best_sgd_lr", **sgd_lr_qlogu_kwargs), 
+            #     "momentum":                 hp.uniform("best_sgd_momentum", **sgd_momentum_uniform_kwargs),
+            #     "nesterov":                 hp.choice("best_sgd_nesterov", [True, False])
+            # }
         ]),
         "loss_function":                hp.choice("best_loss", loss_function_choices),
     }),
@@ -387,7 +387,7 @@ trials_pspace = hp.pchoice("train_and_test_model", [
                 {
                     "func": dnn_with_taper,
                     "num_layers":           hp.uniformint("free_dnn_num_layers", low=1, high=4),
-                    "units":                hp.quniform("free_dnn_units", low=64, high=256, q=64),
+                    "units":                hp.quniform("free_dnn_units", low=128, high=512, q=64),
                     "kernel_initializer":   dnn_kernel_initializer_choice,
                     "activation":           hp.choice("free_dnn_activation", dnn_activation_choices),
                     "dropout_rate":         hp.quniform("free_dnn_dropout", low=0.3, high=0.7, q=0.1),
@@ -410,12 +410,12 @@ trials_pspace = hp.pchoice("train_and_test_model", [
                 "class": optimizers.Nadam,
                 "learning_rate":            hp.qloguniform("free_nadam_lr", **lr_qlogu_kwargs)
             },
-            { # Covers both vanilla SGD and Nesterov momentum
-                "class": optimizers.SGD, 
-                "learning_rate":            hp.qloguniform("free_sgd_lr", **sgd_lr_qlogu_kwargs), 
-                "momentum":                 hp.uniform("free_sgd_momentum", **sgd_momentum_uniform_kwargs),
-                "nesterov":                 hp.choice("free_sgd_nesterov", [True, False])
-            }
+            # { # Covers both vanilla SGD and Nesterov momentum
+            #     "class": optimizers.SGD, 
+            #     "learning_rate":            hp.qloguniform("free_sgd_lr", **sgd_lr_qlogu_kwargs), 
+            #     "momentum":                 hp.uniform("free_sgd_momentum", **sgd_momentum_uniform_kwargs),
+            #     "nesterov":                 hp.choice("free_sgd_nesterov", [True, False])
+            # }
         ]),
         "loss_function":                hp.choice("free_loss", loss_function_choices), 
     })
