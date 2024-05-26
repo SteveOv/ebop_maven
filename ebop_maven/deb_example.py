@@ -230,20 +230,22 @@ def iterate_dataset(dataset_files: Iterable[str],
                     identifiers: List[str]=None,
                     scale_labels: bool=False):
     """
-    Utility/diagnostics function which will parse a saved dataset yielding 
-    rows, and within the rows labels and features, which match the requested
-    criteria.
+    Utility/diagnostics function which will parse a saved dataset yielding rows,
+    and within the rows labels and features, which match the requested criteria.
     
     The rows are yielded in the order in which they appear in the supplied dataset files.
     
     The ext_features and labels are listed in the order they have been specified or in the
     order of extra_features_and_defaults and labels_and_scales if not specified.
 
+    This function is not for use when training a model; for that, requirement use
+    create_dataset_pipeline() directly. Instead this gives easy access to the
+    contents of a dataset for diagnostics lookup, testing or plotting.
+
     :dataset_files: the set of dataset files to parse
     :mags_bins: the width of the mags to publish
     :mags_wrap_phase: the wrap phase of the mags to publish
-    :ext_features: a chosen subset of the available ext_features,
-    in the requested order, or all if None
+    :ext_features: a chosen subset of the available ext_features, in requested order, or all if None
     :labels: a chosen subset of the available labels, in requested order, or all if None
     :identifiers: optional list of ids to yield, or all ids if None
     :scale_values: if True values will be scaled
@@ -252,7 +254,7 @@ def iterate_dataset(dataset_files: Iterable[str],
     # pylint: disable=too-many-arguments, too-many-locals
     mags_key = create_mags_key(mags_bins, mags_wrap_phase)
     if ext_features is not None:
-        chosen_ext_feats = { f: extra_features_and_defaults[f] for f in ext_features if f != "mags"}
+        chosen_ext_feats = {f: extra_features_and_defaults[f] for f in ext_features if f != "mags"}
     else:
         chosen_ext_feats = extra_features_and_defaults
     if labels is not None:
@@ -260,22 +262,22 @@ def iterate_dataset(dataset_files: Iterable[str],
     else:
         chosen_labels = labels_and_scales
 
-    for raw_record in tf.data.TFRecordDataset(dataset_files, ds_options.compression_type):
-        example = tf.io.parse_single_example(raw_record, description)
+    def map_func(record_bytes):
+        example = tf.io.parse_single_example(record_bytes, description)
+        mags_feature = example[mags_key]
+        ext_features = [example.get(k, d) for (k, d) in chosen_ext_feats.items()]
+        if scale_labels:
+            labels = [example[k] * s for k, s in chosen_labels.items()]
+        else:
+            labels = [example[k] for k in chosen_labels]
+        return example["id"], mags_feature, ext_features, labels
 
-        # We know the id is encoded as a utf8 str in a bytes feature
-        id_val = example["id"].numpy().decode(encoding="utf8")
+    # Create a custom pipeline for this dataset, with the above map function
+    (ds, count) = create_dataset_pipeline(dataset_files, 0, map_func)
+    for id_val, mags_val, feat_vals, lab_vals in ds.take(count).as_numpy_iterator():
+        id_val = id_val.decode(encoding="utf8")
         if identifiers is None or id_val in identifiers:
-            
-            mags_val = example[mags_key].numpy()
-            ext_feat_vals = np.array([example.get(k, d) for (k, d) in chosen_ext_feats.items()])
-
-            if scale_labels:
-                label_vals = np.array([example[k].numpy()*sc for (k, sc) in chosen_labels.items()])
-            else:
-                label_vals = np.array([example[k].numpy() for k in chosen_labels])
-
-            yield (id_val, mags_val, ext_feat_vals, label_vals)
+            yield id_val, mags_val, feat_vals, lab_vals
 
 
 #
