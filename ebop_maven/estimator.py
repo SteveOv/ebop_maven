@@ -112,13 +112,22 @@ class Estimator(ABC):
                 unscale: bool=True,
                 seed: int=42) -> List[Dict[str, float]]:
         """
-        Make predictions on one or more instances' features. The instances are
-        in the form of a List of dicts.
+        High level call to make predictions on one or more instances' features.
+        The instances' features are expected in the form of a List of dicts:
 
         [
-            { "mags": List[float] * mags_bins, "phiS": float, "dS_over_dP": float },
+          { "mags": List[float] * mags_bins, "ext_feature_0": float, "ext_feature_1": float },
         ]
         
+        with the results being in the form of a List of dicts:
+        
+        [
+          { "rA_plus_rB": float, "k": float,..., "rA_plus_rB_sigma": float, "k_sigma": float,... },
+        ]
+
+        The equivalent predict_raw() call performs the same predictions without
+        the convenience of the dictionaries, instead taking and returning ndarrays.
+
         :instances: list of dicts, one for each instance to predict
         :iterations: the number of MC Dropout iterations (overriding the instance default)
         :unscale: indicates whether to undo the scaling of the predicted values. For example,
@@ -130,7 +139,7 @@ class Estimator(ABC):
         is_mc = iterations > 1
 
         # It's possible we can be given the instances as a List[Dict] but handle being given an
-        # ndarray or a single instance as a Dict: we'll process these all as ndarrays.
+        # ndarray[Dict] or a single instance as a Dict: we'll process these all as ndarrays.
         if isinstance(instances, np.ndarray):
             pass
         elif isinstance(instances, List): # Convert list to ndarray
@@ -140,36 +149,93 @@ class Estimator(ABC):
         else:
             raise TypeError(f"Expected instances as a list of dicts but got {type(instances)}.")
 
-        # Extract the mags_features into an ndarray of shape(#insts, #bins, 1) as expected by the
-        # ML model. This will throw a KeyError if the mandatory mags item is missing in any instance
-        inst_count = instances.shape[0]
+        # Extract the mags_features into an ndarray of shape(#insts, #bins), as expected by
+        # predict_raw(). Will throw a KeyError if the mandatory mags item is missing in any instance
         mags_features = np.array([inst["mags"] for inst in instances])
-        if mags_features.shape == (inst_count, self.mags_feature_bins, 1):
-            pass
-        elif mags_features.shape == (inst_count, self.mags_feature_bins, ):
-            mags_features = mags_features[:, :, np.newaxis]
-        else:
-            raise ValueError("Expected the list of mags features to be of shape " +
-                            f"(#insts, {self.mags_feature_bins}, 1) but got {mags_features.shape}")
 
-        # We need the extra_features values in an ndarray of shape (#insts, #extra_features, 1)
+        # We need the extra_features values in an ndarray of shape (#insts, #extra_features)
         # in the correct order. Read the expected features from the input dicts, falling back
         # on the default value if not found, and ignore any unexpected key/values.
         efd = self._extra_features_and_defaults
         extra_values = [[inst_dict.get(k, df) for k, df in efd.items()] for inst_dict in instances]
-        extra_values = np.array(extra_values).reshape((inst_count, len(efd), 1))
+        extra_values = np.array(extra_values)
 
-        # Now check that number of mags and feature rows (#insts) match up
-        if inst_count != extra_values.shape[0]:
+        # This returns the stacked predictions in shape (#insts, #labels, #iterations)
+        stkd_prds = self.predict_raw(mags_features, extra_values, iterations, unscale, seed)
+
+        # Summarize the label predictions & append 1-sigma values to each inst
+        # We go from shape (#insts, #labels, #iters) to shape (#insts, #labels*2)
+        if is_mc:
+            # preds are statistical mean and stddev over the iterations axis
+            psets = np.concatenate([np.mean(stkd_prds, axis=2), np.std(stkd_prds, axis=2)], axis=1)
+        else:
+            # preds are the given values, with 1-sigmas of zero. We know the iters axis is size 1.
+            nominals = stkd_prds[..., 0]
+            psets = np.concatenate([nominals, np.zeros_like(nominals)], axis=1)
+
+        # Load the predictions back into a list of dicts
+        return [dict(zip(self.prediction_names, pset)) for pset in psets]
+
+
+    def predict_raw(self,
+                    mags_feature: np.ndarray,
+                    extra_features: np.ndarray,
+                    iterations: int=None,
+                    unscale: bool=True,
+                    seed: int=42) -> np.ndarray:
+        """
+        Make predictions on one or more instances' features. The instances are
+        in the form of two NDArrays, one for the instances' mags data in the shape
+        (#insts, #mags_bins, 1) or (#insts, #mags_bins) and another for
+        extra features in the shape (#insts, #features, 1) or (#insts, #features).
+        The predictions are returned as an NDArray of shape (#insts, #labels, #iterations).
+        
+        :instances: list of dicts, one for each instance to predict
+        :mags_feature: numpy NDArray of shape (#insts, #bins, 1)
+        :extra_features: numpy NDArray of shape (#insts, #features, 1)
+        :iterations: the number of MC Dropout iterations (overriding the instance default)
+        :unscale: indicates whether to undo the scaling of the predicted values. For example,
+        the model may predict inc*0.01 and unscale would undo this returning inc as prediction/0.01
+        :seed: random seed for Tensorflow
+        :returns: a numpy NDArray with the predictions in the shape (#insts, #labels, #iterations)
+        """
+        # pylint: disable=too-many-arguments
+        iterations = self._iterations if iterations is None else iterations
+        is_mc = iterations > 1
+
+        if not isinstance(mags_feature, np.ndarray):
+            raise TypeError("Expect mags_feature to be an numpy ndarray")
+        if not isinstance(extra_features, np.ndarray):
+            raise TypeError("Expect extra_features to be a numpy ndarray")
+
+        # Check that number of mags and feature rows (#insts) match up
+        insts = mags_feature.shape[0]
+        if insts != extra_features.shape[0]:
             raise ValueError("Mismatched number of mags_features and extra_features: " +
-                            f"{inst_count} != {extra_values.shape[0]}")
+                            f"{insts} != {extra_features.shape[0]}")
+
+        # Check the arrays are in the expected shape; (#insts, #bins, 1) and (#insts, #features, 1)
+        if len(mags_feature.shape) > 1 and mags_feature.shape[1] == self.mags_feature_bins:
+            if len(mags_feature.shape) == 2:
+                mags_feature = mags_feature[:, :, np.newaxis]
+        else:
+            raise ValueError(f"Expected mags features of shape ({insts}, {self.mags_feature_bins})"+
+                        f" or ({insts}, {self.mags_feature_bins}, 1) but got {mags_feature.shape}")
+
+        count_ext_features = len(self.input_feature_names)-1
+        if len(extra_features.shape) > 1 and extra_features.shape[1] == count_ext_features:
+            if len(extra_features.shape) == 2:
+                extra_features = extra_features[:, :, np.newaxis]
+        else:
+            raise ValueError(f"Expected extra features of shape ({insts}, {count_ext_features}) " +
+                            f"or ({insts}, {count_ext_features}, 1) but got {extra_features.shape}")
 
         # If dropout, we make multiple predictions for each inst with training switched on so that
         # each prediction is with a statistically unique subset of the model's net: the MC Dropout
-        # algorithm. Stacked predictions are output in shape (#iterations, #insts, #labels)
+        # algorithm. Predictions are output in shape (#iterations, #insts, #labels)
         tf.random.set_seed(seed)
         stkd_prds = np.stack([
-            self._model((mags_features, extra_values), training=is_mc)
+            self._model((mags_feature, extra_features), training=is_mc)
             for _ in range(iterations)
         ])
 
@@ -177,13 +243,5 @@ class Estimator(ABC):
         if unscale:
             stkd_prds /= [*self._labels_and_scales.values()]
 
-        # Summarize the label predictions & append 1-sigma values to each inst
-        # We go from shape (#iters, #insts, #labels) to shape (#insts, #labels*2)
-        if is_mc: # preds are statistical mean and stddev over the iters axis
-            psets = np.concatenate([np.mean(stkd_prds, axis=0), np.std(stkd_prds, axis=0)], axis=1)
-        else: # preds are the given values, with 1-sigmas of zero. Just drop the iters axis.
-            nominals = stkd_prds[0, ...]
-            psets = np.concatenate([nominals, np.zeros_like(nominals)], axis=1)
-
-        # Load the predictions back into a list of dicts
-        return [dict(zip(self.prediction_names, pset)) for pset in psets]
+        # Return the predictions in the shape (#insts, #labels, #iterations)
+        return stkd_prds.transpose([1, 2, 0])

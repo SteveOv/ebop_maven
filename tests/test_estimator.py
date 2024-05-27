@@ -87,7 +87,7 @@ class TestEstimator(unittest.TestCase):
         self.assertIn("Test", estimator.name)
 
     #
-    #   TEST predict(self, instances = [(mags_feature, ext_features)])
+    #   TEST predict(self, instances=List[Dict], iterations=int, unscale=bool, seed=int)
     #   NOTE: not testing the predictions made, just that the "plumbing" works
     #
     def test_predict_invalid_arguments(self):
@@ -99,7 +99,7 @@ class TestEstimator(unittest.TestCase):
     def test_predict_missing_instance_lc_item(self):
         """ Tests predict(missing the mandatory lc items) gives KeyError """
         estimator = Estimator(self._default_model_file)
-        # only lc is mandatory
+        # only mag is mandatory
         self.assertRaises(KeyError, estimator.predict, [{ "dS_over_dP": 1, "phiS": 0.5 }])
         # Nothing else is
         instances = [{ "mags": [0.5] * estimator.mags_feature_bins }]
@@ -176,6 +176,92 @@ class TestEstimator(unittest.TestCase):
 
         result = estimator.predict(instances, unscale=False)
         self.assertTrue(result[0]["inc"] < 5, "expecting inc to be scaled value")
+
+
+    #
+    #   TEST predict_raw(self, mags_feature=[#insts, #bins, 1], extra_features=[#insts, #feats, 1], iterations=int, unscale=bool, seed=int)
+    #   NOTE: not testing the predictions made, just that the "plumbing" works
+    #
+    def test_predict_raw_invalid_argument_types(self):
+        """ Tests predict(various invalid arg types) gives TypeError """
+        estimator = Estimator(self._default_model_file)
+        self.assertRaises(TypeError, estimator.predict_raw, None, np.array([1.0, 0.5]))
+        self.assertRaises(TypeError, estimator.predict_raw, "Hello", np.array([1.0, 0.5]))
+        self.assertRaises(TypeError, estimator.predict_raw, np.array([0.5]*1024), None)
+        self.assertRaises(TypeError, estimator.predict_raw, np.array([0.5]*1024), "World")
+
+    def test_predict_raw_inconsistent_inst_counts(self):
+        """ Tests predict(inconsistent lengths on mags_feature and extra_features) gives ValueError """
+        estimator = Estimator(self._default_model_file)
+        inst_mags = [0.5] * estimator.mags_feature_bins
+        inst_feats = list(range(len(estimator.input_feature_names)-1))
+        mags_feature = np.array([inst_mags])                    # Shape (1, #bins)
+        extra_features = np.array([inst_feats, inst_feats])     # Shape (2, #feats)
+        self.assertRaises(ValueError, estimator.predict_raw, mags_feature, extra_features)
+
+    def test_predict_raw_incorrect_sized_mags_feature(self):
+        """ Tests predict(incorrect size mags_feature) gives ValueError """
+        estimator = Estimator(self._default_model_file)
+        inst_mags = [0.5] * (estimator.mags_feature_bins+1)
+        inst_feats = list(range(len(estimator.input_feature_names)-1))
+        mags_feature = np.array([inst_mags])                    # Shape (1, not #bins)
+        extra_features = np.array([inst_feats])                 # Shape (1, #feats)
+        self.assertRaises(ValueError, estimator.predict_raw, mags_feature, extra_features)
+
+    def test_predict_raw_incorrect_sized_extra_features(self):
+        """ Tests predict(incorrect size extra_features) gives ValueError """
+        estimator = Estimator(self._default_model_file)
+        inst_mags = [0.5] * estimator.mags_feature_bins
+        inst_feats = list(range(len(estimator.input_feature_names)+1))
+        mags_feature = np.array([inst_mags])                    # Shape (1, #bins)
+        extra_features = np.array([inst_feats])                 # Shape (1, not #feats)
+        self.assertRaises(ValueError, estimator.predict_raw, mags_feature, extra_features)
+
+    def test_predict_raw_correctly_shaped_features(self):
+        """ Tests predict(incorrect size extra_features) gives ValueError """
+        estimator = Estimator(self._default_model_file)
+        inst_mags = [0.5] * estimator.mags_feature_bins
+        inst_feats = list(range(len(estimator.input_feature_names)-1))
+
+        mags_feature = np.array([inst_mags])                    # Shape (1, #bins)
+        extra_features = np.array([inst_feats])                 # Shape (1, #feats)
+        preds0 = estimator.predict_raw(mags_feature, extra_features, iterations=1)
+
+        mags_feature = mags_feature[:, :, np.newaxis]           # Shape (1, #bins, 1)
+        extra_features = extra_features[:, :, np.newaxis]       # Shape (1, #feats, 1)
+        preds1 = estimator.predict_raw(mags_feature, extra_features, iterations=1)
+        self.assertEqual(preds0.tolist(), preds1.tolist())
+
+    def test_predict_raw_with_explicit_iterations(self):
+        """ Tests predict(_, _, iterations) expect result as (#insts, #labels, #iterations) """
+        estimator = Estimator(self._default_model_file)
+        inst_mags = np.array([[0.5] * estimator.mags_feature_bins])
+        inst_feats = np.array([list(range(len(estimator.input_feature_names)-1))])
+        for iterations in [None, 1, 100, 250]: # Expect it to coalesce None to 1
+            result = estimator.predict_raw(inst_mags, inst_feats, iterations=iterations)
+            self.assertEqual(iterations or 1, result.shape[2])
+
+    def test_predict_raw_with_default_iterations(self):
+        """ Tests predict({ instance items }, 100 MC Dropout iterations) -> expect some sigmas!=0 """
+        iterations = 42
+        estimator = Estimator(self._default_model_file, iterations=iterations)
+        inst_mags = np.array([[0.5] * estimator.mags_feature_bins])
+        inst_feats = np.array([list(range(len(estimator.input_feature_names)-1))])
+        result = estimator.predict_raw(inst_mags, inst_feats)
+        self.assertEqual(iterations, result.shape[2])
+
+    def test_predict_raw_with_unscale(self):
+        """ Tests predict({ instance items }, unscale=True) -> expect unscaled inc """
+        estimator = Estimator(self._default_model_file)
+        inst_mags = np.array([[0.5] * estimator.mags_feature_bins])
+        inst_feats = np.array([list(range(len(estimator.input_feature_names)-1))])
+
+        result = estimator.predict_raw(inst_mags, inst_feats, iterations=1, unscale=True)
+        self.assertTrue(result[0][estimator.label_names.index("inc")] > 5, "expecting unscaled inc")
+
+        result = estimator.predict_raw(inst_mags, inst_feats, iterations=1, unscale=False)
+        self.assertTrue(result[0][estimator.label_names.index("inc")] < 5, "expecting scaled inc")
+
 
 if __name__ == "__main__":
     unittest.main()
