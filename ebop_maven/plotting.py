@@ -1,18 +1,23 @@
 """ Support for common plots and formatting. """
 # pylint: disable=too-many-arguments
-from typing import Tuple, List, Dict, Union
-import math
-from pathlib import Path
-import json
+from typing import Tuple, List, Union
 
-import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
-from matplotlib.figure import Figure
 import numpy as np
 
 from lightkurve import LightCurve, FoldedLightCurve
 from astropy.time import Time
 
+label_text = {
+    "rA_plus_rB": "$r_A+r_B$",
+    "k": "$k$",
+    "inc": "$i$",
+    "J": "$J$",
+    "ecosw": r"$e\,\cos{\omega}$",
+    "esinw": r"$e\,\sin{\omega}$",
+    "L3": "$L_3$",
+    "bP": "$b_P$",
+}
 
 def format_axes(ax: Axes, title: str=None,
                 xlabel: str=None, ylabel: str=None,
@@ -147,3 +152,45 @@ def plot_folded_lightcurve_on_axes(ax: Axes,
 
     if format_kwargs:
         format_axes(ax, **format_kwargs)
+
+
+def plot_prediction_distributions_on_axes(ax: Axes,
+                                          predictions: np.ndarray,
+                                          label_names: List[str],
+                                          violin_plot: bool=False,
+                                          plot_zero_value_line: bool=True,
+                                          **format_kwargs):
+    """
+    Plot a violin or box plot of the prediction distribution (the last axis of predictions).
+
+    :ax: the Axes to plot to
+    :predictions: the predictions to plot; ndarray of shape (#labels, #iterations)
+    :label_names: the names of each label on predictions[0]
+    :violin_plot: whether to plot a violin plot (True) or a box plot (False)
+    :plot_zero_value_line: whether to draw a horizontal line at zero
+    :format_kwargs: kwargs to be passed on to format_axes()
+    """
+    # We can only handle 1 instance so take the first if we have full (#insts, #labels, #iterations)
+    xdata = predictions[0] if len(predictions.shape) == 3 else predictions
+
+    # Get the predictions in the right shape to plot along the label axis.
+    if xdata.shape[0] == len(label_names):
+        xdata = xdata.transpose()
+
+    if violin_plot:
+        ax.violinplot(xdata, showmeans=True, vert=True)
+    else:
+        ax.boxplot(xdata, showmeans=True, vert=True, patch_artist=True)
+
+    label_names = [label_text[k] or k for k in label_names]
+    ax.set_xticks(ticks=[r+1 for r in range(len(label_names))], labels=label_names)
+
+    if plot_zero_value_line:
+        (xmin, xmax) = ax.get_xlim()
+        ax.hlines([0.0], xmin, xmax, linestyles="--", color="k", lw=.5, alpha=.5, zorder=-10)
+
+    if format_kwargs:
+        format_axes(ax, **format_kwargs)
+
+    # Hide minor x-ticks as they have no meaning in this context
+    ax.tick_params(axis="x", which="minor", bottom=False, top=False)
