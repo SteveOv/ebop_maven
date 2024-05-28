@@ -192,9 +192,11 @@ class Test_deb_example(unittest.TestCase):
     #                        identifiers: List[str], scale_labels: bool)
     #                           -> Generator(ids, mags, features, labels)
     #
+    #   iterate_dataset() wraps create_dataset_pipeline() so that gets a workout too
+    #
     def test_iterate_dataset_default_args(self):
         """ Tests iterate_dataset(no id filter) -> all rows """
-        files = list((Path.cwd() / "datasets/formal-test-dataset/").glob("*.tfrecord"))
+        files = list((Path.cwd() / "datasets/formal-test-dataset/").glob("**/*.tfrecord"))
         (id_val, mrow, frow, lrow) = next(deb_example.iterate_dataset(files))
         # Check the dimensions of whats returned for the first row; should reflect the defaults
         self.assertIsNotNone(id_val)
@@ -204,7 +206,7 @@ class Test_deb_example(unittest.TestCase):
 
     def test_iterate_dataset_no_filters(self):
         """ Tests iterate_dataset(no id filter) -> all rows """
-        files = list((Path.cwd() / "datasets/formal-test-dataset/").glob("*.tfrecord"))
+        files = list((Path.cwd() / "datasets/formal-test-dataset/").glob("**/*.tfrecord"))
         (_, row_count) = deb_example.create_dataset_pipeline(files)
 
         iterate_count = 0
@@ -214,7 +216,7 @@ class Test_deb_example(unittest.TestCase):
 
     def test_iterate_dataset_identifers_filtering(self):
         """ Tests iterate_dataset(with id filter) -> selected rows in stored order """
-        files = list((Path.cwd() / "datasets/formal-test-dataset/").glob("*.tfrecord"))
+        files = list((Path.cwd() / "datasets/formal-test-dataset/").glob("**/*.tfrecord"))
         identifiers = ["CM Dra", "CW Eri"] # Not in the order they appear in the dataset
         id_vals = []
         for (id_val, _, _, _) in deb_example.iterate_dataset(files, identifiers=identifiers):
@@ -223,8 +225,8 @@ class Test_deb_example(unittest.TestCase):
         self.assertEqual(["CW Eri", "CM Dra"], id_vals)
 
     def test_iterate_dataset_all_filters(self):
-        """ Tests iterate_dataset(with id filter) -> selected rows """
-        files = list((Path.cwd() / "datasets/formal-test-dataset/").glob("*.tfrecord"))
+        """ Tests iterate_dataset(with id, features & labels filter and scaling) -> selected rows """
+        files = list((Path.cwd() / "datasets/formal-test-dataset/").glob("**/*.tfrecord"))
         (id_val, mrow, frow, lrow) = next(deb_example.iterate_dataset(files, 4096, 1.0,
                 ext_features=["phiS"], labels=["inc"], identifiers=["CW Eri"], scale_labels=True))
 
@@ -243,23 +245,35 @@ class Test_deb_example(unittest.TestCase):
     #                       -> (ids, mags, features, labels)
     #
     def test_read_dataset_identifers_filtering(self):
-        """ Tests iterate_dataset(with id filter) -> selected rows in given order """
-        files = list((Path.cwd() / "datasets/formal-test-dataset/").glob("*.tfrecord"))
+        """ Tests read_dataset(with id & label filters) -> selected rows in given order """
+        files = list((Path.cwd() / "datasets/formal-test-dataset/").glob("**/*.tfrecord"))
 
         identifiers = ["CM Dra", "CW Eri"] # Not in the order they appear in the dataset
         labels = ["L3", "inc"]
-        (id_vals, _, _, lrow) = deb_example.read_dataset(files, identifiers=identifiers,
-                                                         labels=labels, scale_labels=False)
+        (id_vals, _, _, lrows) = deb_example.read_dataset(files, identifiers=identifiers,
+                                                          labels=labels, scale_labels=False)
 
         # Only the two rows, yielded in the order requested, not the order they're stored in
         # the same with the labels; in the order they are requested
         self.assertEqual(2, len(id_vals))
         self.assertEqual(identifiers[0], id_vals[0])        # CM Dra
-        self.assertAlmostEqual(0, lrow[0, 0], 3)            # L3
-        self.assertAlmostEqual(89.5514, lrow[0, 1], 3)      # inc
+        self.assertAlmostEqual(0, lrows[0, 0], 3)           # L3
+        self.assertAlmostEqual(89.5514, lrows[0, 1], 3)     # inc
         self.assertEqual(identifiers[1], id_vals[1])        # CW Eri
-        self.assertAlmostEqual(-0.0002, lrow[1, 0], 3)      # L3
-        self.assertAlmostEqual(86.381, lrow[1, 1], 3)       # inc
+        self.assertAlmostEqual(-0.0002, lrows[1, 0], 3)     # L3
+        self.assertAlmostEqual(86.381, lrows[1, 1], 3)      # inc
+
+    @unittest.skip("only run this interactively as it may take a long time")
+    def test_read_dataset_scalability_test(self):
+        """ Tests read_dataset(with large dataset) -> data is returned in seconds not minutes/hours """
+
+        # There are approx 116,000 rows in this dataset - should be done in ~20 s
+        # As read_dataset() wraps iterate_dataset() this tests both functions' scalability
+        files = list((Path.cwd() / "datasets/synthetic-mist-tess-dataset/").glob("**/*.tfrecord"))
+        (id_vals, _, _, lrows) = deb_example.read_dataset(files, 4096, 0.75, scale_labels=False)
+        self.assertTrue(len(id_vals) > 100000)
+        self.assertTrue(len(lrows) > 100000)
+        self.assertEqual(len(lrows), len(id_vals))
 
 if __name__ == "__main__":
     unittest.main()
