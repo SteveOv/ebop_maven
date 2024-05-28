@@ -112,21 +112,20 @@ class Estimator(ABC):
                 unscale: bool=True,
                 seed: int=42) -> List[Dict[str, float]]:
         """
-        High level call to make predictions on one or more instances' features.
+        High level call to make predictions on one or more instances' features and then
+        calculate the mean and standard deviation error bars over the iterations axis.
         The instances' features are expected in the form of a List of dicts:
 
         [
           { "mags": List[float] * mags_bins, "ext_feature_0": float, "ext_feature_1": float },
         ]
-        
-        with the results being in the form of a List of dicts:
+
+        This chains the predict_raw() and means_and_stddevs_from_predictions() functions
+        then returns the results in the form of a List of dicts:
         
         [
           { "rA_plus_rB": float, "k": float,..., "rA_plus_rB_sigma": float, "k_sigma": float,... },
         ]
-
-        The equivalent predict_raw() call performs the same predictions without
-        the convenience of the dictionaries, instead taking and returning ndarrays.
 
         :instances: list of dicts, one for each instance to predict
         :iterations: the number of MC Dropout iterations (overriding the instance default)
@@ -136,7 +135,6 @@ class Estimator(ABC):
         :returns: a list dictionaries, each row the predicted labels for the matching input instance
         """
         iterations = self._iterations if iterations is None else iterations
-        is_mc = iterations > 1
 
         # It's possible we can be given the instances as a List[Dict] but handle being given an
         # ndarray[Dict] or a single instance as a Dict: we'll process these all as ndarrays.
@@ -163,17 +161,11 @@ class Estimator(ABC):
         # This returns the stacked predictions in shape (#insts, #labels, #iterations)
         stkd_prds = self.predict_raw(mags_features, extra_values, iterations, unscale, seed)
 
-        # Summarize the label predictions & append 1-sigma values to each inst
-        # We go from shape (#insts, #labels, #iters) to shape (#insts, #labels*2)
-        if is_mc:
-            # preds are statistical mean and stddev over the iterations axis
-            psets = np.concatenate([np.mean(stkd_prds, axis=2), np.std(stkd_prds, axis=2)], axis=1)
-        else:
-            # preds are the given values, with 1-sigmas of zero. We know the iters axis is size 1.
-            nominals = stkd_prds[..., 0]
-            psets = np.concatenate([nominals, np.zeros_like(nominals)], axis=1)
+        # Summarize the label predictions & append 1-sigma error bar values to each inst
+        # We go from shape (#insts, #labels, #iters) to shape (#insts, #means & #stddevs)
+        psets = self.means_and_stddevs_from_predictions(stkd_prds, label_axis=1)
 
-        # Load the predictions back into a list of dicts
+        # Load the predictions back into a list of dicts for returning
         return [dict(zip(self.prediction_names, pset)) for pset in psets]
 
 
@@ -245,3 +237,58 @@ class Estimator(ABC):
 
         # Return the predictions in the shape (#insts, #labels, #iterations)
         return stkd_prds.transpose([1, 2, 0])
+
+
+    def means_and_stddevs_from_predictions(self,
+                                           predictions: np.ndarray,
+                                           label_axis: int=None) -> np.ndarray:
+        """
+        Takes the raw predictions in the form returned by predict_raw() and calculates and returns
+        the means and 1 standard deviation error bars over the iterations axis. If there are one
+        or no iters the resulting stddevs/error bars will be zero.
+
+        Handles the following configurations:
+        - (#insts, #labels, #iters) -> (#insts, #means & #stddevs)
+        - (#insts, #labels) -> (#insts, #means & #stddevs(zeros)) 
+        - (#labels, #iters) -> (#means & #stddevs, )
+        - (#labels, ) -> (#means & #stddevs(zeros), )
+
+        :predictions: the raw predictions in one of the supported the shapes
+        :labels_axis: optionally give the labels axis otherwise infer it from the predictions shape
+        :returns: the nominals & erorbars for every instance in a supported output shape
+        """
+        if not isinstance(predictions, np.ndarray):
+            raise TypeError("Expect raw_predictions to be an numpy ndarray")
+
+        dims = len(predictions.shape)
+        if label_axis is None:
+            # We've no been told which axes are the labels
+            # We can it out if the data is in supported shapes and dimensions are unambiguous
+            labels_width = len(self.label_names)
+            if dims == 1 and predictions.shape[0] == labels_width:
+                # (#labels)
+                label_axis = 0
+            elif dims == 2 and \
+                    predictions.shape[0] == labels_width and predictions.shape[1] != labels_width:
+                # (#labels, #iters)
+                label_axis = 0
+            elif dims == 2 and \
+                    predictions.shape[0] != labels_width and predictions.shape[1] == labels_width:
+                # (#insts, #labels)
+                label_axis = 1
+            elif dims == 3:
+                # (#insts, #labels, #iters)
+                label_axis = 1
+            else:
+                raise ValueError(f"Cannot infer labels axis from input shape {predictions.shape}")
+
+        # Always expet the iters axis to follow the labels
+        iters_axis = label_axis + 1
+        if dims == iters_axis:
+            # Sometimes the iterations are infered (effectively only 1 iteration)
+            predictions = np.expand_dims(predictions, iters_axis)
+
+        return np.concatenate([
+                np.mean(predictions, axis=iters_axis),
+                np.std(predictions, axis=iters_axis)],
+            axis=label_axis)

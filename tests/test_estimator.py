@@ -263,5 +263,117 @@ class TestEstimator(unittest.TestCase):
         self.assertTrue(result[0][estimator.label_names.index("inc")] < 5, "expecting scaled inc")
 
 
+
+    #
+    #   TEST means_and_stddevs_from_predictions(self, predictions: NDArray, labels_axis: int)
+    #   NOTE: not testing the predictions made, just that the "plumbing" works
+    #
+    def test_means_and_stddevs_from_predictions_invalid_type(self):
+        """ Tests means_and_stddevs_from_predictions(various invalid arg types) gives TypeError """
+        estimator = Estimator(self._default_model_file)
+        preds = np.ones(shape=(1, 6, 100))
+        self.assertRaises(TypeError, estimator.means_and_stddevs_from_predictions, None, 1)
+        self.assertRaises(TypeError, estimator.means_and_stddevs_from_predictions, 100, 1)
+        self.assertRaises(TypeError, estimator.means_and_stddevs_from_predictions, preds, "H")
+
+    def test_means_and_stddevs_from_predictions_infer_labels_axis(self):
+        """
+        Tests means_and_stddevs_from_predictions(various pred shapes) 
+                                            -> infers label axis and returns expected shape result
+        """
+        estimator = Estimator(self._default_model_file)
+        lab_count = len(estimator.label_names)
+        for (preds, exp_shape) in [
+            # (#labels,) with infered #insts==1 and #iters==1 -> (#means & #errors, )
+            (np.ones(shape=lab_count), (lab_count*2, )),
+
+            # (#labels, #iters) with infered #insts==1 -> (#means & #errors, )
+            (np.ones(shape=(lab_count, 100)), (lab_count*2, )),
+
+            # (#insts, #labels,) with infered #iters==1 -> (#insts, #means & #errors, )
+            (np.ones(shape=(3, lab_count)), (3, lab_count*2)),
+
+            # (#insts, #labels, #iters) -> (#insts, #means & #errors, )
+            (np.ones(shape=(5, lab_count, 100)), (5, lab_count*2)),
+        ]:
+            result = estimator.means_and_stddevs_from_predictions(preds, label_axis=None)
+            print(f"preds.shape=={preds.shape} -> result.shape=={result.shape} (exp=={exp_shape})")
+            self.assertEqual(exp_shape, result.shape)
+
+    def test_means_and_stddevs_from_predictions_explicit_labels_axis(self):
+        """
+        Tests means_and_stddevs_from_predictions(various pred shapes) 
+                                            -> infers label axis and returns expected shape result
+        """
+        estimator = Estimator(self._default_model_file)
+
+        for (preds, label_axis, exp_shape) in [
+            (np.ones(shape=(4, 6)), 0, (8, )),
+            (np.ones(shape=(4, 6)), 1, (4, 12)),
+
+            (np.ones(shape=(2, 4, 6)), 1, (2, 8)),
+        ]:
+            result = estimator.means_and_stddevs_from_predictions(preds, label_axis)
+            print(f"preds.shape=={preds.shape} -> result.shape=={result.shape} (exp=={exp_shape})")
+            self.assertEqual(exp_shape, result.shape)
+
+    def test_means_and_stddevs_from_predictions_assert_calcs_vsimple_preds(self):
+        """
+        Tests means_and_stddevs_from_predictions(implied 1 inst, 1 iter (#labels, ) preds) -> correct results
+        """
+        estimator = Estimator(self._default_model_file)
+
+        # V-Simple (#insts==1, #labels==3, #iters==1) giving shape=(3,1)->
+        #               [val(0), val(1), val(2), 0, 0, 0]
+        full_preds = np.array([[0.3], [1.5], [5.4]])
+        for preds in [
+                full_preds,             # shape == (3, 1)
+                full_preds.squeeze()    # shape == (3, )
+            ]:
+            result = estimator.means_and_stddevs_from_predictions(preds, label_axis=0)
+            self.assertEqual((6,), result.shape)
+            self.assertAlmostEqual(preds[0], result[0], 6)
+            self.assertAlmostEqual(0, result[5], 6)
+
+    def test_means_and_stddevs_from_predictions_assert_calcs_simple_preds(self):
+        """
+        Tests means_and_stddevs_from_predictions(implied 1 inst (#labels, #iters) preds) -> correct results
+        """
+        estimator = Estimator(self._default_model_file)
+
+        # Simple; (#insts==1, #labels==3, #iters==5) giving shape=(3, 5) ->
+        #               [mean(0,:), mean(1,:), mean(2,:), std(0,:), std(1,:), std(2,:)]
+        preds = np.array(
+            [[0.1, 0.2, 0.3, 0.4, 0.5], [1.1, 1.3, 1.5, 1.7, 1.8], [5.0, 5.2, 5.4, 5.6, 5.8]]
+        )
+        result = estimator.means_and_stddevs_from_predictions(preds, label_axis=0)
+        self.assertEqual((6,), result.shape)
+        self.assertAlmostEqual(np.mean(preds[0, :]), result[0], 6)
+        self.assertAlmostEqual(np.std(preds[1, :]), result[4], 6)
+        self.assertAlmostEqual(np.mean(preds[2, :]), result[2], 6)
+
+    def test_means_and_stddevs_from_predictions_assert_calcs_full_preds(self):
+        """
+        Tests means_and_stddevs_from_predictions(full (#insts, #labels, #iters) preds) -> correct results
+        """
+        estimator = Estimator(self._default_model_file)
+
+        # Less simple; (#insts==2, #labels==3, #iters==5) giving shape=(2, 3, 5) ->
+        #           [
+        #               [mean(0,0,:), mean(0,1,:), mean(0,2,:), std(0,0,:), std(0,1,:), std(0,2,:)],
+        #               [mean(1,0,:), mean(1,1,:), mean(1,2,:), std(1,0,:), std(1,1,:), std(1,2,:)],
+        #           ]
+        preds = np.array([
+            [[0.1, 0.2, 0.3, 0.4, 0.5], [1.1, 1.3, 1.5, 1.7, 1.8], [5.0, 5.2, 5.4, 5.6, 5.8]],
+            [[5.1, 6.1, 7.1, 8.1, 9.1], [15.0, 16.0, 17.0, 18.0, 19.0], [2.2, 2.4, 2.6, 2.8, 3.0]],
+        ])
+        result = estimator.means_and_stddevs_from_predictions(preds, label_axis=1)
+        self.assertEqual((2, 6), result.shape)
+        self.assertAlmostEqual(np.mean(preds[0, 0, :]), result[0, 0], 6)
+        self.assertAlmostEqual(np.std(preds[0, 2, :]), result[0, 5], 6)
+        self.assertAlmostEqual(np.mean(preds[1, 2, :]), result[1, 2], 6)
+        self.assertAlmostEqual(np.std(preds[1, 1, :]), result[1, 4], 6)
+
+
 if __name__ == "__main__":
     unittest.main()
