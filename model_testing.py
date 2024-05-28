@@ -49,45 +49,52 @@ def test_model_against_formal_test_dataset(
     # and which labels it (& the underlying model) can predict.
     if not isinstance(estimator, Estimator):
         estimator = Estimator(estimator)
+    prediction_type = "mc" if mc_iterations > 1 else "nonmc"
+
+    print(f"Looking for the test dataset in '{test_dataset_dir}'...", end="")
+    tfrecord_files = sorted(test_dataset_dir.glob("**/*.tfrecord"))
 
     # The estimator may not predict inc but we will need it later when fitting
+    feature_names = [n for n in estimator.input_feature_names if n not in ["mags"]]
     label_names = estimator.label_names
     calculated_inc = "inc" not in label_names
     if calculated_inc:
         label_names += ["inc"]
 
-    # Gets the target ids (names), labels and mags/ext features to predict on
-    ids, labels, features = get_dataset_labels_and_features(
-                test_dataset_dir,
-                label_names=label_names,
-                feature_names=estimator.input_feature_names,
-                mags_bins=estimator.mags_feature_bins,
-                mags_wrap_phase=estimator.mags_feature_wrap_phase,
-                scaled_labels=scaled,
-                include_ids=include_ids)
+    ids, mags_vals, feat_vals, lbl_vals = deb_example.read_dataset(tfrecord_files,
+                                                                estimator.mags_feature_bins,
+                                                                estimator.mags_feature_wrap_phase,
+                                                                feature_names,
+                                                                label_names,
+                                                                include_ids,
+                                                                scaled)
+
     if include_ids is not None:
         assert len(include_ids) == len(ids)
 
-    # Make our prediction which will return [{"name": value, "name_sigma": sigma_value}]*insts
+    # Make our predictions which will be returned in the shape (#insts, #labels, #iterations)
+    # then turn a set of noms and 1-sigmas: shape (#insts, #nominal & #1-sigmas)
     print(f"\nThe Estimator is making predictions on the {len(ids)} formal test instances",
           f"with {mc_iterations} iteration(s) (iterations >1 triggers MC Dropout algorithm).")
-    predictions = estimator.predict(features, mc_iterations, unscale=not scaled)
-    if calculated_inc:
-        for pred in predictions:
-            append_calculated_inc_prediction(pred)
+    pred_vals = estimator.predict_raw(mags_vals, feat_vals, mc_iterations, unscale=not scaled)
+    pred_vals = estimator.means_and_stddevs_from_predictions(pred_vals)
 
-    # Echo some summary statistics - only report on the directly predicted labels
-    prediction_type = "mc" if mc_iterations > 1 else "nonmc"
-    (lbl_vals, pred_vals, _, _) = get_label_and_prediction_raw_values(labels, predictions,
-                                                                      estimator.label_names)
     print("\n-----------------------------------")
+    noms_width = pred_vals.shape[1] // 2
     for metric_identifier in ["MAE", "MSE", "r2_score"]:
         metric = metrics.get(metric_identifier)
-        metric.update_state(lbl_vals, pred_vals)
-        result = metric.result()
-        print(f"Total {metric_identifier:>8} ({prediction_type}): {result:.9f}")
+        metric.update_state(lbl_vals[:, :noms_width], pred_vals[:, :noms_width])
+        print(f"Total {metric_identifier:>8} ({prediction_type}): {metric.result():.9f}")
     print("-----------------------------------\n")
-    return (np.array(labels), np.array(predictions))
+
+    # TODO:  Remove this by altering the dependency fit_against_formal_test_dataset() has on this.
+    # For now, put the labels and predictions into arrays of Dicts as thats what's needed downstream
+    labels = np.array([dict(zip(label_names, lrow)) for lrow in lbl_vals])
+    predictions = np.array([dict(zip(estimator.prediction_names, prow)) for prow in pred_vals])
+    if calculated_inc:
+        for prow in predictions:
+            append_calculated_inc_prediction(prow)
+    return labels, predictions
 
 
 def fit_against_formal_test_dataset(
@@ -395,56 +402,6 @@ def predictions_vs_labels_to_table(
                  " "*11 + f" {np.mean(np.power(ocs, 2)):10.6f}\n")
     if print_it:
         print(to.getvalue())
-
-
-def get_dataset_labels_and_features(
-    dataset_dir: Path,
-    label_names: List[str],
-    feature_names: List[str],
-    mags_bins: int,
-    mags_wrap_phase: float,
-    scaled_labels: bool=True,
-    include_ids: List[str]=None):
-    """
-    Gets the ids, labels and features of the requested dataset.
-
-    :dataset_dir: the directory within which it lives
-    :label_names: the names of the labels to retrieve
-    :feature_names: the names of the features to retrieve (in addition to mags)
-    :mags_bins: the size of the mags features we require
-    :mags_wrap_phase: the phase at which the mags feature is wrapped
-    :scaled_labels: if True labels will be scaled
-    :include_ids: List of ids to restrict results to, or all if None/empty
-    :returns: Tuple[List[ids], List[labels dict], List[features dict]]
-    """
-
-    print(f"Looking for the test dataset in '{dataset_dir}'...", end="")
-    tfrecord_files = sorted(dataset_dir.glob("**/*.tfrecord"))
-    if len(tfrecord_files) > 0:
-        print(f"found {len(tfrecord_files)} dataset file(s).")
-    else:
-        raise IndexError("No dataset files found")
-
-    ids, ds_labels, ds_features = [], [], []
-    for (targ, mrow, frow, lrow) in deb_example.iterate_dataset(tfrecord_files,
-                                                                mags_bins,
-                                                                mags_wrap_phase,
-                                                                feature_names,
-                                                                label_names,
-                                                                include_ids,
-                                                                scale_labels=scaled_labels):
-        ids += [targ]
-        ds_labels += [dict(zip(label_names, lrow))]
-        ds_features += [{ "mags": mrow, **dict(zip(feature_names, frow)) }]
-
-    # Need to sort the data in the order of the requested ids (if given)
-    if include_ids is not None and len(include_ids) > 0:
-        indices = [ids.index(i) for i in include_ids if i in ids]
-        ids = [ids[ix] for ix in indices]
-        ds_labels = [ds_labels[ix] for ix in indices]
-        ds_features = [ds_features[ix] for ix in indices]
-
-    return ids, ds_labels, ds_features
 
 
 def get_label_and_prediction_raw_values(
