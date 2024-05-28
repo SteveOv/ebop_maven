@@ -235,7 +235,7 @@ def iterate_dataset(dataset_files: Iterable[str],
     
     The rows are yielded in the order in which they appear in the supplied dataset files.
     
-    The ext_features and labels are listed in the order they have been specified or in the
+    The extra_features and labels are listed in the order they have been specified or in the
     order of extra_features_and_defaults and labels_and_scales if not specified.
 
     This function is not for use when training a model; for that, requirement use
@@ -245,8 +245,8 @@ def iterate_dataset(dataset_files: Iterable[str],
     :dataset_files: the set of dataset files to parse
     :mags_bins: the width of the mags to publish
     :mags_wrap_phase: the wrap phase of the mags to publish
-    :ext_features: a chosen subset of the available ext_features, in requested order, or all if None
-    :labels: a chosen subset of the available labels, in requested order, or all if None
+    :ext_features: a chosen subset of the available features, in this order, or all if None
+    :labels: a chosen subset of the available labels, in this order, or all if None
     :identifiers: optional list of ids to yield, or all ids if None
     :scale_values: if True values will be scaled
     :returns: for each matching row yields a tuple of (id, mags vals, ext feature vals, label vals)
@@ -254,7 +254,8 @@ def iterate_dataset(dataset_files: Iterable[str],
     # pylint: disable=too-many-arguments, too-many-locals
     mags_key = create_mags_key(mags_bins, mags_wrap_phase)
     if ext_features is not None:
-        chosen_ext_feats = {f: extra_features_and_defaults[f] for f in ext_features if f != "mags"}
+        chosen_ext_feats = {
+            f: extra_features_and_defaults[f] for f in ext_features if f != "mags" }
     else:
         chosen_ext_feats = extra_features_and_defaults
     if labels is not None:
@@ -278,6 +279,50 @@ def iterate_dataset(dataset_files: Iterable[str],
         id_val = id_val.decode(encoding="utf8")
         if identifiers is None or id_val in identifiers:
             yield id_val, mags_val, feat_vals, lab_vals
+
+
+def read_dataset(dataset_files: Iterable[str],
+                 mags_bins: int = default_mags_bins,
+                 mags_wrap_phase: float = default_mags_wrap_phase,
+                 ext_features: List[str] = None,
+                 labels: List[str]=None,
+                 identifiers: List[str]=None,
+                 scale_labels: bool=False):
+    """
+    Wrapper around iterate_dataset() which handles the iteration and returns separate
+    np ndarrays for the dataset ids, mags values, feature values and label values.
+
+    This may not be hugely performant, especially with large datasets, but it's for convenience.
+
+    :dataset_files: the set of dataset files to parse
+    :mags_bins: the width of the mags to publish
+    :mags_wrap_phase: the wrap phase of the mags to publish
+    :ext_features: a chosen subset of the available features, in this order, or all if None
+    :labels: a chosen subset of the available labels, in this order, or all if None
+    :identifiers: optional list of ids to yield, or all ids if None
+    :scale_values: if True values will be scaled
+    :returns: Tuple[
+    NDArray[#insts, 1], NDArray[#insts, #bins], NDArray[#insts, #feats], NDArray[#insts, #labels]]
+    """
+    # pylint: disable=too-many-arguments, too-many-locals
+    ids, mags_vals, feature_vals, label_vals = [], [], [], []
+    for row in iterate_dataset(dataset_files, mags_bins, mags_wrap_phase,
+                               ext_features, labels, identifiers, scale_labels):
+        ids += [row[0]]
+        mags_vals += [row[1]]
+        feature_vals += [row[2]]
+        label_vals += [row[3]]
+
+    # Need to sort the data in the order of the requested ids (if given).
+    # Not hugely performant, but we only ever expect short lists of indices.
+    if identifiers is not None and len(identifiers) > 0:
+        indices = [ids.index(i) for i in identifiers if i in ids]
+        ids = [ids[ix] for ix in indices]
+        mags_vals = [mags_vals[ix] for ix in indices]
+        feature_vals = [feature_vals[ix] for ix in indices]
+        label_vals = [label_vals[ix] for ix in indices]
+
+    return np.array(ids), np.array(mags_vals), np.array(feature_vals), np.array(label_vals)
 
 
 #
