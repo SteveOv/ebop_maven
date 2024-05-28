@@ -18,11 +18,11 @@ import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from scipy.interpolate import interp1d
 import astropy.units as u
-from lightkurve import LightCurve
+from lightkurve import LightCurve, LightCurveCollection
 import tensorflow as tf
 
-from . import deb_example
-from .libs import param_sets, jktebop, orbital, lightcurve
+from . import deb_example, pipeline
+from .libs import param_sets, jktebop, orbital
 
 def make_dataset_files(trainset_files: Iterator[Path],
                        output_dir: Path,
@@ -172,8 +172,8 @@ def make_dataset_file(trainset_file: Path,
 
             # These are the extra features used for predictions alongside the LC.
             extra_features = {
-                "phiS": lightcurve.expected_secondary_phase(params["ecosw"], params["ecc"]),
-                "dS_over_dP": lightcurve.expected_ratio_of_eclipse_duration(params["esinw"]),
+                "phiS": orbital.secondary_eclipse_phase(params["ecosw"], params["ecc"]),
+                "dS_over_dP": orbital.ratio_of_eclipse_duration(params["esinw"]),
             }
 
             rows.append(deb_example.serialize(params["id"], params, mags_features, extra_features))
@@ -305,7 +305,7 @@ Selected targets are:               {', '.join(target_names) if target_names els
 
             # These are mandatory, so error if missing
             labels = target_cfg["labels"]
-            pe = lightcurve.to_lc_time(target_cfg["primary_epoch"], lc)
+            pe = pipeline.to_lc_time(target_cfg["primary_epoch"], lc)
             period = target_cfg["period"] * u.d
 
             # Produce multiple mags set (varying #bins & wrap phase) available for serialization
@@ -317,7 +317,7 @@ Selected targets are:               {', '.join(target_names) if target_names els
                 # Phase folding the light-curve, then interpolate for the mags features
                 wrap_phase = u.Quantity(wrap_phase)
                 fold_lc = lc.fold(period, pe, wrap_phase=wrap_phase, normalize_phase=True)
-                _, mags = lightcurve.get_reduced_folded_lc(fold_lc, mags_bins, wrap_phase)
+                _, mags = pipeline.get_sampled_phase_mags_data(fold_lc, mags_bins, wrap_phase)
                 mags_features[mag_name] = mags
 
             # ecc is not used as a label but is needed to calculate phiS and impact params
@@ -341,8 +341,8 @@ Selected targets are:               {', '.join(target_names) if target_names els
 
             # Now assemble the extra features needed: phiS (phase secondary) and dS_over_dP
             extra_features = {
-                "phiS": lightcurve.expected_secondary_phase(ecosw, ecc),
-                "dS_over_dP": lightcurve.expected_ratio_of_eclipse_duration(esinw)
+                "phiS": orbital.secondary_eclipse_phase(ecosw, ecc),
+                "dS_over_dP": orbital.ratio_of_eclipse_duration(esinw)
             }
 
             # Serialize the labels, folded mags (lc) & extra_features as a deb_example and write
@@ -448,40 +448,40 @@ def prepare_lc_for_target_sector(target: str,
     append the rectified delta_mag and delta_mag_err columns. It will read the
     information required for these steps from the passed sector config.
     """
-    lc = lightcurve.find_lightcurves(target,
-                                     fits_dir,
-                                     [sector],
-                                     config.get("mission", "TESS"),
-                                     config.get("author", "SPOC"),
-                                     config.get("exptime", "short"),
-                                     config.get("flux_column", "sap_flux"),
-                                     config.get("quality_bitmask", "default"),
-                                     verbose=verbose)[0]
+    lc = pipeline.find_lightcurves(target,
+                                   fits_dir,
+                                   [sector],
+                                   config.get("mission", "TESS"),
+                                   config.get("author", "SPOC"),
+                                   config.get("exptime", "short"),
+                                   config.get("flux_column", "sap_flux"),
+                                   config.get("quality_bitmask", "default"),
+                                   verbose=verbose)[0]
 
     # Here we mask out any "bad" data which may adversely affect detrending and subsequent processes
-    lc = lightcurve.apply_quality_masks(lc, verbose)
+    lc = pipeline.apply_invalid_flux_masks(lc, verbose)
     mask_time_ranges = config.get("quality_masks", None) or []
     if mask_time_ranges:
         if verbose:
             print(f"Applying {len(mask_time_ranges)} quality time range mask(s)...", end="")
-        lc = lightcurve.apply_time_range_masks(lc, mask_time_ranges, verbose)
+        lc = pipeline.apply_time_range_masks(lc, mask_time_ranges, verbose)
 
     time_bin_seconds = (config.get("bin_time", None) or 0) * u.s
     if time_bin_seconds > 0 * u.s:
-        lc = lightcurve.bin_lightcurve(lc, time_bin_seconds, verbose)
+        lc = pipeline.bin_lightcurve(lc, time_bin_seconds, verbose)
 
     # Optionally apply some smoothing/flatten. We need to mask out the eclipses.
     flatten_kwargs = config.get("flatten", None)
     if flatten_kwargs:
         if "mask_time_ranges" in flatten_kwargs:
             flatten_kwargs["period"] = config["period"] * u.d
-        lc = lightcurve.flatten_lightcurve(lc, verbose=verbose, **flatten_kwargs)
+        lc = pipeline.flatten_lightcurve(lc, verbose=verbose, **flatten_kwargs)
 
-    lightcurve.append_magnitude_columns(lc, "delta_mag", "delta_mag_err")
+    pipeline.append_magnitude_columns(lc, "delta_mag", "delta_mag_err")
 
     # Detrending and rectifying to differential mags
     gap_th = config.get("detrend_gap_threshold", None)
-    detrend_ranges = [*lightcurve.find_lightcurve_segments(lc, gap_th or 10000, return_times=True)]
+    detrend_ranges = [*pipeline.find_lightcurve_segments(lc, gap_th or 10000, return_times=True)]
     if verbose:
         print("Will detrend (and rectify by subracting trends) over the following range" +
               (f"(s) (detected on gaps > {gap_th} d)" if gap_th else "") +
@@ -489,12 +489,12 @@ def prepare_lc_for_target_sector(target: str,
               ", ".join(f"{r[0].value:.6f}-{r[1].value:.6f}" for r in detrend_ranges))
     for detrend_range in detrend_ranges:
         mask = (lc.time >= np.min(detrend_range)) & (lc.time <= np.max(detrend_range))
-        lc["delta_mag"][mask] -= lightcurve.fit_polynomial(lc.time[mask],
-                                                          lc["delta_mag"][mask],
-                                                          config.get("detrend_order", 2),
-                                                          config.get("detrend_iterations", 2),
-                                                          config.get("detrend_sigma_clip", 1.0),
-                                                          verbose=verbose)
+        lc["delta_mag"][mask] -= pipeline.fit_polynomial(lc.time[mask],
+                                                         lc["delta_mag"][mask],
+                                                         config.get("detrend_order", 2),
+                                                         config.get("detrend_iterations", 2),
+                                                         config.get("detrend_sigma_clip", 1.0),
+                                                         verbose=verbose)
 
     # Rather than being "bad" these are just data we no longer need, however we trim these
     # after detrending so the polynomial has plenty of "good" data to fit to.
@@ -502,7 +502,7 @@ def prepare_lc_for_target_sector(target: str,
     if mask_time_ranges:
         if verbose:
             print(f"Applying {len(mask_time_ranges)} trim time range mask(s)...", end="")
-        lc = lightcurve.apply_time_range_masks(lc, mask_time_ranges, verbose)
+        lc = pipeline.apply_time_range_masks(lc, mask_time_ranges, verbose)
 
     return lc
 
@@ -529,16 +529,16 @@ def prepare_lightcurve_for_target(target: str,
     # This will download and pre-cache the timeseries fits files. We don't open
     # them here as we may have to apply different settings per sector.
     fits_dir = Path.cwd() / "cache" / re.sub(r'[^\w\d-]', '_', target.lower())
-    lightcurve.find_lightcurves(target, fits_dir, sectors,
-                                mission = target_cfg.get("mission", "TESS"),
-                                author=target_cfg.get("author", "SPOC"),
-                                exptime=target_cfg.get("exptime", None),
-                                verbose=False)
+    pipeline.find_lightcurves(target, fits_dir, sectors,
+                              mission = target_cfg.get("mission", "TESS"),
+                              author=target_cfg.get("author", "SPOC"),
+                              exptime=target_cfg.get("exptime", None),
+                              verbose=False)
     lcs = []
     for sector in sectors:
         # The basic LC data read, rectified & extended with delta_mag and delta_mag_err cols
         sector_cfg = sector_config_from_target(sector, target_cfg)
         lcs +=[prepare_lc_for_target_sector(target, sector, sector_cfg, fits_dir, verbose)]
     if len(lcs) > 1:
-        return (lightcurve.LightCurveCollection(lcs).stitch(), len(sectors))
+        return (LightCurveCollection(lcs).stitch(), len(sectors))
     return (lcs[0], 1)

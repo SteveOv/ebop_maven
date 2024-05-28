@@ -21,9 +21,9 @@ import numpy as np
 from keras import Model, metrics
 
 from ebop_maven.libs.tee import Tee
-from ebop_maven.libs import lightcurve, jktebop, stellar, limb_darkening
+from ebop_maven.libs import jktebop, stellar, limb_darkening
 from ebop_maven.estimator import Estimator
-from ebop_maven import datasets, deb_example
+from ebop_maven import datasets, deb_example, pipeline
 import plots
 
 def test_model_against_formal_test_dataset(
@@ -132,7 +132,7 @@ def fit_against_formal_test_dataset(
 
         # The basic lightcurve data read, rectified & extended with delta_mag and delta_mag_err cols
         (lc, sector_count) = datasets.prepare_lightcurve_for_target(target, target_cfg, True)
-        pe = lightcurve.to_lc_time(target_cfg["primary_epoch"], lc).value
+        pe = pipeline.to_lc_time(target_cfg["primary_epoch"], lc).value
         period = target_cfg["period"]
 
         fit_stem = f"model-testing-{re.sub(r'[^\w\d-]', '-', target.lower())}"
@@ -157,7 +157,7 @@ def fit_against_formal_test_dataset(
         }
 
         # Add scale-factor poly fitting, chi^2 adjustment (to 1.0) or light-ratio instructions
-        segments = lightcurve.find_lightcurve_segments(lc, 0.5, return_times=True)
+        segments = pipeline.find_lightcurve_segments(lc, 0.5, return_times=True)
         append_lines = jktebop.build_poly_instructions(segments, "sf", 1)
         append_lines += ["", "chif", ""] + [ f"lrat {l}" for l in lrats ]
 

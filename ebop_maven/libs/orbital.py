@@ -1,6 +1,8 @@
 """ Utility functions for Orbital relations. """
 from typing import Union, Tuple
 from enum import Flag
+import math
+
 import numpy as np
 import astropy.units as u
 import astropy.constants as const
@@ -127,3 +129,32 @@ def orbital_inclination(r1: float,
         raise ValueError(f"{EclipseType.BOTH} is not supported")
     eccentricity_factor = np.divide(dividend, np.subtract(1, np.power(e, 2)))
     return np.rad2deg(np.arccos(np.multiply(np.multiply(b, r1), eccentricity_factor))) * u.deg
+
+
+def ratio_of_eclipse_duration(esinw: float) -> float:
+    """
+    Calculates the expected ratio of eclipse durations dS/dP from e*sin(omega)
+
+    Uses eqn 5.69 from Hilditch (2001) An Introduction to Close Binary Stars
+    reworked in terms of dS/dP
+    """
+    return (esinw + 1)/(1 - esinw)
+
+
+def secondary_eclipse_phase(ecosw: float, ecc: float=None, esinw: float=None) -> float:
+    """
+    Calculates the expected secondary (normalized) phase from e*cos(omega) and
+    either e directly or e*sin(omega) which is used to derive e.
+
+    Uses eqn 5.67 and 5.68 from Hilditch, setting P=1 (normalized) & t_pri=0
+    to give phi_sec = t_sec = (X-sinX)/2pi where X=pi+2*atan(ecosw/sqrt(1-e^2))
+    """
+    if esinw is None and ecc is None:
+        raise ValueError("One of esinw or ecc is required")
+
+    if ecc is None:
+        # Using: cos^2(w) + sin^2(w) = 1, therefore (ecosw)^2 + (esinw)^2 = e^2
+        ecc = math.sqrt(ecosw**2 + esinw**2)
+
+    x = math.pi + (2*math.atan(ecosw/np.sqrt(1-np.power(ecc, 2))))
+    return (x - math.sin(x)) / (2 * math.pi)

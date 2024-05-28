@@ -1,10 +1,10 @@
-""" Utility functions for Light-curves. """
+""" Utility functions a light-curve ingest, pre-processing, estimation and fitting pipeline. """
+#pylint: disable=no-member
 from typing import Union, List, Iterable, Tuple, Generator
 from pathlib import Path
-import math
 
 import numpy as np
-from scipy import signal, interpolate
+from scipy import interpolate
 import astropy.units as u
 from astropy.io import fits
 from astropy.time import Time, TimeDelta
@@ -12,8 +12,6 @@ from astropy.time import Time, TimeDelta
 import lightkurve as lk
 from lightkurve import LightCurve, FoldedLightCurve, LightCurveCollection
 
-# This pylint disable overlooks the issue it has with astropy const aliases
-# pylint: disable=no-member
 
 def find_lightcurves(target: any,
                      download_dir: Path,
@@ -26,31 +24,28 @@ def find_lightcurves(target: any,
                      force_mast: bool=False,
                      verbose: bool=True) -> LightCurveCollection:
     """
-    This performs both a search and download on Lightkurve assets. However,
-    if override is False it will firstly try to service the request from assets
-    already found in the download_dir to avoid making potentially costly remote
-    calls to MAST. The arguments are the most used arguments associated with
-    the Lightkurve search_lightcurve() and results.download_all() functions.
+    This performs both a search and download on Lightkurve assets to the requested download_dir.
+    Unless force_mast is True, it will try to service the request from the existing contents the
+    of download_dir, where possible avoiding potentially time consuming MAST queries.
 
-    Values are required for sectors, mission and auther in order to try
-    servicing the request from the download_dir. The assumption is made that
-    the download dir is exclusive to this target as we cannot tie all potential
-    values of the target search criterion directly to the contents of fits.
+    The arguments are the most used arguments associated with the Lightkurve search_lightcurve()
+    and results.download_all() functions. Values are required for sectors, mission and author in
+    order to be able to service the request from the download_dir. The assumption is made that the
+    download dir is exclusive to this target as we cannot tie all potential values of the target
+    search criterion directly to the contents of fits.
     
     :target: the target search term
     :download_dir: the local directory under which the assets are/will be stored
     :sectors: the sector or sectors search term
     :mission: the mission search term
     :author: the author search term
-    :exptime: the exptime (exposure time) search term. Either None, text
-    ("long", "short" or "fast") or a numeric value in secords
+    :exptime: the exposure time criterion; None, text ("long", "short" or "fast") or numeric seconds
     :flux_column: the flux column to select when loading the assets
-    :quality_bitmask: the mask to apply to the Quality col when loading the assets.
-    either text ("default", "hard" or "hardest") or a numeric bit mask
+    :quality_bitmask: applied to the Quality col; text ("default", "hard" or "hardest") or bit mask
     :force_mast: if True will always bypass local files and search/download from MAST
     :verbose: if True will output some diagnostics text to the console
     """
-    # pylint: disable=too-many-locals, unnecessary-lambda-assignment
+    # pylint: disable=too-many-locals, too-many-arguments, too-many-branches, unnecessary-lambda-assignment
     lcs = None
     if mission.lower() not in ["tess", "hlsp"]:
         raise ValueError("only missions TESS and HLSP are currently supported")
@@ -131,40 +126,10 @@ def find_lightcurves(target: any,
     return lcs
 
 
-def expected_ratio_of_eclipse_duration(esinw: float) -> float:
+def apply_invalid_flux_masks(lc: LightCurve,
+                             verbose: bool = False) -> LightCurve:
     """
-    Calculates the expected ratio of eclipse durations dS/dP from e*sin(omega)
-
-    Uses eqn 5.69 from Hilditch (2001) An Introduction to Close Binary Stars
-    reworked in terms of dS/dP
-    """
-    return (esinw + 1)/(1 - esinw)
-
-
-def expected_secondary_phase(ecosw: float, ecc: float=None, esinw: float=None) -> float:
-    """
-    Calculates the expected secondary (normalized) phase from e*cos(omega) and
-    either e directly or e*sin(omega) which is used to derive e.
-
-    Uses eqn 5.67 and 5.68 from Hilditch, setting P=1 (normalized) & t_pri=0
-    to give phi_sec = t_sec = (X-sinX)/2pi where X=pi+2*atan(ecosw/sqrt(1-e^2))
-    """
-    if esinw is None and ecc is None:
-        raise ValueError("One of esinw or ecc is required")
-
-    if ecc is None:
-        # Using: cos^2(w) + sin^2(w) = 1, therefore (ecosw)^2 + (esinw)^2 = e^2
-        ecc = math.sqrt(ecosw**2 + esinw**2)
-
-    x = math.pi + (2*math.atan(ecosw/np.sqrt(1-np.power(ecc, 2))))
-    return (x - math.sin(x)) / (2 * math.pi)
-
-
-def apply_quality_masks(lc: LightCurve,
-                        verbose: bool = False) -> LightCurve:
-    """
-    Will return a copy of the passed LightCurve having first masked
-    any fluxes whose value is NaN or less than Zero.
+    Will return the passed LightCurve with any fluxes with value of NaN or less than Zero masked.
 
     :lc: the LightCurve to mask
     :verbose: whether or not to generate progress messages
@@ -184,8 +149,7 @@ def apply_time_range_masks(lc: LightCurve,
                            time_ranges: List[Tuple[Time, Time]] = None,
                            verbose: bool = False) -> LightCurve:
     """
-    Will return a copy of the passed LightCurve haveing first masked out
-    any indicated time ranges.
+    Will return a copy of the passed LightCurve haveing first masked out any indicated time ranges.
 
     :lc: the LightCurve to mask
     :mask_time_ranges: one or more (from, to) Time ranges to mask out
@@ -205,6 +169,7 @@ def apply_time_range_masks(lc: LightCurve,
         print(f"Time range mask(s) matched {sum(mask)} row(s).")
 
     return lc[~mask]
+
 
 def mask_from_time_range(lc: LightCurve,
                          time_range: Union[Tuple[Time, Time], Time]) \
@@ -281,6 +246,95 @@ def bin_lightcurve(lc: LightCurve,
     return lc
 
 
+def append_magnitude_columns(lc: LightCurve,
+                             name: str = "delta_mag",
+                             err_name: str = "delta_mag_err"):
+    """
+    This will append a relative magnitude and corresponding error column to the passed LightCurve
+    based on the values in the flux column.
+
+    :lc: the LightCurve to update
+    :name: the name of the new magnitude column
+    :err_name: the name of the corresponding magnitude error column
+    """
+    lc[name] = u.Quantity(-2.5 * np.log10(lc.flux.value) * u.mag)
+    lc[err_name] = u.Quantity(
+        2.5
+        * 0.5
+        * np.abs(
+            np.subtract(
+                np.log10(np.add(lc.flux.value, lc.flux_err.value)),
+                np.log10(np.subtract(lc.flux.value, lc.flux_err.value))
+            )
+        )
+        * u.mag)
+
+
+def fit_polynomial(times: Time,
+                   ydata: u.Quantity,
+                   degree: int = 2,
+                   iterations: int = 2,
+                   res_sigma_clip: float = 1.,
+                   reset_const_coeff: bool = False,
+                   include_coeffs: bool = False,
+                   verbose: bool = False) \
+                    -> Union[u.Quantity, Tuple[u.Quantity, List]]:
+    """
+    Will calculate a polynomial fit over the requested time range and y-data
+    values. The fit is iterative; after each iteration the residuals are
+    evaluated against a threshold defined by the StdDev of the residuals
+    multiplied by res_sigma_clip; any datapoints with residuals greater than
+    this are excluded from subsequent iterations.  This approach will exclude
+    large y-data excursions, such as eclipses, from influencing the final fit.
+
+    :times: the times (x data)
+    :ydata: data to fit to
+    :degree: degree of polynomial to fit.  Defaults to 2.
+    :iterations: number of fit iterations to run.
+    :res_sigma_clip: the factor applied to the residual StdDev to calculate
+    the clipping threshold for each new iteration.
+    :reset_const_coeff: set True to reset the const coeff to 0 before final fit
+    :include_coeffs: set True to return the coefficients with the fitted ydata
+    :returns: fitted y data and optionally the coefficients used to generate it.
+    """
+    # pylint: disable=too-many-arguments, too-many-locals
+    pivot_ix = int(np.floor(len(times) / 2))
+    pivot_jd = times[pivot_ix].jd
+    time_values = times.jd - pivot_jd
+
+    fit_mask = [True] * len(ydata)
+    for remaining_iterations in np.arange(iterations, 0, -1):
+        # Fit a polynomial to the masked data so that we find its coefficients.
+        # For the first iteration this will be all the data.
+        coeffs = np.polynomial.polynomial.polyfit(time_values[fit_mask],
+                                                  ydata.value[fit_mask],
+                                                  deg=degree,
+                                                  full=False)
+
+        if remaining_iterations > 1:
+            # Find and mask out those datapoints where the residual to the
+            # above poly lies outside the requested sigma clip. This stops
+            # large excursions, such as eclipses, from influencing the poly fit.
+            poly_func = np.polynomial.Polynomial(coeffs)
+            fit_ydata = poly_func(time_values)
+            resids = ydata.value - fit_ydata
+            fit_mask &= (np.abs(resids) <= (np.std(resids)*res_sigma_clip))
+        else:
+            # Last iteration we generate the poly's y-axis datapoints for return
+            if reset_const_coeff:
+                if verbose:
+                    print("\tResetting const/0th coefficient to zero on request.")
+                coeffs[0] = 0
+            poly_func = np.polynomial.Polynomial(coeffs)
+            fit_ydata = poly_func(time_values) * ydata.unit
+            if verbose:
+                c_list = ", ".join(f'c{ix}={c:.6e}' for ix, c in enumerate(poly_func.coef))
+                print(f"\tGenerated polynomial; y = poly(x, {c_list})",
+                      f"(sigma(fit_ydata)={np.std(fit_ydata):.6e})")
+
+    return (fit_ydata, coeffs) if include_coeffs else fit_ydata
+
+
 @u.quantity_input(period=u.d)
 def flatten_lightcurve(lc: LightCurve,
                        mask_time_ranges: List[Union[Tuple[Time, Time], Tuple[float, float]]]=None,
@@ -320,116 +374,24 @@ def flatten_lightcurve(lc: LightCurve,
     return lc.flatten(**kwargs)
 
 
-def append_magnitude_columns(lc: LightCurve,
-                             name: str = "delta_mag",
-                             err_name: str = "delta_mag_err"):
+def get_sampled_phase_mags_data(flc: FoldedLightCurve,
+                                num_bins: int = 1024,
+                                phase_pivot: Union[u.Quantity, float]=0.75,
+                                flc_rollover: int = 200,
+                                interp_kind: str="linear") \
+                                    -> Tuple[u.Quantity, u.Quantity]:
     """
-    This will append a relative magnitude and corresponding error column
-    to the passed LightCurve based on the values in the flux column,
-
-    :lc: the LightCurve to update
-    :name: the name of the new magnitude column
-    :err_name: the name of the corresponding magnitude error column
-    """
-    lc[name] = u.Quantity(-2.5 * np.log10(lc.flux.value) * u.mag)
-    lc[err_name] = u.Quantity(
-        2.5
-        * 0.5
-        * np.abs(
-            np.subtract(
-                np.log10(np.add(lc.flux.value, lc.flux_err.value)),
-                np.log10(np.subtract(lc.flux.value, lc.flux_err.value))
-            )
-        )
-        * u.mag)
-
-
-# pylint: disable=too-many-arguments, too-many-locals
-def fit_polynomial(times: Time,
-                   ydata: u.Quantity,
-                   degree: int = 2,
-                   iterations: int = 2,
-                   res_sigma_clip: float = 1.,
-                   reset_const_coeff: bool = False,
-                   include_coeffs: bool = False,
-                   verbose: bool = False) \
-                    -> Union[u.Quantity, Tuple[u.Quantity, List]]:
-    """
-    Will calculate a polynomial fit over the requested time range and y-data
-    values. The fit is iterative; after each iteration the residuals are
-    evaluated against a threshold defined by the StdDev of the residuals
-    multiplied by res_sigma_clip; any datapoints with residuals greater than
-    this are excluded from subsequent iterations.  This approach will exclude
-    large y-data excursions, such as eclipses, from influencing the final fit.
-
-    :times: the times (x data)
-    :ydata: data to fit to
-    :degree: degree of polynomial to fit.  Defaults to 2.
-    :iterations: number of fit iterations to run.
-    :res_sigma_clip: the factor applied to the residual StdDev to calculate
-    the clipping threshold for each new iteration.
-    :reset_const_coeff: set True to reset the const coeff to 0 before final fit
-    :include_coeffs: set True to return the coefficients with the fitted ydata
-    :returns: fitted y data and optionally the coefficients used to generate it.
-    """
-    pivot_ix = int(np.floor(len(times) / 2))
-    pivot_jd = times[pivot_ix].jd
-    time_values = times.jd - pivot_jd
-
-    fit_mask = [True] * len(ydata)
-    for remaining_iterations in np.arange(iterations, 0, -1):
-        # Fit a polynomial to the masked data so that we find its coefficients.
-        # For the first iteration this will be all the data.
-        coeffs = np.polynomial.polynomial.polyfit(time_values[fit_mask],
-                                                  ydata.value[fit_mask],
-                                                  deg=degree,
-                                                  full=False)
-
-        if remaining_iterations > 1:
-            # Find and mask out those datapoints where the residual to the
-            # above poly lies outside the requested sigma clip. This stops
-            # large excursions, such as eclipses, from influencing the poly fit.
-            poly_func = np.polynomial.Polynomial(coeffs)
-            fit_ydata = poly_func(time_values)
-            resids = ydata.value - fit_ydata
-            fit_mask &= (np.abs(resids) <= (np.std(resids)*res_sigma_clip))
-        else:
-            # Last iteration we generate the poly's y-axis datapoints for return
-            if reset_const_coeff:
-                if verbose:
-                    print("\tResetting const/0th coefficient to zero on request.")
-                coeffs[0] = 0
-            poly_func = np.polynomial.Polynomial(coeffs)
-            fit_ydata = poly_func(time_values) * ydata.unit
-            if verbose:
-                c_list = ", ".join(f'c{ix}={c:.6e}' for ix, c in enumerate(poly_func.coef))
-                print(f"\tGenerated polynomial; y = poly(x, {c_list})",
-                      f"(sigma(fit_ydata)={np.std(fit_ydata):.6e})")
-
-    return (fit_ydata, coeffs) if include_coeffs else fit_ydata
-
-
-def get_reduced_folded_lc(flc: FoldedLightCurve,
-                          num_bins: int = 1024,
-                          phase_pivot: Union[u.Quantity, float]=0.75,
-                          flc_rollover: int = 200,
-                          smooth_fit: bool = False,
-                          interp_kind: str="linear",) \
-                                -> Tuple[u.Quantity, u.Quantity]:
-    """
-    A data reduction function which gets a reduced set of phase folded 
-    delta magnitude data in equal size bins of the requested number. 
+    A data reduction function which gets a reduced set of phase and delta magnitude data in
+    the requested number of equal size bins. 
     
-    The data is sourced by sampling the passed FoldedLightCurve.  In case this 
-    does not extend over a complete phase, rows are copied over from opposite
-    ends of the phase space data to extend the coverage.  The number of rows 
-    copied is controlled by the flc_rollover argument.
+    The data is sourced by sampling the passed FoldedLightCurve.  In case this does not extend over
+    a complete phase, rows are copied over from opposite ends of the phase space data to extend the
+    coverage.  The number of rows copied is controlled by the flc_rollover argument.
 
     :flc: the source FoldedLightCurve
     :num_bins: the number of equally spaced rows to return
     :phase_pivot: the pivot point about which the fold phase was wrapped to < 0.
     :flc_rollover: the number of row to extend the ends of the source phases by
-    :smooth_fit: whether to apply SavGol smoothing while reducing the fold
     :interp_kind: the 1d interpolation algorithm to use when reducing the fold
     :returns: a tuple with requested number or phases and delta magnitudes
     """
@@ -459,13 +421,6 @@ def get_reduced_folded_lc(flc: FoldedLightCurve,
     interp = interpolate.interp1d(source_phases, source_delta_mags, kind=interp_kind)
     reduced_phases = np.linspace(min_phase, min_phase + 1., num_bins + 1)[:-1]
     reduced_mags = interp(reduced_phases)
-
-    # TODO: may remove this as it doesn't particularly help predictions
-    if smooth_fit:
-        # Apply smoothing to the output. Keep the window and order low otherwise
-        # we get artefacts (extra peaks) at the transition in/out of eclipses.
-        reduced_mags = signal.savgol_filter(reduced_mags, 7, 3)
-
     return (reduced_phases, reduced_mags)
 
 
@@ -474,15 +429,15 @@ def find_lightcurve_segments(lc: LightCurve,
                              return_times: bool=False) \
                                 -> Generator[Union[Tuple[int, int], Tuple[Time, Time]], any, None]:
     """
-    Finds the start and end of contiguous segments in the passed LightCurve.
-    These are subsets of the LC where the gaps between bins does not exceed the
-    passed threshold. Gaps > threshold are treated as boundaries between segments.
+    Finds the start and end of contiguous segments in the passed LightCurve. These are subsets of
+    where the gaps between bins does not exceed the passed threshold. Gaps greater then the
+    threshold are treated as boundaries between segments.
 
     :lc: the source LightCurve to parse for gaps/segments.
     :threshold: the threshold gap time beyond which a segment break is triggered
     :return_times: if true start/end times will be yielded, otherwise the indices
-    :returns: an generator of segment (start, end). If no gaps found this 
-    will yield a single (start, end) for the whole LightCurve.
+    :returns: a generator of segment (start, end).
+    If no gaps found this will yield a single (start, end) for the whole LightCurve.
     """
     if not isinstance(threshold, TimeDelta):
         threshold = TimeDelta(threshold * u.d)

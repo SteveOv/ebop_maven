@@ -5,8 +5,9 @@ import astropy.units as u
 from astropy.units.core import UnitsError
 
 from ebop_maven.libs.orbital import orbital_period, semi_major_axis
-from ebop_maven.libs.orbital import impact_parameter, orbital_inclination
-from ebop_maven.libs.orbital import EclipseType
+from ebop_maven.libs.orbital import impact_parameter, orbital_inclination, EclipseType
+from ebop_maven.libs.orbital import secondary_eclipse_phase, ratio_of_eclipse_duration
+
 
 # pylint: disable=too-many-public-methods, no-member, line-too-long
 class Testorbital(unittest.TestCase):
@@ -235,6 +236,54 @@ class Testorbital(unittest.TestCase):
             for b, eclipse in [(bp, EclipseType.PRIMARY), (bs, EclipseType.SECONDARY)]:
                 inc = orbital_inclination(**kwargs, b=b, eclipse=eclipse)
                 self.assertAlmostEqual(exp_inc, inc.to(u.deg).value, 6)
+
+    #
+    #   TEST expected_secondary_phase(esinw, ecc) -> float
+    #
+    def test_expected_secondary_phase_gg_lup(self):
+        """ Tests expected_secondary_phase(values for GG Lup from Hilditch pp238) """
+        ecc = 0.15
+        ecosw = 0.0098
+        esinw = 0.15
+        expected_phi_s = 0.5064
+
+        phi_s = secondary_eclipse_phase(ecosw, ecc=ecc)
+        self.assertAlmostEqual(phi_s, expected_phi_s, 3)
+
+        phi_s = secondary_eclipse_phase(ecosw, esinw=esinw)
+        self.assertAlmostEqual(phi_s, expected_phi_s, 3)
+
+    def test_expected_secondary_phase_cw_eri(self):
+        """ Tests expected_secondary_phase(values for CW Eri from OverallSouthworth24) """
+        ecc = 0.0131
+        ecosw = 0.00502
+        esinw = -0.0121
+        expected_phi_s = 0.5032
+
+        phi_s = secondary_eclipse_phase(ecosw, ecc=ecc)
+        self.assertAlmostEqual(phi_s, expected_phi_s, 3)
+
+        phi_s = secondary_eclipse_phase(ecosw, esinw=esinw)
+        self.assertAlmostEqual(phi_s, expected_phi_s, 3)
+
+    #
+    #   TESTS expected_ratio_of_eclipse_duration(esinw) -> float
+    #
+    def test_expected_ratio_of_eclipse_duration_gg_lup(self):
+        """ Tests expected_ratio_of_eclipse_duration(values for GG Lup from Hilditch) """
+        esinw = 0.15
+        expected_ds_over_dp = 1.353
+
+        ds_over_dp = ratio_of_eclipse_duration(esinw)
+        self.assertAlmostEqual(ds_over_dp, expected_ds_over_dp, 3)
+
+    def test_expected_ratio_of_eclipse_duration_cw_eri(self):
+        """ Tests expected_ratio_of_eclipse_duration(values for CW Eri from OverallSouthworth24) """
+        esinw = -0.0121
+        expected_ds_over_dp = 0.976
+
+        ds_over_dp = ratio_of_eclipse_duration(esinw)
+        self.assertAlmostEqual(ds_over_dp, expected_ds_over_dp, 3)
 
 
 if __name__ == "__main__":

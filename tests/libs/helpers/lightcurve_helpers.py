@@ -1,4 +1,5 @@
 """ A module of lightcurve related helper functions for use throughout the tests. """
+# pylint: disable=no-member
 from inspect import getsourcefile
 from pathlib import Path
 from argparse import Namespace
@@ -9,7 +10,7 @@ from astropy.time import Time
 import lightkurve as lk
 
 # Use this as it will use previously downloaded fits if available, avoiding remote MAST calls.
-from ebop_maven.libs.lightcurve import find_lightcurves
+from ebop_maven.pipeline import find_lightcurves
 
 TEST_DATA_DIR = Path(getsourcefile(lambda:0)).parent / "../../../../cache/test_data"
 
