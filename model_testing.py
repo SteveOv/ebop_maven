@@ -1,7 +1,7 @@
 """
 Formal testing of the regression TF Model trained by train_*_estimator.py
 """
-# pylint: disable=too-many-arguments, too-many-locals, no-member, import-error
+# pylint: disable=too-many-arguments, too-many-locals, no-member, import-error, invalid-name
 from typing import Union, List, Dict, Tuple
 from io import TextIOBase, StringIO
 import sys
@@ -9,7 +9,7 @@ from pathlib import Path
 import json
 import re
 from contextlib import redirect_stdout
-from textwrap import TextWrapper, fill
+from textwrap import fill
 import copy
 import argparse
 
@@ -26,46 +26,44 @@ from ebop_maven.estimator import Estimator
 from ebop_maven import datasets, deb_example, pipeline
 import plots
 
-def test_model_against_formal_test_dataset(
+SYNTHETIC_MIST_TEST_DS_DIR = Path("./datasets/synthetic-mist-tess-dataset/")
+FORMAL_TEST_DATASET_DIR = Path("./datasets/formal-test-dataset/")
+
+def evaluate_model_against_dataset(
         estimator: Union[Model, Estimator],
         mc_iterations: int=1,
         include_ids: List[str]=None,
         scaled: bool=False,
-        test_dataset_dir: Path=Path("./datasets/formal-test-dataset")) \
-            -> Tuple[np.ndarray[Dict[str, float]], np.ndarray[Dict[str, float]]]:
+        test_dataset_dir: Path=FORMAL_TEST_DATASET_DIR) \
+            -> Tuple[np.ndarray, np.ndarray]:
     """
-    Will test the indicated model file or Estimator against the contents of the
-    formal test dataset.
+    Will evaluate the indicated model file or Estimator against the contents of the
+    chosen test dataset.
 
-    :use_estimator: the Estimator or estimator model to use to make predictions
+    :estimator: the Estimator or estimator model to use to make predictions
     :mc_iterations: the number of MC Dropout iterations
     :include_ids: list of target ids to predict, or all if not set
-    :scaled: whether labels and predictions are scaled (like raw model predictions) or not
+    :report_label_names: the label names to report on, or those supported by the estimator if None
+    :scaled: whether labels and predictions are scaled (raw model predictions) or not
     :test_dataset_dir: the location of the formal test dataset
-    :returns: a tuple of (List[labels dicts], List[predictions dicts])
-    one row per target instance in the order of the dataset
+    :returns: a tuple of (NDArray, NDArray) containing
+    label valuess (#insts, #labels) and predictions (#insts, #labels & #sigmas)
     """
     # Create our Estimator. It will tell us what its inputs should look like
     # and which labels it (& the underlying model) can predict.
-    if not isinstance(estimator, Estimator):
+    if isinstance(estimator, (Model, Path)):
         estimator = Estimator(estimator)
     prediction_type = "mc" if mc_iterations > 1 else "nonmc"
 
     print(f"Looking for the test dataset in '{test_dataset_dir}'...", end="")
     tfrecord_files = sorted(test_dataset_dir.glob("**/*.tfrecord"))
-
-    # The estimator may not predict inc but we will need it later when fitting
-    feature_names = [n for n in estimator.input_feature_names if n not in ["mags"]]
-    label_names = estimator.label_names
-    calculated_inc = "inc" not in label_names
-    if calculated_inc:
-        label_names += ["inc"]
+    print(f"found {len(tfrecord_files)} file(s).")
 
     ids, mags_vals, feat_vals, lbl_vals = deb_example.read_dataset(tfrecord_files,
                                                                 estimator.mags_feature_bins,
                                                                 estimator.mags_feature_wrap_phase,
-                                                                feature_names,
-                                                                label_names,
+                                                                estimator.input_feature_names,
+                                                                estimator.label_names,
                                                                 include_ids,
                                                                 scaled)
 
@@ -74,36 +72,32 @@ def test_model_against_formal_test_dataset(
 
     # Make our predictions which will be returned in the shape (#insts, #labels, #iterations)
     # then turn a set of noms and 1-sigmas: shape (#insts, #nominal & #1-sigmas)
-    print(f"\nThe Estimator is making predictions on the {len(ids)} formal test instances",
+    print(f"The Estimator is making predictions on the {len(ids)} test instances",
           f"with {mc_iterations} iteration(s) (iterations >1 triggers MC Dropout algorithm).")
     pred_vals = estimator.predict_raw(mags_vals, feat_vals, mc_iterations, unscale=not scaled)
-    pred_vals = estimator.means_and_stddevs_from_predictions(pred_vals)
+    pred_vals = estimator.means_and_stddevs_from_predictions(pred_vals, label_axis=1)
+    lbl_vals = estimator.means_and_stddevs_from_predictions(lbl_vals, label_axis=1)
 
-    print("\n-----------------------------------")
+    print("Metrics over predicted values;", ", ".join(estimator.label_names))
+    print("-----------------------------------")
     noms_width = pred_vals.shape[1] // 2
     for metric_identifier in ["MAE", "MSE", "r2_score"]:
         metric = metrics.get(metric_identifier)
         metric.update_state(lbl_vals[:, :noms_width], pred_vals[:, :noms_width])
         print(f"Total {metric_identifier:>8} ({prediction_type}): {metric.result():.9f}")
-    print("-----------------------------------\n")
-
-    # TODO:  Remove this by altering the dependency fit_against_formal_test_dataset() has on this.
-    # For now, put the labels and predictions into arrays of Dicts as thats what's needed downstream
-    labels = np.array([dict(zip(label_names, lrow)) for lrow in lbl_vals])
-    predictions = np.array([dict(zip(estimator.prediction_names, prow)) for prow in pred_vals])
-    if calculated_inc:
-        for prow in predictions:
-            append_calculated_inc_prediction(prow)
-    return labels, predictions
+    print("-----------------------------------")
+    return lbl_vals, pred_vals
 
 
 def fit_against_formal_test_dataset(
-        labels: List[Dict[str, float]],
-        input_params: List[Dict[str, float]],
+        estimator: Union[Model, Estimator],
         targets_config: Dict[str, any],
-        selected_targets: List[str]=None,
-        report_label_names: List[str]=None,
-        apply_fit_overrides: bool=True) -> np.ndarray[Dict[str, float]]:
+        include_ids: List[str]=None,
+        mc_iterations: int=1,
+        apply_fit_overrides: bool=True,
+        do_control_fit: bool=False,
+        comparison_dicts: np.ndarray[Dict[str, float]]=None,
+        report_dir: Path=None) -> np.ndarray[Dict[str, float]]:
     """
     Will fit members of the formal test dataset, as configured in targets_config,
     based on the sets of input_params passed in returning the corresponding fitted params.
@@ -111,55 +105,90 @@ def fit_against_formal_test_dataset(
     It's important that input_params, labels and selected_targets (or targets_config keys)
     are all of the same length and in the same order.
 
-    :labels: the list of labels Dicts, for reporting
-    :input_params: the list of params Dicts to fit with, one per target
+    :estimator: the Estimator or estimator model to use to make predictions
     :targets_config: the full config for all targets
     :selected_targets: list of target ids to fit, or all if empty
-    :report_label_names: the names of labels/values that are reported before/after a fit
+    :mc_iterations: the number of MC iterations to use when making predictions
     :apply_fit_overrides: apply any fit_overrides from each target's config
-    :returns: a List of the targets fitted parameter Dicts
+    :do_control_fit: when True labels, rather than predictions, will be the input params for fitting
+    :comparison_dicts: optional List[Dict] to compare the fitting results to in addition to labels
+    :report_dir: optional directory into which to save reports, reports not saved if this is None
+    :returns: a List of the targets' fitted parameter Dicts
     """
-    # We report on  labels common to the all labels & input values or those requested
-    if report_label_names is None:
-        report_label_names = [k for k in labels[0].keys() if k in input_params[0]]
+    # pylint: disable=too-many-statements, too-many-branches
+    fit_dir = jktebop.get_jktebop_dir()
+    if isinstance(estimator, (Model, Path)):
+        estimator = Estimator(estimator)
 
-    tw = TextWrapper(100)
-    fitted_params = []
-    if selected_targets is None or len(selected_targets) == 0:
-        selected_targets = list(targets_config.keys())
-    assert len(selected_targets) == len(input_params)
-    assert len(selected_targets) == len(labels)
+    prediction_type = "control" if do_control_fit else "mc" if mc_iterations > 1 else "nonmc"
 
-    for ix, (target, target_input_params, target_labels) in enumerate(zip(selected_targets,
-                                                                          input_params,
-                                                                          labels)):
-        target_cfg = targets_config[target].copy()
-        print(f"\n\nProcessing target {ix+1} of {len(selected_targets)}: {target}\n" + "-"*40)
-        print(tw.fill(target_cfg.get("desc", "")) + "\n")
+    # To clarify: the estimator publishes a list of what it can predict via its label_names attrib
+    # The fit_names can differ; they are those values required for JKTEBOP fitting and reporting
+    # super_names is the set of both and is used, for example, to get the superset of label values
+    fit_names = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "inc"]
+    super_names = estimator.label_names + [n for n in fit_names if n not in estimator.label_names]
+    super_names_and_errs = super_names + [f"{n}_sigma" for n in super_names]
+
+    if include_ids is None or len(include_ids) == 0:
+        include_ids = list(targets_config.keys())
+    trans_flags = np.array([targets_config.get(t,{}).get("transits", False) for t in include_ids])
+
+    print(f"\nLooking for the test dataset in '{FORMAL_TEST_DATASET_DIR}'.")
+    tfrecord_files = sorted(FORMAL_TEST_DATASET_DIR.glob("**/*.tfrecord"))  
+    all_targs, all_mags_val, all_feat_vals, all_lbl_vals = deb_example.read_dataset(tfrecord_files,
+                                                                estimator.mags_feature_bins,
+                                                                estimator.mags_feature_wrap_phase,
+                                                                estimator.input_feature_names,
+                                                                super_names,
+                                                                include_ids)
+
+    # Get the labels into an NDArray[Dicts] for ease of reporting & possible use as control fit
+    all_lbl_vals = estimator.means_and_stddevs_from_predictions(all_lbl_vals, label_axis=1)
+    all_lbl_dicts = np.array([dict(zip(super_names_and_errs, v)) for v in all_lbl_vals])
+
+    # The Estimator predictions will be in the shape (#insts, #labels, #iterations)
+    # Then get the predictions into NDArray(Dicts), which is required for jktebop and
+    # reporting, via sets of means and 1-sigmas: shape (#insts, #nominal & #1-sigmas)
+    if do_control_fit:
+        print("\nControl fits will use label values as 'predictions' and fitting inputs.")
+        all_pred_dicts = copy.deepcopy(all_lbl_dicts)
+    else:
+        print(f"\nThe Estimator will make predictions on {len(all_targs)} formal test instance(s)",
+              f"with {mc_iterations} iteration(s) (iterations >1 triggers MC Dropout algorithm).")
+        all_pred_vals = estimator.predict_raw(all_mags_val, all_feat_vals, mc_iterations)
+        all_pred_vals = estimator.means_and_stddevs_from_predictions(all_pred_vals, label_axis=1)
+        all_pred_dicts = np.array([dict(zip(estimator.prediction_names, v)) for v in all_pred_vals])
+        if "inc" not in estimator.label_names:
+            append_calculated_inc_predictions(all_pred_dicts)
+
+    # Finally, we have everything in place to fit our targets with JKTEBOP and report on the results
+    fitted_param_dicts = []
+    for ix, (targ, pred_dict, lbl_dict) in enumerate(zip(all_targs, all_pred_dicts, all_lbl_dicts)):
+        print(f"\n\nProcessing target {ix + 1} of {len(all_targs)}: {targ}\n" + "-"*40)
+        targ_config = targets_config[targ].copy()
+        print(fill(targ_config.get("desc", "")) + "\n")
 
         # The basic lightcurve data read, rectified & extended with delta_mag and delta_mag_err cols
-        (lc, sector_count) = datasets.prepare_lightcurve_for_target(target, target_cfg, True)
-        pe = pipeline.to_lc_time(target_cfg["primary_epoch"], lc).value
-        period = target_cfg["period"]
+        (lc, sector_count) = datasets.prepare_lightcurve_for_target(targ, targ_config, True)
+        pe = pipeline.to_lc_time(targ_config["primary_epoch"], lc).value
+        period = targ_config["period"]
 
-        fit_stem = f"model-testing-{re.sub(r'[^\w\d-]', '-', target.lower())}"
-        fit_dir = jktebop.get_jktebop_dir()
+        fit_stem = f"model-testing-{re.sub(r'[^\w\d-]', '-', targ.lower())}"
         for file in fit_dir.glob(f"{fit_stem}.*"):
             file.unlink()
         in_fname = fit_dir / f"{fit_stem}.in"
         dat_fname = fit_dir / f"{fit_stem}.dat"
 
-        print(f"\nWill fit {target} with the following input params")
-        predictions_vs_labels_to_table([target_labels], [target_input_params], [target],
-                                       report_label_names)
+        print(f"\nWill fit {targ} with the following input params")
+        predictions_vs_labels_to_table([lbl_dict], [pred_dict], [targ], fit_names)
 
-        # published fitting params that may be needed for good fit
-        fit_overrides = target_cfg.get("fit_overrides", {}) if apply_fit_overrides else {}
+        # published fitting params that may be needed for reliable fit
+        fit_overrides = targ_config.get("fit_overrides", {}) if apply_fit_overrides else {}
         lrats = fit_overrides.get("lrat", [])
 
         params = {
-            **base_jktebop_task3_params(period, pe, dat_fname.name, fit_stem, target_cfg),
-            **target_input_params,
+            **base_jktebop_task3_params(period, pe, dat_fname.name, fit_stem, targ_config),
+            **pred_dict,
             **fit_overrides,
         }
 
@@ -172,16 +201,57 @@ def fit_against_formal_test_dataset(
         jktebop.write_light_curve_to_dat_file(
                     lc, dat_fname, column_formats=[lambda t: f"{t.value:.6f}", "%.6f", "%.6f"])
 
-        # Don't consume the output files so they're available for subsequent plotting
-        print(f"\nFitting {target} (with {sector_count} sector(s) of data) using JKTEBOP task 3...")
+        # Don't consume the output files so they're available if we need any diagnostics
+        print(f"\nFitting {targ} (with {sector_count} sector(s) of data) using JKTEBOP task 3...")
         par_fname = fit_dir / f"{fit_stem}.par"
         par_contents = list(jktebop.run_jktebop_task(in_fname, par_fname, stdout_to=sys.stdout))
-        fit_params = jktebop.read_fitted_params_from_par_lines(par_contents, report_label_names)
+        fit_params_dict = jktebop.read_fitted_params_from_par_lines(par_contents, fit_names)
+        fitted_param_dicts.append(fit_params_dict)
 
-        print(f"\nHave fitted {target} resulting in the following fitted params")
-        predictions_vs_labels_to_table([target_labels], [fit_params], [target], report_label_names)
-        fitted_params.append(fit_params)
-    return np.array(fitted_params)
+        # Now report on how well the fitting has gone relative to the labels
+        print(f"\nHave fitted {targ} resulting in the following fitted params")
+        predictions_vs_labels_to_table([lbl_dict], [fit_params_dict], [targ], fit_names,
+                                       prediction_head="Fitted")
+
+    # Save reports on how the fitting has gone over all of the selected targets
+    fitted_param_dicts = np.array(fitted_param_dicts)
+    if report_dir:
+        comparison_reports = [("labels", "Label", all_lbl_dicts)]
+        if comparison_dicts is not None:
+            comparison_reports += [("control", "Control", comparison_dicts)]
+        transit_sub_reports = [("All targets",                      [True]*len(all_targs)),
+                               ("\n\nTransiting systems only",      trans_flags),
+                               ("\n\nNon-transiting systems only",  ~trans_flags)]
+
+        for comp_type, comp_head, comp_dicts in comparison_reports:
+            if not do_control_fit: # Control == fit from labels not preds; no point producing these
+                preds_stem = f"predictions_{prediction_type}_vs_{comp_type}"
+                plots.plot_predictions_vs_labels(comp_dicts, all_pred_dicts, trans_flags, fit_names,
+                                xlabel_prefix=comp_head).savefig(report_dir / f"{preds_stem}.eps")
+
+                # with open(report_dir / f"{preds_stem}.csv", mode="w", encoding="utf8") as csvf:
+                #     predictions_vs_labels_to_csv(
+                #                         comp_dicts, all_pred_dicts, all_targs, fit_names, to=csvf)
+
+                with open(report_dir / f"{preds_stem}.txt", mode="w", encoding="utf8") as txtf:
+                    for (sub_head, mask) in transit_sub_reports:
+                        if any(mask):
+                            predictions_vs_labels_to_table(comp_dicts[mask], all_pred_dicts[mask],
+                                                all_targs[mask], fit_names, title=sub_head, to=txtf)
+
+            results_stem = f"fitted_params_from_{prediction_type}_vs_{comp_type}"
+            plots.plot_predictions_vs_labels(comp_dicts, fitted_param_dicts, trans_flags, fit_names,
+                                             xlabel_prefix=comp_head, ylabel_prefix="fitted") \
+                                                    .savefig(report_dir / f"{results_stem}.eps")
+
+            with open(report_dir / f"{results_stem}.txt", "w", encoding="utf8") as txtf:
+                for (sub_head, mask) in transit_sub_reports:
+                    if any(mask):
+                        predictions_vs_labels_to_table(comp_dicts[mask], fitted_param_dicts[mask],
+                                                       all_targs[mask], fit_names, title=sub_head,
+                                                       comparison_head=comp_head.capitalize(),
+                                                       prediction_head="Fitted", to=txtf)
+    return fitted_param_dicts
 
 
 def base_jktebop_task3_params(period: float,
@@ -235,35 +305,35 @@ def base_jktebop_task3_params(period: float,
     }
 
 
-def append_calculated_inc_prediction(predictions: Dict[str, float]):
+def append_calculated_inc_predictions(predictions: np.ndarray[Dict[str, float]]):
     """
     Calculate the predicted inc value (in degrees) from the primary
     impact param bP, cosi or sini and append to the predictions.
 
-    :preds: the prediction dictionary for this instance
+    :preds: the array of prediction dictionaries to update
     """
-    def pred_to_ufloat(key: str):
-        return ufloat(predictions[key], predictions[f"{key}_sigma"])
+    def to_ufloat(preds: dict, key: str):
+        return ufloat(preds[key], preds.get(f"{key}_sigma", 0))
 
-    if "inc" in predictions:
-        return
+    preds_iter = [predictions] if isinstance(predictions, Dict) else predictions
+    for ix, preds in enumerate(preds_iter):
+        if "inc" not in preds:
+            if "bP" in preds:
+                # From primary impact param:  i = arccos(bP * r1 * (1+esinw)/(1-e^2))
+                b = to_ufloat(preds, "bP")
+                r = to_ufloat(preds, "rA_plus_rB") / (1 + to_ufloat(preds, "k"))
+                esinw = to_ufloat(preds, "esinw")
+                e = sqrt(to_ufloat(preds, "ecosw")**2 + esinw**2)
+                inc = degrees(acos(b * r * (1 + esinw) / (1 - e**2)))
+            elif "cosi" in preds:
+                inc = degrees(acos(to_ufloat(preds, "cosi")))
+            elif "sini" in preds:
+                inc = degrees(asin(to_ufloat(preds, "sini")))
+            else:
+                raise KeyError(f"Missing inc, bP, cosi or sini in predictions[{ix}] to calc inc.")
 
-    if "bP" in predictions:
-        # From primary impact param:  i = arccos(bP * r1 * (1+esinw)/(1-e^2))
-        b = pred_to_ufloat("bP")
-        r = pred_to_ufloat("rA_plus_rB") / (1 + pred_to_ufloat("k"))
-        esinw = pred_to_ufloat("esinw")
-        e = sqrt(pred_to_ufloat("ecosw")**2 + esinw**2)
-        inc = degrees(acos(b * r * (1 + esinw) / (1 - e**2)))
-    elif "cosi" in predictions:
-        inc = degrees(acos(pred_to_ufloat("cosi")))
-    elif "sini" in predictions:
-        inc = degrees(asin(pred_to_ufloat("sini")))
-    else:
-        raise KeyError("Did not find inc, bP, cosi or sini in predictions to calc orbital inc.")
-
-    predictions["inc"] = inc.nominal_value
-    predictions["inc_sigma"] = inc.std_dev
+            preds["inc"] = inc.nominal_value
+            preds["inc_sigma"] = inc.std_dev
 
 
 def predictions_vs_labels_to_csv(
@@ -337,6 +407,7 @@ def predictions_vs_labels_to_table(
         reverse_scaling: bool=False,
         comparison_head: str="Label",
         prediction_head: str="Prediction",
+        title: str=None,
         summary_only: bool=False,
         to: TextIOBase=None):
     """
@@ -351,6 +422,7 @@ def predictions_vs_labels_to_table(
     :reverse_scaling: whether to reverse the scaling of the values to represent the model output
     :comparison_head: the text of the comparison row headings (10 chars or less)
     :prediction_head: the text of the prediction row headings (10 chars or less)
+    :title: optional title text to write above the table
     :summary_only: omit the body and just report the summary
     :to: the output to write the table to. Defaults to printing.
     """
@@ -377,6 +449,9 @@ def predictions_vs_labels_to_table(
     def header_block(header):
         horizontal_line("-")
         to.write(f"{header:<10s} | " + " ".join(f"{k:>10s}" for k in keys + ["MAE", "MSE"]) + "\n")
+
+    if title:
+        to.write(f"{title}\n")
 
     if summary_only:
         header_block("Summary")
@@ -471,79 +546,52 @@ if __name__ == "__main__":
     args = ap.parse_args()
 
     with open("./config/formal-test-dataset.json", mode="r", encoding="utf8") as tf:
-        targets_cfg = json.load(tf)
-    targets = np.array([t for t in targets_cfg if not targets_cfg[t].get("exclude", False)])
-    trn_flags = np.array([targets_cfg.get(t, {}).get("transits", False) for t in targets])
+        formal_targs_cfg = json.load(tf)
+    formal_targs = np.array([t for t, c in formal_targs_cfg.items() if not c.get("exclude", False)])
+    #formal_targs = np.array(["V436 Per", "CM Dra"])
 
     for file_counter, model_file in enumerate(args.model_files, 1):
         print(f"\nModel file {file_counter} of {len(args.model_files)}: {model_file}\n")
 
+        # Set up the estimator and the reporting directory for this model
         the_estimator = Estimator(model_file)
         trainset_name = the_estimator.metadata["trainset_name"]
         mags_key = deb_example.create_mags_key(the_estimator.mags_feature_bins,
                                                the_estimator.mags_feature_wrap_phase)
-        save_dir = Path(f"./drop/results/{the_estimator.name}/{trainset_name}/{mags_key}")
-        save_dir.mkdir(parents=True, exist_ok=True)
+        results_dir = Path(f"./drop/results/{the_estimator.name}/{trainset_name}/{mags_key}")
+        results_dir.mkdir(parents=True, exist_ok=True)
 
-        labs, all_preds, all_fits = None, {}, {}
-        with redirect_stdout(Tee(open(save_dir / "model_testing.log", "w", encoding="utf8"))):
-            print("\n"+fill(f"Testing {the_estimator.name} against\n{', '.join(targets)}", 100))
-
+        labs, all_preds = None, {}
+        with redirect_stdout(Tee(open(results_dir / "model_testing.log", "w", encoding="utf8"))):
             # Report on the performance of the model/Estimator predictions vs labels
-            for pred_type, iters in [("nonmc", 1), ("mc", 1000)]:
-                print(f"\n\nTesting the model's {pred_type} estimates (iters={iters})\n" + "="*80)
-                (labs, all_preds[pred_type]) = test_model_against_formal_test_dataset(the_estimator,
-                                                                                    iters, targets)
+            for pred_type, iters, dataset_dir, targs in [
+                    ("nonmc",   1,      FORMAL_TEST_DATASET_DIR,    None),
+                    ("mc",      1000,   FORMAL_TEST_DATASET_DIR,    None),
+                    # TODO: probably need a batched dataset for these two memory hogs
+                    # ("nonmc",   1,      SYNTHETIC_MIST_TEST_DS_DIR, None),
+                    # ("mc",      1000,   SYNTHETIC_MIST_TEST_DS_DIR, None),
+            ]:
+                print(f"\nEvaluating the model's {pred_type} estimates (iters={iters})",
+                      f"on {dataset_dir.name}\n" + "="*80)
+                evaluate_model_against_dataset(the_estimator, iters, targs, False, dataset_dir)
 
-                results_stem = "predictions_vs_labels_" + pred_type # pylint: disable=invalid-name
-                fig = plots.plot_predictions_vs_labels(labs, all_preds[pred_type], trn_flags)
-                fig.savefig(save_dir / f"{results_stem}.eps")
-
-                with open(save_dir / f"{results_stem}.csv", mode="w", encoding="utf8") as cf:
-                    predictions_vs_labels_to_csv(labs, all_preds[pred_type], targets, to=cf)
-
-                with open(save_dir / f"{results_stem}.txt", mode="w", encoding="utf8") as tf:
-                    for (heading, mask) in [("All targets", [True]*len(targets)),
-                                            ("\n\nTransiting systems only", trn_flags),
-                                            ("\n\nNon-transiting systems only", ~trn_flags)]:
-                        tf.write(f"\n{heading}\n")
-                        if any(mask):
-                            predictions_vs_labels_to_table(labs[mask], all_preds[pred_type][mask],
-                                                           targets[mask], to=tf)
-
-            # These are the key/values which are set for a JKTEBOP fit. If comparing
-            # models/prediction values it's these six which ultimately matter.
-            fit_keys = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "inc"]
-
-            # Report using the predictions as input to fitting the formal-test-dataset with JKTEBOP.
-            # First we add control "preds" from labels, so we can use them to create control fits.
-            all_preds["control"] = copy.deepcopy(labs)
-            for pred_type in ["control", "mc", "nonmc"]:
-                print(f"\n\nTesting JKTEBOP fitting based on {pred_type} input values\n" + "="*80)
-                all_fits[pred_type] = fit_against_formal_test_dataset(labs, all_preds[pred_type],
-                                                                      targets_cfg, targets,
-                                                                      fit_keys, True)
-
-                # Now summarize how well the fits compare with labels and the control fit
-                for comp, fits, comp_type, comp_heading in [
-                            (labs, all_fits[pred_type], "labels", "Label"),
-                            (all_fits["control"], all_fits[pred_type], "control_fit", "Control")]:
-                    if comp is fits:
-                        break # No point comparing the controls with the controls
-
-                    results_stem = f"fitted_params_from_{pred_type}_vs_{comp_type}" # pylint: disable=invalid-name
-                    fig = plots.plot_predictions_vs_labels(comp, fits, trn_flags, fit_keys,
-                                                           xlabel_prefix=comp_heading.lower(),
-                                                           ylabel_prefix="fitted")
-                    fig.savefig(save_dir / f"{results_stem}.eps", dpi=300)
-
-                    with open(save_dir / f"{results_stem}.txt", "w", encoding="utf8") as of:
-                        for (heading, mask) in [("All targets", [True]*len(targets)),
-                                                ("\n\nTransiting systems only", trn_flags),
-                                                ("\n\nNon-transiting systems only", ~trn_flags)]:
-                            of.write(f"\n{heading}\n")
-                            if any(mask):
-                                predictions_vs_labels_to_table(comp[mask], fits[mask],
-                                                               targets[mask], fit_keys,
-                                                               comparison_head=comp_heading,
-                                                               prediction_head="Fitted", to=of)
+            # Report on fitting the formal-test-dataset based on estimator predictions. First run
+            # through actually uses labels as the fit inputs to give us a set of control fit results
+            control_fit_dicts = None # To be set on the first, control fit run
+            for (pred_type, is_control_fit, iterations) in [
+                ("control",     True,       0),
+                ("nonmc",       False,      1),
+                ("mc",          False,      1000),
+            ]:
+                print(f"\nTesting JKTEBOP fitting of {pred_type} input values\n" + "="*80)
+                compare_dicts = None if is_control_fit else control_fit_dicts
+                fit_results_dicts = fit_against_formal_test_dataset(the_estimator,
+                                                                    formal_targs_cfg,
+                                                                    formal_targs,
+                                                                    iterations,
+                                                                    True,
+                                                                    is_control_fit,
+                                                                    compare_dicts,
+                                                                    results_dir)
+                if is_control_fit:
+                    control_fit_dicts = fit_results_dicts

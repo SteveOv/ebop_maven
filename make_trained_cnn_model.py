@@ -246,5 +246,5 @@ if __name__ == "__main__":
     # -----------------------------------------------------------
     # We use scaled prediction so the MAE/MSE is comperable with model.fit() and model.evaluate()
     print("\n *** Running formal test against real data ***")
-    model_testing.test_model_against_formal_test_dataset(model_save_file, 1, scaled=True)
-    model_testing.test_model_against_formal_test_dataset(model_save_file, 1000, scaled=True)
+    model_testing.evaluate_model_against_dataset(model_save_file, 1, scaled=True)
+    model_testing.evaluate_model_against_dataset(model_save_file, 1000, scaled=True)
