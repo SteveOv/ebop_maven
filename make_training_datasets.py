@@ -96,7 +96,7 @@ with redirect_stdout(Tee(open(dataset_dir / "trainset.log", "w", encoding="utf8"
                                          output_dir=dataset_dir,
                                          mission_name="TESS",
                                          models_name="MIST",
-                                         drop_ratio=0.5,
+                                         drop_ratio=0.75,
                                          verbose=True,
                                          simulate=False)
 
