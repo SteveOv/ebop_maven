@@ -13,6 +13,8 @@ from textwrap import fill
 import copy
 import argparse
 
+import matplotlib.pylab as plt
+
 from uncertainties import ufloat
 from uncertainties.umath import sqrt, acos, asin, degrees # pylint: disable=no-name-in-module
 
@@ -23,7 +25,7 @@ from keras import Model, metrics
 from ebop_maven.libs.tee import Tee
 from ebop_maven.libs import jktebop, stellar, limb_darkening
 from ebop_maven.estimator import Estimator
-from ebop_maven import datasets, deb_example, pipeline
+from ebop_maven import datasets, deb_example, pipeline, plotting
 import plots
 
 SYNTHETIC_MIST_TEST_DS_DIR = Path("./datasets/synthetic-mist-tess-dataset/")
@@ -33,8 +35,9 @@ def evaluate_model_against_dataset(
         estimator: Union[Model, Estimator],
         mc_iterations: int=1,
         include_ids: List[str]=None,
-        scaled: bool=False,
-        test_dataset_dir: Path=FORMAL_TEST_DATASET_DIR) \
+        test_dataset_dir: Path=FORMAL_TEST_DATASET_DIR,
+        report_dir: Path=None,
+        scaled: bool=False) \
             -> Tuple[np.ndarray, np.ndarray]:
     """
     Will evaluate the indicated model file or Estimator against the contents of the
@@ -44,8 +47,9 @@ def evaluate_model_against_dataset(
     :mc_iterations: the number of MC Dropout iterations
     :include_ids: list of target ids to predict, or all if not set
     :report_label_names: the label names to report on, or those supported by the estimator if None
-    :scaled: whether labels and predictions are scaled (raw model predictions) or not
     :test_dataset_dir: the location of the formal test dataset
+    :report_dir: optional directory into which to save reports, reports not saved if this is None
+    :scaled: whether labels and predictions are scaled (raw model predictions) or not
     :returns: a tuple of (NDArray, NDArray) containing
     label valuess (#insts, #labels) and predictions (#insts, #labels & #sigmas)
     """
@@ -54,6 +58,7 @@ def evaluate_model_against_dataset(
     if isinstance(estimator, (Model, Path)):
         estimator = Estimator(estimator)
     prediction_type = "mc" if mc_iterations > 1 else "nonmc"
+    label_names = estimator.label_names
 
     print(f"Looking for the test dataset in '{test_dataset_dir}'...", end="")
     tfrecord_files = sorted(test_dataset_dir.glob("**/*.tfrecord"))
@@ -63,7 +68,7 @@ def evaluate_model_against_dataset(
                                                                 estimator.mags_feature_bins,
                                                                 estimator.mags_feature_wrap_phase,
                                                                 estimator.input_feature_names,
-                                                                estimator.label_names,
+                                                                label_names,
                                                                 include_ids,
                                                                 scaled)
 
@@ -86,6 +91,15 @@ def evaluate_model_against_dataset(
         metric.update_state(lbl_vals[:, :noms_width], pred_vals[:, :noms_width])
         print(f"Total {metric_identifier:>8} ({prediction_type}): {metric.result():.9f}")
     print("-----------------------------------")
+
+    if report_dir:
+        # Produce a violin plot of the prediction residual for each predicted label/value
+        # Output to pdf which looks better as eps doesn't support transparency/alpha.
+        resids_by_label = (pred_vals - lbl_vals).transpose()[:len(label_names), :]
+        fig, axes = plt.subplots(figsize=(6, 4), tight_layout=True)
+        plotting.plot_prediction_distributions_on_axes(axes, resids_by_label, label_names, True,
+            ylabel="Residual", title=f"Prediction distribution over {len(ids)} instances")
+        fig.savefig(report_dir / f"predictions-dist-{test_dataset_dir.name}-{prediction_type}.pdf")
     return lbl_vals, pred_vals
 
 
@@ -558,22 +572,22 @@ if __name__ == "__main__":
         trainset_name = the_estimator.metadata["trainset_name"]
         mags_key = deb_example.create_mags_key(the_estimator.mags_feature_bins,
                                                the_estimator.mags_feature_wrap_phase)
-        results_dir = Path(f"./drop/results/{the_estimator.name}/{trainset_name}/{mags_key}")
-        results_dir.mkdir(parents=True, exist_ok=True)
+        result_dir = Path(f"./drop/results/{the_estimator.name}/{trainset_name}/{mags_key}")
+        result_dir.mkdir(parents=True, exist_ok=True)
 
         labs, all_preds = None, {}
-        with redirect_stdout(Tee(open(results_dir / "model_testing.log", "w", encoding="utf8"))):
+        with redirect_stdout(Tee(open(result_dir / "model_testing.log", "w", encoding="utf8"))):
             # Report on the performance of the model/Estimator predictions vs labels
             for pred_type, iters, dataset_dir, targs in [
                     ("nonmc",   1,      FORMAL_TEST_DATASET_DIR,    None),
                     ("mc",      1000,   FORMAL_TEST_DATASET_DIR,    None),
-                    # TODO: probably need a batched dataset for these two memory hogs
-                    # ("nonmc",   1,      SYNTHETIC_MIST_TEST_DS_DIR, None),
+                    ("nonmc",   1,      SYNTHETIC_MIST_TEST_DS_DIR, None),
+                    # TODO: probably need a batched dataset for this as it's a memory hog
                     # ("mc",      1000,   SYNTHETIC_MIST_TEST_DS_DIR, None),
             ]:
                 print(f"\nEvaluating the model's {pred_type} estimates (iters={iters})",
                       f"on {dataset_dir.name}\n" + "="*80)
-                evaluate_model_against_dataset(the_estimator, iters, targs, False, dataset_dir)
+                evaluate_model_against_dataset(the_estimator, iters, targs, dataset_dir, result_dir)
 
             # Report on fitting the formal-test-dataset based on estimator predictions. First run
             # through actually uses labels as the fit inputs to give us a set of control fit results
@@ -592,6 +606,6 @@ if __name__ == "__main__":
                                                                     True,
                                                                     is_control_fit,
                                                                     compare_dicts,
-                                                                    results_dir)
+                                                                    result_dir)
                 if is_control_fit:
                     control_fit_dicts = fit_results_dicts
