@@ -196,7 +196,8 @@ def create_dataset_pipeline(dataset_files: Iterable[str],
     rows without any optional filtering applied.
     """
     # Read through once to get the total number of records
-    ds = tf.data.TFRecordDataset(list(dataset_files), num_parallel_reads=100)
+    ds = tf.data.TFRecordDataset(list(dataset_files), num_parallel_reads=100,
+                                 compression_type=ds_options.compression_type)
     row_count = ds.reduce(0, lambda count, _: count+1).numpy()
 
     # Now build the full pipeline
