@@ -97,8 +97,8 @@ def evaluate_model_against_dataset(
         # Output to pdf which looks better as eps doesn't support transparency/alpha.
         resids_by_label = (pred_vals - lbl_vals).transpose()[:len(label_names), :]
         fig, axes = plt.subplots(figsize=(6, 4), tight_layout=True)
-        plotting.plot_prediction_distributions_on_axes(axes, resids_by_label, label_names, True,
-            ylabel="Residual", title=f"Prediction distribution over {len(ids)} instances")
+        plotting.plot_prediction_distributions_on_axes(axes, resids_by_label, label_names,
+                                            violin_plot=False, show_fliers=False, ylabel="Residual")
         fig.savefig(report_dir / f"predictions-dist-{test_dataset_dir.name}-{prediction_type}.pdf")
     return lbl_vals, pred_vals
 

@@ -158,16 +158,27 @@ def plot_prediction_distributions_on_axes(ax: Axes,
                                           predictions: np.ndarray,
                                           label_names: List[str],
                                           violin_plot: bool=False,
-                                          plot_zero_value_line: bool=True,
+                                          show_zero_value_line: bool=True,
+                                          show_1sigma_lines: bool=False,
+                                          show_fliers: bool=False,
                                           **format_kwargs):
     """
     Plot a violin or box plot of the prediction distribution (the last axis of predictions).
+
+    The violin plot is set up to focus on the distribution about the mean value, with
+    the mean and 1-sigma intervals marked with horizontal lines.
+
+    The box plot is set up to focus on the distribution about the median value, with the meadian
+    shown with a line and a box bounding the (2nd & 3rd) interquartile range, the whiskers covering
+    values within x1.5 interquartile range from the box, and fliers/outliers (if enabled) beyond.
 
     :ax: the Axes to plot to
     :predictions: the predictions to plot; ndarray of shape (#labels, #iterations)
     :label_names: the names of each label on predictions[0]
     :violin_plot: whether to plot a violin plot (True) or a box plot (False)
-    :plot_zero_value_line: whether to draw a horizontal line at zero
+    :show_zero_value_line: whether to draw a horizontal line at zero
+    :show_1sigma_lines: if true, show 1-sigma positions in addition to the mean (violin plot only)
+    :show_fliers: if true, outliers are plotted beyond the box_plot whiskers (box plot only)
     :format_kwargs: kwargs to be passed on to format_axes()
     """
     # We can only handle 1 instance so take the first if we have full (#insts, #labels, #iterations)
@@ -178,14 +189,24 @@ def plot_prediction_distributions_on_axes(ax: Axes,
         xdata = xdata.transpose()
 
     if violin_plot:
-        ax.violinplot(xdata, showmeans=True, vert=True)
+        # For customizations https://matplotlib.org/stable/gallery/statistics/violinplot.html
+        # and https://matplotlib.org/stable/gallery/statistics/customized_violin.html
+        # Approximate 1-sigma lines at 0.5+/-(0.68/2)
+        quantiles = [[0.16, 0.84]] * xdata.shape[1] if show_1sigma_lines else None
+        plot = ax.violinplot(xdata, showmeans=True, quantiles=quantiles, vert=True)
+        plot["cquantiles"].set(lw=1.0, alpha=0.75)
+        plot["cmaxes"].set(lw=1.0, alpha=0.75)
+        plot["cmins"].set(lw=1.0, alpha=0.75)
     else:
-        ax.boxplot(xdata, showmeans=True, vert=True, patch_artist=True)
+        # For customizations https://matplotlib.org/stable/gallery/statistics/boxplot.html
+        flier_props = { "marker": ".", "alpha": 0.5, "markersize": 3 }
+        ax.boxplot(xdata, showmeans=False, meanline=True, vert=True, patch_artist=False,
+                   showfliers=show_fliers, flierprops=flier_props)
 
     label_names = [label_text[k] or k for k in label_names]
     ax.set_xticks(ticks=[r+1 for r in range(len(label_names))], labels=label_names)
 
-    if plot_zero_value_line:
+    if show_zero_value_line:
         (xmin, xmax) = ax.get_xlim()
         ax.hlines([0.0], xmin, xmax, linestyles="--", color="k", lw=.5, alpha=.5, zorder=-10)
 
