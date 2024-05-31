@@ -194,7 +194,7 @@ def fit_against_formal_test_dataset(
         dat_fname = fit_dir / f"{fit_stem}.dat"
 
         print(f"\nWill fit {targ} with the following input params")
-        predictions_vs_labels_to_table([lbl_dict], [pred_dict], [targ], fit_names)
+        preds_vs_labels_dicts_to_table([pred_dict], [lbl_dict], [targ], fit_names)
 
         # published fitting params that may be needed for reliable fit
         fit_overrides = targ_config.get("fit_overrides", {}) if apply_fit_overrides else {}
@@ -224,7 +224,7 @@ def fit_against_formal_test_dataset(
 
         # Now report on how well the fitting has gone relative to the labels
         print(f"\nHave fitted {targ} resulting in the following fitted params")
-        predictions_vs_labels_to_table([lbl_dict], [fit_params_dict], [targ], fit_names,
+        preds_vs_labels_dicts_to_table([fit_params_dict], [lbl_dict], [targ], fit_names,
                                        prediction_head="Fitted")
 
     # Save reports on how the fitting has gone over all of the selected targets
@@ -250,7 +250,7 @@ def fit_against_formal_test_dataset(
                 with open(report_dir / f"{preds_stem}.txt", mode="w", encoding="utf8") as txtf:
                     for (sub_head, mask) in transit_sub_reports:
                         if any(mask):
-                            predictions_vs_labels_to_table(comp_dicts[mask], all_pred_dicts[mask],
+                            preds_vs_labels_dicts_to_table(all_pred_dicts[mask], comp_dicts[mask],
                                                 all_targs[mask], fit_names, title=sub_head, to=txtf)
 
             results_stem = f"fitted_params_from_{prediction_type}_vs_{comp_type}"
@@ -261,7 +261,7 @@ def fit_against_formal_test_dataset(
             with open(report_dir / f"{results_stem}.txt", "w", encoding="utf8") as txtf:
                 for (sub_head, mask) in transit_sub_reports:
                     if any(mask):
-                        predictions_vs_labels_to_table(comp_dicts[mask], fitted_param_dicts[mask],
+                        preds_vs_labels_dicts_to_table(fitted_param_dicts[mask], comp_dicts[mask],
                                                        all_targs[mask], fit_names, title=sub_head,
                                                        comparison_head=comp_head.capitalize(),
                                                        prediction_head="Fitted", to=txtf)
@@ -350,11 +350,11 @@ def append_calculated_inc_predictions(predictions: np.ndarray[Dict[str, float]])
             preds["inc_sigma"] = inc.std_dev
 
 
-def predictions_vs_labels_to_csv(
-        labels: List[Dict[str, float]],
-        predictions: List[Union[Dict[str, float], Dict[str, Tuple[float, float]]]],
-        row_headings: List[str]=None,
-        selected_label_names: List[str]=None,
+def preds_vs_labels_dicts_to_csv(
+        predictions: np.ndarray[Union[Dict[str, float], Dict[str, Tuple[float, float]]]],
+        labels: np.ndarray[Dict[str, float]],
+        row_headings: np.ndarray[str]=None,
+        selected_label_names: np.ndarray[str]=None,
         reverse_scaling: bool=False,
         to: TextIOBase=None):
     """
@@ -413,11 +413,11 @@ def predictions_vs_labels_to_csv(
         print(to.getvalue())
 
 
-def predictions_vs_labels_to_table(
-        labels: List[Dict[str, float]],
-        predictions: List[Union[Dict[str, float], Dict[str, Tuple[float, float]]]],
-        block_headings: List[str]=None,
-        selected_label_names: List[str]=None,
+def preds_vs_labels_dicts_to_table(
+        predictions: np.ndarray[Union[Dict[str, float], Dict[str, Tuple[float, float]]]],        
+        labels: np.ndarray[Dict[str, float]],
+        block_headings: np.ndarray[str]=None,
+        selected_label_names: np.ndarray[str]=None,
         reverse_scaling: bool=False,
         comparison_head: str="Label",
         prediction_head: str="Prediction",
