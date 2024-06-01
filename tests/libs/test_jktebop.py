@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 from subprocess import CalledProcessError
 
+from uncertainties import ufloat, UFloat
 import numpy as np
 from astropy.time import Time
 
@@ -22,7 +23,7 @@ class Testjktebop(unittest.TestCase):
     _prefix = "test_deblib_"
     _task2_params = { # set of valid param/tokens & values for task 2
         "ring": 2,
-        "rA_plus_rB": 0.3,  "k": 0.5,
+        "rA_plus_rB": 0.3,  "k": ufloat(0.5, 0.0),
         "inc": 90.,         "qphot": 0.5,
         "ecosw": 0.,        "esinw": 0.,
         "gravA": 0.,        "gravB": 0.,
@@ -35,7 +36,7 @@ class Testjktebop(unittest.TestCase):
 
     _task3_params = { # set of valid param/tokens & values for task 3
         "ring": 3,
-        "rA_plus_rB": 0.3,  "k": 0.5,
+        "rA_plus_rB": 0.3,  "k": ufloat(0.5, 0.0),
         "inc": 90.,         "qphot": 0.5,
         "ecosw": 0.,        "esinw": 0.,
         "gravA": 0.,        "gravB": 0.,
@@ -358,14 +359,14 @@ class Testjktebop(unittest.TestCase):
     def test__prepare_params_for_task_fit_rA_and_rB_true(self):
         """ Test _prepare_params_for_task(fit_rA_and_rB=True) check params correctly updated """
         params = { "rA": 2, "rB": 1, "rA_plus_rB": 3, "k": 0.5 }
-        _prepare_params_for_task(2, params, fit_rA_and_rB=True, in_place=True)
+        params = _prepare_params_for_task(2, params, fit_rA_and_rB=True)
         self.assertEqual(params["rA_plus_rB"], -params["rA"])
         self.assertEqual(params["k"], params["rB"])
 
     def test__prepare_params_for_task_fit_e_and_omega_true(self):
         """ Test _prepare_params_for_task(fit_e_and_omega=True) check params correctly updated """
         params = { "ecosw": 0., "esinw": 0., "e": 0.1, "omega": 90 }
-        _prepare_params_for_task(2, params, fit_e_and_omega=True, in_place=True)
+        params = _prepare_params_for_task(2, params, fit_e_and_omega=True)
         self.assertEqual(params["ecosw"], 10+params["e"])
         self.assertEqual(params["esinw"], params["omega"])
 
@@ -386,22 +387,30 @@ class Testjktebop(unittest.TestCase):
         self.assertEqual(params["reflA"], 0)
         self.assertEqual(params["reflB"], 0)
 
-    def test__prepare_params_for_task_in_place_true(self):
-        """ Test _prepare_params_for_task(in_place=True) byref params updated """
+    def test__prepare_params_for_task_with_floats(self):
+        """ Test _prepare_params_for_task(params as floats (separate sigma values)) values passed on """
         # Requesting a fit on rA & rB causes the rA_plus_rB & k params to be
         # changed which is how we detect if the params arg has been modified.
-        params = { "rA": 2, "rB": 1, "rA_plus_rB": 3, "k": 0.5 }
-        _prepare_params_for_task(2, params, fit_rA_and_rB=True, in_place=True)
-        self.assertEqual(params["rA_plus_rB"], -2, "params arg not modified")
+        params = { "rA_plus_rB": 3, "k": 0.5, "rA_plus_rB_sigma": 0.1, "k_sigma": 0.1 }
+        result = _prepare_params_for_task(2, params)
+        for key, value in params.items():
+            self.assertIn(key, result.keys())
+            self.assertEqual(value, result[key])
 
-    def test__prepare_params_for_task_in_place_false(self):
-        """ Test _prepare_params_for_task(in_place=False) byref params unchanged """
+    def test__prepare_params_for_task_with_ufloats(self):
+        """ Test _prepare_params_for_task(params as ufloats) nominal values passed on as floats """
         # Requesting a fit on rA & rB causes the rA_plus_rB & k params to be
         # changed which is how we detect if the params arg has been modified.
-        params = { "rA": 2, "rB": 1, "rA_plus_rB": 3, "k": 0.5 }
-        new_params = _prepare_params_for_task(2, params, fit_rA_and_rB=True, in_place=False)
-        self.assertEqual(params["rA_plus_rB"], 3, "params arg has been modified")
-        self.assertEqual(new_params["rA_plus_rB"], -2, "return params unchanged")
+        params = { "rA_plus_rB": ufloat(3, 0.1), "k": ufloat(0.5, 0.1), "J": 1.0 }
+        result = _prepare_params_for_task(2, params)
+        for key, value in params.items():
+            self.assertIn(key, result.keys())
+            self.assertNotIsInstance(result[key], UFloat)
+            if isinstance(value, UFloat):
+                self.assertEqual(result[key], value.nominal_value)
+            else:
+                self.assertEqual(result[key], value)
+
 
 if __name__ == "__main__":
     unittest.main()

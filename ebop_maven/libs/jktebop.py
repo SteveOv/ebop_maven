@@ -11,6 +11,7 @@ from pathlib import Path
 from string import Template
 import re
 
+from uncertainties import ufloat, UFloat
 import numpy as np
 from lightkurve import LightCurve
 from astropy.io import ascii as io_ascii
@@ -295,13 +296,16 @@ def read_fitted_params_from_par_file(par_filename: Path,
 
 
 def read_fitted_params_from_par_lines(par_lines: Iterable[str],
-                                      params: List[str]) -> Dict[str, Tuple[float, float]]:
+                                      params: List[str],
+                                      as_ufloat: bool=False) \
+                                    -> Union[Dict[str, Tuple[float, float]], Dict[str, UFloat]]:
     """
     Will retrieve the final values of the requested parameters from the
     passed on contents of a JKTEBOP Task 3 parameter output file (par)
 
     :par_lines: the content of the file
     :params: the list of params to read (see _param_file_line_beginswith for those supported)
+    :as_ufloat: if true values will output as UFloats, otherwise as Tuple[val, err]
     :returns: a dict with the value and any associated error for those parameters found
     """
     results = {}
@@ -313,8 +317,8 @@ def read_fitted_params_from_par_lines(par_lines: Iterable[str],
             for line in lines:
                 match = pattern.match(line)
                 if match and "val" in match.groupdict():
-                    val, err = match.group("val"), match.group("err") or 0
-                    results[param] = (float(val), float(err))
+                    val, err = float(match.group("val")), match.group("err") or 0
+                    results[param] = ufloat(val, float(err)) if as_ufloat else (val, float(err))
     return results
 
 
@@ -325,8 +329,7 @@ def _prepare_params_for_task(task: int,
                              params: dict,
                              fit_rA_and_rB: bool = False,
                              fit_e_and_omega: bool = False,
-                             calc_refl_coeffs: bool = False,
-                             in_place: bool = False) -> Union[None, Dict]:
+                             calc_refl_coeffs: bool = False) -> Union[None, Dict]:
     """
     Will prepare the passed params dictionary for subsequent use against a
     JKTEBOP in file template. This function understands the various JKTEBOP
@@ -346,31 +349,30 @@ def _prepare_params_for_task(task: int,
     if params is None:
         raise TypeError("params cannot be None")
 
-    new_params = params if in_place else params.copy()
+    # JKTEBOP will only take nominal values as input
+    params = { k: v.nominal_value if isinstance(v, UFloat) else v for (k, v) in params.items() }
 
     # Apply any defaults for rarely used params
-    new_params.setdefault("ring", 5)
+    params.setdefault("ring", 5)
 
     if fit_rA_and_rB:
         # indicate to JKTEBOP to fit/generate for rA and rB, rather than
         # rA+rB and k, by setting rA_plus_rB=-rA and k=rB.
         # Will give KeyErrors if the expected rA and rB values are not present
-        new_params["rA_plus_rB"] = np.negative(new_params["rA"])
-        new_params["k"] = new_params["rB"]
+        params["rA_plus_rB"] = np.negative(params["rA"])
+        params["k"] = params["rB"]
 
     if fit_e_and_omega:
         # indicate to JKTEBOP to fit/generate for e and omega, rather than the
         # Poincare elements ecosw and esinw, by setting ecosw=e+10, esinw=omega
         # Will give KeyErrors if the expected e and omega values are not present
-        new_params["ecosw"] = np.add(new_params["e"], 10.)
-        new_params["esinw"] = new_params["omega"]
+        params["ecosw"] = np.add(params["e"], 10.)
+        params["esinw"] = params["omega"]
 
     if task == 2 and calc_refl_coeffs:
         # For task 2 JKTEBOP supports calculating the reflected light coeffs.
         # To signal this set the coeffs to a large negative value.
-        new_params["reflA"] = -100
-        new_params["reflB"] = -100
+        params["reflA"] = -100
+        params["reflB"] = -100
 
-    if not in_place:
-        return new_params
-    return None
+    return params
