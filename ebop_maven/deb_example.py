@@ -15,8 +15,6 @@ stored_mags_features = {
     "mags_2048_1.0": (2048, 1.0),
     "mags_4096_0.75": (4096, 0.75),
     "mags_4096_1.0": (4096, 1.0),
-    "mags_8192_0.75": (8192, 0.75),
-    "mags_8192_1.0": (8192, 1.0),
 }
 default_mags_key = "mags_1024_0.75"                                                     # pylint: disable=invalid-name
 (default_mags_bins, default_mags_wrap_phase) = stored_mags_features[default_mags_key]   # pylint: disable=invalid-name
@@ -62,7 +60,7 @@ description = {
 }
 
 # Common options used when reading or writing a deb Example dataset file
-ds_options = tf.io.TFRecordOptions(compression_type="GZIP")
+ds_options = tf.io.TFRecordOptions(compression_type=None)
 
 def create_mags_key(mags_bins: int, mags_wrap_phase: float) -> str:
     """ Helper function to format a key to the stored_mags_features dict """
