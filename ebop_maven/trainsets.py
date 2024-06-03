@@ -113,44 +113,48 @@ def generate_instances_from_distributions(instance_count: int, label: str, verbo
     set_id = label.replace("trainset", "")
 
     while usable_counter < instance_count:
-        # These are the "label" params for which we have defined distributions
-        rA_plus_rB  = np.random.uniform(low=0.001, high=0.45001)
-        k           = np.random.normal(loc=0.8, scale=0.4)
-        inc         = np.random.uniform(low=50., high=90.00001) * u.deg
-        J           = np.random.normal(loc=0.8, scale=0.4)
+        while True: # imitate "loop and a half" / "repeat ... until" logic
+            # These are the "label" params for which we have defined distributions
+            rA_plus_rB  = np.random.uniform(low=0.001, high=0.45001)
+            k           = np.random.normal(loc=0.8, scale=0.4)
+            inc         = np.random.uniform(low=50., high=90.00001) * u.deg
+            J           = np.random.normal(loc=0.8, scale=0.4)
 
-        # We're once more predicting L3 as JKTEBOP is being updated to support
-        # negative L3 input values (so it's now fully trainable)
-        L3          = np.random.normal(0., 0.1)
-        L3          = 0 # continue to override this as L3 doesn't train well
+            # We're once more predicting L3 as JKTEBOP is being updated to support
+            # negative L3 input values (so it's now fully trainable)
+            L3          = np.random.normal(0., 0.1)
+            L3          = 0 # continue to override this as L3 doesn't train well
 
-        # The qphot mass ratio value (MB/MA) affects the lightcurve via the
-        # ellipsoidal effect from the distortion of the stars' shape. Generate
-        # a value from the ratio of the radii (or set to -1 to force spherical)
-        # The standard homology M-R ratios are a starting point;
-        # - low mass M-S stars;     M \propto R^2.5
-        # - high-mass M-S stars;    M \propto R^1.25
-        qphot       = np.random.normal(loc=k**2, scale=0.1)
+            # The qphot mass ratio value (MB/MA) affects the lightcurve via the ellipsoidal effect
+            # from the distortion of the stars' shape. Generate a value from the ratio of the radii
+            # (or set to -1 to force spherical). Standard homology M-R ratios are a starting point;
+            # - low mass M-S stars;     M \propto R^2.5
+            # - high-mass M-S stars;    M \propto R^1.25
+            qphot       = np.random.normal(loc=k**2, scale=0.1)
 
-        # We generate ecc and omega (argument of periastron) from appropriate
-        # distributions and then we subsequently calculate the values of
-        # the esinw and ecosw labels and primary/secondary impact params.
-        ecc         = np.abs(np.random.normal(loc=0.0, scale=0.2))
-        omega       = np.random.uniform(low=0., high=360.) * u.deg
+            # We generate ecc and omega (argument of periastron) from appropriate distributions.
+            # They're not used directly as labels, but they make up ecosw and esinw which are.
+            ecc         = np.abs(np.random.normal(loc=0.0, scale=0.2))
+            omega       = np.random.uniform(low=0., high=360.) * u.deg
 
-        # Now we can calculate the derived values
-        inc_rad     = inc.to(u.rad).value
-        omega_rad   = omega.to(u.rad).value
-        esinw       = ecc * np.sin(omega_rad)
-        ecosw       = ecc * np.cos(omega_rad)
-        rA          = rA_plus_rB / (1 + k)
-        rB          = rA_plus_rB - rA
-        imp_prm     = orbital.impact_parameter(rA, inc, ecc, None, esinw, orbital.EclipseType.BOTH)
+            # Now we can calculate the derived values, sufficient to check we've a usable system
+            inc_rad     = inc.to(u.rad).value
+            omega_rad   = omega.to(u.rad).value
+            esinw       = ecc * np.sin(omega_rad)
+            ecosw       = ecc * np.cos(omega_rad)
+            rA          = rA_plus_rB / (1 + k)
+            rB          = rA_plus_rB - rA
+            imp_prm     = orbital.impact_parameter(rA, inc, ecc, None, esinw,
+                                                   orbital.EclipseType.BOTH)
+
+            generated_counter += 1
+            inst_id = f"{set_id}/{generated_counter:06d}"
+            if _is_usable_system(rA, rB, J, qphot, ecc, inc, imp_prm):
+                break
 
         # Create the pset dictionary.
-        generated_counter += 1
-        pset = {
-            "id":           f"{set_id}/{generated_counter:06d}",
+        yield {
+            "id":           inst_id,
 
             # Basic system params for generating the model light-curve
             # The keys (& those for LD below) are those expected by make_dateset
@@ -176,12 +180,10 @@ def generate_instances_from_distributions(instance_count: int, label: str, verbo
             "bS":           imp_prm[1],                      
         }
 
-        if _is_usable_system(pset):
-            yield pset
-            usable_counter += 1
-            if verbose and usable_counter % 100 == 0:
-                print(f"{label}: Generated {usable_counter:,} usable",
-                      f"instances from {generated_counter:,} distinct configurations.")
+        usable_counter += 1
+        if verbose and usable_counter % 100 == 0:
+            print(f"{label}: Generated {usable_counter:,} usable",
+                    f"instances from {generated_counter:,} distinct configurations.")
 
 
 def write_trainset_from_models(pspace_file: Path,
@@ -415,7 +417,7 @@ def generate_instances_from_models(z: float,
                 "MB":           MB.to(u.solMass).value
             }
 
-            if _is_usable_system(pset):
+            if _is_usable_system(rA, rB, J, q, ecc, inc, imp_prm):
                 yield pset
                 usable_counter += 1
                 if verbose and usable_counter % 100 == 0:
@@ -488,30 +490,32 @@ def _calculate_file_splits(instance_count: int, file_count: int) -> List[int]:
     return file_instance_counts
 
 
-def _is_usable_system(pset: Dict) -> bool:
+def _is_usable_system(rA: float, rB: float, J: float, qphot: float,
+                      ecc: float, inc: float, imp_params: tuple[float]) -> bool:
     """
-    Checks various pset values to decide whether this represents a usable system.
+    Checks various  values to decide whether this represents a usable system.
     Checks on;
     - is system physically plausible
     - will it generate eclipses
     - is it suitable for modelling with JKTEBOP
     """
     usable = False
-    if pset:
-        # Physically plausible
-        k = pset.get("k", 0)
-        usable = k > 0 and pset.get("J", 0) > 0 \
-            and pset.get("qphot", 0) > 0 and pset.get("ecc", 0) < 1
 
-        # Will eclipse
-        if usable:
-            usable = all(pset.get(b, 0) <= 1 + k for b in ["bP", "bS"])
+    k = rB / rA
 
-        # Compatible with JKTEBOP restrictions
-        # Soft restriction of rA & rB both < 0.2 as its model is not suited to higher
-        # Hard resstrictions of rA+rB<0.8 (covered by above), inc and L3
-        if usable:
-            usable = all(pset.get(r, 0) <= 0.2 for r in ["rA", "rB"]) \
-                and pset.get("inc", 0) > 50 \
-                and -1 < pset.get("L3", 0) < 1
+    # Physically plausible
+    usable = k > 0 and J > 0 and qphot > 0 and ecc < 1
+
+    # Will eclipse
+    if usable:
+        usable = all(b <= 1 + k for b in imp_params)
+
+    # Compatible with JKTEBOP restrictions
+    # Soft restriction of rA & rB both < 0.2 as its model is not suited to higher
+    # Hard restrictions of rA+rB<0.8 (covered by above), inc > 50
+    # TODO: will need to extend this for L3 if we start to use non-Zero L3 values
+    if usable:
+        if isinstance(inc, u.Quantity):
+            inc = inc.to(u.deg).value
+        usable = rA < 0.2 and rB < 0.2 and inc > 50
     return usable
