@@ -239,7 +239,7 @@ def fit_against_formal_test_dataset(
 
         for comp_type, comp_head, comp_dicts in comparison_reports:
             if not do_control_fit: # Control == fit from labels not preds; no point producing these
-                preds_stem = f"predictions_{prediction_type}_vs_{comp_type}"
+                preds_stem = f"predictions-{prediction_type}-vs-{comp_type}"
                 plots.plot_predictions_vs_labels(comp_dicts, all_pred_dicts, trans_flags, fit_names,
                                 xlabel_prefix=comp_head).savefig(report_dir / f"{preds_stem}.eps")
 
@@ -253,7 +253,7 @@ def fit_against_formal_test_dataset(
                             preds_vs_labels_dicts_to_table(all_pred_dicts[mask], comp_dicts[mask],
                                                 all_targs[mask], fit_names, title=sub_head, to=txtf)
 
-            results_stem = f"fitted_params_from_{prediction_type}_vs_{comp_type}"
+            results_stem = f"fitted-params-from-{prediction_type}-vs-{comp_type}"
             plots.plot_predictions_vs_labels(comp_dicts, fitted_param_dicts, trans_flags, fit_names,
                                              xlabel_prefix=comp_head, ylabel_prefix="fitted") \
                                                     .savefig(report_dir / f"{results_stem}.eps")
