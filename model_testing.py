@@ -579,8 +579,8 @@ if __name__ == "__main__":
         with redirect_stdout(Tee(open(result_dir / "model_testing.log", "w", encoding="utf8"))):
             # Report on the performance of the model/Estimator predictions vs labels
             for pred_type, iters, dataset_dir, targs in [
-                    ("nonmc",   1,      FORMAL_TEST_DATASET_DIR,    None),
-                    ("mc",      1000,   FORMAL_TEST_DATASET_DIR,    None),
+                    ("nonmc",   1,      FORMAL_TEST_DATASET_DIR,    formal_targs),
+                    ("mc",      1000,   FORMAL_TEST_DATASET_DIR,    formal_targs),
                     ("nonmc",   1,      SYNTHETIC_MIST_TEST_DS_DIR, None),
                     # TODO: probably need a batched dataset for this as it's a memory hog
                     # ("mc",      1000,   SYNTHETIC_MIST_TEST_DS_DIR, None),
