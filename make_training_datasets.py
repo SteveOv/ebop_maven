@@ -66,10 +66,12 @@ if not "JKTEBOP_DIR" in os.environ:
 dataset_dir = datasets_root / "formal-training-dataset"
 dataset_dir.mkdir(parents=True, exist_ok=True)
 with redirect_stdout(Tee(open(dataset_dir / "trainset.log", "w", encoding="utf8"))):
-    trainsets.write_trainset_from_distributions(instance_count=100000,
-                                                file_count=10,
-                                                output_dir=dataset_dir,
-                                                verbose=True)
+    trainsets.write_trainset(instance_count=100000,
+                             file_count=10,
+                             output_dir=dataset_dir,
+                             generator_func=trainsets.generate_instances_from_distributions,
+                             verbose=True,
+                             simulate=False)
 
 trainsets.plot_trainset_histograms(dataset_dir, dataset_dir / "histogram_full.png", cols=3)
 trainsets.plot_trainset_histograms(dataset_dir, dataset_dir / "histogram_main.eps", cols=2,
@@ -81,24 +83,22 @@ with redirect_stdout(Tee(open(dataset_dir/"dataset.log", "a" if RESUME else "w",
                                 valid_ratio=0.2,
                                 test_ratio=0,
                                 resume=RESUME,
-                                max_workers=8,
+                                max_workers=5,
                                 verbose=True,
                                 simulate=False)
 
 # ------------------------------------------------------------------------------
 # A second testing dataset based on MIST models and a configured parameter space
 # ------------------------------------------------------------------------------
-pspace_config_file = config_dir / "synthetic-mist-tess-dataset.json"
 dataset_dir = datasets_root / "synthetic-mist-tess-dataset"
 dataset_dir.mkdir(parents=True, exist_ok=True)
 with redirect_stdout(Tee(open(dataset_dir / "trainset.log", "w", encoding="utf8"))):
-    trainsets.write_trainset_from_models(pspace_file=pspace_config_file,
-                                         output_dir=dataset_dir,
-                                         mission_name="TESS",
-                                         models_name="MIST",
-                                         drop_ratio=0.75,
-                                         verbose=True,
-                                         simulate=False)
+    trainsets.write_trainset(instance_count=10000,
+                             file_count=10,
+                             output_dir=dataset_dir,
+                             generator_func=trainsets.generate_instances_from_mist_models,
+                             verbose=True,
+                             simulate=False)
 
 trainsets.plot_trainset_histograms(dataset_dir, dataset_dir / "histogram_full.png", cols=3)
 trainsets.plot_trainset_histograms(dataset_dir, dataset_dir / "histogram_main.eps", cols=2,
@@ -110,7 +110,7 @@ with redirect_stdout(Tee(open(dataset_dir/"dataset.log", "a" if RESUME else "w",
                                 valid_ratio=0.,
                                 test_ratio=0.,
                                 resume=RESUME,
-                                max_workers=8,
+                                max_workers=5,
                                 verbose=True,
                                 simulate=False)
 
