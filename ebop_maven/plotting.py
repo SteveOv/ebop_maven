@@ -199,7 +199,7 @@ def plot_prediction_distributions_on_axes(ax: Axes,
         plot["cmins"].set(lw=1.0, alpha=0.75)
     else:
         # For customizations https://matplotlib.org/stable/gallery/statistics/boxplot.html
-        flier_props = { "marker": ".", "alpha": 0.5, "markersize": 3 }
+        flier_props = { "marker": "x", "alpha": 0.5 }
         ax.boxplot(xdata, showmeans=False, meanline=True, vert=True, patch_artist=False,
                    showfliers=show_fliers, flierprops=flier_props)
 

@@ -93,12 +93,13 @@ def evaluate_model_against_dataset(
     print("-----------------------------------")
 
     if report_dir:
-        # Produce a violin plot of the prediction residual for each predicted label/value
-        # Output to pdf which looks better as eps doesn't support transparency/alpha.
+        # Produce a box plot of the prediction residual for each predicted label/value
+        # Output to pdf, which looks better than eps, as pdf supports transparency/alpha.
         resids_by_label = (pred_vals - lbl_vals).transpose()[:len(label_names), :]
         fig, axes = plt.subplots(figsize=(6, 4), tight_layout=True)
+        fliers = "formal" in test_dataset_dir.name
         plotting.plot_prediction_distributions_on_axes(axes, resids_by_label, label_names,
-                                            violin_plot=False, show_fliers=False, ylabel="Residual")
+                                        violin_plot=False, show_fliers=fliers, ylabel="Residual")
         fig.savefig(report_dir / f"predictions-dist-{test_dataset_dir.name}-{prediction_type}.pdf")
     return lbl_vals, pred_vals
 
@@ -215,54 +216,61 @@ def fit_against_formal_test_dataset(
         jktebop.write_light_curve_to_dat_file(
                     lc, dat_fname, column_formats=[lambda t: f"{t.value:.6f}", "%.6f", "%.6f"])
 
-        # Don't consume the output files so they're available if we need any diagnostics
+        # Don't consume the output files so they're available if we need any diagnostics.
+        # Read superset of fit and label values as these data are needed for reports.
         print(f"\nFitting {targ} (with {sector_count} sector(s) of data) using JKTEBOP task 3...")
         par_fname = fit_dir / f"{fit_stem}.par"
         par_contents = list(jktebop.run_jktebop_task(in_fname, par_fname, stdout_to=sys.stdout))
-        fit_params_dict = jktebop.read_fitted_params_from_par_lines(par_contents, fit_names)
+        fit_params_dict = jktebop.read_fitted_params_from_par_lines(par_contents, super_names)
         fitted_param_dicts.append(fit_params_dict)
 
-        # Now report on how well the fitting has gone relative to the labels
         print(f"\nHave fitted {targ} resulting in the following fitted params")
         preds_vs_labels_dicts_to_table([fit_params_dict], [lbl_dict], [targ], fit_names,
                                        prediction_head="Fitted")
 
-    # Save reports on how the fitting has gone over all of the selected targets
+    # Save reports on how the predictions and fitting has gone over all of the selected targets
     fitted_param_dicts = np.array(fitted_param_dicts)
     if report_dir:
-        comparison_reports = [("labels", "Label", all_lbl_dicts)]
+        comparison_reports = [("labels", "label", all_lbl_dicts)]
         if comparison_dicts is not None:
-            comparison_reports += [("control", "Control", comparison_dicts)]
-        transit_sub_reports = [("All targets",                      [True]*len(all_targs)),
-                               ("\n\nTransiting systems only",      trans_flags),
-                               ("\n\nNon-transiting systems only",  ~trans_flags)]
+            comparison_reports += [("control", "control", comparison_dicts)]
+        sub_reports = [
+            ("All targets (model labels)",          [True]*len(all_targs),  estimator.label_names),
+            ("\nTransiting systems only",           trans_flags,            estimator.label_names),
+            ("\nNon-transiting systems only",       ~trans_flags,           estimator.label_names),
+            ("\n\n\nAll targets (fitting params)",  [True]*len(all_targs),  fit_names),
+            ("\nTransiting systems only",           trans_flags,            fit_names),
+            ("\nNon-transiting systems only",       ~trans_flags,           fit_names)]
 
         for comp_type, comp_head, comp_dicts in comparison_reports:
             if not do_control_fit: # Control == fit from labels not preds; no point producing these
                 preds_stem = f"predictions-{prediction_type}-vs-{comp_type}"
-                plots.plot_predictions_vs_labels(comp_dicts, all_pred_dicts, trans_flags, fit_names,
-                                xlabel_prefix=comp_head).savefig(report_dir / f"{preds_stem}.eps")
+                for (source, names) in [("model", estimator.label_names), ("fitting", fit_names)]:
+                    names = [n for n in names if n not in ["ecosw", "esinw"]] + ["ecosw", "esinw"]
+                    plots.plot_predictions_vs_labels(comp_dicts, all_pred_dicts, trans_flags, names,
+                        xlabel_prefix=comp_head).savefig(report_dir / f"{preds_stem}-{source}.eps")
 
                 # with open(report_dir / f"{preds_stem}.csv", mode="w", encoding="utf8") as csvf:
                 #     predictions_vs_labels_to_csv(
                 #                         comp_dicts, all_pred_dicts, all_targs, fit_names, to=csvf)
 
                 with open(report_dir / f"{preds_stem}.txt", mode="w", encoding="utf8") as txtf:
-                    for (sub_head, mask) in transit_sub_reports:
+                    for (sub_head, mask, rep_names) in sub_reports:
                         if any(mask):
                             preds_vs_labels_dicts_to_table(all_pred_dicts[mask], comp_dicts[mask],
-                                                all_targs[mask], fit_names, title=sub_head, to=txtf)
+                                                all_targs[mask], rep_names, title=sub_head, to=txtf)
 
             results_stem = f"fitted-params-from-{prediction_type}-vs-{comp_type}"
-            plots.plot_predictions_vs_labels(comp_dicts, fitted_param_dicts, trans_flags, fit_names,
+            names = [n for n in fit_names if n not in ["ecosw", "esinw"]] + ["ecosw", "esinw"]
+            plots.plot_predictions_vs_labels(comp_dicts, fitted_param_dicts, trans_flags, names,
                                              xlabel_prefix=comp_head, ylabel_prefix="fitted") \
                                                     .savefig(report_dir / f"{results_stem}.eps")
 
             with open(report_dir / f"{results_stem}.txt", "w", encoding="utf8") as txtf:
-                for (sub_head, mask) in transit_sub_reports:
+                for (sub_head, mask, rep_names) in sub_reports:
                     if any(mask):
                         preds_vs_labels_dicts_to_table(fitted_param_dicts[mask], comp_dicts[mask],
-                                                       all_targs[mask], fit_names, title=sub_head,
+                                                       all_targs[mask], rep_names, title=sub_head,
                                                        comparison_head=comp_head.capitalize(),
                                                        prediction_head="Fitted", to=txtf)
     return fitted_param_dicts
