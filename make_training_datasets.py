@@ -73,9 +73,9 @@ with redirect_stdout(Tee(open(dataset_dir / "trainset.log", "w", encoding="utf8"
                              verbose=True,
                              simulate=False)
 
-trainsets.plot_trainset_histograms(dataset_dir, dataset_dir / "histogram_full.png", cols=3)
-trainsets.plot_trainset_histograms(dataset_dir, dataset_dir / "histogram_main.eps", cols=2,
-                                    params=["rA_plus_rB", "k", "inc", "J", "ecosw", "esinw"])
+trainsets.plot_trainset_histograms(dataset_dir, dataset_dir / "train-histogram-full.png", cols=3)
+trainsets.plot_trainset_histograms(dataset_dir, dataset_dir / "train-histogram-main.eps", cols=2,
+                                    params=["rA_plus_rB", "k", "J", "inc", "ecosw", "esinw"])
 
 with redirect_stdout(Tee(open(dataset_dir/"dataset.log", "a" if RESUME else "w", encoding="utf8"))):
     datasets.make_dataset_files(trainset_files=sorted(dataset_dir.glob("trainset*.csv")),
@@ -100,9 +100,9 @@ with redirect_stdout(Tee(open(dataset_dir / "trainset.log", "w", encoding="utf8"
                              verbose=True,
                              simulate=False)
 
-trainsets.plot_trainset_histograms(dataset_dir, dataset_dir / "histogram_full.png", cols=3)
-trainsets.plot_trainset_histograms(dataset_dir, dataset_dir / "histogram_main.eps", cols=2,
-                                    params=["rA_plus_rB", "k", "inc", "J", "ecosw", "esinw"])
+trainsets.plot_trainset_histograms(dataset_dir, dataset_dir / "synth-histogram-full.png", cols=3)
+trainsets.plot_trainset_histograms(dataset_dir, dataset_dir / "synth-histogram-main.eps", cols=2,
+                                    params=["rA_plus_rB", "k", "J", "inc", "ecosw", "esinw"])
 
 with redirect_stdout(Tee(open(dataset_dir/"dataset.log", "a" if RESUME else "w", encoding="utf8"))):
     datasets.make_dataset_files(trainset_files=sorted(dataset_dir.glob("trainset*.csv")),
