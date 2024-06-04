@@ -4,14 +4,12 @@ Functions for generating binary system instances and writing their parameters to
 # Use ucase variable names where they match the equivalent symbol and pylint can't find units alias
 # pylint: disable=invalid-name, no-member
 
-from typing import Dict, List, Iterable, Callable, Generator
+from typing import List, Callable, Generator
 from pathlib import Path
 from inspect import getsourcefile
 from timeit import default_timer
 from datetime import timedelta
-from itertools import product, zip_longest
-import json
-import random
+from itertools import zip_longest
 import math
 
 import numpy as np
@@ -188,7 +186,6 @@ def generate_instances_from_distributions(instance_count: int, label: str, verbo
                     f"instances from {generated_counter:,} distinct configurations.")
 
 
-
 def generate_instances_from_mist_models(instance_count: int, label: str, verbose: bool=False):
     """
     Generates the requested number of system instances with a combination of random selecion
@@ -241,8 +238,8 @@ def generate_instances_from_mist_models(instance_count: int, label: str, verbose
             # We generate period, inc, ecc and omega (argument of periastron) from
             # appropriate distributions and then we subsequently calculate the values
             # of the esinw and ecosw labels and primary/secondary impact params.
-            per         = np.random.uniform(low=2.0, high=25) * u.d
-            inc         = np.random.uniform(low=70., high=90.00001) * u.deg
+            per         = np.random.uniform(low=2.5, high=25) * u.d
+            inc         = np.random.uniform(low=50., high=90.00001) * u.deg
             ecc         = np.abs(np.random.normal(loc=0.0, scale=0.2))
             omega       = np.random.uniform(low=0., high=360.) * u.deg
 
@@ -271,7 +268,7 @@ def generate_instances_from_mist_models(instance_count: int, label: str, verbose
         # Central surface brightness ratio (i.e. in absence of LD) within the mission's bandpass
         J = mission.expected_brightness_ratio(T_eff_A, T_eff_B)
 
-        # Lookup the LD coeffs. Minimum supported T_eff for pow2 coeffs is 350 0K
+        # Lookup the LD coeffs. Minimum supported T_eff for pow2 coeffs is 3500 K
         LD_ALGO = "pow2"
         ld_coeffs_A = limb_darkening.lookup_tess_pow2_ld_coeffs(loggA, max(T_eff_A, 3500 * u.K))
         ld_coeffs_B = limb_darkening.lookup_tess_pow2_ld_coeffs(loggB, max(T_eff_B, 3500 * u.K))
@@ -390,7 +387,7 @@ def _calculate_file_splits(instance_count: int, file_count: int) -> List[int]:
 
 
 def _is_usable_system(rA: float, rB: float, J: float, qphot: float,
-                      ecc: float, inc: float, imp_params: tuple[float]) -> bool:
+                      ecc: float, inc: float, imp_params: tuple[float], eclipse_baseline=1) -> bool:
     """
     Checks various  values to decide whether this represents a usable system.
     Checks on;
@@ -407,7 +404,7 @@ def _is_usable_system(rA: float, rB: float, J: float, qphot: float,
 
     # Will eclipse
     if usable:
-        usable = all(b <= 1 + k for b in imp_params)
+        usable = all(b <= eclipse_baseline + k for b in imp_params)
 
     # Compatible with JKTEBOP restrictions
     # Soft restriction of rA & rB both < 0.2 as its model is not suited to higher
