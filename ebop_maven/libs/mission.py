@@ -12,7 +12,7 @@ from pandas import DataFrame
 # pylint: disable=no-member
 import astropy.constants as const
 import astropy.units as u
-from astropy.units import Quantity, quantity_input
+from astropy.units import quantity_input
 
 class Mission(ABC):
     """ Base class for photemetry mission characteristics. """
@@ -92,8 +92,8 @@ class Mission(ABC):
         return radiance2 / radiance1
 
     @classmethod
-    @quantity_input(temperature=u.K, wavelength="length",)
-    def __bb_spectral_radiance(cls, temperature: Quantity, wavelegth: Quantity) \
+    @quantity_input
+    def __bb_spectral_radiance(cls, temperature: u.K, wavelegth: u.nm) \
                                             -> u.W / u.m**2 / u.sr / u.nm: # type: ignore
         """
         Calculates the blackbody spectral radiance:
@@ -105,10 +105,13 @@ class Mission(ABC):
         :wavelength: the wavelength of the radiation.
         :returns: the calculated radiance in units of W / m^2 / sr / nm
         """
-        pt1 = np.divide(np.multiply(2, np.multiply(const.h, np.power(const.c, 2))),
+        c = const.c
+        h = const.h
+        k_B = const.k_B # pylint: disable=invalid-name
+        pt1 = np.divide(np.multiply(2, np.multiply(h, np.power(c, 2))),
                         np.power(wavelegth, 5))
-        inr = np.divide(np.multiply(const.h, const.c),
-                        np.multiply(wavelegth, np.multiply(const.k_B, temperature)))
+        inr = np.divide(np.multiply(h, c),
+                        np.multiply(wavelegth, np.multiply(k_B, temperature)))
         pt2 = np.reciprocal(np.subtract(np.exp(inr), 1))
         return np.multiply(pt1, pt2) / u.sr
 

@@ -8,6 +8,7 @@ import pandas as pd
 from pandas import DataFrame
 import astropy.units as u
 from astropy.units import Quantity, quantity_input
+from numba import jit
 
 _this_dir = Path(getsourcefile(lambda:0)).parent
 
@@ -108,7 +109,7 @@ def __tess_power2_coeffs_table() -> DataFrame:
                     names=["logg", "Teff", "Z", "g", "h"],
                     index_col=["logg", "Teff"])
 
-
+@jit(nopython=True)
 def __round_to_nearest(value, nearest=1.):
     """
     Will round the passed value to the nearest value to the passed
