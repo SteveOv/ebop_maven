@@ -66,8 +66,8 @@ if not "JKTEBOP_DIR" in os.environ:
 dataset_dir = datasets_root / "formal-training-dataset"
 dataset_dir.mkdir(parents=True, exist_ok=True)
 with redirect_stdout(Tee(open(dataset_dir / "trainset.log", "w", encoding="utf8"))):
-    trainsets.write_trainset(instance_count=100000,
-                             file_count=10,
+    trainsets.write_trainset(instance_count=250000,
+                             file_count=25,
                              output_dir=dataset_dir,
                              generator_func=trainsets.generate_instances_from_distributions,
                              verbose=True,
