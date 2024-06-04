@@ -200,6 +200,7 @@ def make_dataset_file(trainset_file: Path,
     random.Random(this_seed).shuffle(row_indices)
     subset_slice_start = 0
     for subset, subset_file, subset_count in zip(subsets, subset_files, subset_values):
+        msg = None
         short_name = f"{subset_file.parent.name}/{subset_file.name}"
         if simulate:
             msg = f"{label}: Simulated saving {subset_count} {subset} instance(s) to {short_name}"
@@ -217,7 +218,7 @@ def make_dataset_file(trainset_file: Path,
             # Delete the existing file which may be left from previous run or we
             # will be left with too many rows, and duplicates, over the subsets.
             subset_file.unlink(missing_ok=True)
-        if verbose:
+        if verbose and msg:
             print(msg)
 
 
