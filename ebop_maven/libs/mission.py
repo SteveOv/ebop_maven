@@ -83,35 +83,35 @@ class Mission(ABC):
         mask = (response.index >= min(bandpass).to(u.nm).value) \
                 & (response.index <= max(bandpass).to(u.nm).value)
 
-        radiance1, radiance2 = 0., 0.
-        for lam in response[mask].index:
-            coeff = response.loc[lam].coefficient
-            lam *= u.nm
-            radiance1 += coeff * cls.__bb_spectral_radiance(t_eff_a, lam).value
-            radiance2 += coeff * cls.__bb_spectral_radiance(t_eff_b, lam).value
-        return radiance2 / radiance1
+        bins = response[mask].index.values * u.nm
+        coeffs = response[mask].coefficient.values
+
+        radiance_a = np.sum(np.multiply(coeffs, cls.__bb_spectral_radiance(t_eff_a, bins).value))
+        radiance_b = np.sum(np.multiply(coeffs, cls.__bb_spectral_radiance(t_eff_b, bins).value))
+        return radiance_b / radiance_a
+
 
     @classmethod
     @quantity_input
-    def __bb_spectral_radiance(cls, temperature: u.K, wavelegth: u.nm) \
-                                            -> u.W / u.m**2 / u.sr / u.nm: # type: ignore
+    def __bb_spectral_radiance(cls, temperature: u.K, wavelengths: np.ndarray[u.nm]) \
+        -> np.ndarray[u.W / u.m**2 / u.sr / u.nm]: # type: ignore
         """
         Calculates the blackbody spectral radiance:
-        power / (area*solid angle*wavelength) at a given temperature and wavelength.
+        power / (area*solid angle*wavelength) at the given temperature and each wavelength
 
         Uses: B_λ(T) = (2hc^2)/λ^5 * 1/(exp(hc/λkT)-1)
         
         :temperature: the temperature of the body in K
-        :wavelength: the wavelength of the radiation.
-        :returns: the calculated radiance in units of W / m^2 / sr / nm
+        :wavelengths: the wavelength bins at which of the radiation is to be calculated.
+        :returns: NDArray of the calculated radiance, in units of W / m^2 / sr / nm, at each bin
         """
         c = const.c
         h = const.h
         k_B = const.k_B # pylint: disable=invalid-name
         pt1 = np.divide(np.multiply(2, np.multiply(h, np.power(c, 2))),
-                        np.power(wavelegth, 5))
+                        np.power(wavelengths, 5))
         inr = np.divide(np.multiply(h, c),
-                        np.multiply(wavelegth, np.multiply(k_B, temperature)))
+                        np.multiply(wavelengths, np.multiply(k_B, temperature)))
         pt2 = np.reciprocal(np.subtract(np.exp(inr), 1))
         return np.multiply(pt1, pt2) / u.sr
 
