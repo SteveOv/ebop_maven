@@ -251,7 +251,7 @@ class StellarModels(ABC):
             values = self._models_df.index.get_level_values(index_col_name)
         else:
             index_df = self._models_df.index.to_frame()
-            mask = [True] * len(index_df)
+            mask = np.full((len(index_df)), True)
             for fname, fval in filter_by.items():
                 if fname and fval is not None:
                     fname = fname.upper()
