@@ -327,6 +327,7 @@ def plot_trainset_histograms(trainset_dir: Path,
                              plot_file: Path=None,
                              params: List[str]=None,
                              cols: int=3,
+                             yscale: str="log",
                              verbose: bool=True):
     """
     Saves histogram plots to a single figure on a grid of axes. The params will
@@ -337,6 +338,7 @@ def plot_trainset_histograms(trainset_dir: Path,
     :parameters: the list of parameters to plot, or the full list if None.
     See the histogram_parameters attribute for the full list
     :cols: the width of the axes grid (the rows automatically adjust)
+    :yscale: set to "linear" or "log" to control the y-axis scale
     :verbose: whether to print verbose progress/diagnostic messages
     """
     if not params:
@@ -346,10 +348,9 @@ def plot_trainset_histograms(trainset_dir: Path,
     csvs = sorted(trainset_dir.glob("trainset*.csv"))
 
     if param_specs and csvs:
-        size = 3
         rows = math.ceil(len(param_specs) / cols)
         _, axes = plt.subplots(rows, cols, sharey="all",
-                               figsize=(cols*size, rows*size), constrained_layout=True)
+                               figsize=(cols*3, rows*2.5), constrained_layout=True)
         if verbose:
             print(f"Plotting histograms in a {cols}x{rows} grid for:", ", ".join(param_specs))
 
@@ -363,6 +364,7 @@ def plot_trainset_histograms(trainset_dir: Path,
                 ax.set_xlabel(label)
                 ax.tick_params(axis="both", which="both", direction="in",
                                top=True, bottom=True, left=True, right=True)
+                ax.set_yscale(yscale)
             else:
                 ax.axis("off") # remove the unused ax
 
