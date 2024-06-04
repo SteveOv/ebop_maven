@@ -261,7 +261,9 @@ def generate_instances_from_mist_models(instance_count: int, label: str, verbose
 
             generated_counter += 1
             inst_id = f"{set_id}/{generated_counter:06d}"
-            if _is_usable_system(rA, rB, 1.0, q, ecc, inc, imp_prm): # Assume J will be OK
+            # Assume J will be OK to defer expensive calc
+            # Use eclipse_baseline of 0.9 rather than 1.0 so we don't parse negligible eclipses
+            if _is_usable_system(rA, rB, 1.0, q, ecc, inc, imp_prm, eclipse_baseline=0.9):
                 break
         # End of do ... until bock
 
