@@ -580,7 +580,10 @@ if __name__ == "__main__":
         trainset_name = the_estimator.metadata["trainset_name"]
         mags_key = deb_example.create_mags_key(the_estimator.mags_feature_bins,
                                                the_estimator.mags_feature_wrap_phase)
-        result_dir = Path(f"./drop/results/{model_file.stem if model_file else 'default-model'}")
+        if model_file is None or model_file.parent == "estimator": # model published with ebop_maven
+            result_dir = Path("./drop/training/ebop_maven/published/testing")
+        else:
+            result_dir = model_file.parent / "testing"
         result_dir.mkdir(parents=True, exist_ok=True)
 
         labs, all_preds = None, {}

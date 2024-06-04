@@ -26,8 +26,8 @@ MAGS_WRAP_PHASE = 0.75
 CHOSEN_LABELS = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "bP"]
 
 MODEL_NAME = f"CNN-New-Ext{len(CHOSEN_FEATURES)}-{'-'.join(CHOSEN_LABELS[5:])}-{MAGS_BINS}-{MAGS_WRAP_PHASE}"
-MODEL_FILE_NAME = MODEL_NAME.lower()
-SAVE_DIR = Path(".") / "drop/"
+MODEL_FILE_NAME = "default-model"
+SAVE_DIR = Path("./drop/training") / MODEL_NAME.lower()
 PLOTS_DIR = SAVE_DIR / "plots"
 
 # We can now specify paths to train/val/test datasets separately for greater flexibility.
