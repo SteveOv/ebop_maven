@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 from contextlib import redirect_stdout
 
-from ebop_maven import trainsets, datasets, deb_example
+from ebop_maven import trainsets, datasets
 from ebop_maven.libs.tee import Tee
 
 RESUME = False
@@ -63,11 +63,12 @@ if not "JKTEBOP_DIR" in os.environ:
 # ------------------------------------------------------------------------------
 # The formal training dataset based on sampling parameter distributions
 # ------------------------------------------------------------------------------
-dataset_dir = datasets_root / "formal-training-dataset"
+DATASET_SIZE = 250000
+dataset_dir = datasets_root / f"formal-training-dataset-{DATASET_SIZE // 1000}k"
 dataset_dir.mkdir(parents=True, exist_ok=True)
 with redirect_stdout(Tee(open(dataset_dir / "trainset.log", "w", encoding="utf8"))):
-    trainsets.write_trainset(instance_count=250000,
-                             file_count=25,
+    trainsets.write_trainset(instance_count=DATASET_SIZE,
+                             file_count=DATASET_SIZE // 10000,
                              output_dir=dataset_dir,
                              generator_func=trainsets.generate_instances_from_distributions,
                              verbose=True,
@@ -90,10 +91,11 @@ with redirect_stdout(Tee(open(dataset_dir/"dataset.log", "a" if RESUME else "w",
 # ------------------------------------------------------------------------------
 # A second testing dataset based on MIST models and a configured parameter space
 # ------------------------------------------------------------------------------
+DATASET_SIZE = 20000
 dataset_dir = datasets_root / "synthetic-mist-tess-dataset"
 dataset_dir.mkdir(parents=True, exist_ok=True)
 with redirect_stdout(Tee(open(dataset_dir / "trainset.log", "w", encoding="utf8"))):
-    trainsets.write_trainset(instance_count=20000,
+    trainsets.write_trainset(instance_count=DATASET_SIZE,
                              file_count=10,
                              output_dir=dataset_dir,
                              generator_func=trainsets.generate_instances_from_mist_models,
