@@ -93,7 +93,7 @@ with redirect_stdout(Tee(open(dataset_dir/"dataset.log", "a" if RESUME else "w",
 dataset_dir = datasets_root / "synthetic-mist-tess-dataset"
 dataset_dir.mkdir(parents=True, exist_ok=True)
 with redirect_stdout(Tee(open(dataset_dir / "trainset.log", "w", encoding="utf8"))):
-    trainsets.write_trainset(instance_count=10000,
+    trainsets.write_trainset(instance_count=20000,
                              file_count=10,
                              output_dir=dataset_dir,
                              generator_func=trainsets.generate_instances_from_mist_models,
