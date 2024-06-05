@@ -5,6 +5,7 @@ Trains a regression CNN to estimate fitting parameters from folded dEB light cur
 from pathlib import Path
 import os
 import random as python_random
+import json
 
 import numpy as np
 import pandas as pd
@@ -248,5 +249,8 @@ if __name__ == "__main__":
     # -----------------------------------------------------------
     # We use scaled prediction so the MAE/MSE is comperable with model.fit() and model.evaluate()
     print("\n *** Running formal test against real data ***")
-    model_testing.evaluate_model_against_dataset(model_save_file, 1, scaled=True)
-    model_testing.evaluate_model_against_dataset(model_save_file, 1000, scaled=True)
+    with open("./config/formal-test-dataset.json", mode="r", encoding="utf8") as tf:
+        targs_config = json.load(tf)
+    usable_targs = np.array([t for t, c in targs_config.items() if not c.get("exclude", False)])
+    model_testing.evaluate_model_against_dataset(model_save_file, 1, usable_targs, scaled=True)
+    model_testing.evaluate_model_against_dataset(model_save_file, 1000, usable_targs, scaled=True)
