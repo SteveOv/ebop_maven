@@ -229,7 +229,9 @@ def iterate_dataset(dataset_files: Iterable[str],
                     ext_features: List[str] = None,
                     labels: List[str]=None,
                     identifiers: List[str]=None,
-                    scale_labels: bool=False):
+                    scale_labels: bool=False,
+                    noise_stddev: float = 0.,
+                    roll_max: int = 0):
     """
     Utility/diagnostics function which will parse a saved dataset yielding rows,
     and within the rows labels and features, which match the requested criteria.
@@ -250,6 +252,8 @@ def iterate_dataset(dataset_files: Iterable[str],
     :labels: a chosen subset of the available labels, in this order, or all if None
     :identifiers: optional list of ids to yield, or all ids if None
     :scale_values: if True values will be scaled
+    :noise_stddev: the standard deviation of Gaussian Noise to add to the mags feature
+    :roll_max: the maximum random roll to apply to the mags feature
     :returns: for each matching row yields a tuple of (id, mags vals, ext feature vals, label vals)
     """
     # pylint: disable=too-many-arguments, too-many-locals
@@ -267,6 +271,17 @@ def iterate_dataset(dataset_files: Iterable[str],
     def map_func(record_bytes):
         example = tf.io.parse_single_example(record_bytes, description)
         mags_feature = example[mags_key]
+
+        # Apply any required random perturbations to the model mags
+        if noise_stddev:
+            if noise_stddev:
+                mags_feature += tf.random.normal(mags_feature.shape, stddev=noise_stddev)
+
+        if roll_max:
+            roll_by = tf.random.uniform([], -roll_max, roll_max+1, tf.int32)
+            if roll_by != 0:
+                mags_feature = tf.roll(mags_feature, [roll_by], axis=[0])
+
         ext_features = [example.get(k, d) for (k, d) in chosen_ext_feats.items()]
         if scale_labels:
             labels = [example[k] * s for k, s in chosen_labels.items()]
@@ -288,7 +303,9 @@ def read_dataset(dataset_files: Iterable[str],
                  ext_features: List[str] = None,
                  labels: List[str]=None,
                  identifiers: List[str]=None,
-                 scale_labels: bool=False):
+                 scale_labels: bool=False,
+                 noise_stddev: float = 0.,
+                 roll_max: int = 0):
     """
     Wrapper around iterate_dataset() which handles the iteration and returns separate
     np ndarrays for the dataset ids, mags values, feature values and label values.
@@ -302,13 +319,16 @@ def read_dataset(dataset_files: Iterable[str],
     :labels: a chosen subset of the available labels, in this order, or all if None
     :identifiers: optional list of ids to yield, or all ids if None
     :scale_values: if True values will be scaled
+    :noise_stddev: the standard deviation of Gaussian Noise to add to the mags feature
+    :roll_max: the maximum random roll to apply to the mags feature
     :returns: Tuple[
     NDArray[#insts, 1], NDArray[#insts, #bins], NDArray[#insts, #feats], NDArray[#insts, #labels]]
     """
     # pylint: disable=too-many-arguments, too-many-locals
     ids, mags_vals, feature_vals, label_vals = [], [], [], []
     for row in iterate_dataset(dataset_files, mags_bins, mags_wrap_phase,
-                               ext_features, labels, identifiers, scale_labels):
+                               ext_features, labels, identifiers, scale_labels,
+                               noise_stddev, roll_max):
         ids += [row[0]]
         mags_vals += [row[1]]
         feature_vals += [row[2]]

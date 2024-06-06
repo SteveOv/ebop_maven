@@ -64,13 +64,21 @@ def evaluate_model_against_dataset(
     tfrecord_files = sorted(test_dataset_dir.glob("**/*.tfrecord"))
     print(f"found {len(tfrecord_files)} file(s).")
 
+    # Set up augmentations to perturb synthetic data as we do for the full pipeline
+    noise_stddev, roll_max = 0, 0
+    if test_dataset_dir != FORMAL_TEST_DATASET_DIR:
+        noise_stddev = 0.005
+        roll_max = 36
+
     ids, mags_vals, feat_vals, lbl_vals = deb_example.read_dataset(tfrecord_files,
                                                                 estimator.mags_feature_bins,
                                                                 estimator.mags_feature_wrap_phase,
                                                                 estimator.input_feature_names,
                                                                 label_names,
                                                                 include_ids,
-                                                                scaled)
+                                                                scaled,
+                                                                noise_stddev,
+                                                                roll_max)
 
     if include_ids is not None:
         assert len(include_ids) == len(ids)
@@ -602,21 +610,21 @@ if __name__ == "__main__":
 
             # Report on fitting the formal-test-dataset based on estimator predictions. First run
             # through actually uses labels as the fit inputs to give us a set of control fit results
-            control_fit_dicts = None # To be set on the first, control fit run
-            for (pred_type, is_control_fit, iterations) in [
-                ("control",     True,       0),
-                ("nonmc",       False,      1),
-                ("mc",          False,      1000),
-            ]:
-                print(f"\nTesting JKTEBOP fitting of {pred_type} input values\n" + "="*80)
-                compare_dicts = None if is_control_fit else control_fit_dicts
-                fit_results_dicts = fit_against_formal_test_dataset(the_estimator,
-                                                                    formal_targs_cfg,
-                                                                    formal_targs,
-                                                                    iterations,
-                                                                    True,
-                                                                    is_control_fit,
-                                                                    compare_dicts,
-                                                                    result_dir)
-                if is_control_fit:
-                    control_fit_dicts = fit_results_dicts
+            # control_fit_dicts = None # To be set on the first, control fit run
+            # for (pred_type, is_control_fit, iterations) in [
+            #     ("control",     True,       0),
+            #     ("nonmc",       False,      1),
+            #     ("mc",          False,      1000),
+            # ]:
+            #     print(f"\nTesting JKTEBOP fitting of {pred_type} input values\n" + "="*80)
+            #     compare_dicts = None if is_control_fit else control_fit_dicts
+            #     fit_results_dicts = fit_against_formal_test_dataset(the_estimator,
+            #                                                         formal_targs_cfg,
+            #                                                         formal_targs,
+            #                                                         iterations,
+            #                                                         True,
+            #                                                         is_control_fit,
+            #                                                         compare_dicts,
+            #                                                         result_dir)
+            #     if is_control_fit:
+            #         control_fit_dicts = fit_results_dicts
