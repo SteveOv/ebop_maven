@@ -18,9 +18,12 @@ import astropy.units as u
 
 from .libs import param_sets, orbital, limb_darkening
 from .libs.mission import Mission
-from .libs.stellarmodels import StellarModels
+from .libs.mistisochrones import MistIsochrones
 
 _this_dir = Path(getsourcefile(lambda:0)).parent
+
+# TODO: better way to share inst over multiple calls to generate_instances_from_mist_models()
+_mist_isochones = MistIsochrones()
 
 # Useable "general use" limb-darkening algo and coefficients
 # for a F-type star T_eff~7200 K and logg~4.0
@@ -206,34 +209,43 @@ def generate_instances_from_mist_models(instance_count: int, label: str, verbose
     usable_counter = 0
     set_id = label.replace("trainset", "")
 
-    # These are the available values from which we can select MIST lookup values
-    models = StellarModels.get_instance("MIST")
     mission = Mission.get_instance("TESS")
-    z_values = models.list_distinct_z_values()
-    initial_mass_values = models.list_distinct_initial_masses()
-    initial_mass_values = [m.value for m in initial_mass_values if 0.4 <= m.value <= 6.4]
+
+    feh_values = _mist_isochones.list_metallicities()
+    min_mass, max_mass = 0.4, 20.0
+    min_phase, max_phase = 0.0, 2.0 # M-S to RGB
+    cols = ["star_mass", "log_R", "log_Teff", "log_L", "log_g"]
 
     while usable_counter < instance_count:
         while True: # imitate "loop and a half" / do ... until logic
-            # These are the basic parameters we need for MIST lookups
-            z = np.random.choice(z_values)
-            y = np.random.choice(models.list_distinct_y_values(z))
-            init_MA = np.random.choice(initial_mass_values) * u.solMass
-            init_MB = np.random.choice(initial_mass_values) * u.solMass
-            if init_MB > init_MA:
-                init_MA, init_MB = init_MB, init_MA
+            # Get a list of initial masses at a random metallicity & age to choose our stars from
+            feh = np.random.choice(feh_values)
+            ages = _mist_isochones.list_ages(feh, min_phase, max_phase)
+            while True:
+                age = np.random.choice(ages) * u.dex(u.yr)
+                init_masses = _mist_isochones.list_initial_masses(feh, age.value,
+                                                                  min_phase, max_phase,
+                                                                  min_mass, max_mass)
+                if len(init_masses):
+                    break
 
-            # TODO: age algo copied over; look to move to random selection. If we implement random
-            #       selection we probably want to filter on phase which isn't currently supported.
-            age = 9.5 * u.dex(u.yr) # ~ 3.5 Gyr
-            max_mass = max(init_MA, init_MB)
-            if max_mass > 1.0 * u.solMass:
-                all_ages = sorted(models.list_distinct_ages(max_mass))
-                age = all_ages[int(np.ceil(len(all_ages) * 0.9))]# tends to later M-S
+            # Choose our stars and then get the basic physical params from the isochrones
+            init_MA = np.random.choice(init_masses) * u.solMass
+            init_MB = np.random.choice(init_masses[init_masses <= init_MA.value]) * u.solMass
 
-            # With which we can lookup the current physical stellar parameters
-            MA, RA, T_eff_A, LA, loggA = models.lookup_stellar_parameters(z, y, init_MA, age)
-            MB, RB, T_eff_B, LB, loggB = models.lookup_stellar_parameters(z, y, init_MB, age)
+            results = _mist_isochones.lookup_stellar_params(feh, age.value, init_MA.value, cols)
+            MA          = results["star_mass"] * u.solMass
+            RA          = np.power(10, results["log_R"]) * u.solRad
+            T_eff_A     = np.power(10, results["log_Teff"]) * u.K
+            LA          = np.power(10, results["log_L"]) * u.solLum
+            loggA       = results["log_g"] * u.dex(u.cm / u.s**2)
+
+            results = _mist_isochones.lookup_stellar_params(feh, age.value, init_MB.value, cols)
+            MB          = results["star_mass"] * u.solMass
+            RB          = np.power(10, results["log_R"]) * u.solRad
+            T_eff_B     = np.power(10, results["log_Teff"]) * u.K
+            LB          = np.power(10, results["log_L"]) * u.solLum
+            loggB       = results["log_g"] * u.dex(u.cm / u.s**2)
 
             # We generate period, inc, ecc and omega (argument of periastron) from
             # appropriate distributions and then we subsequently calculate the values
