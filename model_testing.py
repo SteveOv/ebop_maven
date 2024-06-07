@@ -611,7 +611,7 @@ if __name__ == "__main__":
 
             # Report on fitting the formal-test-dataset based on estimator predictions. First run
             # through actually uses labels as the fit inputs to give us a set of control fit results
-            # control_fit_dicts = None # To be set on the first, control fit run
+            control_fit_dicts = None # To be set on the first, control fit run
             for (pred_type, is_control_fit, iterations) in [
                 ("control",     True,       0),
                 ("nonmc",       False,      1),
