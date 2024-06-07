@@ -272,10 +272,9 @@ def iterate_dataset(dataset_files: Iterable[str],
         example = tf.io.parse_single_example(record_bytes, description)
         mags_feature = example[mags_key]
 
-        # Apply any required random perturbations to the model mags
+        # Apply any required random augmentations to the model mags
         if noise_stddev:
-            if noise_stddev:
-                mags_feature += tf.random.normal(mags_feature.shape, stddev=noise_stddev)
+            mags_feature += tf.random.normal(mags_feature.shape, stddev=noise_stddev)
 
         if roll_max:
             roll_by = tf.random.uniform([], -roll_max, roll_max+1, tf.int32)

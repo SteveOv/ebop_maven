@@ -64,7 +64,7 @@ def evaluate_model_against_dataset(
     tfrecord_files = sorted(test_dataset_dir.glob("**/*.tfrecord"))
     print(f"found {len(tfrecord_files)} file(s).")
 
-    # Set up augmentations to perturb synthetic data as we do for the full pipeline
+    # Set up augmentations to perturb synthetic data as we do for the full training pipeline
     noise_stddev, roll_max = 0, 0
     if test_dataset_dir != FORMAL_TEST_DATASET_DIR:
         noise_stddev = 0.005
