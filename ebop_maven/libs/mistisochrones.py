@@ -14,7 +14,12 @@ class MistIsochrones():
     """
     _this_dir = Path(getsourcefile(lambda:0)).parent
 
-    def __init__(self) -> None:
+    def __init__(self, metallicities: list[float]=None) -> None:
+        """
+        Initializes a MistIsochrones class.
+
+        :metallicities: optional list of metallicities to load by feh value, or any found if not set
+        """
         isos_dir = self._this_dir / "data/stellar_models/mist/MIST_v1.2_vvcrit0.4_basic_isos"
         iso_files = sorted(isos_dir.glob("*.iso"))
 
@@ -26,7 +31,8 @@ class MistIsochrones():
             if match and "feh" in match.groupdict():
                 pm = -1 if (match.group("pm") or "p") == "m" else 1
                 feh = float(match.group("feh")) * pm
-                self._isos[feh] = ISO(f"{iso_file.resolve()}")
+                if metallicities is None or feh in metallicities:
+                    self._isos[feh] = ISO(f"{iso_file.resolve()}")
             else:
                 raise Warning(f"Unexpected iso file name format: {iso_file}")
 
@@ -105,3 +111,33 @@ class MistIsochrones():
         age_block = iso.isos[iso.age_index(age)]
         row = age_block[age_block["initial_mass"] == initial_mass]
         return { col: row[col][0] for col in cols }
+
+    def lookup_zams_params(self, feh: float, cols: list[str|int]) -> np.ndarray:
+        """
+        Will get the values for the chosen metallicity and columns across the
+        zero age main-sequence (ZAMS) equivalent evolutionary point (EEP).
+
+        :feh: the metallicity key value - used to select the appropiate isochrone
+        :cols: the columns to return
+        :returns: a 2-d NDArray[cols, rows] with cols in the input order
+        """
+        # We look for the first M-S EEP (equivalent evolutionary point) which is 202.
+        return self._get_eep_column_values(feh, 202, 0.0, cols)
+
+    def lookup_tams_params(self, feh: float, cols: list[str|int]) -> np.ndarray:
+        """
+        Will get the values for the chosen metallicity and columns across the
+        terminal age main-sequence (TAMS) equivalent evolutionary point (EEP).
+
+        :feh: the metallicity key value - used to select the appropiate isochrone
+        :cols: the columns to return
+        :returns: a 2-d NDArray[cols, rows] with cols in the input order
+        """
+        # We look for the last M-S EEP (equivalent evolutionary point) which is 453
+        return self._get_eep_column_values(feh, 453, 0.0, cols)
+
+    def _get_eep_column_values(self, feh: float, eep: int, phase: float, cols: list[str|int]):
+        # Two stage process as imposing both eep and phase criteria may yield empty rows
+        iso = self._isos[feh]
+        rows = (ab[(ab["EEP"]==eep) & (ab["phase"]==phase)] for ab in iso.isos if eep in ab["EEP"])
+        return np.array([list(row[0][cols]) for row in rows if len(row) > 0]).transpose()

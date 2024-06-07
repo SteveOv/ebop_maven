@@ -1,14 +1,13 @@
-""" Matplotlib plotting helper functions.  *** TO BE DEPRECATED *** """
+""" Matplotlib plotting helper functions.  *** Funcs to be move away *** """
 from typing import Tuple, List, Dict, Union
 import math
-from pathlib import Path
-import json
 
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 import numpy as np
 
 from ebop_maven.plotting import format_axes
+from ebop_maven.libs.mistisochrones import MistIsochrones
 import model_testing
 
 
@@ -110,7 +109,6 @@ def plot_formal_test_dataset_hr_diagram(targets_cfg: Dict[str, any],
         print("Plotting log(Teff) vs log(L) 'H-R' diagram")
     if verbose:
         print("Loading MIST isochrone for ZAMS data")
-    isos = _read_mist_isos()
 
     fig = plt.figure(figsize=(6, 4), tight_layout=True)
     ax = fig.add_subplot(1, 1, 1)
@@ -127,43 +125,11 @@ def plot_formal_test_dataset_hr_diagram(targets_cfg: Dict[str, any],
                                f"log(y) range [{min(y):.3f}, {max(y):.3f}]")
 
     # Now plot a ZAMS line from the MIST on the same criteria
-    x = [eep[eep["phase"] == 0][0]["log_Teff"] for eep in isos]
-    y = [eep[eep["phase"] == 0][0]["log_L"] for eep in isos]
-    ax.plot(x, y, c="k", ls=(0, (15, 5)), linewidth=0.5, label="ZAMS", zorder=-10)
+    mist_isos = MistIsochrones(metallicities=[0.0])
+    zams = mist_isos.lookup_zams_params(feh=0.0, cols=["log_Teff", "log_L"])
+    ax.plot(zams[0], zams[1], c="k", ls=(0, (15, 5)), linewidth=0.5, label="ZAMS", zorder=-10)
+
     format_axes(ax, xlim=(4.45, 3.35), ylim=(-2.6, 4.5),
                 xlabel= r"$\log{(\mathrm{T_{eff}\,/\,K})}$",
                 ylabel=r"$\log{(\mathrm{L\,/\,L_{\odot}})}$")
     return fig
-
-
-def _read_mist_isos(file_name: Path=None) -> List:
-    """
-    Read in a MIST iso file and return an isos list.
-    Just a cut down copy of the sample MIST code.
-    """
-    if not file_name:
-        file_name = Path.cwd() / "config/MIST_v1.2_feh_p0.00_afe_p0.0_vvcrit0.0_basic.iso"
-
-    isos = []
-    with open(file_name, mode="r", encoding="utf8") as isof:
-        content = [line.split() for line in isof]
-
-        #read one block for each isochrone
-        counter = 0
-        data = content[8:]
-        num_ages = int(content[6][-1])
-        for _ in range(num_ages):
-            # grab info for each isochrone
-            num_eeps = int(data[counter][-2])
-            num_cols = int(data[counter][-1])
-            hdr_list = data[counter+2][1:]
-            formats = tuple([np.int32]+[np.float64 for i in range(num_cols-1)])
-            iso = np.zeros((num_eeps),{'names':tuple(hdr_list),'formats':tuple(formats)})
-
-            # read through EEPs for each isochrone
-            for eep in range(num_eeps):
-                iso_chunk = data[3+counter+eep]
-                iso[eep]=tuple(iso_chunk)
-            isos.append(iso)
-            counter+=3+num_eeps+2
-    return isos
