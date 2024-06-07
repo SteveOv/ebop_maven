@@ -611,20 +611,20 @@ if __name__ == "__main__":
             # Report on fitting the formal-test-dataset based on estimator predictions. First run
             # through actually uses labels as the fit inputs to give us a set of control fit results
             # control_fit_dicts = None # To be set on the first, control fit run
-            # for (pred_type, is_control_fit, iterations) in [
-            #     ("control",     True,       0),
-            #     ("nonmc",       False,      1),
-            #     ("mc",          False,      1000),
-            # ]:
-            #     print(f"\nTesting JKTEBOP fitting of {pred_type} input values\n" + "="*80)
-            #     compare_dicts = None if is_control_fit else control_fit_dicts
-            #     fit_results_dicts = fit_against_formal_test_dataset(the_estimator,
-            #                                                         formal_targs_cfg,
-            #                                                         formal_targs,
-            #                                                         iterations,
-            #                                                         True,
-            #                                                         is_control_fit,
-            #                                                         compare_dicts,
-            #                                                         result_dir)
-            #     if is_control_fit:
-            #         control_fit_dicts = fit_results_dicts
+            for (pred_type, is_control_fit, iterations) in [
+                ("control",     True,       0),
+                ("nonmc",       False,      1),
+                ("mc",          False,      1000),
+            ]:
+                print(f"\nTesting JKTEBOP fitting of {pred_type} input values\n" + "="*80)
+                compare_dicts = None if is_control_fit else control_fit_dicts
+                fit_results_dicts = fit_against_formal_test_dataset(the_estimator,
+                                                                    formal_targs_cfg,
+                                                                    formal_targs,
+                                                                    iterations,
+                                                                    True,
+                                                                    is_control_fit,
+                                                                    compare_dicts,
+                                                                    result_dir)
+                if is_control_fit:
+                    control_fit_dicts = fit_results_dicts
