@@ -212,7 +212,6 @@ def generate_instances_from_mist_models(instance_count: int, label: str, verbose
     mission = Mission.get_instance("TESS")
 
     feh_values = _mist_isochones.list_metallicities()
-    min_mass, max_mass = 0.4, 20.0
     min_phase, max_phase = 0.0, 2.0 # M-S to RGB
     cols = ["star_mass", "log_R", "log_Teff", "log_L", "log_g"]
 
@@ -225,7 +224,7 @@ def generate_instances_from_mist_models(instance_count: int, label: str, verbose
                 age = np.random.choice(ages) * u.dex(u.yr)
                 init_masses = _mist_isochones.list_initial_masses(feh, age.value,
                                                                   min_phase, max_phase,
-                                                                  min_mass, max_mass)
+                                                                  min_mass=0.4, max_mass=20.0)
                 if len(init_masses):
                     break
 
@@ -274,8 +273,8 @@ def generate_instances_from_mist_models(instance_count: int, label: str, verbose
             generated_counter += 1
             inst_id = f"{set_id}/{generated_counter:06d}"
             # Assume J will be OK to defer expensive calc
-            # Use eclipse_baseline of 0.9 rather than 1.0 so we don't parse negligible eclipses
-            if _is_usable_system(rA, rB, 1.0, q, ecc, inc, imp_prm, eclipse_baseline=0.9):
+            # Use eclipse_baseline of 0.75 rather than 1.0 so we don't allow negligible eclipses
+            if _is_usable_system(rA, rB, 1.0, q, ecc, inc, imp_prm, eclipse_baseline=0.75):
                 break
         # End of do ... until bock
 
