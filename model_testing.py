@@ -363,8 +363,7 @@ def append_calculated_inc_predictions(predictions: np.ndarray[Dict[str, float]])
             else:
                 raise KeyError(f"Missing inc, bP, cosi or sini in predictions[{ix}] to calc inc.")
 
-            preds["inc"] = inc.nominal_value
-            preds["inc_sigma"] = inc.std_dev
+            preds.update(inc=inc.nominal_value, inc_sigma=inc.std_dev)
 
 
 def preds_vs_labels_dicts_to_csv(
@@ -460,7 +459,7 @@ def preds_vs_labels_dicts_to_table(
     # pylint: disable=too-many-arguments, too-many-locals
     # We output the labels common to the all labels & predictions or those requested
     if selected_label_names is None:
-        keys = [k for k in predictions[0].keys() if k in labels[0]]
+        keys = [k for k in labels[0].keys() if k in predictions[0]]
     else:
         keys = selected_label_names
 
