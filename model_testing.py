@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Formal testing of the regression TF Model trained by train_*_estimator.py
 """
@@ -157,7 +158,7 @@ def fit_against_formal_test_dataset(
     trans_flags = np.array([targets_config.get(t,{}).get("transits", False) for t in include_ids])
 
     print(f"\nLooking for the test dataset in '{FORMAL_TEST_DATASET_DIR}'.")
-    tfrecord_files = sorted(FORMAL_TEST_DATASET_DIR.glob("**/*.tfrecord"))  
+    tfrecord_files = sorted(FORMAL_TEST_DATASET_DIR.glob("**/*.tfrecord"))
     all_targs, all_mags_val, all_feat_vals, all_lbl_vals = deb_example.read_dataset(tfrecord_files,
                                                                 estimator.mags_feature_bins,
                                                                 estimator.mags_feature_wrap_phase,
@@ -430,7 +431,7 @@ def preds_vs_labels_dicts_to_csv(
 
 
 def preds_vs_labels_dicts_to_table(
-        predictions: np.ndarray[Union[Dict[str, float], Dict[str, Tuple[float, float]]]],        
+        predictions: np.ndarray[Union[Dict[str, float], Dict[str, Tuple[float, float]]]],
         labels: np.ndarray[Dict[str, float]],
         block_headings: np.ndarray[str]=None,
         selected_label_names: np.ndarray[str]=None,
