@@ -1,4 +1,4 @@
-""" Matplotlib plotting helper functions. """
+""" Matplotlib plotting helper functions.  *** TO BE DEPRECATED *** """
 from typing import Tuple, List, Dict, Union
 import math
 from pathlib import Path
@@ -167,12 +167,3 @@ def _read_mist_isos(file_name: Path=None) -> List:
             isos.append(iso)
             counter+=3+num_eeps+2
     return isos
-
-
-if __name__ == "__main__":
-
-    with open(Path.cwd() / "config/formal-test-dataset.json", mode="r", encoding="utf8") as f:
-        targets_config = { t: c for (t, c) in json.load(f).items() if not c.get("exclude", False) }
-
-    plot_formal_test_dataset_hr_diagram(targets_config, True) \
-                                            .savefig(Path.cwd() / "drop/plots/hr-logl-vs-teff.eps")

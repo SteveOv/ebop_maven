@@ -2,9 +2,11 @@
 import os
 from pathlib import Path
 from contextlib import redirect_stdout
+import json
 
 from ebop_maven import trainsets, datasets
 from ebop_maven.libs.tee import Tee
+import plots
 
 RESUME = False
 config_dir = Path("./config")
@@ -63,58 +65,58 @@ if not "JKTEBOP_DIR" in os.environ:
 # ------------------------------------------------------------------------------
 # The formal training dataset based on sampling parameter distributions
 # ------------------------------------------------------------------------------
-DATASET_SIZE = 250000
-dataset_dir = datasets_root / f"formal-training-dataset-{DATASET_SIZE // 1000}k"
-dataset_dir.mkdir(parents=True, exist_ok=True)
-with redirect_stdout(Tee(open(dataset_dir / "trainset.log", "w", encoding="utf8"))):
-    trainsets.write_trainset(instance_count=DATASET_SIZE,
-                             file_count=DATASET_SIZE // 10000,
-                             output_dir=dataset_dir,
-                             generator_func=trainsets.generate_instances_from_distributions,
-                             verbose=True,
-                             simulate=False)
+# DATASET_SIZE = 250000
+# dataset_dir = datasets_root / f"formal-training-dataset-{DATASET_SIZE // 1000}k"
+# dataset_dir.mkdir(parents=True, exist_ok=True)
+# with redirect_stdout(Tee(open(dataset_dir / "trainset.log", "w", encoding="utf8"))):
+#     trainsets.write_trainset(instance_count=DATASET_SIZE,
+#                              file_count=DATASET_SIZE // 10000,
+#                              output_dir=dataset_dir,
+#                              generator_func=trainsets.generate_instances_from_distributions,
+#                              verbose=True,
+#                              simulate=False)
 
-trainsets.plot_trainset_histograms(dataset_dir, dataset_dir / "train-histogram-full.png", cols=3)
-trainsets.plot_trainset_histograms(dataset_dir, dataset_dir / "train-histogram-main.eps", cols=2,
-                                    params=["rA_plus_rB", "k", "J", "inc", "ecosw", "esinw"])
+# trainsets.plot_trainset_histograms(dataset_dir, dataset_dir / "train-histogram-full.png", cols=3)
+# trainsets.plot_trainset_histograms(dataset_dir, dataset_dir / "train-histogram-main.eps", cols=2,
+#                                     params=["rA_plus_rB", "k", "J", "inc", "ecosw", "esinw"])
 
-with redirect_stdout(Tee(open(dataset_dir/"dataset.log", "a" if RESUME else "w", encoding="utf8"))):
-    datasets.make_dataset_files(trainset_files=sorted(dataset_dir.glob("trainset*.csv")),
-                                output_dir=dataset_dir,
-                                valid_ratio=0.2,
-                                test_ratio=0,
-                                resume=RESUME,
-                                max_workers=5,
-                                verbose=True,
-                                simulate=False)
+# with redirect_stdout(Tee(open(dataset_dir/"dataset.log", "a" if RESUME else "w", encoding="utf8"))):
+#     datasets.make_dataset_files(trainset_files=sorted(dataset_dir.glob("trainset*.csv")),
+#                                 output_dir=dataset_dir,
+#                                 valid_ratio=0.2,
+#                                 test_ratio=0,
+#                                 resume=RESUME,
+#                                 max_workers=5,
+#                                 verbose=True,
+#                                 simulate=False)
 
 # ------------------------------------------------------------------------------
 # A second testing dataset based on MIST models and a configured parameter space
 # ------------------------------------------------------------------------------
-DATASET_SIZE = 20000
-dataset_dir = datasets_root / "synthetic-mist-tess-dataset"
-dataset_dir.mkdir(parents=True, exist_ok=True)
-with redirect_stdout(Tee(open(dataset_dir / "trainset.log", "w", encoding="utf8"))):
-    trainsets.write_trainset(instance_count=DATASET_SIZE,
-                             file_count=10,
-                             output_dir=dataset_dir,
-                             generator_func=trainsets.generate_instances_from_mist_models,
-                             verbose=True,
-                             simulate=False)
+# DATASET_SIZE = 20000
+# dataset_dir = datasets_root / "synthetic-mist-tess-dataset"
+# dataset_dir.mkdir(parents=True, exist_ok=True)
+# with redirect_stdout(Tee(open(dataset_dir / "trainset.log", "w", encoding="utf8"))):
+#     trainsets.write_trainset(instance_count=DATASET_SIZE,
+#                              file_count=10,
+#                              output_dir=dataset_dir,
+#                              generator_func=trainsets.generate_instances_from_mist_models,
+#                              verbose=True,
+#                              simulate=False)
 
-trainsets.plot_trainset_histograms(dataset_dir, dataset_dir / "synth-histogram-full.png", cols=3)
-trainsets.plot_trainset_histograms(dataset_dir, dataset_dir / "synth-histogram-main.eps", cols=2,
-                                    params=["rA_plus_rB", "k", "J", "inc", "ecosw", "esinw"])
+# trainsets.plot_trainset_histograms(dataset_dir, dataset_dir / "synth-histogram-full.png", cols=3)
+# trainsets.plot_trainset_histograms(dataset_dir, dataset_dir / "synth-histogram-main.eps", cols=2,
+#                                     params=["rA_plus_rB", "k", "J", "inc", "ecosw", "esinw"])
 
-with redirect_stdout(Tee(open(dataset_dir/"dataset.log", "a" if RESUME else "w", encoding="utf8"))):
-    datasets.make_dataset_files(trainset_files=sorted(dataset_dir.glob("trainset*.csv")),
-                                output_dir=dataset_dir,
-                                valid_ratio=0.,
-                                test_ratio=1.,
-                                resume=RESUME,
-                                max_workers=5,
-                                verbose=True,
-                                simulate=False)
+# with redirect_stdout(Tee(open(dataset_dir/"dataset.log", "a" if RESUME else "w", encoding="utf8"))):
+#     datasets.make_dataset_files(trainset_files=sorted(dataset_dir.glob("trainset*.csv")),
+#                                 output_dir=dataset_dir,
+#                                 valid_ratio=0.,
+#                                 test_ratio=1.,
+#                                 resume=RESUME,
+#                                 max_workers=5,
+#                                 verbose=True,
+#                                 simulate=False)
 
 
 # ------------------------------------------------------------------------------
@@ -131,3 +133,9 @@ with redirect_stdout(Tee(open(dataset_dir / "dataset.log", "w", encoding="utf8")
                                                             target_names=None,
                                                             verbose=True,
                                                             simulate=False)
+
+# Plot a H-R diagram of those test targets not excluded from testing
+with open(targets_config_file, mode="r", encoding="utf8") as f:
+    targets_config = { t: c for (t, c) in json.load(f).items() if not c.get("exclude", False) }
+plots.plot_formal_test_dataset_hr_diagram(targets_config, True) \
+                                .savefig(dataset_dir / "formal-test-hr-logl-vs-logteff.eps")
