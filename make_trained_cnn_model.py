@@ -51,7 +51,7 @@ tf.random.set_seed(SEED)
 
 OPTIMIZER = optimizers.Nadam(learning_rate=5e-4)
 LOSS = ["mae"]
-METRICS = ["mse"] + [MeanAbsoluteErrorForLabel(CHOSEN_LABELS.index(l), l) for l in CHOSEN_LABELS]
+METRICS = ["mse"] #+ [MeanAbsoluteErrorForLabel(CHOSEN_LABELS.index(l), l) for l in CHOSEN_LABELS]
 
 # This gives the option of tweaking the emphasis across the labels when training/reducing the loss
 CLASS_WEIGHTS = { CHOSEN_LABELS.index(l): 1 for l in CHOSEN_LABELS } # Currently all the same
