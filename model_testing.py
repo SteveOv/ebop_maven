@@ -365,6 +365,39 @@ def append_calculated_inc_predictions(predictions: np.ndarray[Dict[str, float]])
             preds.update(inc=inc.nominal_value, inc_sigma=inc.std_dev)
 
 
+def will_transit(rA_plus_rB: np.ndarray[float],
+                 k: np.ndarray[float],
+                 inc: np.ndarray[float],
+                 ecosw: np.ndarray[float],
+                 esinw: np.ndarray[float]) \
+                        -> np.ndarray[bool]:
+    """
+    From the values given over 1 or more systems, this will indicate which will
+    exhibit at least one type of transit.
+
+    :rA_plus_rB: the systems' sum of the radii
+    :k: the systems' ratio of the radii
+    :inc: the orbital inclinations in degrees
+    :ecosw: the e*cos(omega) Poincare elements
+    :esinw: the e*sin(omega) Poincare elements
+    :returns: flags indicating which systems will transit
+    """
+    cosi = np.cos(np.deg2rad(inc))
+    e = np.sqrt(np.add(np.square(ecosw), np.square(esinw)))
+
+    # For some systems rB > rA which we handle by using abs to get the difference
+    rA = np.divide(rA_plus_rB, np.add(1, k))
+    rA_diff_rB = np.abs(np.subtract(rA, np.subtract(rA_plus_rB, rA)))
+
+    # As we're looking for total eclipses the condition is
+    # Primary:      cos(inc) < rA-rB * (1+esinw) / (1-e^2)
+    # Secondary:    cos(inc) < rA-rB * (1-esinw) / (1-e^2)
+    pt1 = np.divide(rA_diff_rB, np.subtract(1, np.square(e)))
+    primary_trans = cosi < np.multiply(pt1, np.add(1, esinw))
+    secondary_trans = cosi < np.multiply(pt1, np.subtract(1, esinw))
+    return np.bitwise_and(primary_trans, secondary_trans)
+
+
 def preds_vs_labels_dicts_to_csv(
         predictions: np.ndarray[Union[Dict[str, float], Dict[str, Tuple[float, float]]]],
         labels: np.ndarray[Dict[str, float]],
