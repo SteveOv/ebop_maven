@@ -92,14 +92,13 @@ def evaluate_model_against_dataset(
     pred_vals = estimator.means_and_stddevs_from_predictions(pred_vals, label_axis=1)
     lbl_vals = estimator.means_and_stddevs_from_predictions(lbl_vals, label_axis=1)
 
-    print("Metrics over predicted values;", ", ".join(estimator.label_names))
-    print("-----------------------------------")
-    noms_width = pred_vals.shape[1] // 2
-    for metric_identifier in ["MAE", "MSE", "r2_score"]:
-        metric = metrics.get(metric_identifier)
-        metric.update_state(lbl_vals[:, :noms_width], pred_vals[:, :noms_width])
-        print(f"Total {metric_identifier:>8} ({prediction_type}): {metric.result():.9f}")
-    print("-----------------------------------")
+    # A bit wasteful to turn them into dicts, but it allows reuse of the summary functionality
+    # to give us MAE and MSE stats across each label in addition to the whole set of predictions.
+    print("\nMetrics over predicted values;", ", ".join(estimator.label_names))
+    pred_dicts = np.array([dict(zip(estimator.prediction_names, rvals)) for rvals in pred_vals])
+    lbl_dicts = np.array([dict(zip(estimator.prediction_names, rvals)) for rvals in lbl_vals])
+    preds_vs_labels_dicts_to_table(pred_dicts, lbl_dicts,
+                                   selected_label_names=label_names, summary_only=True)
 
     if report_dir:
         # Produce a box plot of the prediction residual for each predicted label/value
