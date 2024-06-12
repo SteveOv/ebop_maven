@@ -6,6 +6,7 @@ from pathlib import Path
 import os
 import random as python_random
 import json
+from datetime import datetime, timezone
 
 import numpy as np
 import pandas as pd
@@ -97,7 +98,8 @@ def make_best_model(chosen_features: list[str]=CHOSEN_FEATURES,
         "mags_bins": mags_bins,
         "mags_wrap_phase": mags_wrap_phase,
         "labels_and_scales": {l: deb_example.labels_and_scales[l] for l in chosen_labels},
-        "trainset_name": trainset_name
+        "trainset_name": trainset_name,
+        "created_timestamp": datetime.now(timezone.utc).isoformat(),
     }
     best_model = modelling.build_mags_ext_model(
         mags_input=modelling.mags_input_layer(shape=(mags_bins, 1), verbose=verbose),
