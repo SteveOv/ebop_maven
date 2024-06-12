@@ -143,11 +143,11 @@ if __name__ == "__main__":
     print(f"Found {len(tf.config.list_physical_devices('GPU'))} GPU(s)\n")
 
     # -----------------------------------------------------------
-    # Set up the training/validation/test datasets
+    # Set up the training and validation dataset pipelines
     # -----------------------------------------------------------
     print("Picking up training/validation/test datasets.")
-    datasets = [tf.data.TFRecordDataset] * 3
-    counts = [int] * 3
+    datasets = [tf.data.TFRecordDataset] * 2
+    counts = [int] * 2
     ROLL_MAX = int(9 * (MAGS_BINS/1024))
     map_func = deb_example.create_map_func(mags_bins=MAGS_BINS,
                                            mags_wrap_phase=MAGS_WRAP_PHASE,
@@ -157,8 +157,7 @@ if __name__ == "__main__":
                                         roll_steps=lambda: tf.random.uniform([], -ROLL_MAX,
                                                                              ROLL_MAX+1, tf.int32))
     for ds_ix, (label, set_dir) in enumerate([("training", TRAINSET_DIR),
-                                            ("valiation", VALIDSET_DIR),
-                                            ("testing", TESTSET_DIR)]):
+                                              ("valiation", VALIDSET_DIR)]):
         files = list(set_dir.glob("**/*.tfrecord"))
         if ds_ix == 0:
             (datasets[ds_ix], counts[ds_ix]) = \
@@ -203,8 +202,7 @@ if __name__ == "__main__":
         callbacks.CSVLogger(SAVE_DIR / "training-log.csv")
     ]
 
-    print(f"\nTraining the model on {counts[0]} training and {counts[1]} validation",
-        f"instances, with a further {counts[2]} instances held back for test.")
+    print(f"\nTraining the model on {counts[0]} training and {counts[1]} validation instances.")
     try:
         # You may see the following warning while training, which can safely be ignored;
         #   UserWarning: Your input ran out of data; interrupting training
@@ -224,35 +222,24 @@ if __name__ == "__main__":
             msg = exc.message + "\n*** Probable cause: incompatible serialized mags feature length."
             raise tf.errors.InvalidArgumentError(exc.node_def, exc.op, msg, exc.args) from exc
 
-    print(f"\nEvaluating the model on {counts[2]} test instances.")
-    model.evaluate(datasets[2], verbose=1)
-
-    # Evaluate against the test dataset filtered to various subsets
-    if "bP" in CHOSEN_LABELS:
-        ix_bp = CHOSEN_LABELS.index("bP")
-        ix_k = CHOSEN_LABELS.index("k")
-        files = list(TESTSET_DIR.glob("**/*.tfrecord"))
-        for msg, filter_func in [
-                    ("Transiting systems",     lambda _, lab: lab[ix_bp] < (1-lab[ix_k])),
-                    ("Non-transiting systems", lambda _, lab: lab[ix_bp] >= (1-lab[ix_k]))
-            ]:
-            print("\nEvaluatiing model on the following subset of the test dataset;", msg)
-            (ds_filtered, _) = deb_example.create_dataset_pipeline(files, BATCH_FRACTION,
-                                                                   map_func, filter_func)
-            model.evaluate(ds_filtered, verbose=1)
-
     # Save the newly trained model
     model_save_file = SAVE_DIR / f"{MODEL_FILE_NAME}.keras"
     modelling.save_model(model_save_file, model)
     print(f"\nSaved model '{MODEL_NAME}' to: {model_save_file}")
 
     # -----------------------------------------------------------
-    # Tests the newly saved model, within an Estimator, against a dataset of real systems.
+    # Test the newly saved model against various test datasets
     # -----------------------------------------------------------
     # We use scaled prediction so the MAE/MSE is comperable with model.fit() and model.evaluate()
-    print("\n *** Running formal test against real data ***")
+    # Test against the synthetic test dataset
+    print(f"\n *** Running tests against {TESTSET_DIR.name}\n")
+    model_testing.evaluate_model_against_dataset(model_save_file, 1, None, TESTSET_DIR, scaled=True)
+
+    # Test against the formal test set of real systems
     with open("./config/formal-test-dataset.json", mode="r", encoding="utf8") as tf:
         targs_config = json.load(tf)
     usable_targs = np.array([t for t, c in targs_config.items() if not c.get("exclude", False)])
+    print(f"\n *** Running tests against {TESTSET_DIR.name} with no MC-Dropout\n")
     model_testing.evaluate_model_against_dataset(model_save_file, 1, usable_targs, scaled=True)
+    print(f"\n *** Running tests against {TESTSET_DIR.name} with 1000 MC-Dropout iterations\n")
     model_testing.evaluate_model_against_dataset(model_save_file, 1000, usable_targs, scaled=True)
