@@ -60,9 +60,9 @@ def evaluate_model_against_dataset(
     prediction_type = "mc" if mc_iterations > 1 else "nonmc"
 
     # Be sure to retrieve the inc label as it's needed to work out which systems have transits
-    extended_label_names = estimator.label_names
-    if "inc" not in extended_label_names:
-        extended_label_names += ["inc"]
+    ext_label_names = estimator.label_names
+    if "inc" not in ext_label_names:
+        ext_label_names += ["inc"]
 
     print(f"Looking for the test dataset in '{test_dataset_dir}'...", end="")
     tfrecord_files = sorted(test_dataset_dir.glob("**/*.tfrecord"))
@@ -78,7 +78,7 @@ def evaluate_model_against_dataset(
                                                                 estimator.mags_feature_bins,
                                                                 estimator.mags_feature_wrap_phase,
                                                                 estimator.input_feature_names,
-                                                                extended_label_names,
+                                                                ext_label_names,
                                                                 include_ids,
                                                                 scaled,
                                                                 noise_stddev,
@@ -99,8 +99,13 @@ def evaluate_model_against_dataset(
     # to give us MAE and MSE stats across each label in addition to the whole set of predictions.
     pred_dicts = np.array([dict(zip(estimator.prediction_names, rvals)) for rvals in pred_vals])
     lbl_dicts = np.array([dict(zip(estimator.prediction_names, rvals)) for rvals in lbl_vals])
-    transit_args = ["rA_plus_rB", "k", "inc", "ecosw", "esinw"]
-    tflags = will_transit(*[lbl_vals[:, extended_label_names.index(k)] for k in transit_args])
+    tnames = ["rA_plus_rB", "k", "inc", "ecosw", "esinw"]
+    if scaled:
+        tflags = will_transit(*[
+            lbl_vals[:, ext_label_names.index(t)] / deb_example.labels_and_scales[t] for t in tnames
+        ])
+    else:
+        tflags = will_transit(*[lbl_vals[:, ext_label_names.index(t)] for t in tnames])
     for (subset, mask) in [("",                 [True]*len(lbl_dicts)),
                            (" transiting",      tflags),
                            (" non-transiting",  ~tflags)]:
