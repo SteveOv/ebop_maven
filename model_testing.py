@@ -21,7 +21,7 @@ from uncertainties.umath import sqrt, acos, asin, degrees # pylint: disable=no-n
 
 import astropy.units as u
 import numpy as np
-from keras import Model, metrics
+from keras import Model
 
 from ebop_maven.libs.tee import Tee
 from ebop_maven.libs import jktebop, stellar, limb_darkening
@@ -47,7 +47,6 @@ def evaluate_model_against_dataset(
     :estimator: the Estimator or estimator model to use to make predictions
     :mc_iterations: the number of MC Dropout iterations
     :include_ids: list of target ids to predict, or all if not set
-    :report_label_names: the label names to report on, or those supported by the estimator if None
     :test_dataset_dir: the location of the formal test dataset
     :report_dir: optional directory into which to save reports, reports not saved if this is None
     :scaled: whether labels and predictions are scaled (raw model predictions) or not
@@ -59,7 +58,11 @@ def evaluate_model_against_dataset(
     if isinstance(estimator, (Model, Path)):
         estimator = Estimator(estimator)
     prediction_type = "mc" if mc_iterations > 1 else "nonmc"
-    label_names = estimator.label_names
+
+    # Be sure to retrieve the inc label as it's needed to work out which systems have transits
+    extended_label_names = estimator.label_names
+    if "inc" not in extended_label_names:
+        extended_label_names += ["inc"]
 
     print(f"Looking for the test dataset in '{test_dataset_dir}'...", end="")
     tfrecord_files = sorted(test_dataset_dir.glob("**/*.tfrecord"))
@@ -75,7 +78,7 @@ def evaluate_model_against_dataset(
                                                                 estimator.mags_feature_bins,
                                                                 estimator.mags_feature_wrap_phase,
                                                                 estimator.input_feature_names,
-                                                                label_names,
+                                                                extended_label_names,
                                                                 include_ids,
                                                                 scaled,
                                                                 noise_stddev,
@@ -85,28 +88,35 @@ def evaluate_model_against_dataset(
         assert len(include_ids) == len(ids)
 
     # Make our predictions which will be returned in the shape (#insts, #labels, #iterations)
-    # then turn a set of noms and 1-sigmas: shape (#insts, #nominal & #1-sigmas)
+    # then make a set of noms and 1-sigmas: shape (#insts, #nominal & #1-sigmas)
     print(f"The Estimator is making predictions on the {len(ids)} test instances",
           f"with {mc_iterations} iteration(s) (iterations >1 triggers MC Dropout algorithm).")
     pred_vals = estimator.predict_raw(mags_vals, feat_vals, mc_iterations, unscale=not scaled)
     pred_vals = estimator.means_and_stddevs_from_predictions(pred_vals, label_axis=1)
     lbl_vals = estimator.means_and_stddevs_from_predictions(lbl_vals, label_axis=1)
 
-    # A bit wasteful to turn them into dicts, but it allows reuse of the summary functionality
+    # A bit costly to create arrays of dicts, but we can reuse of existing summary functionality
     # to give us MAE and MSE stats across each label in addition to the whole set of predictions.
-    print("\nMetrics over predicted values;", ", ".join(estimator.label_names))
     pred_dicts = np.array([dict(zip(estimator.prediction_names, rvals)) for rvals in pred_vals])
     lbl_dicts = np.array([dict(zip(estimator.prediction_names, rvals)) for rvals in lbl_vals])
-    preds_vs_labels_dicts_to_table(pred_dicts, lbl_dicts,
-                                   selected_label_names=label_names, summary_only=True)
+    transit_args = ["rA_plus_rB", "k", "inc", "ecosw", "esinw"]
+    tflags = will_transit(*[lbl_vals[:, extended_label_names.index(k)] for k in transit_args])
+    for (subset, mask) in [("",                 [True]*len(lbl_dicts)),
+                           (" transiting",      tflags),
+                           (" non-transiting",  ~tflags)]:
+        if any(mask):
+            print(f"\nMetrics for {sum(mask)}{subset} system(s).")
+            preds_vs_labels_dicts_to_table(pred_dicts[mask], lbl_dicts[mask], summary_only=True,
+                                           selected_label_names=estimator.label_names)
 
     if report_dir:
-        # Produce a box plot of the prediction residual for each predicted label/value
-        # Output to pdf, which looks better than eps, as pdf supports transparency/alpha.
-        resids_by_label = (pred_vals - lbl_vals).transpose()[:len(label_names), :]
+        # Produce a box plot of the prediction residual for each instance vs label/value
+        # Output to pdf, which looks better than eps, as it supports transparency/alpha.
+        num_est_labels = len(estimator.label_names)
+        resids_by_label = (pred_vals[:, :num_est_labels] - lbl_vals[:, :num_est_labels]).transpose()
         fig, axes = plt.subplots(figsize=(6, 4), tight_layout=True)
         fliers = "formal" in test_dataset_dir.name
-        plotting.plot_prediction_distributions_on_axes(axes, resids_by_label, label_names,
+        plotting.plot_prediction_distributions_on_axes(axes, resids_by_label, estimator.label_names,
                                         violin_plot=False, show_fliers=fliers, ylabel="Residual")
         fig.savefig(report_dir / f"predictions-dist-{test_dataset_dir.name}-{prediction_type}.pdf")
     return lbl_vals, pred_vals
@@ -395,7 +405,7 @@ def will_transit(rA_plus_rB: np.ndarray[float],
     pt1 = np.divide(rA_diff_rB, np.subtract(1, np.square(e)))
     primary_trans = cosi < np.multiply(pt1, np.add(1, esinw))
     secondary_trans = cosi < np.multiply(pt1, np.subtract(1, esinw))
-    return np.bitwise_and(primary_trans, secondary_trans)
+    return np.bitwise_or(primary_trans, secondary_trans)
 
 
 def preds_vs_labels_dicts_to_csv(
