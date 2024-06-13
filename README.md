@@ -79,7 +79,8 @@ of JKTEBOP model parameters across its entire parameter space
     - the file `./config/formal-test-dataset.json` contains the search criteria, labels and
         supplementary information for each target
 
-This will roughly hour or so on a moderately powerful system, with the resulting datasets taking up ~15 GB of disk space.
+This will take roughly one hour on a moderately powerful system, with the resulting datasets
+taking up ~15 GB of disk space.
 
 #### Training and testing the machine learning model
 The default machine learning model can be built and tested by running the following:
@@ -93,31 +94,30 @@ $e\sin{\omega}$ and $b_P$ labels. Once trained it is evaluated on the
 the **formal-test-dataset**.
 
 > By default CUDA cores are disabled so that training and testing is repeatable. In this 
-> configuration the process above takes about 10 to 20 minutes on my laptop with an 11th gen
-> Intel i7 CPU. If you have them, CUDA cores can be enabled by setting the `ENFORCE_REPEATABILITY`
-> const to False to give a significant reduction in training time.
+> configuration the process above takes about an hour and a half on my laptop with an 8 core
+> 11th gen Intel i7 CPU. If you have them, CUDA cores can be enabled by setting the
+> `ENFORCE_REPEATABILITY` const to False to give a significant reduction in training time.
 >
 > Note: there are recorded incidents where TensorFlow v2.16.1 does not "see" installed GPUs
-> (me for one) and under these circumstances the above change may have no effect.
+> (me, for one) and under these circumstances the above change may have no effect.
 
 The compiled and trained model will be saved to the 
 `./drop/training/cnn-new-ext0-4096-0.75-250k/default-model.keras` file.
 Plots of the learning curves and the model structure are written to the `plots` sub-directory.
 
-A detailed evaluation of the newly created model can be invoked with the following command:
+A detailed evaluation of any models can be invoked with the following command:
 ```sh
-$ python3 model_testing.py ./drop/training/cnn-new-ext0-4096-0.75-250k/default-model.keras
-```
-Alternatively, you can evaluate the pre-built model within the ./ebop_maven/data/estimator/
-directory with
-```sh
-$ python3 model_testing.py
+$ python3 model_testing.py [model_files ...]
 ```
 
 This will initially evaluate model predictions against the **synthetic-mist-tess-dataset**
 and the **formal-test-dataset**. Subsequently it will run the full end-to-end testing of
 model predictions and JKTEBOP fitting against the **formal-test-dataset**. Testing output
-files and a log file will be written to the `testing` sub-directory. 
+files and a log file will be written to a `testing` sub-directory alongside any tested models. 
+
+You can test the pre-built model, at `./ebop_maven/data/estimator/default-model.keras`, by
+running model_testing without any arguments. In this case, the results will be written to
+the `./drop/training/published/testing/` directory.
 
 > [!WARNING]  
 > The model structure and hyperparameters are still subject to change as ongoing testing and
