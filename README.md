@@ -65,10 +65,9 @@ learning model. These are built by running the following:
 $ python3 make_training_datasets.py
 ```
 This module will write three datasets under the ./datasets directory:
-- **formal-training-dataset** : a synthetic dataset built by randomly sampling distributions
+- **formal-training-dataset-250k** : a synthetic dataset built by randomly sampling distributions
 of JKTEBOP model parameters across its entire parameter space
-    - currently this generates 250,000 instances split on the ratios 80:20 between training
-        and validation sets
+    - currently this generates 250,000 instances split 80:20 between training and validation sets
 - **synthetic-mist-tess-dataset** : a synthetic dataset of light-curves from physically plausible
         systems based on MIST stellar models and the TESS photometric bandpass
     - this depends on [MIST isochrone files](http://waps.cfa.harvard.edu/MIST/data/tarballs_v1.2/MIST_v1.2_vvcrit0.4_basic_isos.txz)
@@ -127,7 +126,14 @@ the `./drop/training/published/testing/` directory.
 > The model structure and hyperparameters are still subject to change as ongoing testing and
 > model searches continue to reveal improvements.
 
-
+#### Interactive model tester
+This is a jupyter notebook which can be used to download, predict and fit any target
+system selected from the **formal-test-dataset** against the pre-built default-model within
+the `./ebop_maven/data/estimator` directory or any model found within `./drop/training/`.
+It can be run with:
+```sh
+$ jupyter notebook model_interactive_tester.ipynb
+```
 
 #### Model structure and hyperparameter search
 A search over a range of model structures and hyperparameter values, using the 
