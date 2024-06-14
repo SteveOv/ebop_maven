@@ -43,6 +43,10 @@ Then run the following to set up the required packages within the environment:
 ```sh
 $ pip install -r requirements.txt
 ```
+You may need to install the jupyter kernel in the new venv:
+```sh
+$ ipython kernel install --user --name=.ebop_maven
+```
 #### The ebop_maven package
 Finally there is support for installing ebop_maven as a pip package, however this is still very
 much "work in progress" and subject to change.  Simply run:
