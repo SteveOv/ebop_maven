@@ -211,7 +211,7 @@ def fit_against_formal_test_dataset(
         pe = pipeline.to_lc_time(targ_config["primary_epoch"], lc).value
         period = targ_config["period"]
 
-        fit_stem = f"model-testing-{re.sub(r'[^\w\d-]', '-', targ.lower())}"
+        fit_stem = "model-testing-" + re.sub(r"[^\w\d-]", "-", targ.lower())
         for file in fit_dir.glob(f"{fit_stem}.*"):
             file.unlink()
         in_fname = fit_dir / f"{fit_stem}.in"
