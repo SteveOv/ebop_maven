@@ -5,7 +5,7 @@ description = "EBOP Model Automatic input Value Estimation Neural network"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
-    "numpy",
+    "numpy<2.0",
     "pandas",
     "pathlib",
     "scipy",
