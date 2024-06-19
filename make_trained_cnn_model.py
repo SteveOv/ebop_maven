@@ -9,7 +9,6 @@ import json
 from datetime import datetime, timezone
 
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
 
 import tensorflow as tf
@@ -17,7 +16,7 @@ import tensorboard
 import keras
 from keras import layers, optimizers, callbacks
 
-from ebop_maven import modelling, deb_example
+from ebop_maven import modelling, deb_example, plotting
 from ebop_maven.libs.keras_custom.metrics import MeanAbsoluteErrorForLabel
 import model_testing
 
@@ -211,11 +210,14 @@ if __name__ == "__main__":
                             callbacks = CALLBACKS,
                             class_weight=CLASS_WEIGHTS,
                             validation_data = datasets[1])
+
         # Plot the learning curves
-        ax = pd.DataFrame(history.history).plot(figsize=(6, 4), xlabel="Epoch", ylabel="Loss")
-        ax.get_figure().tight_layout()
+        fig, ax = plt.subplots(figsize=(6, 4), tight_layout=True)
+        ax.plot(history.history['loss'], label="training")
+        ax.plot(history.history['val_loss'], label="validation")
+        plotting.format_axes(ax, xlabel="Epoch", ylabel="Loss", legend_loc="best")
         PLOTS_DIR.mkdir(parents=True, exist_ok=True)
-        plt.savefig(PLOTS_DIR / f"{MODEL_FILE_NAME}-learning-curves.eps", dpi=300)
+        fig.savefig(PLOTS_DIR / f"{MODEL_FILE_NAME}-learning-curves.eps", dpi=300)
     except tf.errors.InvalidArgumentError as exc:
         if ("lc" in exc.message or "mags" in exc.message) \
                 and "Can't parse serialized" in exc.message:
