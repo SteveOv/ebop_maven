@@ -241,7 +241,7 @@ if __name__ == "__main__":
     with open("./config/formal-test-dataset.json", mode="r", encoding="utf8") as tf:
         targs_config = json.load(tf)
     usable_targs = np.array([t for t, c in targs_config.items() if not c.get("exclude", False)])
-    print(f"\n *** Running tests against {TESTSET_DIR.name} with no MC-Dropout\n")
+    print("\n *** Running tests against the formal-test-dataset with no MC-Dropout\n")
     model_testing.evaluate_model_against_dataset(model_save_file, 1, usable_targs, scaled=True)
-    print(f"\n *** Running tests against {TESTSET_DIR.name} with 1000 MC-Dropout iterations\n")
+    print("\n *** Running tests against the formal-test-dataset with 1000 MC-Dropout iterations\n")
     model_testing.evaluate_model_against_dataset(model_save_file, 1000, usable_targs, scaled=True)
