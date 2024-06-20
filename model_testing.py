@@ -57,7 +57,7 @@ def evaluate_model_against_dataset(
     # and which labels it (& the underlying model) can predict.
     if isinstance(estimator, (Model, Path)):
         estimator = Estimator(estimator)
-    prediction_type = "mc" if mc_iterations > 1 else "nonmc"
+    mc_type = "mc" if mc_iterations > 1 else "nonmc"
 
     # Be sure to retrieve the inc label as it's needed to work out which systems have transits
     ext_label_names = estimator.label_names
@@ -65,6 +65,7 @@ def evaluate_model_against_dataset(
         ext_label_names += ["inc"]
 
     print(f"Looking for the test dataset in '{test_dataset_dir}'...", end="")
+    dataset_name = test_dataset_dir.name
     tfrecord_files = sorted(test_dataset_dir.glob("**/*.tfrecord"))
     print(f"found {len(tfrecord_files)} file(s).")
 
@@ -99,6 +100,8 @@ def evaluate_model_against_dataset(
     # to give us MAE and MSE stats across each label in addition to the whole set of predictions.
     pred_dicts = np.array([dict(zip(estimator.prediction_names, rvals)) for rvals in pred_vals])
     lbl_dicts = np.array([dict(zip(estimator.prediction_names, rvals)) for rvals in lbl_vals])
+
+    # Work out which are the transiting systems so we can break down the reporting
     tnames = ["rA_plus_rB", "k", "inc", "ecosw", "esinw"]
     if scaled:
         tflags = will_transit(*[
@@ -106,6 +109,7 @@ def evaluate_model_against_dataset(
         ])
     else:
         tflags = will_transit(*[lbl_vals[:, ext_label_names.index(t)] for t in tnames])
+
     for (subset, mask) in [("",                 [True]*len(lbl_dicts)),
                            (" transiting",      tflags),
                            (" non-transiting",  ~tflags)]:
@@ -114,16 +118,21 @@ def evaluate_model_against_dataset(
             preds_vs_labels_dicts_to_table(pred_dicts[mask], lbl_dicts[mask], summary_only=True,
                                            selected_label_names=estimator.label_names)
 
-    if report_dir:
-        # Produce a box plot of the prediction residual for each instance vs label/value
-        # Output to pdf, which looks better than eps, as it supports transparency/alpha.
-        num_est_labels = len(estimator.label_names)
-        resids_by_label = (pred_vals[:, :num_est_labels] - lbl_vals[:, :num_est_labels]).transpose()
-        fig, axes = plt.subplots(figsize=(6, 4), tight_layout=True)
-        fliers = "formal" in test_dataset_dir.name
-        plotting.plot_prediction_distributions_on_axes(axes, resids_by_label, estimator.label_names,
-                                        violin_plot=False, show_fliers=fliers, ylabel="Residual")
-        fig.savefig(report_dir / f"predictions-dist-{test_dataset_dir.name}-{prediction_type}.pdf")
+            # For the formal-test-dataset we only create plots for the whole set, as the volumes are
+            # too small, otherwise we create separate plots for "all", transiting & non-transiting.
+            if report_dir and (not subset or "formal" not in dataset_name):
+                # Output to pdf, which looks better than eps, as it supports transparency/alpha.
+                filename = f"predictions-dist-{dataset_name}-{mc_type}{subset.replace(' ','-')}.pdf"
+                print(f"Plotting residual boxplot for {sum(mask)}{subset} system(s) to", filename)
+                n_est_lbls = len(estimator.label_names)
+                resids_by_label = (pred_vals[:, :n_est_lbls] - lbl_vals[:, :n_est_lbls]).transpose()
+                fig, axes = plt.subplots(figsize=(6, 4), tight_layout=True)
+                plotting.plot_prediction_distributions_on_axes(axes, resids_by_label,
+                                                               estimator.label_names,
+                                                               violin_plot=False,
+                                                               show_fliers="formal" in dataset_name,
+                                                               ylabel="Residual")
+                fig.savefig(report_dir / filename)
     return lbl_vals, pred_vals
 
 
