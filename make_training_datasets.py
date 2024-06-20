@@ -4,10 +4,6 @@ from pathlib import Path
 from contextlib import redirect_stdout
 import json
 
-from ebop_maven import trainsets, datasets
-from ebop_maven.libs.tee import Tee
-import plots
-
 RESUME = False
 config_dir = Path("./config")
 datasets_root = Path("./datasets")
@@ -16,6 +12,13 @@ datasets_root = Path("./datasets")
 # The conda yaml based env sets this but it's not set for venvs.
 if not "JKTEBOP_DIR" in os.environ:
     os.environ["JKTEBOP_DIR"] = "~/jktebop/"
+
+
+# pylint: disable=wrong-import-position
+# Put these after the above environ statements so the values are picked up
+from ebop_maven import trainsets, datasets
+from ebop_maven.libs.tee import Tee
+import plots
 
 # Creating a training dataset is a two step process;
 #   1. create a set of trainset csv files
