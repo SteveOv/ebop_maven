@@ -132,6 +132,7 @@ def evaluate_model_against_dataset(
                                                                show_fliers="formal" in ds_name,
                                                                ylabel="Residual")
                 fig.savefig(report_dir / f"predictions-{mc_type}-box-{ds_name}{sub_suffix}.pdf")
+                plt.close()
 
             if report_dir and "formal" not in ds_name:
                 # Break down the predictions into bins then plot the MAE against mean label to give
@@ -139,10 +140,12 @@ def evaluate_model_against_dataset(
                 fig = plots.plot_binned_mae_vs_labels(pred_dicts[mask], lbl_dicts[mask],
                                                       ["esinw", "ecosw"], xlim=(-0.75, 0.75))
                 fig.savefig(report_dir / f"binned-mae-poincare-{mc_type}-{ds_name}{sub_suffix}.pdf")
+                plt.close()
 
                 fig = plots.plot_binned_mae_vs_labels(pred_dicts[mask], lbl_dicts[mask],
                                                       ["k", "J", "bP"])
                 fig.savefig(report_dir / f"binned-mae-kjbp-{mc_type}-{ds_name}{sub_suffix}.pdf")
+                plt.close()
     return lbl_vals, pred_vals
 
 
@@ -307,6 +310,7 @@ def fit_against_formal_test_dataset(
             plots.plot_predictions_vs_labels(comp_dicts, fitted_param_dicts, trans_flags, names,
                                              xlabel_prefix=comp_head, ylabel_prefix="fitted") \
                                                     .savefig(report_dir / f"{results_stem}.eps")
+            plt.close()
 
             with open(report_dir / f"{results_stem}.txt", "w", encoding="utf8") as txtf:
                 for (sub_head, mask, rep_names) in sub_reports:
