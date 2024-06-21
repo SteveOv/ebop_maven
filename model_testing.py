@@ -122,7 +122,7 @@ def evaluate_model_against_dataset(
             # too small, otherwise we create separate plots for "all", transiting & non-transiting.
             if report_dir and (not subset or "formal" not in dataset_name):
                 # Output to pdf, which looks better than eps, as it supports transparency/alpha.
-                filename = f"predictions-dist-{dataset_name}-{mc_type}{subset.replace(' ','-')}.pdf"
+                filename = f"predictions-{mc_type}-box-{dataset_name}{subset.replace(' ','-')}.pdf"
                 print(f"Plotting residual boxplot for {sum(mask)}{subset} system(s) to", filename)
                 n_est_lbls = len(estimator.label_names)
                 resids_by_label = (pred_vals[:, :n_est_lbls] - lbl_vals[:, :n_est_lbls]).transpose()
