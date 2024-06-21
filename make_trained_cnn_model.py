@@ -7,6 +7,7 @@ import os
 import random as python_random
 import json
 from datetime import datetime, timezone
+from contextlib import redirect_stdout
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -17,6 +18,7 @@ import keras
 from keras import layers, optimizers, callbacks
 
 from ebop_maven import modelling, deb_example, plotting
+from ebop_maven.libs.tee import Tee
 from ebop_maven.libs.keras_custom.metrics import MeanAbsoluteErrorForLabel
 import model_testing
 
@@ -132,116 +134,119 @@ def make_best_model(chosen_features: list[str]=CHOSEN_FEATURES,
 
 
 if __name__ == "__main__":
-    print("\n".join(f"{lib.__name__} v{lib.__version__}" for lib in [tf, tensorboard, keras]))
-    if ENFORCE_REPEATABILITY:
-        # Extreme, but it stops TensorFlow/Keras from using (even seeing) the GPU.
-        # Slows training down massively (by 3-4 times) but should avoid GPU memory
-        # constraints! Necessary if repeatable results are required (Keras advises
-        # that out of order processing within GPU/CUDA can lead to varying results).
-        os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-    print(f"Found {len(tf.config.list_physical_devices('GPU'))} GPU(s)\n")
+    SAVE_DIR.mkdir(parents=True, exist_ok=True)
+    with redirect_stdout(Tee(open(SAVE_DIR / "make_trained_cnn_model.log", "w", encoding="utf8"))):
+        print("\n".join(f"{lib.__name__} v{lib.__version__}" for lib in [tf, tensorboard, keras]))
+        if ENFORCE_REPEATABILITY:
+            # Extreme, but it stops TensorFlow/Keras from using (even seeing) the GPU.
+            # Slows training down massively (by 3-4 times) but should avoid GPU memory
+            # constraints! Necessary if repeatable results are required (Keras advises
+            # that out of order processing within GPU/CUDA can lead to varying results).
+            os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+        print(f"Found {len(tf.config.list_physical_devices('GPU'))} GPU(s)\n")
 
-    # -----------------------------------------------------------
-    # Set up the training and validation dataset pipelines
-    # -----------------------------------------------------------
-    print("Picking up training/validation/test datasets.")
-    datasets = [tf.data.TFRecordDataset] * 2
-    counts = [int] * 2
-    ROLL_MAX = int(9 * (MAGS_BINS/1024))
-    map_func = deb_example.create_map_func(mags_bins=MAGS_BINS,
-                                           mags_wrap_phase=MAGS_WRAP_PHASE,
-                                           ext_features=CHOSEN_FEATURES,
-                                           labels=CHOSEN_LABELS,
-                                           noise_stddev=lambda: 0.005,
-                                        roll_steps=lambda: tf.random.uniform([], -ROLL_MAX,
-                                                                             ROLL_MAX+1, tf.int32))
-    for ds_ix, (label, set_dir) in enumerate([("training", TRAINSET_DIR),
-                                              ("valiation", VALIDSET_DIR)]):
-        files = list(set_dir.glob("**/*.tfrecord"))
-        if ds_ix == 0:
-            (datasets[ds_ix], counts[ds_ix]) = \
-                deb_example.create_dataset_pipeline(files, BATCH_FRACTION, map_func,
-                                                    shuffle=True, reshuffle_each_iteration=True,
-                                                    max_buffer_size=MAX_BUFFER_SIZE,
-                                                    prefetch=1, seed=SEED)
-        else:
-            (datasets[ds_ix], counts[ds_ix]) = \
-                deb_example.create_dataset_pipeline(files, BATCH_FRACTION, map_func)
-        print(f"Found {counts[ds_ix]:,} {label} insts over {len(files)} tfrecord files in", set_dir)
+        # -----------------------------------------------------------
+        # Set up the training and validation dataset pipelines
+        # -----------------------------------------------------------
+        print("Picking up training and validation datasets.")
+        datasets = [tf.data.TFRecordDataset] * 2
+        counts = [int] * 2
+        ROLL_MAX = int(9 * (MAGS_BINS/1024))
+        map_func = deb_example.create_map_func(mags_bins=MAGS_BINS,
+                                            mags_wrap_phase=MAGS_WRAP_PHASE,
+                                            ext_features=CHOSEN_FEATURES,
+                                            labels=CHOSEN_LABELS,
+                                            noise_stddev=lambda: 0.005,
+                                            roll_steps=lambda: tf.random.uniform(
+                                                            [], -ROLL_MAX, ROLL_MAX+1, tf.int32))
+        for ds_ix, (label, set_dir) in enumerate([("training", TRAINSET_DIR),
+                                                ("valiation", VALIDSET_DIR)]):
+            files = list(set_dir.glob("**/*.tfrecord"))
+            if ds_ix == 0:
+                (datasets[ds_ix], counts[ds_ix]) = \
+                    deb_example.create_dataset_pipeline(files, BATCH_FRACTION, map_func,
+                                                        shuffle=True, reshuffle_each_iteration=True,
+                                                        max_buffer_size=MAX_BUFFER_SIZE,
+                                                        prefetch=1, seed=SEED)
+            else:
+                (datasets[ds_ix], counts[ds_ix]) = \
+                    deb_example.create_dataset_pipeline(files, BATCH_FRACTION, map_func)
+            print(f"Found {counts[ds_ix]:,} {label} insts over {len(files)} tfrecords in", set_dir)
 
-    # -----------------------------------------------------------
-    # Define the model
-    # -----------------------------------------------------------
-    model = make_best_model(verbose=True)
-    model.compile(loss=LOSS, optimizer=OPTIMIZER, metrics=METRICS)
-    model.summary()
+        # -----------------------------------------------------------
+        # Define the model
+        # -----------------------------------------------------------
+        model = make_best_model(verbose=True)
+        model.compile(loss=LOSS, optimizer=OPTIMIZER, metrics=METRICS)
+        model.summary()
 
-    try:
-        # Can only get this working specific pydot (1.4) & graphviz (8.0) conda packages.
-        # With pip I can't get graphviz beyond 0.2.0 which leads to pydot errors here.
-        # At least with the try block I can degrade gracefully.
-        PLOTS_DIR.mkdir(parents=True, exist_ok=True)
-        keras.utils.plot_model(model, to_file=PLOTS_DIR / f"{MODEL_FILE_NAME}.png",
-                show_layer_names=True, show_shapes=True, show_layer_activations=True,
-                show_dtype=False, show_trainable=False, rankdir="TB", dpi=300)
-    except ImportError:
-        print("Unable to plot_model() without pydot and/or graphviz.")
+        try:
+            # Can only get this working specific pydot (1.4) & graphviz (8.0) conda packages.
+            # With pip I can't get graphviz beyond 0.2.0 which leads to pydot errors here.
+            # At least with the try block I can degrade gracefully.
+            PLOTS_DIR.mkdir(parents=True, exist_ok=True)
+            keras.utils.plot_model(model, to_file=PLOTS_DIR / f"{MODEL_FILE_NAME}.png",
+                    show_layer_names=True, show_shapes=True, show_layer_activations=True,
+                    show_dtype=False, show_trainable=False, rankdir="TB", dpi=300)
+        except ImportError:
+            print("Unable to plot_model() without pydot and/or graphviz.")
 
 
-    # -----------------------------------------------------------
-    # Train the model
-    # -----------------------------------------------------------
-    CALLBACKS = [
-        # To use tensorboard make sure the containing conda env is active then run
-        # $ tensorboard --port 6006 --logdir ./logs
-        # Then start a browser and head to http://localhost:6006
-        #callbacks.TensorBoard(log_dir="./logs", write_graph=True, write_images=True),
-        callbacks.EarlyStopping("val_loss", restore_best_weights=True,
-                                patience=EARLY_STOPPING_PATIENCE, verbose=1),
-        callbacks.CSVLogger(SAVE_DIR / "training-log.csv")
-    ]
+        # -----------------------------------------------------------
+        # Train the model
+        # -----------------------------------------------------------
+        CALLBACKS = [
+            # To use tensorboard make sure the containing conda env is active then run
+            # $ tensorboard --port 6006 --logdir ./logs
+            # Then start a browser and head to http://localhost:6006
+            #callbacks.TensorBoard(log_dir="./logs", write_graph=True, write_images=True),
+            callbacks.EarlyStopping("val_loss", restore_best_weights=True,
+                                    patience=EARLY_STOPPING_PATIENCE, verbose=1),
+            callbacks.CSVLogger(SAVE_DIR / "training-log.csv")
+        ]
 
-    print(f"\nTraining the model on {counts[0]} training and {counts[1]} validation instances.")
-    try:
-        # You may see the following warning while training, which can safely be ignored;
-        #   UserWarning: Your input ran out of data; interrupting training
-        history = model.fit(x = datasets[0],    # pylint: disable=invalid-name
-                            epochs = TRAINING_EPOCHS,
-                            callbacks = CALLBACKS,
-                            class_weight=CLASS_WEIGHTS,
-                            validation_data = datasets[1])
+        print(f"\nTraining the model on {counts[0]} training and {counts[1]} validation instances.")
+        try:
+            # You may see the following warning while training, which can safely be ignored;
+            #   UserWarning: Your input ran out of data; interrupting training
+            history = model.fit(x = datasets[0],    # pylint: disable=invalid-name
+                                epochs = TRAINING_EPOCHS,
+                                callbacks = CALLBACKS,
+                                class_weight=CLASS_WEIGHTS,
+                                validation_data = datasets[1],
+                                verbose=2)
 
-        # Plot the learning curves
-        fig, ax = plt.subplots(figsize=(6, 4), tight_layout=True)
-        ax.plot(history.history['loss'], label="training")
-        ax.plot(history.history['val_loss'], label="validation")
-        plotting.format_axes(ax, xlabel="Epoch", ylabel="Loss", legend_loc="best")
-        PLOTS_DIR.mkdir(parents=True, exist_ok=True)
-        fig.savefig(PLOTS_DIR / f"{MODEL_FILE_NAME}-learning-curves.eps", dpi=300)
-    except tf.errors.InvalidArgumentError as exc:
-        if ("lc" in exc.message or "mags" in exc.message) \
-                and "Can't parse serialized" in exc.message:
-            msg = exc.message + "\n*** Probable cause: incompatible serialized mags feature length."
-            raise tf.errors.InvalidArgumentError(exc.node_def, exc.op, msg, exc.args) from exc
+            # Plot the learning curves
+            fig, ax = plt.subplots(figsize=(6, 4), tight_layout=True)
+            ax.plot(history.history['loss'], label="training")
+            ax.plot(history.history['val_loss'], label="validation")
+            plotting.format_axes(ax, xlabel="Epoch", ylabel="Loss", legend_loc="best")
+            PLOTS_DIR.mkdir(parents=True, exist_ok=True)
+            fig.savefig(PLOTS_DIR / f"{MODEL_FILE_NAME}-learning-curves.eps", dpi=300)
+        except tf.errors.InvalidArgumentError as exc:
+            if ("lc" in exc.message or "mags" in exc.message) \
+                    and "Can't parse serialized" in exc.message:
+                msg = exc.message + "\n*** Probably an incompatible serialized mags feature length."
+                raise tf.errors.InvalidArgumentError(exc.node_def, exc.op, msg, exc.args) from exc
 
-    # Save the newly trained model
-    model_save_file = SAVE_DIR / f"{MODEL_FILE_NAME}.keras"
-    modelling.save_model(model_save_file, model)
-    print(f"\nSaved model '{MODEL_NAME}' to: {model_save_file}")
+        # Save the newly trained model
+        model_file = SAVE_DIR / f"{MODEL_FILE_NAME}.keras"
+        modelling.save_model(model_file, model)
+        print(f"\nSaved model '{MODEL_NAME}' to: {model_file}")
 
-    # -----------------------------------------------------------
-    # Test the newly saved model against various test datasets
-    # -----------------------------------------------------------
-    # We use scaled prediction so the MAE/MSE is comperable with model.fit() and model.evaluate()
-    # Test against the synthetic test dataset
-    print(f"\n *** Running tests against {TESTSET_DIR.name}\n")
-    model_testing.evaluate_model_against_dataset(model_save_file, 1, None, TESTSET_DIR, scaled=True)
+        # -----------------------------------------------------------
+        # Test the newly saved model against various test datasets
+        # -----------------------------------------------------------
+        # We use scaled prediction so the MAE/MSE is comperable with model.fit() & model.evaluate()
+        # Test against the synthetic test dataset
+        print(f"\n *** Running tests against {TESTSET_DIR.name}\n")
+        model_testing.evaluate_model_against_dataset(model_file, 1, None, TESTSET_DIR, scaled=True)
 
-    # Test against the formal test set of real systems
-    with open("./config/formal-test-dataset.json", mode="r", encoding="utf8") as tf:
-        targs_config = json.load(tf)
-    usable_targs = np.array([t for t, c in targs_config.items() if not c.get("exclude", False)])
-    print("\n *** Running tests against the formal-test-dataset with no MC-Dropout\n")
-    model_testing.evaluate_model_against_dataset(model_save_file, 1, usable_targs, scaled=True)
-    print("\n *** Running tests against the formal-test-dataset with 1000 MC-Dropout iterations\n")
-    model_testing.evaluate_model_against_dataset(model_save_file, 1000, usable_targs, scaled=True)
+        # Test against the formal test set of real systems
+        with open("./config/formal-test-dataset.json", mode="r", encoding="utf8") as tf:
+            targs_config = json.load(tf)
+        usable_targs = np.array([t for t, c in targs_config.items() if not c.get("exclude", False)])
+        print("\n *** Running tests against formal-test-dataset with no MC-Dropout\n")
+        model_testing.evaluate_model_against_dataset(model_file, 1, usable_targs, scaled=True)
+        print("\n *** Running tests against formal-test-dataset with 1000 MC-Dropout iterations\n")
+        model_testing.evaluate_model_against_dataset(model_file, 1000, usable_targs, scaled=True)
