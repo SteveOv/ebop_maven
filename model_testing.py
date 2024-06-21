@@ -65,7 +65,7 @@ def evaluate_model_against_dataset(
         ext_label_names += ["inc"]
 
     print(f"Looking for the test dataset in '{test_dataset_dir}'...", end="")
-    dataset_name = test_dataset_dir.name
+    ds_name = test_dataset_dir.name
     tfrecord_files = sorted(test_dataset_dir.glob("**/*.tfrecord"))
     print(f"found {len(tfrecord_files)} file(s).")
 
@@ -113,26 +113,36 @@ def evaluate_model_against_dataset(
     for (subset, mask) in [("",                 [True]*len(lbl_dicts)),
                            (" transiting",      tflags),
                            (" non-transiting",  ~tflags)]:
+        sub_suffix = subset.replace(' ','-')
         if any(mask):
             print(f"\nMetrics for {sum(mask)}{subset} system(s).")
             preds_vs_labels_dicts_to_table(pred_dicts[mask], lbl_dicts[mask], summary_only=True,
                                            selected_label_names=estimator.label_names)
 
-            # For the formal-test-dataset we only create plots for the whole set, as the volumes are
-            # too small, otherwise we create separate plots for "all", transiting & non-transiting.
-            if report_dir and (not subset or "formal" not in dataset_name):
-                # Output to pdf, which looks better than eps, as it supports transparency/alpha.
-                filename = f"predictions-{mc_type}-box-{dataset_name}{subset.replace(' ','-')}.pdf"
-                print(f"Plotting residual boxplot for {sum(mask)}{subset} system(s) to", filename)
+            # These plot to pdf, which looks better than eps, as it supports transparency/alpha.
+            if report_dir and (not subset or "formal" not in ds_name):
+                # For the formal-test-dataset we only plot the whole set, as the volumes are too
+                # small, otherwise we create separate plots for "all", transiting & non-transiting.
                 n_est_lbls = len(estimator.label_names)
                 resids_by_label = (pred_vals[:, :n_est_lbls] - lbl_vals[:, :n_est_lbls]).transpose()
                 fig, axes = plt.subplots(figsize=(6, 4), tight_layout=True)
                 plotting.plot_prediction_distributions_on_axes(axes, resids_by_label,
                                                                estimator.label_names,
                                                                violin_plot=False,
-                                                               show_fliers="formal" in dataset_name,
+                                                               show_fliers="formal" in ds_name,
                                                                ylabel="Residual")
-                fig.savefig(report_dir / filename)
+                fig.savefig(report_dir / f"predictions-{mc_type}-box-{ds_name}{sub_suffix}.pdf")
+
+            if report_dir and "formal" not in ds_name:
+                # Break down the predictions into bins then plot the MAE against mean label to give
+                # an indication of how the accuracy of the predictions vary over the label range.
+                fig = plots.plot_binned_mae_vs_labels(pred_dicts[mask], lbl_dicts[mask],
+                                                      ["esinw", "ecosw"], xlim=(-0.75, 0.75))
+                fig.savefig(report_dir / f"binned-mae-poincare-{mc_type}-{ds_name}{sub_suffix}.pdf")
+
+                fig = plots.plot_binned_mae_vs_labels(pred_dicts[mask], lbl_dicts[mask],
+                                                      ["k", "J", "bP"])
+                fig.savefig(report_dir / f"binned-mae-kjbp-{mc_type}-{ds_name}{sub_suffix}.pdf")
     return lbl_vals, pred_vals
 
 

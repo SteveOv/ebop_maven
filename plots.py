@@ -5,11 +5,22 @@ import math
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 import numpy as np
+from scipy.stats import binned_statistic
 
 from ebop_maven.plotting import format_axes
 from ebop_maven.libs.mistisochrones import MistIsochrones
 import model_testing
 
+all_pub_labels = {
+    "rA_plus_rB":   "$r_A+r_B$",
+    "k":            "$k$",
+    "inc":          "$i$",
+    "J":            "$J$",
+    "ecosw":        r"$e\cos{\omega}$",
+    "esinw":        r"$e\sin{\omega}$",
+    "L3":           "$L_3$",
+    "bP":           "$b_P$",
+}
 
 def plot_predictions_vs_labels(
         labels: List[Dict[str, float]],
@@ -38,16 +49,6 @@ def plot_predictions_vs_labels(
     :returns: the Figure
     """
     # pylint: disable=too-many-arguments, too-many-locals
-    all_pub_labels = {
-        "rA_plus_rB": "$r_A+r_B$",
-        "k": "$k$",
-        "inc": "$i$",
-        "J": "$J$",
-        "ecosw": r"$e\cos{\omega}$",
-        "esinw": r"$e\sin{\omega}$",
-        "L3": "$L_3$",
-        "bP": "$b_P$",
-    }
 
     # We plot the keys common to the labels & preds, & optionally the input list
     # of names. Avoiding using set() as we want names or the labels to set order
@@ -92,6 +93,69 @@ def plot_predictions_vs_labels(
         # Make sure the plots are squared and have the same ticks
         ax.set_aspect("equal", "box")
         ax.set_yticks([t for t in ax.get_xticks() if diag[0] < t < diag[1]])
+    return fig
+
+
+def plot_binned_mae_vs_labels(
+        predictions: List[Union[Dict[str, float], Dict[str, Tuple[float, float]]]],
+        labels: List[Dict[str, float]],
+        selected_labels: List[str]=None,
+        num_bins: float=100,
+        indicate_bin_counts: bool=False,
+        xlabel: str="label value",
+        ylabel: str="mean absolute error",
+        **format_kwargs) -> Figure:
+    """
+    Will create a plot figure with a single set of axes, with the MAE vs label values
+    for one or more labels broken down into equal sized bins. It is intended to show
+    how the predictions accuracy varies over the range of the labels.
+
+    :predictions: the prediction values as a dict of predictions per instance.
+    All the dicts may either be as { "key": val, "key_sigma": err } or { "key":(val, err) }
+    :labels: the labels values as a dict of labels per instance
+    :selected_labels: a subset of the full list of labels/prediction names to render
+    :num_bins: the number of equal sized bins to apply to the data
+    :indicate_bin_counts: give an indication of each bin's count by its marker size
+    :xlabel: the label to give the x-axis
+    :ylabel: the label to give the y-axis
+    :format_kwargs: kwargs to be passed on to format_axes()
+    :returns: the figure
+    """
+    # pylint: disable=too-many-arguments, too-many-locals
+    # We plot the keys common to the labels & preds, & optionally the input list
+    # of names. Avoiding using set() as we want input names or the labels to set order
+    if selected_labels is None:
+        selected_labels = list(all_pub_labels.keys())
+    pub_labels = { k: all_pub_labels[k] for k in selected_labels if k in predictions[0].keys() }
+
+    print("Plotting binned MAE vs label values for:", ", ".join(pub_labels.keys()))
+    fig, ax = plt.subplots(1, 1, figsize=(6, 4), constrained_layout=True)
+
+    # We need to know the extent of the data beforehand, so we can apply equivalent bins to all
+    (lbl_vals, pred_vals, _, resids) = model_testing.get_label_and_prediction_raw_values(
+                                                    labels, predictions, list(pub_labels.keys()))
+    resids = np.abs(resids)
+
+    min_val = min(lbl_vals.min(), pred_vals.min())
+    max_val = max(lbl_vals.max(), pred_vals.max())
+    bins = np.linspace(min_val, max_val, num_bins+1)
+
+    for ix, label_name in enumerate(pub_labels):
+        means, bin_edges, _ = binned_statistic(lbl_vals[:, ix], resids[:, ix], "mean", bins)
+        bin_width = bin_edges[1] - bin_edges[0]
+        bin_centres = bin_edges[1:] - bin_width / 2
+
+        if indicate_bin_counts:
+            counts, _, _ = binned_statistic(lbl_vals[:, ix], resids[:, ix], "count", bins)
+            marker_sizes = 1.0 * (counts/10)
+            alpha = 0.5 # more likely to overlap
+        else:
+            marker_sizes = 5.0
+            alpha = 0.75
+
+        ax.scatter(bin_centres, means, s=marker_sizes, alpha=alpha, label=pub_labels[label_name])
+
+    format_axes(ax, xlabel=xlabel, ylabel=ylabel, legend_loc="best", **format_kwargs)
     return fig
 
 
