@@ -1180,6 +1180,54 @@
             "LDA2": 0.545,
             "LDB2": 0.545
         }
+    },
+    "V530 Ori": {
+        "source": "DEBCat and Torres et al. (2014) who used JKTEBOP with various non-TESS photometry sources.",
+        "reference": "TorresSandbergLacy+14aj",
+        "exclude": true,
+        "why": "Ready to add, just need to finish current tests",
+        "aka": "TIC 11961096, HD 294598",
+        "SpT": "G1 V + M1 V", 
+        "MA": 1.0038,           "MA_err": 0.0066,
+        "MB": 0.5955,           "MB_err": 0.0022,
+        "RA": 0.980,            "RA_err": 0.013,
+        "RB": 0.5873,           "RB_err": 0.0067,
+        "TeffA": 5890,          "TeffA_err": 100,
+        "TeffB": 3880,          "TeffB_err": 120,
+        "logLA": 0.016,         "logLA_err": 0.032,
+        "logLB": -1.154,        "logLB_err": 0.053,
+        "rA": 0.0596,           "rA_err": 0.0008,
+        "rB": 0.0357,           "rB_err": 0.0004,
+        "desc": "A G+M pair in an eccentric 6.1 d orbit showing partial primary eclipses of ~0.5 mag and shallow secondary transits of ~0.06 mag. Some variability detected; probably from star spots on the primary component.",
+        "transits": true,
+        "eclipses_similar": false,
+        "components_similar": false,
+        "notes": "J in TESS bandpass calculated from T_effs; bP derived from rA, inc, e & esinw; control fit on TESS S33, with flattening to dampen variability, yields MAE 0.0090;",
+        "primary_epoch": 2210.491034996,
+        "period": 6.110760760,
+        "ecc": 0.0862,              "ecc_err": 0.0010,
+        "omega": 130.08,            "omega_err": 0.14,
+        "labels": { 
+            "rA_plus_rB": 0.0953,       "rA_plus_rB_err" : 0.0010,
+            "k": 0.600,                 "k_err": 0.004,
+            "bP": 0.06,                 "bP_err": 0.02,
+            "inc": 89.78,               "inc_err": 0.08,
+            "ecosw": -0.0555,           "ecosw_err": 0.0007,
+            "esinw": 0.0660,            "esinw_err": 0.0008,
+            "J": 0.18,                  "J_err": null,
+            "L3": 0.0,                  "L3_err": null
+        },
+        "sectors": {
+            "33": {
+                "quality_bitmask": "hard",
+                "flatten": { "mask_time_ranges": [[2210.37, 2210.62], [2213.19, 2213.46]] },
+                "detrend_gap_threshold": 0.5,
+                "detrend_order": 1
+            }
+        },
+        "fit_overrides": {
+            "qphot": 0.5932
+        }
     },  
     "CM Dra": {
         "source": "DEBCAT and Martin et al. (2024), Table I. TESS Sectors 16, 19, 22-26, 49-52 (all slow) and 56-59 (200 s) analysed with EXOPLANET. SpT, Teff & logL from Morales et al. (2009).",
