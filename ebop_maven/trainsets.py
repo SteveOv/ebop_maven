@@ -119,9 +119,9 @@ def generate_instances_from_distributions(instance_count: int, label: str, verbo
         while True: # imitate "loop and a half" / "repeat ... until" logic
             # These are the "label" params for which we have defined distributions
             rA_plus_rB  = np.random.uniform(low=0.001, high=0.45001)
-            k           = np.random.normal(loc=0.8, scale=0.4)
+            k           = np.random.normal(loc=0.8, scale=0.6)
             inc         = np.random.uniform(low=50., high=90.00001) * u.deg
-            J           = np.random.normal(loc=0.8, scale=0.4)
+            J           = np.random.normal(loc=0.8, scale=0.6)
 
             # We're once more predicting L3 as JKTEBOP is being updated to support
             # negative L3 input values (so it's now fully trainable)
