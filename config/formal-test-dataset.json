@@ -94,6 +94,57 @@
             "L3_fit": 0
         }
     },
+    "IQ Per": {
+        "source": "DEBCat and Lacy & Frueh (1985) tables 6, 7 & 8 (V-band) - based on non-TESS photometry. TESS sectors 19 and 59 now available.",
+        "reference": "LacyFrueh85aj",
+        "exclude": true,
+        "why": "awaiting John's characterization, although note that rA > 0.2",
+        "aka": "TIC 265767012, HD 24909",
+        "SpT": "B7.5 + A6",
+        "MA": 3.51,             "MA_err": 0.04,
+        "MB": 1.73,             "MB_err": 0.02,
+        "RA": 2.45,             "RA_err": 0.03,
+        "RB": 1.50,             "RB_err": 0.02,
+        "TeffA": 12300,         "TeffA_err": 200,
+        "TeffB": 7670,          "TeffB_err": 90,
+        "logLA": null,          "logLA_err": null,
+        "logLB": null,           "logLB_err": null,
+        "rA": 0.231,            "rA_err": 0.002,
+        "rB": 0.142,            "rB_err": 0.001,
+        "desc": "",
+        "transits": true,
+        "eclipses_similar": false,
+        "components_similar": false,
+        "notes": "J(TESS) approximated from T_effs; w, ecosw & esinw approximated update (apsidal motion); bP derived from rA, inc, e & esinw; current control fit is poor at MAE~0.24 (awaiting JKT characterization);",
+        "primary_epoch": 1821.255,
+        "period": 1.7435699,
+        "ecc": 0.075,               "ecc_err": 0.006,
+        "omega": 140,               "omega_err": null,
+        "labels": {
+            "rA_plus_rB": 0.373,        "rA_plus_rB_err": 0.002,
+            "k": 0.613,                 "k_err": 0.003,
+            "bP": 0.05,                 "bP_err": null,
+            "inc": 89.3,                "inc_err": 0.8,
+            "ecosw": -0.06,             "ecosw_err": null,
+            "esinw": -0.02,             "esinw_err": null,
+            "J": 0.33,                  "J_err": null,
+            "L3": 0.0,                  "L3_err": null
+        },
+        "sectors": {
+            "19": {
+                "quality_bitmask": "hardest",
+                "quality_masks":[[1815.0, 1817.2], [1839.2, 1842.0]],
+                "detrend_gap_threshold": 0.5,
+                "detrend_order": 2
+            }
+        },
+        "fit_overrides": {
+            "gravA": 0.55,
+            "gravB": 0.88,
+            "reflA": 0.0012,
+            "reflB": 0.0125
+        }
+    },
     "psi Cen": {
         "source": "DEBCat and Bruntt et al. (2006) Table 2 based on WIRE photometry and JKTEBOP. We have access to TESS sectors 38 & 65 120 s SAP photometry (38 has incomplete eclipses).",
         "reference": "BrunttSouthworth+06aa",
