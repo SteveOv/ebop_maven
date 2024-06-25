@@ -41,10 +41,10 @@ TRAINSET_DIR = Path(".") / "datasets" / TRAINSET_NAME / "training"
 VALIDSET_DIR = Path(".") / "datasets" / TRAINSET_NAME / "validation"
 TESTSET_DIR = Path(".") / "datasets" / "synthetic-mist-tess-dataset"
 
-TRAINING_EPOCHS = 100           # Set high if we're using early stopping
+TRAINING_EPOCHS = 250           # Set high if we're using early stopping
 BATCH_FRACTION = 0.001          # larger -> quicker training per epoch but more to converge
 MAX_BUFFER_SIZE = 20000000      # Size of Dataset shuffle buffer (in instances)
-EARLY_STOPPING_PATIENCE = 7     # Number of epochs w/o improvement before stopping
+EARLY_STOPPING_PATIENCE = 15    # Number of epochs w/o improvement before stopping
 ENFORCE_REPEATABILITY = True    # If true, avoid GPU/CUDA cores for repeatable results
 SEED = 42                       # Standard random seed ensures repeatable randomization
 np.random.seed(SEED)
