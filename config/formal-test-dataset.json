@@ -14,11 +14,11 @@
         "logLB": 3.471,         "logLB_err": 0.079,
         "rA": 0.03822,          "rA_err": 0.00051,
         "rB": 0.04191,          "rB_err": 0.00029,
-        "desc": "An eccentric orbit with the secondary eclipse near phase 0.4 and depths of ~0.4 and ~0.15 mag. The long period means only one of each eclipse is observed. Star B is both larger (k~1.1) and more luminous (J~1.04) than Star A which, coupled with partial eclipses and SLF variability, will likely make this difficult to predict.",
+        "desc": "An eccentric orbit with the secondary eclipse near phase 0.4 and depths of ~0.4 and ~0.15 mag. The long period means only one of each eclipse is observed. Star B is both larger (k~1.1) and more luminous (J~1.04) than Star A which, coupled with partial eclipses and SLF variability, will likely make this difficult to predict. Southworth & Bowman found solutions where k=0.69(3), 0.84(2) and 1.10(3), with that last adopted; poor predictions may lead JKTEBOP to the wrong solution.",
         "transits": false,
         "eclipses_similar": false,
         "components_similar": false,
-        "notes": "bP derived from rA, inc, e & esinw; control fit of S18 SAP data (period, PE and LD params set to published values) yields MAE~0.0090;",
+        "notes": "bP derived from rA, inc, e & esinw; control fit of S18 SAP data (period, PE and LD params fixed at published values) yields MAE~0.0031;",
         "primary_epoch": 1813.2011,
         "period": 25.935953,
         "ecc": 0.3835,          "ecc_err": 0.0018,
@@ -37,13 +37,15 @@
             "18": {
                 "quality_bitmask": "hardest",
                 "quality_masks": [[1790.0, 1792.0]],
-                "detrend_order": 1
+                "detrend_order": 3
             }
         },
         "fit_overrides": {
             "period_fit": 0,
             "LDA": "quad",
             "LDB": "quad",
+            "LDA1_fit": 0,
+            "LDB1_fit": 0,
             "LDA1": 0.046,
             "LDB1": 0.046,
             "LDA2": 0.22,
