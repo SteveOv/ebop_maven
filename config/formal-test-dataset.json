@@ -1184,8 +1184,7 @@
     "V530 Ori": {
         "source": "DEBCat and Torres et al. (2014) who used JKTEBOP with various non-TESS photometry sources.",
         "reference": "TorresSandbergLacy+14aj",
-        "exclude": true,
-        "why": "Ready to add, just need to finish current tests",
+        "exclude": false,
         "aka": "TIC 11961096, HD 294598",
         "SpT": "G1 V + M1 V", 
         "MA": 1.0038,           "MA_err": 0.0066,
