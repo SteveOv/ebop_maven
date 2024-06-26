@@ -71,7 +71,7 @@ def load_lightcurve(target: str, setup_mag_columns: bool=True) -> lk.LightCurve:
     """
     params = KNOWN_TARGETS[target]
     tic = f"TIC{params.tic}"
-    lc = find_lightcurves(target=tic,
+    lc = find_lightcurves(search_term=tic,
                           download_dir=TEST_DATA_DIR / tic,
                           sectors=params.sector,
                           mission=params.__dict__.get("mission", "TESS"),

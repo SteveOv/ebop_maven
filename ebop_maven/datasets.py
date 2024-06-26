@@ -439,7 +439,7 @@ def sector_config_from_target(sector: int, target_cfg: Dict[str, any]) -> Dict[s
     return sector_cfg
 
 
-def prepare_lc_for_target_sector(target: str,
+def prepare_lc_for_target_sector(search_term: str,
                                  sector: int,
                                  config: Dict[str, any],
                                  fits_dir: Path,
@@ -449,7 +449,7 @@ def prepare_lc_for_target_sector(target: str,
     append the rectified delta_mag and delta_mag_err columns. It will read the
     information required for these steps from the passed sector config.
     """
-    lc = pipeline.find_lightcurves(target,
+    lc = pipeline.find_lightcurves(search_term,
                                    fits_dir,
                                    [sector],
                                    config.get("mission", "TESS"),
@@ -458,6 +458,9 @@ def prepare_lc_for_target_sector(target: str,
                                    config.get("flux_column", "sap_flux"),
                                    config.get("quality_bitmask", "default"),
                                    verbose=verbose)[0]
+
+    if verbose:
+        print(f"Opened light-curve fits for {lc.meta['OBJECT']} sector {lc.meta['SECTOR']}")
 
     # Here we mask out any "bad" data which may adversely affect detrending and subsequent processes
     lc = pipeline.apply_invalid_flux_masks(lc, verbose)
@@ -522,24 +525,28 @@ def prepare_lightcurve_for_target(target: str,
     :verbose: whether to print progress messages
     :returns: a tuple of the combined LightCurve for the configured sectors and the sector count
     """
+    # Handle using a different search term than the target name
+    search_term = target_cfg.get("search_term", target) or target
     sectors = list_sectors_in_target_config(target_cfg)
     if verbose:
-        print(f"Downloading and stitching the lightcurves for {target} sector(s)",
+        print(f"Downloading and stitching the lightcurves for {target}",
+              f"(search term='{search_term}')" if search_term != target else "",
+              "sector(s)", 
               ", ".join(f"{s}" for s in sectors))
 
     # This will download and pre-cache the timeseries fits files. We don't open
     # them here as we may have to apply different settings per sector.
     fits_dir = Path.cwd() / "cache" / re.sub(r'[^\w\d-]', '_', target.lower())
-    pipeline.find_lightcurves(target, fits_dir, sectors,
+    pipeline.find_lightcurves(search_term, fits_dir, sectors,
                               mission = target_cfg.get("mission", "TESS"),
                               author=target_cfg.get("author", "SPOC"),
                               exptime=target_cfg.get("exptime", None),
                               verbose=False)
     lcs = []
     for sector in sectors:
-        # The basic LC data read, rectified & extended with delta_mag and delta_mag_err cols
+        # Now open & pre-process each LC directly.
         sector_cfg = sector_config_from_target(sector, target_cfg)
-        lcs +=[prepare_lc_for_target_sector(target, sector, sector_cfg, fits_dir, verbose)]
+        lcs +=[prepare_lc_for_target_sector(search_term, sector, sector_cfg, fits_dir, verbose)]
     if len(lcs) > 1:
         return (LightCurveCollection(lcs).stitch(), len(sectors))
     return (lcs[0], 1)

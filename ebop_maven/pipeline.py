@@ -13,7 +13,7 @@ import lightkurve as lk
 from lightkurve import LightCurve, FoldedLightCurve, LightCurveCollection
 
 
-def find_lightcurves(target: any,
+def find_lightcurves(search_term: any,
                      download_dir: Path,
                      sectors: Union[int, List[int]]=None,
                      mission: str="TESS",
@@ -34,7 +34,7 @@ def find_lightcurves(target: any,
     download dir is exclusive to this target as we cannot tie all potential values of the target
     search criterion directly to the contents of fits.
     
-    :target: the target search term
+    :search_term: the target search term
     :download_dir: the local directory under which the assets are/will be stored
     :sectors: the sector or sectors search term
     :mission: the mission search term
@@ -56,7 +56,7 @@ def find_lightcurves(target: any,
         sectors = [sectors]
 
     if verbose:
-        print(f"Searching for lightcurves based on; target={target}, sectors={sectors},",
+        print(f"Searching for lightcurves based on; search term={search_term}, sectors={sectors},",
               f"mission={mission}, author={author} and exptime={exptime}")
 
     if not force_mast and sectors and mission and author:
@@ -79,29 +79,33 @@ def find_lightcurves(target: any,
 
             # select only those that match the sector & exptime
             if not exptime:
-                check_exptime = None
+                chk_exp = None
             else:
                 # This is what lambdas are for despite what pylint keeps wittering on about!
                 if not isinstance(exptime, str):
-                    check_exptime = lambda fits_exptime: fits_exptime == exptime
+                    chk_exp = lambda fits_exptime: fits_exptime == exptime
                 elif exptime.lower() == "short":
-                    check_exptime = lambda fits_exptime: 60 <= fits_exptime <= 120
+                    chk_exp = lambda fits_exptime: 60 <= fits_exptime <= 120
                 elif exptime.lower() == "fast":
-                    check_exptime = lambda fits_exptime: fits_exptime < 60
+                    chk_exp = lambda fits_exptime: fits_exptime < 60
                 else:
-                    check_exptime = lambda fits_exptime: fits_exptime > 120
+                    chk_exp = lambda fits_exptime: fits_exptime > 120
+
+            tic_term = None
+            if isinstance(search_term, str) and search_term.upper().startswith("TIC"):
+                tic_term = int(''.join(filter(str.isdigit, search_term)))
 
             hduls = [
                 h for h in (fits.open(ff) for ff in fits_files)
-                    if h[0].header["SECTOR"] in sectors and
-                        (not check_exptime
-                            or check_exptime(h[1].header["FRAMETIM"] * h[1].header["NUM_FRM"]))
+                    if h[0].header["SECTOR"] in sectors
+                        and (not tic_term or h[1].header["TICID"] == tic_term)
+                        and (not chk_exp or chk_exp(h[1].header["FRAMETIM"]*h[1].header["NUM_FRM"]))
             ]
 
             if len(hduls) == len(sectors):
                 # We're on! Load these into a collection and return them.
                 if verbose:
-                    print(f"Found the required {len(hduls)} fits also meeting the sectors &",
+                    print(f"Found the required {len(hduls)} fits file(s) meeting the TIC, sector &",
                           "exptime criteria. Will load the requested lightcurves from these.")
                 lcs = LightCurveCollection(
                     lk.read(h.filename(), flux_column=flux_column, quality_bitmask=quality_bitmask)
@@ -112,13 +116,13 @@ def find_lightcurves(target: any,
         if verbose:
             print("Performing a MAST query based on the criteria.")
         # We've not been able to service the request from already dl assets: usual search & download
-        results = lk.search_lightcurve(target, sector=sectors, mission=mission,
+        results = lk.search_lightcurve(search_term, sector=sectors, mission=mission,
                                        author=author, exptime=exptime)
         if verbose:
             print("Criteria met by a MAST search yielding a", results)
 
         # Work around a recent issues with DL assets - suggested by Pierre Maxted
-        if "dataUrl" not in results.table.colnames:
+        if "dataUrl" not in results.table.colnames and "dataURI" in results.table.colnames:
             results.table["dataURL"] = results.table["dataURI"]
         download_dir.mkdir(parents=True, exist_ok=True)
         lcs = results.download_all(quality_bitmask, f"{download_dir}",
