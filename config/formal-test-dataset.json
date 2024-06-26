@@ -210,7 +210,7 @@
         "source": "DEBCat and Bruntt et al. (2006) Table 2 based on WIRE photometry and JKTEBOP. We have access to TESS sectors 38 & 65 120 s SAP photometry (38 has incomplete eclipses).",
         "reference": "BrunttSouthworth+06aa",
         "exclude": true,
-        "why": "unstable fit - slight deviations from published params and we get gaussj warnings out of JKTEBOP",
+        "why": "unstable fit - slight deviations from published params and we loose the best fit",
         "label": "$\\mathrm{\\psi}$ Cen",
         "aka": "TIC 179958960, HD 125473, HR 5367",
         "SpT": "B9 + A2",
@@ -224,11 +224,11 @@
         "logLB": 1.2,           "logLB_err": 0.1,
         "rA": 0.043984,         "rA_err": 0.000045,
         "rB": 0.021877,         "rB_err": 0.000032,
-        "desc": "An eccentric orbit with transit depths of ~0.25 and ~0.15 mag and the secondary after phase 0.8. The period of 38.8 d is longer than a single TESS sector; we use both 38 & 65 to give the most coverage.",
+        "desc": "A highly eccentric orbit with transit depths of ~0.25 and ~0.15 mag and the secondary after phase 0.8. The period of 38.8 d is longer than a single TESS sector; we use both 38 & 65 to give the most coverage.",
         "transits": true,
         "eclipses_similar": false,
         "components_similar": false,
-        "notes": "bP derived from rA, inc, e & esinw; logLA & logLB derived from R and Teff; qphot, gravA & gravB from paper (pp 654); control fit of SAP flux of sectors 38 & 65, with published qphot & gravA/B values fixed, yields MAE~0.056 however it's an unstable fit - slight deviations from published params and we get gaussj warnings out of JKTEBOP;",
+        "notes": "bP derived from rA, inc, e & esinw; logLA & logLB derived from R and Teff; qphot, gravA & gravB from paper (pp 654); control fit of SAP flux of sectors 38 & 65, with published qphot & gravA/B values fixed, yields MAE~0.056 however it's an unstable fit;",
         "primary_epoch": 2354.145650402,
         "period": 38.811922892,
         "ecc": 0.55408,             "ecc_err": 0.00024,
@@ -246,13 +246,18 @@
         "sectors": {
             "38": {
                 "quality_bitmask": "hardest",
-                "quality_masks":[[2347.0, 2350.0]]
+                "quality_masks":[[2330.0, 2350.0]],
+                "flatten": { "mask_time_ranges": [[2353.8, 2354.5]] },
+                "detrend_order": 0
             },
             "65": {
                 "quality_bitmask": "hardest",
-                "quality_masks": [[3087.0, 3090.3]]
+                "quality_masks": [[3087.0, 3090.3]],
+                "flatten": { "mask_time_ranges": [[3084.0, 3085.1], [3091.1, 3092.0]] },
+                "detrend_order": 0
             }
         },
+        "bin_time": 300,
         "fit_overrides": {
             "qphot": 0.65,
             "gravA": 1.0,
