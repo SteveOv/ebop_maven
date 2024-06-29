@@ -137,7 +137,11 @@ def generate_instances_from_distributions(instance_count: int, label: str, verbo
 
             # We generate ecc and omega (argument of periastron) from appropriate distributions.
             # They're not used directly as labels, but they make up ecosw and esinw which are.
-            ecc         = np.abs(np.random.normal(loc=0.0, scale=0.2))
+            # Use a Laplace distribution, rather than normal, as tests found this trains a better
+            # model. The Laplace distribution is characterised by a higher peak and fatter tails.
+            # This should give us more systems around e~0 but also more at the extremes.
+            # f(x|\mu, b) = 1/2b exp(-|x-\mu|/b), where b is the scale param.
+            ecc         = np.abs(np.random.laplace(loc=0.0, scale=0.2))
             omega       = np.random.uniform(low=0., high=360.) * u.deg
 
             # Now we can calculate the derived values, sufficient to check we've a usable system
