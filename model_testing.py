@@ -26,7 +26,10 @@ from keras import Model
 from ebop_maven.libs.tee import Tee
 from ebop_maven.libs import jktebop, stellar, limb_darkening
 from ebop_maven.estimator import Estimator
-from ebop_maven import datasets, deb_example, pipeline, plotting
+from ebop_maven import deb_example, pipeline, plotting
+
+from traininglib import formal_testing
+
 import plots
 
 SYNTHETIC_MIST_TEST_DS_DIR = Path("./datasets/synthetic-mist-tess-dataset/")
@@ -229,7 +232,7 @@ def fit_against_formal_test_dataset(
         print(fill(targ_config.get("desc", "")) + "\n")
 
         # The basic lightcurve data read, rectified & extended with delta_mag and delta_mag_err cols
-        (lc, sector_count) = datasets.prepare_lightcurve_for_target(targ, targ_config, True)
+        (lc, sector_count) = formal_testing.prepare_lightcurve_for_target(targ, targ_config, True)
         pe = pipeline.to_lc_time(targ_config["primary_epoch"], lc).value
         period = targ_config["period"]
 
@@ -645,9 +648,10 @@ if __name__ == "__main__":
     ap.set_defaults(model_files=[None]) # If None will load the default model under ebop_maven/data
     args = ap.parse_args()
 
-    with open("./config/formal-test-dataset.json", mode="r", encoding="utf8") as tf:
-        formal_targs_cfg = json.load(tf)
-    formal_targs = np.array([t for t, c in formal_targs_cfg.items() if not c.get("exclude", False)])
+    # This will get the config, labels and published params for formal targets not excluded
+    targets_config_file = Path("./config/formal-test-dataset.json")
+    formal_targs_cfg = dict(formal_testing.iterate_target_configs(targets_config_file))
+    formal_targs = list(formal_targs_cfg.keys())
     #formal_targs = np.array(["V436 Per", "CM Dra"])
 
     for file_counter, model_file in enumerate(args.model_files, 1):
