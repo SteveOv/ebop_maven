@@ -1,22 +1,47 @@
 """
-Functions for building TensorFlow datasets. To be deprecated.
+Helper functions to support interacting with formal test dataset.
+Functions in this module know about the format of the formal test dataset config.
 """
 # Use ucase variable names where they match the equivalent symbol and pylint can't find units alias
 # pylint: disable=invalid-name, no-member, too-many-arguments, too-many-locals
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Generator
 from pathlib import Path
+import json
 import re
 
 import numpy as np
 import astropy.units as u
 from lightkurve import LightCurve, LightCurveCollection
 
-from . import pipeline
+from ebop_maven import pipeline
+
+
+def iterate_target_configs(target_config_file: Path,
+                           chosen_targets: List[str]=None,
+                           include_excluded: bool=False) \
+                                -> Generator[Tuple[str, Dict[str, any]], any, None]:
+    """
+    Sets up a Generator over the target configs within the passed config file.
+
+    :target_config_file: the source json configuration file
+    :chosen_targets: which targets to find, or all of None
+    :include_excluded: whether to include those targets marked as excluded
+    :returns: Generator over the chosen targets yielding (str, dict) of the target name and config
+    """
+    with open(target_config_file, mode="r", encoding="utf8") as f:
+        configs = json.load(f)
+    for k, v in configs.items():
+        if chosen_targets is None or k in chosen_targets:
+            if include_excluded or not v.get("exclude", False):
+                yield k, v
 
 
 def list_sectors_in_target_config(target_cfg: Dict[str, any]) -> List[int]:
     """
     Returns a list of the sectors configured for this target.
+
+    :target_cfg: the target's config dictionary, as read from the config json
+    :returns: a list[int] of the configured sector numbers
     """
     return [int(s) for s in target_cfg["sectors"].keys() if s.isdigit()]
 
@@ -24,7 +49,11 @@ def list_sectors_in_target_config(target_cfg: Dict[str, any]) -> List[int]:
 def sector_config_from_target(sector: int, target_cfg: Dict[str, any]) -> Dict[str, any]:
     """
     Get the sector specific config from the passed target config. The sector config
-    is the target config overlaid with the sector config so the sector provides overrides.
+    is the target config coalesced with the sector config so the sector provides overrides.
+
+    :sector: the chosen sector number
+    :target_cfg: the target's config dictionary, as read from the config json
+    :returns: the sector's configuration dictionary
     """
     sector_cfg = {
         **target_cfg.copy(),
@@ -34,7 +63,48 @@ def sector_config_from_target(sector: int, target_cfg: Dict[str, any]) -> Dict[s
     return sector_cfg
 
 
-def prepare_lc_for_target_sector(search_term: str,
+def prepare_lightcurve_for_target(target: str,
+                                  target_cfg: Dict[str, any],
+                                  verbose: bool=True) \
+                                    -> Tuple[LightCurve, int]:
+    """
+    Will prepare a lightcurve for the passed test target.
+    If the target has multiple sectors configured, these will be downloaded
+    separately and stitched into a single Lightcurve
+
+    :target: the name/search term for the target
+    :target_cfg: the target's config dictionary, as read from the config json
+    :verbose: whether to write detailed progress information to stdout
+    :returns: a tuple of the combined LightCurve for the configured sectors and the sector count
+    """
+    # Handle using a different search term than the target name
+    search_term = target_cfg.get("search_term", target) or target
+    sectors = list_sectors_in_target_config(target_cfg)
+    if verbose:
+        print(f"Downloading and stitching the lightcurves for {target}",
+              f"(search term='{search_term}')" if search_term != target else "",
+              "sector(s)", 
+              ", ".join(f"{s}" for s in sectors))
+
+    # This will download and pre-cache the timeseries fits files. We don't open
+    # them here as we may have to apply different settings per sector.
+    fits_dir = Path.cwd() / "cache" / re.sub(r'[^\w\d-]', '_', target.lower())
+    pipeline.find_lightcurves(search_term, fits_dir, sectors,
+                              mission = target_cfg.get("mission", "TESS"),
+                              author=target_cfg.get("author", "SPOC"),
+                              exptime=target_cfg.get("exptime", None),
+                              verbose=False)
+    lcs = []
+    for sector in sectors:
+        # Now open & pre-process each LC directly.
+        sector_cfg = sector_config_from_target(sector, target_cfg)
+        lcs +=[_prepare_lc_for_target_sector(search_term, sector, sector_cfg, fits_dir, verbose)]
+    if len(lcs) > 1:
+        return (LightCurveCollection(lcs).stitch(), len(sectors))
+    return (lcs[0], 1)
+
+
+def _prepare_lc_for_target_sector(search_term: str,
                                  sector: int,
                                  config: Dict[str, any],
                                  fits_dir: Path,
@@ -43,6 +113,13 @@ def prepare_lc_for_target_sector(search_term: str,
     Will find and load the requested target/sector lightcurve then mask, bin and
     append the rectified delta_mag and delta_mag_err columns. It will read the
     information required for these steps from the passed sector config.
+
+    :search_term: the name or id of the chosen target system
+    :sector: which sector
+    :target_cfg: the target's config dictionary, as read from the config json
+    :fits_dir: the location of the local cache for the downloaded MAST fits assets
+    :verbose: whether to write detailed progress information to stdout
+    :returns: a LightCurve object with prepared light-curve data
     """
     lc = pipeline.find_lightcurves(search_term,
                                    fits_dir,
@@ -104,44 +181,3 @@ def prepare_lc_for_target_sector(search_term: str,
         lc = pipeline.apply_time_range_masks(lc, mask_time_ranges, verbose)
 
     return lc
-
-
-def prepare_lightcurve_for_target(target: str,
-                                  target_cfg: Dict[str, any],
-                                  verbose: bool=True) \
-                                    -> Tuple[LightCurve, int]:
-    """
-    Will prepare a lightcurve for the passed test target.
-    If the target has multiple sectors configured, these will be downloaded
-    separately and stitched into a single Lightcurve
-
-    :target: the name/search term for the target
-    :target_cfg: the configuration dictionary for the target
-    :verbose: whether to print progress messages
-    :returns: a tuple of the combined LightCurve for the configured sectors and the sector count
-    """
-    # Handle using a different search term than the target name
-    search_term = target_cfg.get("search_term", target) or target
-    sectors = list_sectors_in_target_config(target_cfg)
-    if verbose:
-        print(f"Downloading and stitching the lightcurves for {target}",
-              f"(search term='{search_term}')" if search_term != target else "",
-              "sector(s)", 
-              ", ".join(f"{s}" for s in sectors))
-
-    # This will download and pre-cache the timeseries fits files. We don't open
-    # them here as we may have to apply different settings per sector.
-    fits_dir = Path.cwd() / "cache" / re.sub(r'[^\w\d-]', '_', target.lower())
-    pipeline.find_lightcurves(search_term, fits_dir, sectors,
-                              mission = target_cfg.get("mission", "TESS"),
-                              author=target_cfg.get("author", "SPOC"),
-                              exptime=target_cfg.get("exptime", None),
-                              verbose=False)
-    lcs = []
-    for sector in sectors:
-        # Now open & pre-process each LC directly.
-        sector_cfg = sector_config_from_target(sector, target_cfg)
-        lcs +=[prepare_lc_for_target_sector(search_term, sector, sector_cfg, fits_dir, verbose)]
-    if len(lcs) > 1:
-        return (LightCurveCollection(lcs).stitch(), len(sectors))
-    return (lcs[0], 1)

@@ -8,7 +8,6 @@ import numpy as np
 from scipy.stats import binned_statistic
 
 from ebop_maven.plotting import format_axes
-from ebop_maven.libs.mistisochrones import MistIsochrones
 import model_testing
 
 all_pub_labels = {
@@ -156,44 +155,4 @@ def plot_binned_mae_vs_labels(
         ax.scatter(bin_centres, means, s=marker_sizes, alpha=alpha, label=pub_labels[label_name])
 
     format_axes(ax, xlabel=xlabel, ylabel=ylabel, legend_loc="best", **format_kwargs)
-    return fig
-
-
-def plot_formal_test_dataset_hr_diagram(targets_cfg: Dict[str, any],
-                                        verbose: bool=True):
-    """
-    Plots a log(L) vs log(Teff) H-R diagram with ZAMS line. Returns the figure
-    of the plot and it is up to calling code to show or save this.
-
-    :targets_cfg: the config data to plot from
-    :verbose: whether to print out progress messages
-    :returns: the Figure
-    """
-    if verbose:
-        print("Plotting log(Teff) vs log(L) 'H-R' diagram")
-    if verbose:
-        print("Loading MIST isochrone for ZAMS data")
-
-    fig = plt.figure(figsize=(6, 4), tight_layout=True)
-    ax = fig.add_subplot(1, 1, 1)
-    for comp, fillstyle in [("A", "full"), ("B", "none") ]:
-        # Don't bother with error bars as this is just an indicative distribution.
-        x = np.log10([cfg.get(f"Teff{comp}", None) or 0 for _, cfg in targets_cfg.items()])
-        y = [cfg.get(f"logL{comp}", None) or 0 for _, cfg in targets_cfg.items()]
-
-        ax.errorbar(x, y, fmt = "o", fillstyle = fillstyle, linewidth = 0.5,
-                    ms = 7., markeredgewidth=0.5, c='tab:blue', label=f"Star{comp}")
-
-        if verbose:
-            print(f"Star {comp}: log(x) range [{min(x):.3f}, {max(x):.3f}],",
-                               f"log(y) range [{min(y):.3f}, {max(y):.3f}]")
-
-    # Now plot a ZAMS line from the MIST on the same criteria
-    mist_isos = MistIsochrones(metallicities=[0.0])
-    zams = mist_isos.lookup_zams_params(feh=0.0, cols=["log_Teff", "log_L"])
-    ax.plot(zams[0], zams[1], c="k", ls=(0, (15, 5)), linewidth=0.5, label="ZAMS", zorder=-10)
-
-    format_axes(ax, xlim=(4.45, 3.35), ylim=(-2.6, 4.5),
-                xlabel= r"$\log{(\mathrm{T_{eff}\,/\,K})}$",
-                ylabel=r"$\log{(\mathrm{L\,/\,L_{\odot}})}$")
     return fig
