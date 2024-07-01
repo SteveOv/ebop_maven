@@ -9,10 +9,10 @@ from matplotlib.figure import Figure
 import numpy as np
 
 from ebop_maven.plotting import format_axes
-from ebop_maven.libs.mistisochrones import MistIsochrones
 from ebop_maven import deb_example
 
 from .datasets import read_param_sets_from_csvs
+from .mistisochrones import MistIsochrones
 
 all_pub_labels = {
     "rA_plus_rB":   r"$r_{A}+r_{B}$",

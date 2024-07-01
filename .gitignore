@@ -173,4 +173,4 @@ cache/
 drop/
 
 # MIST isochrones which should be downloaded from source
-ebop_maven/libs/data/stellar_models/mist/MIST*/*.iso
+traininglib/data/mist/MIST*/*.iso

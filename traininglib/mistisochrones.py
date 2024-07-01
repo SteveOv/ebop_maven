@@ -6,7 +6,7 @@ import re
 
 import numpy as np
 
-from .data.stellar_models.mist.read_mist_models import ISO
+from .data.mist.read_mist_models import ISO
 
 class MistIsochrones():
     """
@@ -20,7 +20,7 @@ class MistIsochrones():
 
         :metallicities: optional list of metallicities to load by feh value, or any found if not set
         """
-        isos_dir = self._this_dir / "data/stellar_models/mist/MIST_v1.2_vvcrit0.4_basic_isos"
+        isos_dir = self._this_dir / "data/mist/MIST_v1.2_vvcrit0.4_basic_isos"
         iso_files = sorted(isos_dir.glob("*.iso"))
 
         # Index the iso files on their [Fe/H]
