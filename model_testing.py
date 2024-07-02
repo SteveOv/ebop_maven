@@ -7,7 +7,6 @@ from typing import Union, List, Dict, Tuple
 from io import TextIOBase, StringIO
 import sys
 from pathlib import Path
-import json
 import re
 from contextlib import redirect_stdout
 from textwrap import fill
@@ -28,9 +27,8 @@ from ebop_maven.libs import jktebop, stellar, limb_darkening
 from ebop_maven.estimator import Estimator
 from ebop_maven import deb_example, pipeline, plotting
 
-from traininglib import formal_testing
+from traininglib import formal_testing, plots
 
-import plots
 
 SYNTHETIC_MIST_TEST_DS_DIR = Path("./datasets/synthetic-mist-tess-dataset/")
 FORMAL_TEST_DATASET_DIR = Path("./datasets/formal-test-dataset/")
