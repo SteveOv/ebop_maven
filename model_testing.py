@@ -126,7 +126,7 @@ def evaluate_model_against_dataset(
                 # small, otherwise we create separate plots for "all", transiting & non-transiting.
                 n_est_lbls = len(estimator.label_names)
                 resids_by_label = (pred_vals[:, :n_est_lbls] - lbl_vals[:, :n_est_lbls]).transpose()
-                fig, axes = plt.subplots(figsize=(6, 4), tight_layout=True)
+                fig, axes = plt.subplots(figsize=(6, 4), constrained_layout=True)
                 plotting.plot_prediction_distributions_on_axes(axes, resids_by_label,
                                                                estimator.label_names,
                                                                violin_plot=False,

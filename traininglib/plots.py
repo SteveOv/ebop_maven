@@ -75,7 +75,7 @@ def plot_trainset_histograms(trainset_dir: Path,
     if param_specs and csvs:
         rows = math.ceil(len(param_specs) / cols)
         _, axes = plt.subplots(rows, cols, sharey="all",
-                               figsize=(cols*3, rows*2.5), tight_layout=True)
+                               figsize=(cols*3, rows*2.5), constrained_layout=True)
         if verbose:
             print(f"Plotting histograms in a {cols}x{rows} grid for:", ", ".join(param_specs))
 
@@ -113,7 +113,7 @@ def plot_formal_test_dataset_hr_diagram(targets_cfg: Dict[str, any],
     if verbose:
         print("Plotting log(Teff) vs log(L) 'H-R' diagram")
 
-    fig = plt.figure(figsize=(6, 4), tight_layout=True)
+    fig = plt.figure(figsize=(6, 4), constrained_layout=True)
     ax = fig.add_subplot(1, 1, 1)
     for comp, fillstyle in [("A", "full"), ("B", "none") ]:
         # Don't bother with error bars as this is just an indicative distribution.
@@ -164,7 +164,7 @@ def plot_dataset_instance_mags_features(dataset_files: Iterable[Path],
 
     rows = math.ceil(len(instances) / cols)
     fig, axes = plt.subplots(rows, cols, sharex="all", sharey="all",
-                             figsize=(cols*4, rows*3), tight_layout=True)
+                             figsize=(cols*4, rows*3), constrained_layout=True)
 
     # Infer the common phase data from the details of the bins we're given
     phases = np.linspace(mags_wrap_phase-1, mags_wrap_phase, mags_bins)

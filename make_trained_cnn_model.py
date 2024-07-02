@@ -217,7 +217,7 @@ if __name__ == "__main__":
                                 verbose=2)
 
             # Plot the learning curves
-            fig, ax = plt.subplots(figsize=(6, 4), tight_layout=True)
+            fig, ax = plt.subplots(figsize=(6, 4), constrained_layout=True)
             ax.plot(history.history['loss'], label="training")
             ax.plot(history.history['val_loss'], label="validation")
             plotting.format_axes(ax, xlabel="Epoch", ylabel="Loss", legend_loc="best")
