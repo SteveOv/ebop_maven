@@ -59,31 +59,42 @@ libraries. The code used in the following steps for training and testing models 
 ## Usage
 
 #### Generation of training and testing datasets
-The first step is to generate the datasets which will be used to train and test the machine
-learning model. These are built by running the following:
+To generate the datasets which will be used to train and test the machine learning model, first run
 ```sh
-$ python3 make_training_datasets.py
+$ python3 make_training_dataset.py
 ```
-This module will write three datasets under the ./datasets directory:
-- **formal-training-dataset-250k** : a synthetic dataset built by randomly sampling distributions
-of JKTEBOP model parameters across its entire parameter space
-    - currently this generates 250,000 instances split 80:20 between training and validation sets
-- **synthetic-mist-tess-dataset** : a synthetic dataset of light-curves from physically plausible
-        systems based on MIST stellar models and the TESS photometric bandpass
-    - this depends on [MIST isochrone files](http://waps.cfa.harvard.edu/MIST/data/tarballs_v1.2/MIST_v1.2_vvcrit0.4_basic_isos.txz)
-        being downloaded and extracted into the./ebop_maven/libs/data/stellar_models/mist/MIST_v1.2_vvcrit0.4_basic_isos/ directory
-    - 20,000 randomly oriented instances will be generated based on an initial random selection
-        of metallicity, age and initial masses supplemented with lookups of stellar parameters
-        in the isochrones
-- **formal-test-dataset** : a set of real, well characterized systems from
-        [DEBCAT](https://www.astro.keele.ac.uk/jkt/debcat/)
-    - selection criteria being the availability of _TESS_ lightcurves, suitability for fitting
-        with JKTEBOP and a published characterization from which parameters can be taken
-    - the file `./config/formal-test-dataset.json` contains the search criteria, labels and
-        supplementary information for each target
+to generate the the **formal-training-dataset-250k**. This is a synthetic training dataset built
+by randomly sampling distributions of JKTEBOP model parameters across its entire parameter space.
+It generates 250,000 instances split 80:20 between training and validation sets.
 
-This will take roughly one hour on a moderately powerful system, with the resulting datasets
-taking up ~15 GB of disk space.
+Next run
+```sh
+$ python3 make_synthetic_test_dataset.py
+```
+to build the **synthetic-mist-tess-dataset**. This is the full dataset of synthetic light-curves
+generated from physically plausible systems based on MIST stellar models and the TESS photometric
+bandpass. It generates 20,000 randomly oriented instances based on an initial random selection
+of metallicity, age and initial masses supplemented with lookups of stellar parameters in the
+isochrones.
+
+This module depends on
+[MIST isochrone files](http://waps.cfa.harvard.edu/MIST/data/tarballs_v1.2/MIST_v1.2_vvcrit0.4_basic_isos.txz)
+which are not distributed as part of this GitHub repo. You will need to download and extract a
+pre-built model grid by following the instructions in
+[readme.txt](traininglib/data/mist/MIST_v1.2_vvcrit0.4_basic_isos/readme.txt). 
+
+Finally run
+```sh
+$ python3 make_formal_test_dataset.py
+```
+to build the **formal-test-dataset**. These are set of real, well characterized systems from
+[DEBCAT](https://www.astro.keele.ac.uk/jkt/debcat/) selected on the availability of _TESS_
+lightcurves, suitability for fitting with JKTEBOP and a published characterization from which
+parameters can be taken. The chosen systems are configured in the file
+`./config/formal-test-dataset.json` which contains the search criteria, labels and supplementary
+information for each. 
+
+These steps will take roughly one to two hours on a moderately powerful system, with the resulting datasets taking up ~10 GB of disk space under the `./datasets/` directory.
 
 #### Training and testing the machine learning model
 The default machine learning model can be built and tested by running the following:
