@@ -10,6 +10,7 @@ from inspect import getsourcefile
 from pathlib import Path
 from string import Template
 import re
+import warnings
 
 from uncertainties import ufloat, UFloat
 import numpy as np
@@ -190,9 +191,11 @@ def write_in_file(file_name: Path,
     in_params = _prepare_params_for_task(task, params)
 
     if "L3" in in_params and in_params["L3"] < 0. and not _jktebop_support_negative_l3:
-        raise ValueError("Minimum supported L3 input value is 0.0")
+        warnings.warn("Minimum supported L3 input value is 0.0. Setting L3=0.0")
+        in_params["L3"] = 0.
     if "rA_plus_rB" in in_params and in_params["rA_plus_rB"] > 0.8:
-        raise ValueError("Maximum rA_plus_rB input value is 0.8")
+        warnings.warn("Maximum supported rA_plus_rB input value is 0.8. Setting rA_plus_rB=0.8")
+        in_params["rA_plus_rB"] = 0.8
 
     if "file_name_stem" not in in_params:
         in_params["file_name_stem"] = file_name.stem
