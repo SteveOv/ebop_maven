@@ -407,7 +407,7 @@
     },
     "WW Aur": {
         "source": "DEBCat and Southworth et al. (2005) who use EBOP (with mods to fit rA+rB & k and to use MRQMIN) for fitting of observations from the 1970s. We use V-band fitting results (Table 10). Available TESS sectors 20, 43-45, 60 & 71-73 at 120 s cadence.",
-        "reference": "SouthworthSMalley+05mnras",
+        "reference": "SouthworthSmalley+05mnras",
         "aka": "TIC 172171873, HD 46052",
         "SpT": "A4 m + A5 m",
         "MA": 1.964,            "MA_err": 0.007,
