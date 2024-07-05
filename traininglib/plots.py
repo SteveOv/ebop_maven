@@ -1,5 +1,5 @@
 """ Training and testing specific plots. """
-from typing import List, Dict, Tuple, Union, Iterable
+from typing import List, Dict, Iterable
 import math
 from pathlib import Path
 from itertools import zip_longest
@@ -8,15 +8,15 @@ import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 import numpy as np
 from scipy.stats import binned_statistic
+from uncertainties import UFloat, unumpy
 
 from ebop_maven.plotting import format_axes
 from ebop_maven import deb_example
 
-import model_testing
 from .datasets import read_param_sets_from_csvs
 from .mistisochrones import MistIsochrones
 
-all_pub_labels = {
+all_param_captions = {
     "rA_plus_rB":   r"$r_{A}+r_{B}$",
     "k":            r"$k$",
     "inc":          r"$i$",
@@ -28,7 +28,7 @@ all_pub_labels = {
 }
 
 # The full set of parameters available for histograms, their #bins and plot labels
-histogram_params = {
+all_histogram_params = {
     "rA_plus_rB":   (100, r"$r_{A}+r_{B}$"),
     "k":            (100, r"$k$"),
     "inc":          (100, r"$i~(^{\circ})$"),
@@ -67,9 +67,9 @@ def plot_trainset_histograms(trainset_dir: Path,
     """
     # pylint: disable=too-many-arguments
     if not params:
-        param_specs = histogram_params
+        param_specs = all_histogram_params
     else:
-        param_specs = { p: histogram_params[p] for p in params if p in histogram_params }
+        param_specs = { p: all_histogram_params[p] for p in params if p in all_histogram_params }
     csvs = sorted(trainset_dir.glob("trainset*.csv"))
 
     if param_specs and csvs:
@@ -207,52 +207,51 @@ def plot_dataset_instance_mags_features(dataset_files: Iterable[Path],
     return fig
 
 
-def plot_predictions_vs_labels(
-        labels: List[Dict[str, float]],
-        predictions: List[Union[Dict[str, float], Dict[str, Tuple[float, float]]]],
-        transit_flags: List[bool],
-        selected_labels: List[str]=None,
-        show_errorbars: bool=None,
-        reverse_scaling: bool=False,
-        xlabel_prefix: str="label",
-        ylabel_prefix: str="predicted") -> Figure:
+def plot_predictions_vs_labels(predictions: np.rec.recarray[UFloat],
+                               labels: np.rec.recarray[UFloat],
+                               transit_flags: List[bool],
+                               selected_params: List[str]=None,
+                               show_errorbars: bool=None,
+                               xlabel_prefix: str="label",
+                               ylabel_prefix: str="predicted") -> Figure:
     """
     Will create a plot figure with a grid of axes, one per label, showing the
     predictions vs label values. It is up to calling code to show or save the figure.
 
-    :labels: the labels values as a dict of labels per instance
-    :predictions: the prediction values as a dict of predictions per instance.
-    All the dicts may either be as { "key": val, "key_sigma": err } or { "key":(val, err) }
+    :predictions: the prediction values
+    :labels: the label values
     :transit_flags: the associated transit flags; points where the transit flag is True
     are plotted as a filled shape otherwise as an empty shape
-    :selected_labels: a subset of the full list of labels/prediction names to render
+    :selected_params: a subset of the full list of prediction/label params to render
     :show_errorbars: whether to plot errorbars - if not set the function will plot errorbars
     if there are non-zero error/sigma values in the predictions
-    :reverse_scaling: whether to reverse the scaling of the values to represent the model output
     :xlabel_prefix: the prefix text for the labels/x-axis label
     :ylabel_prefix: the prefix text for the predictions/y-axis label
     :returns: the Figure
     """
     # pylint: disable=too-many-arguments, too-many-locals
 
-    # We plot the keys common to the labels & preds, & optionally the input list
-    # of names. Avoiding using set() as we want names or the labels to set order
-    if selected_labels is None:
-        selected_labels = list(all_pub_labels.keys())
-    pub_labels = { k: all_pub_labels[k] for k in selected_labels if k in predictions[0].keys() }
+    # We plot the params common to the labels & preds, & optionally the input list
+    # of names. Avoiding using set() as we want requested names or the labels to set order
+    if selected_params is None:
+        selected_params = [n for n in labels.dtype.names if n in predictions.dtype.names]
+    elif isinstance(selected_params, str):
+        selected_params = [selected_params]
+    params = { n: all_param_captions[n] for n in selected_params }
 
     cols = 2
-    rows = math.ceil(len(pub_labels) / cols)
+    rows = math.ceil(len(params) / cols)
     fig, axes = plt.subplots(rows, cols, figsize=(cols * 3, rows * 2.9), constrained_layout=True)
     axes = axes.flatten()
 
     if transit_flags is None:
         transit_flags = [False] * len(labels)
 
-    print(f"Plotting scatter plot {rows}x{cols} grid for: {', '.join(pub_labels.keys())}")
-    for ax_ix, (lbl_name, ax_label) in enumerate(pub_labels.items()):
-        (lbl_vals, pred_vals, pred_sigmas, _) = model_testing.get_label_and_prediction_raw_values(
-                                                labels, predictions, [lbl_name], reverse_scaling)
+    print(f"Plotting scatter plot {rows}x{cols} grid for: {', '.join(params.keys())}")
+    for ax_ix, (param_name, param_caption) in enumerate(params.items()):
+        lbl_vals = unumpy.nominal_values(labels[param_name])
+        pred_vals = unumpy.nominal_values(predictions[param_name])
+        pred_sigmas = unumpy.std_devs(predictions[param_name])
 
         # Plot a diagonal line for exact match
         dmin, dmax = min(lbl_vals.min(), pred_vals.min()), max(lbl_vals.max(), pred_vals.max()) # pylint: disable=nested-min-max
@@ -272,8 +271,8 @@ def plot_predictions_vs_labels(
             else:
                 ax.errorbar(x=x, y=y, fmt="o", c="tab:blue", ms=5.0, lw=1.0, fillstyle=f, zorder=z)
 
-        format_axes(ax, xlim=diag, ylim=diag,
-                    xlabel=f"{xlabel_prefix} {ax_label}", ylabel=f"{ylabel_prefix} {ax_label}")
+        format_axes(ax, xlim=diag, ylim=diag, xlabel=f"{xlabel_prefix} {param_caption}",
+                    ylabel=f"{ylabel_prefix} {param_caption}")
 
         # Make sure the plots are squared and have the same ticks
         ax.set_aspect("equal", "box")
@@ -281,24 +280,22 @@ def plot_predictions_vs_labels(
     return fig
 
 
-def plot_binned_mae_vs_labels(
-        predictions: List[Union[Dict[str, float], Dict[str, Tuple[float, float]]]],
-        labels: List[Dict[str, float]],
-        selected_labels: List[str]=None,
-        num_bins: float=100,
-        indicate_bin_counts: bool=False,
-        xlabel: str="label value",
-        ylabel: str="mean absolute error",
-        **format_kwargs) -> Figure:
+def plot_binned_mae_vs_labels(residuals: np.rec.recarray[UFloat],
+                              labels: np.rec.recarray[UFloat],
+                              selected_params: List[str]=None,
+                              num_bins: float=100,
+                              indicate_bin_counts: bool=False,
+                              xlabel: str="label value",
+                              ylabel: str="mean absolute error",
+                              **format_kwargs) -> Figure:
     """
     Will create a plot figure with a single set of axes, with the MAE vs label values
     for one or more labels broken down into equal sized bins. It is intended to show
-    how the predictions accuracy varies over the range of the labels.
+    how the prediction accuracy varies over the range of the labels.
 
-    :predictions: the prediction values as a dict of predictions per instance.
-    All the dicts may either be as { "key": val, "key_sigma": err } or { "key":(val, err) }
-    :labels: the labels values as a dict of labels per instance
-    :selected_labels: a subset of the full list of labels/prediction names to render
+    :residuals: the residual values
+    :labels: the label values
+    :selected_params: a subset of the full list of prediction/label params to render
     :num_bins: the number of equal sized bins to apply to the data
     :indicate_bin_counts: give an indication of each bin's count by its marker size
     :xlabel: the label to give the x-axis
@@ -307,38 +304,75 @@ def plot_binned_mae_vs_labels(
     :returns: the figure
     """
     # pylint: disable=too-many-arguments, too-many-locals
-    # We plot the keys common to the labels & preds, & optionally the input list
-    # of names. Avoiding using set() as we want input names or the labels to set order
-    if selected_labels is None:
-        selected_labels = list(all_pub_labels.keys())
-    pub_labels = { k: all_pub_labels[k] for k in selected_labels if k in predictions[0].keys() }
+    if selected_params is None:
+        selected_params = [n for n in labels.dtype.names if n in residuals.dtype.names]
+    elif isinstance(selected_params, str):
+        selected_params = [selected_params]
+    params = { n: all_param_captions[n] for n in selected_params }
 
-    print("Plotting binned MAE vs label values for:", ", ".join(pub_labels.keys()))
+    print("Plotting binned MAE vs label values for:", ", ".join(params))
     fig, ax = plt.subplots(1, 1, figsize=(6, 4), constrained_layout=True)
 
-    # We need to know the extent of the data beforehand, so we can apply equivalent bins to all
-    (lbl_vals, pred_vals, _, resids) = model_testing.get_label_and_prediction_raw_values(
-                                                    labels, predictions, list(pub_labels.keys()))
-    resids = np.abs(resids)
+    # We need to know the extent of all the data beforehand, so we can apply equivalent bins to all
+    lbl_vals = unumpy.nominal_values(labels[selected_params].tolist())
+    bins = np.linspace(lbl_vals.min(), lbl_vals.max(), num_bins+1)
+    for ix, param_name in enumerate(params):
+        abs_resids = np.abs(unumpy.nominal_values(residuals[param_name]))
 
-    min_val = min(lbl_vals.min(), pred_vals.min())
-    max_val = max(lbl_vals.max(), pred_vals.max())
-    bins = np.linspace(min_val, max_val, num_bins+1)
-
-    for ix, label_name in enumerate(pub_labels):
-        means, bin_edges, _ = binned_statistic(lbl_vals[:, ix], resids[:, ix], "mean", bins)
+        means, bin_edges, _ = binned_statistic(lbl_vals[:, ix], abs_resids, "mean", bins)
         bin_width = bin_edges[1] - bin_edges[0]
         bin_centres = bin_edges[1:] - bin_width / 2
 
         if indicate_bin_counts:
-            counts, _, _ = binned_statistic(lbl_vals[:, ix], resids[:, ix], "count", bins)
+            counts, _, _ = binned_statistic(lbl_vals[:, ix], abs_resids, "count", bins)
             marker_sizes = 1.0 * (counts/10)
             alpha = 0.5 # more likely to overlap
         else:
             marker_sizes = 5.0
             alpha = 0.75
 
-        ax.scatter(bin_centres, means, s=marker_sizes, alpha=alpha, label=pub_labels[label_name])
+        ax.scatter(bin_centres, means, s=marker_sizes, alpha=alpha, label=params[param_name])
 
     format_axes(ax, xlabel=xlabel, ylabel=ylabel, legend_loc="best", **format_kwargs)
+    return fig
+
+
+def plot_prediction_boxplot(predictions: np.rec.recarray[UFloat],
+                            show_zero_value_line: bool=True,
+                            show_fliers: bool=False,
+                            **format_kwargs):
+    """
+    Plot a box plot of the prediction distribution (the last axis of predictions).
+
+    The box plot is set up to focus on the distribution about the median value, with the meadian
+    shown with a line and a box bounding the (2nd & 3rd) interquartile range, the whiskers covering
+    values within x1.5 interquartile range from the box, and fliers/outliers (if enabled) beyond.
+
+    :predictions: the predictions to plot; recarray[UFloat] of shape (#instances, #labels)
+    :show_zero_value_line: whether to draw a horizontal line at zero
+    :show_fliers: if true, outliers are plotted beyond the box_plot whiskers
+    :format_kwargs: kwargs to be passed on to format_axes()
+    :returns: the figure
+    """
+    # We're only interested in the nominals. Get this into a format matplotlib can handle
+    xdata = unumpy.nominal_values(predictions.tolist())
+
+    # For customizations https://matplotlib.org/stable/gallery/statistics/boxplot.html
+    fig, ax = plt.subplots(figsize=(6, 4), constrained_layout=True)
+    flier_props = { "marker": "x", "alpha": 0.5 }
+    ax.boxplot(xdata, showmeans=False, meanline=True, vert=True, patch_artist=False,
+               showfliers=show_fliers, flierprops=flier_props)
+
+    pub_labels = [all_param_captions[k] for k in predictions.dtype.names]
+    ax.set_xticks(ticks=[r+1 for r in range(len(pub_labels))], labels=pub_labels)
+
+    if show_zero_value_line:
+        (xmin, xmax) = ax.get_xlim()
+        ax.hlines([0.0], xmin, xmax, linestyles="--", color="k", lw=.5, alpha=.5, zorder=-10)
+
+    if format_kwargs:
+        format_axes(ax, **format_kwargs)
+
+    # Hide minor x-ticks as they have no meaning in this context
+    ax.tick_params(axis="x", which="minor", bottom=False, top=False)
     return fig

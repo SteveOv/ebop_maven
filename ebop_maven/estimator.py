@@ -1,11 +1,12 @@
 """ Estimator classes from which model specific ones are derived. """
-from typing import List, Dict, Union
+from typing import List, Dict, Tuple, Union
 from datetime import datetime
 from pathlib import Path
 from abc import ABC
 from inspect import getsourcefile
 
 import numpy as np
+from uncertainties import ufloat, UFloat
 import tensorflow as tf
 from keras import Model
 
@@ -52,15 +53,25 @@ class Estimator(ABC):
         # Not published
         self._extra_features_and_defaults = self._metadata.pop("extra_features_and_defaults",
                                                     deb_example.extra_features_and_defaults)
-        self._labels_and_scales = self._metadata.pop("labels_and_scales",
+        self._labels_and_scales = self._metadata.pop("labels_and_scales",\
                                                     deb_example.labels_and_scales)
+        self._dtypes = [(name, UFloat) for name in self._labels_and_scales]
 
-        # Now set up the names for the inputs and predictions (these include 1-sigma values)
-        print("Each input dict to contain:   ", ", ".join(self.input_feature_names),
-              f"(with mags to have {self.mags_feature_bins} bins with the",
-              f"phases after {self.mags_feature_wrap_phase} wrapped)")
-        print("Each output dict will publish:", ", ".join(self.label_names),
-              "(and corresponding <key>_sigma uncertainty values)")
+        print("The prediction inputs are:\n",
+              f"\tmags_feature - numpy ndarray[float] shape (#instances, {self.mags_feature_bins})",
+              f"with the phases after {self.mags_feature_wrap_phase} wrapped by -1")
+        if len(self.extra_feature_names):
+            print( "\textra_features - numpy ndarray[float] shape (#instances, ",
+                  f"{len(self.extra_feature_names)}) for the features;",
+                   ", ".join(self.extra_feature_names))
+        else:
+            print("\textra_features - numpy ndarray shape (#instances, 0) or None",
+                  "as extra_features are not used for predictions")           
+        print("The prediction results are:\n",
+               "\tpredicted values as an numpy recarray[UFloat] of shape",
+              f"(#instances, [{', '.join(self.label_names)}])\n",
+               "\toptionally raw predictions as a numpy NDArray[float] of shape",
+              f"(#instances, {len(self.label_names)}, #iterations), if include_raw==True")
 
     @property
     def name(self) -> str:
@@ -78,20 +89,14 @@ class Estimator(ABC):
         return self._metadata.get("mags_wrap_phase", deb_example.default_mags_wrap_phase)
 
     @property
-    def input_feature_names(self) -> List[str]:
+    def extra_feature_names(self) -> List[str]:
         """ The names to give the input features """
-        return ["mags"] + [*self._extra_features_and_defaults.keys()]
+        return [*self._extra_features_and_defaults.keys()]
 
     @property
     def label_names(self) -> List[str]:
         """ Gets the ordered list of the names of the labels used to train the model. """
         return [*self._labels_and_scales.keys()]
-
-    @property
-    def prediction_names(self) -> List[str]:
-        """ Gets the ordered list of the names of the predicted values, including error bars. """
-        return [*self._labels_and_scales.keys()] \
-                + [f"{k}_sigma" for k in self._labels_and_scales.keys()]
 
     @property
     def metadata(self) -> Dict[str, any]:
@@ -107,120 +112,73 @@ class Estimator(ABC):
         return self._iterations
 
     def predict(self,
-                instances: List[Dict[str, any]],
+                mags_feature: np.ndarray[float],
+                extra_features: np.ndarray[float]=None,
                 iterations: int=None,
                 unscale: bool=True,
-                seed: int=42) -> List[Dict[str, float]]:
-        """
-        High level call to make predictions on one or more instances' features and then
-        calculate the mean and standard deviation error bars over the iterations axis.
-        The instances' features are expected in the form of a List of dicts:
-
-        [
-          { "mags": List[float] * mags_bins, "ext_feature_0": float, "ext_feature_1": float },
-        ]
-
-        This chains the predict_raw() and means_and_stddevs_from_predictions() functions
-        then returns the results in the form of a List of dicts:
-        
-        [
-          { "rA_plus_rB": float, "k": float,..., "rA_plus_rB_sigma": float, "k_sigma": float,... },
-        ]
-
-        :instances: list of dicts, one for each instance to predict
-        :iterations: the number of MC Dropout iterations (overriding the instance default)
-        :unscale: indicates whether to undo the scaling of the predicted values. For example,
-        the model may predict inc*0.01 and unscale would undo this returning inc as prediction/0.01
-        :seed: random seed for Tensorflow
-        :returns: a list dictionaries, each row the predicted labels for the matching input instance
-        """
-        iterations = self._iterations if iterations is None else iterations
-
-        # It's possible we can be given the instances as a List[Dict] but handle being given an
-        # ndarray[Dict] or a single instance as a Dict: we'll process these all as ndarrays.
-        if isinstance(instances, np.ndarray):
-            pass
-        elif isinstance(instances, List): # Convert list to ndarray
-            instances = np.array(instances)
-        elif isinstance(instances, Dict): # Single instance
-            instances = np.array([instances])
-        else:
-            raise TypeError(f"Expected instances as a list of dicts but got {type(instances)}.")
-
-        # Extract the mags_features into an ndarray of shape(#insts, #bins), as expected by
-        # predict_raw(). Will throw a KeyError if the mandatory mags item is missing in any instance
-        mags_features = np.array([inst["mags"] for inst in instances])
-
-        # We need the extra_features values in an ndarray of shape (#insts, #extra_features)
-        # in the correct order. Read the expected features from the input dicts, falling back
-        # on the default value if not found, and ignore any unexpected key/values.
-        efd = self._extra_features_and_defaults
-        extra_values = [[inst_dict.get(k, df) for k, df in efd.items()] for inst_dict in instances]
-        extra_values = np.array(extra_values)
-
-        # This returns the stacked predictions in shape (#insts, #labels, #iterations)
-        stkd_prds = self.predict_raw(mags_features, extra_values, iterations, unscale, seed)
-
-        # Summarize the label predictions & append 1-sigma error bar values to each inst
-        # We go from shape (#insts, #labels, #iters) to shape (#insts, #means & #stddevs)
-        psets = self.means_and_stddevs_from_predictions(stkd_prds, label_axis=1)
-
-        # Load the predictions back into a list of dicts for returning
-        return [dict(zip(self.prediction_names, pset)) for pset in psets]
-
-
-    def predict_raw(self,
-                    mags_feature: np.ndarray,
-                    extra_features: np.ndarray,
-                    iterations: int=None,
-                    unscale: bool=True,
-                    seed: int=42) -> np.ndarray:
+                include_raw_preds: bool=False,
+                seed: int=42) \
+            -> Union[np.rec.recarray[UFloat], Tuple[np.rec.recarray[UFloat], np.ndarray[float]]]:
         """
         Make predictions on one or more instances' features. The instances are
         in the form of two NDArrays, one for the instances' mags data in the shape
         (#insts, #mags_bins, 1) or (#insts, #mags_bins) and another for
         extra features in the shape (#insts, #features, 1) or (#insts, #features).
-        The predictions are returned as an NDArray of shape (#insts, #labels, #iterations).
+        The predictions are returned as an recarray of UFloats of shape (#insts, #labels), with
+        the labels accessible by the names given in self.label_names, and if include_raw_preds is
+        set, an NDArray of the raw predictions in the shape (#insts, #labels, #iterations)
+
+        Examples:
+        ```Python
+        preds = estimator.predict2(mags, ext, 1000)
+        print(preds[0]['k'].nominal_value)
+
+        # masking support
+        transiting = preds[transit_flags]
+        ```
         
-        :instances: list of dicts, one for each instance to predict
         :mags_feature: numpy NDArray of shape (#insts, #bins, 1)
         :extra_features: numpy NDArray of shape (#insts, #features, 1)
         :iterations: the number of MC Dropout iterations (overriding the instance default)
         :unscale: indicates whether to undo the scaling of the predicted values. For example,
         the model may predict inc*0.01 and unscale would undo this returning inc as prediction/0.01
+        :include_raw_preds: if True the raw preds will also be returned as the 2nd item of a tuple
         :seed: random seed for Tensorflow
-        :returns: a numpy NDArray with the predictions in the shape (#insts, #labels, #iterations)
+        :returns: a numpy recarray[UFloat] with the predictions in the shape (#insts, #labels) and
+        optionally an NDArray of the raw predictions in the shape (#insts, #labels, #iterations)
         """
-        # pylint: disable=too-many-arguments
+        # pylint: disable=too-many-arguments, too-many-branches
         iterations = self._iterations if iterations is None else iterations
         is_mc = iterations > 1
 
         if not isinstance(mags_feature, np.ndarray):
             raise TypeError("Expect mags_feature to be an numpy ndarray")
-        if not isinstance(extra_features, np.ndarray):
+        if not isinstance(extra_features, (None|np.ndarray)):
             raise TypeError("Expect extra_features to be a numpy ndarray")
 
-        # Check that number of mags and feature rows (#insts) match up
+        # Check the mags features are in the expected shape; (#insts, #bins) or (#insts, #bins, 1)
         insts = mags_feature.shape[0]
-        if insts != extra_features.shape[0]:
-            raise ValueError("Mismatched number of mags_features and extra_features: " +
-                            f"{insts} != {extra_features.shape[0]}")
-
-        # Check the arrays are in the expected shape; (#insts, #bins, 1) and (#insts, #features, 1)
         if len(mags_feature.shape) > 1 and mags_feature.shape[1] == self.mags_feature_bins:
             if len(mags_feature.shape) == 2:
                 mags_feature = mags_feature[:, :, np.newaxis]
         else:
-            raise ValueError(f"Expected mags features of shape ({insts}, {self.mags_feature_bins})"+
-                        f" or ({insts}, {self.mags_feature_bins}, 1) but got {mags_feature.shape}")
+            raise ValueError(f"Expected mags features of shape (#insts, {self.mags_feature_bins})"+
+                        f" or (#insts, {self.mags_feature_bins}, 1) but got {mags_feature.shape}")
 
-        count_ext_features = len(self.input_feature_names)-1
-        if len(extra_features.shape) > 1 and extra_features.shape[1] == count_ext_features:
-            if len(extra_features.shape) == 2:
-                extra_features = extra_features[:, :, np.newaxis]
+        # For extra features, we allow it to be None if there are no expected features
+        # otherwise we expect it to be in the shape (#insts, #features) or (#insts, #features, 1)
+        num_ext_features = len(self.extra_feature_names)
+        if num_ext_features or extra_features is not None:
+            if len(extra_features.shape) > 1 and extra_features.shape[0] == insts and \
+                                                extra_features.shape[1] == num_ext_features:
+                if len(extra_features.shape) == 2:
+                    extra_features = extra_features[:, :, np.newaxis]
+            else:
+                raise ValueError(f"Expected extra features of shape ({insts}, {num_ext_features}) "+
+                            f"or ({insts}, {num_ext_features}, 1) but got {extra_features.shape}")
         else:
-            raise ValueError(f"Expected extra features of shape ({insts}, {count_ext_features}) " +
-                            f"or ({insts}, {count_ext_features}, 1) but got {extra_features.shape}")
+            # No extra features required, and None supplied. Make sure we don't choke the model.
+            extra_features = np.empty(shape=(insts, 0, 1))
 
         # If dropout, we make multiple predictions for each inst with training switched on so that
         # each prediction is with a statistically unique subset of the model's net: the MC Dropout
@@ -235,60 +193,17 @@ class Estimator(ABC):
         if unscale:
             stkd_prds /= [*self._labels_and_scales.values()]
 
-        # Return the predictions in the shape (#insts, #labels, #iterations)
-        return stkd_prds.transpose([1, 2, 0])
+        # Calc the means/stddevs, over the #iters axis to go to lists of records [(ufloats, ...)]
+        if is_mc:
+            # We have multiple predictions per input. Summarize over #iters axis
+            records = [
+                tuple(ufloat(n, s) for (n, s) in zip(noms, sigs))
+                    for (noms, sigs) in zip(np.mean(stkd_prds, axis=0), np.std(stkd_prds, axis=0))
+            ]
+        else:
+            # Not MC; only 1 set of predictions per instance so drop #iters axis and assume zero std
+            records = [tuple(ufloat(n, 0) for n in noms) for noms in stkd_prds[0, ...]]
 
-
-    def means_and_stddevs_from_predictions(self,
-                                           predictions: np.ndarray,
-                                           label_axis: int=None) -> np.ndarray:
-        """
-        Takes the raw predictions in the form returned by predict_raw() and calculates and returns
-        the means and 1 standard deviation error bars over the iterations axis. If there are one
-        or no iters the resulting stddevs/error bars will be zero.
-
-        Handles the following configurations:
-        - (#insts, #labels, #iters) -> (#insts, #means & #stddevs)
-        - (#insts, #labels) -> (#insts, #means & #stddevs(zeros)) 
-        - (#labels, #iters) -> (#means & #stddevs, )
-        - (#labels, ) -> (#means & #stddevs(zeros), )
-
-        :predictions: the raw predictions in one of the supported the shapes
-        :labels_axis: optionally give the labels axis otherwise infer it from the predictions shape
-        :returns: the nominals & erorbars for every instance in a supported output shape
-        """
-        if not isinstance(predictions, np.ndarray):
-            raise TypeError("Expect raw_predictions to be an numpy ndarray")
-
-        dims = len(predictions.shape)
-        if label_axis is None:
-            # We've no been told which axes are the labels
-            # We can it out if the data is in supported shapes and dimensions are unambiguous
-            labels_width = len(self.label_names)
-            if dims == 1 and predictions.shape[0] == labels_width:
-                # (#labels)
-                label_axis = 0
-            elif dims == 2 and \
-                    predictions.shape[0] == labels_width and predictions.shape[1] != labels_width:
-                # (#labels, #iters)
-                label_axis = 0
-            elif dims == 2 and \
-                    predictions.shape[0] != labels_width and predictions.shape[1] == labels_width:
-                # (#insts, #labels)
-                label_axis = 1
-            elif dims == 3:
-                # (#insts, #labels, #iters)
-                label_axis = 1
-            else:
-                raise ValueError(f"Cannot infer labels axis from input shape {predictions.shape}")
-
-        # Always expet the iters axis to follow the labels
-        iters_axis = label_axis + 1
-        if dims == iters_axis:
-            # Sometimes the iterations are infered (effectively only 1 iteration)
-            predictions = np.expand_dims(predictions, iters_axis)
-
-        return np.concatenate([
-                np.mean(predictions, axis=iters_axis),
-                np.std(predictions, axis=iters_axis)],
-            axis=label_axis)
+        if not include_raw_preds:
+            return np.rec.fromrecords(records, dtype=self._dtypes)
+        return np.rec.fromrecords(records, dtype=self._dtypes), stkd_prds.transpose([1, 2, 0])

@@ -3,8 +3,9 @@
 Formal testing of the regression TF Model trained by train_*_estimator.py
 """
 # pylint: disable=too-many-arguments, too-many-locals, no-member, import-error, invalid-name
-from typing import Union, List, Dict, Tuple
+from typing import Union, List, Dict
 from io import TextIOBase, StringIO
+import inspect
 import sys
 from pathlib import Path
 import re
@@ -15,8 +16,8 @@ import argparse
 
 import matplotlib.pylab as plt
 
-from uncertainties import ufloat
-from uncertainties.umath import sqrt, acos, asin, degrees # pylint: disable=no-name-in-module
+from uncertainties import ufloat, UFloat, unumpy
+from uncertainties.umath import acos, asin, degrees # pylint: disable=no-name-in-module
 
 import astropy.units as u
 import numpy as np
@@ -25,7 +26,7 @@ from keras import Model
 from ebop_maven.libs.tee import Tee
 from ebop_maven.libs import jktebop, stellar, limb_darkening
 from ebop_maven.estimator import Estimator
-from ebop_maven import deb_example, pipeline, plotting
+from ebop_maven import deb_example, pipeline
 
 from traininglib import formal_testing, plots
 
@@ -33,14 +34,12 @@ from traininglib import formal_testing, plots
 SYNTHETIC_MIST_TEST_DS_DIR = Path("./datasets/synthetic-mist-tess-dataset/")
 FORMAL_TEST_DATASET_DIR = Path("./datasets/formal-test-dataset/")
 
-def evaluate_model_against_dataset(
-        estimator: Union[Model, Estimator],
-        mc_iterations: int=1,
-        include_ids: List[str]=None,
-        test_dataset_dir: Path=FORMAL_TEST_DATASET_DIR,
-        report_dir: Path=None,
-        scaled: bool=False) \
-            -> Tuple[np.ndarray, np.ndarray]:
+def evaluate_model_against_dataset(estimator: Union[Model, Estimator],
+                                   mc_iterations: int=1,
+                                   include_ids: List[str]=None,
+                                   test_dataset_dir: Path=FORMAL_TEST_DATASET_DIR,
+                                   report_dir: Path=None,
+                                   scaled: bool=False):
     """
     Will evaluate the indicated model file or Estimator against the contents of the
     chosen test dataset.
@@ -51,8 +50,6 @@ def evaluate_model_against_dataset(
     :test_dataset_dir: the location of the formal test dataset
     :report_dir: optional directory into which to save reports, reports not saved if this is None
     :scaled: whether labels and predictions are scaled (raw model predictions) or not
-    :returns: a tuple of (NDArray, NDArray) containing
-    label valuess (#insts, #labels) and predictions (#insts, #labels & #sigmas)
     """
     # Create our Estimator. It will tell us what its inputs should look like
     # and which labels it (& the underlying model) can predict.
@@ -79,7 +76,7 @@ def evaluate_model_against_dataset(
     ids, mags_vals, feat_vals, lbl_vals = deb_example.read_dataset(tfrecord_files,
                                                                 estimator.mags_feature_bins,
                                                                 estimator.mags_feature_wrap_phase,
-                                                                estimator.input_feature_names,
+                                                                estimator.extra_feature_names,
                                                                 ext_label_names,
                                                                 include_ids,
                                                                 scaled,
@@ -89,82 +86,62 @@ def evaluate_model_against_dataset(
     if include_ids is not None:
         assert len(include_ids) == len(ids)
 
-    # Make our predictions which will be returned in the shape (#insts, #labels, #iterations)
-    # then make a set of noms and 1-sigmas: shape (#insts, #nominal & #1-sigmas)
+    # TODO: Turn the label values into a recarray[UFloat] -> move this into deb_example?
+    lbl_vals = np.rec.fromrecords([tuple(ufloat(val, 0) for val in row) for row in lbl_vals],
+                                  dtype=[(col, UFloat) for col in ext_label_names])
+
+    # Make predictions, returned as a numpy recarray of shape (#insts, #labels) and dtype=UFloat
     print(f"The Estimator is making predictions on the {len(ids)} test instances",
           f"with {mc_iterations} iteration(s) (iterations >1 triggers MC Dropout algorithm).")
-    pred_vals = estimator.predict_raw(mags_vals, feat_vals, mc_iterations, unscale=not scaled)
-    pred_vals = estimator.means_and_stddevs_from_predictions(pred_vals, label_axis=1)
-    lbl_vals = estimator.means_and_stddevs_from_predictions(lbl_vals, label_axis=1)
-
-    # A bit costly to create arrays of dicts, but we can reuse of existing summary functionality
-    # to give us MAE and MSE stats across each label in addition to the whole set of predictions.
-    pred_dicts = np.array([dict(zip(estimator.prediction_names, rvals)) for rvals in pred_vals])
-    lbl_dicts = np.array([dict(zip(estimator.prediction_names, rvals)) for rvals in lbl_vals])
+    pred_vals = estimator.predict(mags_vals, feat_vals, mc_iterations, unscale=not scaled)
 
     # Work out which are the transiting systems so we can break down the reporting
-    tnames = ["rA_plus_rB", "k", "inc", "ecosw", "esinw"]
-    if scaled:
-        tflags = will_transit(*[
-            lbl_vals[:, ext_label_names.index(t)] / deb_example.labels_and_scales[t] for t in tnames
-        ])
-    else:
-        tflags = will_transit(*[lbl_vals[:, ext_label_names.index(t)] for t in tnames])
+    pnames = list(inspect.signature(will_transit).parameters)
+    argvs = [lbl_vals[p] / (deb_example.labels_and_scales[p] if scaled else 1) for p in pnames]
+    tflags = will_transit(*argvs)
 
-    for (subset, mask) in [("",                 [True]*len(lbl_dicts)),
-                           (" transiting",      tflags),
-                           (" non-transiting",  ~tflags)]:
+    # Now report on the quality of the predictions, for which we will need the residuals
+    resids = calculate_residuals(pred_vals, lbl_vals, estimator.label_names)
+    for (subset, tmask) in [("",                 [True]*lbl_vals.shape[0]),
+                            (" transiting",      tflags),
+                            (" non-transiting",  ~tflags)]:
         sub_suffix = subset.replace(' ','-')
-        if any(mask):
-            print(f"\nMetrics for {sum(mask)}{subset} system(s).")
-            preds_vs_labels_dicts_to_table(pred_dicts[mask], lbl_dicts[mask], summary_only=True,
-                                           selected_label_names=estimator.label_names)
+        if any(tmask):
+            print(f"\nMetrics for {sum(tmask)}{subset} system(s).")
+            predictions_vs_labels_to_table(pred_vals[tmask], lbl_vals[tmask], summary_only=True,
+                                           selected_param_names=estimator.label_names)
 
             # These plot to pdf, which looks better than eps, as it supports transparency/alpha.
             if report_dir and (not subset or "formal" not in ds_name):
-                # For the formal-test-dataset we only plot the whole set, as the volumes are too
-                # small, otherwise we create separate plots for "all", transiting & non-transiting.
-                n_est_lbls = len(estimator.label_names)
-                resids_by_label = (pred_vals[:, :n_est_lbls] - lbl_vals[:, :n_est_lbls]).transpose()
-                fig, axes = plt.subplots(figsize=(6, 4), constrained_layout=True)
-                plotting.plot_prediction_distributions_on_axes(axes, resids_by_label,
-                                                               estimator.label_names,
-                                                               violin_plot=False,
-                                                               show_fliers="formal" in ds_name,
-                                                               ylabel="Residual")
+                # For formal-test-dataset plot only the whole set as the size is too low to split.
+                fig = plots.plot_prediction_boxplot(resids[tmask], show_fliers="formal" in ds_name,
+                                                    ylabel="Residual")
                 fig.savefig(report_dir / f"predictions-{mc_type}-box-{ds_name}{sub_suffix}.pdf")
-                plt.close()
 
             if report_dir and "formal" not in ds_name:
                 # Break down the predictions into bins then plot the MAE against mean label to give
-                # an indication of how the accuracy of the predictions vary over the label range.
-                fig = plots.plot_binned_mae_vs_labels(pred_dicts[mask], lbl_dicts[mask],
-                                                      ["esinw", "ecosw"], xlim=(-0.75, 0.75))
+                # an indication of how the accuracy of the predictions vary over the label ranges.
+                fig = plots.plot_binned_mae_vs_labels(resids[tmask], lbl_vals[tmask],
+                                                      ["esinw", "ecosw"], xlim=(-.75, .75))
                 fig.savefig(report_dir / f"binned-mae-poincare-{mc_type}-{ds_name}{sub_suffix}.pdf")
-                plt.close()
 
-                fig = plots.plot_binned_mae_vs_labels(pred_dicts[mask], lbl_dicts[mask],
+                fig = plots.plot_binned_mae_vs_labels(resids[tmask], lbl_vals[tmask],
                                                       ["k", "J", "bP"])
                 fig.savefig(report_dir / f"binned-mae-kjbp-{mc_type}-{ds_name}{sub_suffix}.pdf")
-                plt.close()
-    return lbl_vals, pred_vals
+            plt.close()
 
 
-def fit_against_formal_test_dataset(
-        estimator: Union[Model, Estimator],
-        targets_config: Dict[str, any],
-        include_ids: List[str]=None,
-        mc_iterations: int=1,
-        apply_fit_overrides: bool=True,
-        do_control_fit: bool=False,
-        comparison_dicts: np.ndarray[Dict[str, float]]=None,
-        report_dir: Path=None) -> np.ndarray[Dict[str, float]]:
+def fit_against_formal_test_dataset(estimator: Union[Model, Estimator],
+                                    targets_config: Dict[str, any],
+                                    include_ids: List[str]=None,
+                                    mc_iterations: int=1,
+                                    apply_fit_overrides: bool=True,
+                                    do_control_fit: bool=False,
+                                    comparison_vals: np.rec.recarray[UFloat]=None,
+                                    report_dir: Path=None) -> np.rec.recarray[UFloat]:
     """
     Will fit members of the formal test dataset, as configured in targets_config,
     based on the sets of input_params passed in returning the corresponding fitted params.
-
-    It's important that input_params, labels and selected_targets (or targets_config keys)
-    are all of the same length and in the same order.
 
     :estimator: the Estimator or estimator model to use to make predictions
     :targets_config: the full config for all targets
@@ -172,9 +149,9 @@ def fit_against_formal_test_dataset(
     :mc_iterations: the number of MC iterations to use when making predictions
     :apply_fit_overrides: apply any fit_overrides from each target's config
     :do_control_fit: when True labels, rather than predictions, will be the input params for fitting
-    :comparison_dicts: optional List[Dict] to compare the fitting results to in addition to labels
+    :comparison_vals: optional recarray[UFloat] to compare to fitting results, in addition to labels
     :report_dir: optional directory into which to save reports, reports not saved if this is None
-    :returns: a List of the targets' fitted parameter Dicts
+    :returns: a recarray[UFloat] containing the resulting fitted parameters for each target
     """
     # pylint: disable=too-many-statements, too-many-branches
     fit_dir = jktebop.get_jktebop_dir()
@@ -188,7 +165,6 @@ def fit_against_formal_test_dataset(
     # super_names is the set of both and is used, for example, to get the superset of label values
     fit_names = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "inc"]
     super_names = estimator.label_names + [n for n in fit_names if n not in estimator.label_names]
-    super_names_and_errs = super_names + [f"{n}_sigma" for n in super_names]
 
     if include_ids is None or len(include_ids) == 0:
         include_ids = list(targets_config.keys())
@@ -196,36 +172,36 @@ def fit_against_formal_test_dataset(
 
     print(f"\nLooking for the test dataset in '{FORMAL_TEST_DATASET_DIR}'.")
     tfrecord_files = sorted(FORMAL_TEST_DATASET_DIR.glob("**/*.tfrecord"))
-    all_targs, all_mags_val, all_feat_vals, all_lbl_vals = deb_example.read_dataset(tfrecord_files,
+    targs, mags_vals, feat_vals, lbl_vals = deb_example.read_dataset(tfrecord_files,
                                                                 estimator.mags_feature_bins,
                                                                 estimator.mags_feature_wrap_phase,
-                                                                estimator.input_feature_names,
+                                                                estimator.extra_feature_names,
                                                                 super_names,
                                                                 include_ids)
 
-    # Get the labels into an NDArray[Dicts] for ease of reporting & possible use as control fit
-    all_lbl_vals = estimator.means_and_stddevs_from_predictions(all_lbl_vals, label_axis=1)
-    all_lbl_dicts = np.array([dict(zip(super_names_and_errs, v)) for v in all_lbl_vals])
 
-    # The Estimator predictions will be in the shape (#insts, #labels, #iterations)
-    # Then get the predictions into NDArray(Dicts), which is required for jktebop and
-    # reporting, via sets of means and 1-sigmas: shape (#insts, #nominal & #1-sigmas)
+    # TODO: Turn the label values into a recarray[UFloat] -> move this into deb_example?
+    lbl_vals = np.rec.fromrecords([tuple(ufloat(val, 0) for val in row) for row in lbl_vals],
+                                  dtype=[(col, UFloat) for col in super_names])
+
+    # Make predictions, returned as a numpy recarray of shape (#insts, #labels) and dtype=UFloat
     if do_control_fit:
         print("\nControl fits will use label values as 'predictions' and fitting inputs.")
-        all_pred_dicts = copy.deepcopy(all_lbl_dicts)
+        pred_vals = copy.deepcopy(lbl_vals)
     else:
-        print(f"\nThe Estimator will make predictions on {len(all_targs)} formal test instance(s)",
+        print(f"\nThe Estimator will make predictions on {len(targs)} formal test instance(s)",
               f"with {mc_iterations} iteration(s) (iterations >1 triggers MC Dropout algorithm).")
-        all_pred_vals = estimator.predict_raw(all_mags_val, all_feat_vals, mc_iterations)
-        all_pred_vals = estimator.means_and_stddevs_from_predictions(all_pred_vals, label_axis=1)
-        all_pred_dicts = np.array([dict(zip(estimator.prediction_names, v)) for v in all_pred_vals])
-        if "inc" not in estimator.label_names:
-            append_calculated_inc_predictions(all_pred_dicts)
+        pred_vals = estimator.predict(mags_vals, feat_vals, mc_iterations)
+        if "inc" not in pred_vals.dtype.names:
+            pred_vals = append_calculated_inc_predictions(pred_vals)
 
-    # Finally, we have everything in place to fit our targets with JKTEBOP and report on the results
-    fitted_param_dicts = []
-    for ix, (targ, pred_dict, lbl_dict) in enumerate(zip(all_targs, all_pred_dicts, all_lbl_dicts)):
-        print(f"\n\nProcessing target {ix + 1} of {len(all_targs)}: {targ}\n" + "-"*40)
+    # Presize a recarray to hold the params which are output from each JKTEBOP fitting
+    fitted_vals = np.rec.recarray(shape=(len(targs), ),
+                                  dtype=[(name, UFloat) for name in super_names])
+
+    # Finally, we have everything in place to fit our targets and report on the results
+    for ix, targ in enumerate(targs):
+        print(f"\n\nProcessing target {ix + 1} of {len(targs)}: {targ}\n" + "-"*40)
         targ_config = targets_config[targ].copy()
         print(fill(targ_config.get("desc", "")) + "\n")
 
@@ -240,8 +216,8 @@ def fit_against_formal_test_dataset(
         in_fname = fit_dir / f"{fit_stem}.in"
         dat_fname = fit_dir / f"{fit_stem}.dat"
 
-        print(f"\nWill fit {targ} with the following input params")
-        preds_vs_labels_dicts_to_table([pred_dict], [lbl_dict], [targ], fit_names)
+        print(f"\nWill fit {targ} with these input params from {prediction_type} predictions")
+        predictions_vs_labels_to_table(pred_vals[ix], lbl_vals[ix], [targ], fit_names)
 
         # published fitting params that may be needed for reliable fit
         fit_overrides = targ_config.get("fit_overrides", {}) if apply_fit_overrides else {}
@@ -249,11 +225,11 @@ def fit_against_formal_test_dataset(
 
         params = {
             **base_jktebop_task3_params(period, pe, dat_fname.name, fit_stem, targ_config),
-            **pred_dict,
-            **fit_overrides,
+            **{ n: pred_vals[ix][n].nominal_value for n in pred_vals.dtype.names }, # predictions
+            **fit_overrides,                                                        # overrides
         }
 
-        # Add scale-factor poly fitting, chi^2 adjustment (to 1.0) or light-ratio instructions
+        # Add scale-factor poly fitting, chi^2 adjustment (to 1.0) and any light-ratio instructions
         segments = pipeline.find_lightcurve_segments(lc, 0.5, return_times=True)
         append_lines = jktebop.build_poly_instructions(segments, "sf", 1)
         append_lines += ["", "chif", ""] + [ f"lrat {l}" for l in lrats ]
@@ -268,59 +244,58 @@ def fit_against_formal_test_dataset(
         par_fname = fit_dir / f"{fit_stem}.par"
         par_contents = list(jktebop.run_jktebop_task(in_fname, par_fname, stdout_to=sys.stdout))
         fit_params_dict = jktebop.read_fitted_params_from_par_lines(par_contents, super_names)
-        fitted_param_dicts.append(fit_params_dict)
+        fitted_vals[ix] = tuple(ufloat(value[0], value[1]) for _, value in fit_params_dict.items())
 
         print(f"\nHave fitted {targ} resulting in the following fitted params")
-        preds_vs_labels_dicts_to_table([fit_params_dict], [lbl_dict], [targ], fit_names,
+        predictions_vs_labels_to_table(fitted_vals[ix], lbl_vals[ix], [targ], fit_names,
                                        prediction_head="Fitted")
 
     # Save reports on how the predictions and fitting has gone over all of the selected targets
-    fitted_param_dicts = np.array(fitted_param_dicts)
     if report_dir:
-        comparison_reports = [("labels", "label", all_lbl_dicts)]
-        if comparison_dicts is not None:
-            comparison_reports += [("control", "control", comparison_dicts)]
+        comparison_type = [("labels", "label", lbl_vals)] # type, heading, values
+        if comparison_vals is not None:
+            comparison_type += [("control", "control", comparison_vals)]
         sub_reports = [
-            ("All targets (model labels)",          [True]*len(all_targs),  estimator.label_names),
+            ("All targets (model labels)",          [True]*len(targs),      estimator.label_names),
             ("\nTransiting systems only",           trans_flags,            estimator.label_names),
             ("\nNon-transiting systems only",       ~trans_flags,           estimator.label_names),
-            ("\n\n\nAll targets (fitting params)",  [True]*len(all_targs),  fit_names),
+            ("\n\n\nAll targets (fitting params)",  [True]*len(targs),      fit_names),
             ("\nTransiting systems only",           trans_flags,            fit_names),
             ("\nNon-transiting systems only",       ~trans_flags,           fit_names)]
 
-        for comp_type, comp_head, comp_dicts in comparison_reports:
-            if not do_control_fit: # Control == fit from labels not preds; no point producing these
+        for comp_type, comp_head, comp_vals in comparison_type:
+            # Summarize this set of predictions as plots-vs-label|control and in text table
+            # Control == fit from labels not preds, so no point producing these
+            if not do_control_fit:
                 preds_stem = f"predictions-{prediction_type}-vs-{comp_type}"
                 for (source, names) in [("model", estimator.label_names), ("fitting", fit_names)]:
                     names = [n for n in names if n not in ["ecosw", "esinw"]] + ["ecosw", "esinw"]
-                    plots.plot_predictions_vs_labels(comp_dicts, all_pred_dicts, trans_flags, names,
-                        xlabel_prefix=comp_head).savefig(report_dir / f"{preds_stem}-{source}.eps")
-
-                # with open(report_dir / f"{preds_stem}.csv", mode="w", encoding="utf8") as csvf:
-                #     predictions_vs_labels_to_csv(
-                #                         comp_dicts, all_pred_dicts, all_targs, fit_names, to=csvf)
+                    fig = plots.plot_predictions_vs_labels(pred_vals, comp_vals, trans_flags,
+                                                           names, xlabel_prefix=comp_head)
+                    fig.savefig(report_dir / f"{preds_stem}-{source}.eps")
 
                 with open(report_dir / f"{preds_stem}.txt", mode="w", encoding="utf8") as txtf:
                     for (sub_head, mask, rep_names) in sub_reports:
                         if any(mask):
-                            preds_vs_labels_dicts_to_table(all_pred_dicts[mask], comp_dicts[mask],
-                                                all_targs[mask], rep_names, title=sub_head, to=txtf)
+                            predictions_vs_labels_to_table(pred_vals[mask], comp_vals[mask],
+                                                    targs[mask], rep_names, title=sub_head, to=txtf)
 
+            # Summarize this set of fitted params as plots pred-vs-label|control and in text tables
             results_stem = f"fitted-params-from-{prediction_type}-vs-{comp_type}"
             names = [n for n in fit_names if n not in ["ecosw", "esinw"]] + ["ecosw", "esinw"]
-            plots.plot_predictions_vs_labels(comp_dicts, fitted_param_dicts, trans_flags, names,
-                                             xlabel_prefix=comp_head, ylabel_prefix="fitted") \
-                                                    .savefig(report_dir / f"{results_stem}.eps")
+            fig = plots.plot_predictions_vs_labels(fitted_vals, comp_vals, trans_flags, names,
+                                                   xlabel_prefix=comp_head, ylabel_prefix="fitted")
+            fig.savefig(report_dir / f"{results_stem}.eps")
             plt.close()
 
             with open(report_dir / f"{results_stem}.txt", "w", encoding="utf8") as txtf:
                 for (sub_head, mask, rep_names) in sub_reports:
                     if any(mask):
-                        preds_vs_labels_dicts_to_table(fitted_param_dicts[mask], comp_dicts[mask],
-                                                       all_targs[mask], rep_names, title=sub_head,
+                        predictions_vs_labels_to_table(fitted_vals[mask], comp_vals[mask],
+                                                       targs[mask], rep_names, title=sub_head,
                                                        comparison_head=comp_head.capitalize(),
                                                        prediction_head="Fitted", to=txtf)
-    return fitted_param_dicts
+    return fitted_vals
 
 
 def base_jktebop_task3_params(period: float,
@@ -374,41 +349,40 @@ def base_jktebop_task3_params(period: float,
     }
 
 
-def append_calculated_inc_predictions(predictions: np.ndarray[Dict[str, float]]):
+def append_calculated_inc_predictions(preds: np.rec.recarray[UFloat]) -> np.rec.recarray[UFloat]:
     """
-    Calculate the predicted inc value (in degrees) from the primary
-    impact param bP, cosi or sini and append to the predictions.
+    Calculate the predicted inc value (in degrees) and append to the predictions
+    if not already present.
 
-    :preds: the array of prediction dictionaries to update
+    :preds: the predictions recarray to which inc should be appended
+    :returns: the predictions with inc added if necessary
     """
-    def to_ufloat(preds: dict, key: str):
-        return ufloat(preds[key], preds.get(f"{key}_sigma", 0))
+    names = list(preds.dtype.names)
+    if "inc" not in names:
+        if "bP" in names:
+            # From primary impact param:  i = arccos(bP * r1 * (1+esinw)/(1-e^2))
+            r = preds.rA_plus_rB / (1 + preds.k)
+            inner = preds.bP * r * (1 + preds.esinw) / (1 - (preds.ecosw**2 + preds.esinw**2))
+            inc = np.array([degrees(acos(i)) for i in inner], dtype=UFloat)
+        elif "cosi" in names:
+            inc = np.array([degrees(acos(val)) for val in preds["cosi"]], dtype=[("inc", UFloat)])
+        elif "sini" in names:
+            inc = np.array([degrees(asin(val)) for val in preds["sini"]], dtype=[("inc", UFloat)])
+        else:
+            raise KeyError("Missing bP, cosi or sini in predictions required to calc inc.")
 
-    preds_iter = [predictions] if isinstance(predictions, Dict) else predictions
-    for ix, preds in enumerate(preds_iter):
-        if "inc" not in preds:
-            if "bP" in preds:
-                # From primary impact param:  i = arccos(bP * r1 * (1+esinw)/(1-e^2))
-                b = to_ufloat(preds, "bP")
-                r = to_ufloat(preds, "rA_plus_rB") / (1 + to_ufloat(preds, "k"))
-                esinw = to_ufloat(preds, "esinw")
-                e = sqrt(to_ufloat(preds, "ecosw")**2 + esinw**2)
-                inc = degrees(acos(b * r * (1 + esinw) / (1 - e**2)))
-            elif "cosi" in preds:
-                inc = degrees(acos(to_ufloat(preds, "cosi")))
-            elif "sini" in preds:
-                inc = degrees(asin(to_ufloat(preds, "sini")))
-            else:
-                raise KeyError(f"Missing inc, bP, cosi or sini in predictions[{ix}] to calc inc.")
-
-            preds.update(inc=inc.nominal_value, inc_sigma=inc.std_dev)
+        # It's difficult to append a field to an existing object recarray so copy over to new inst
+        new = np.empty_like(preds, dtype=np.dtype(preds.dtype.descr + [("inc", UFloat)]))
+        new[names] = preds[names]
+        new["inc"] = inc
+        return new
 
 
-def will_transit(rA_plus_rB: np.ndarray[float],
-                 k: np.ndarray[float],
-                 inc: np.ndarray[float],
-                 ecosw: np.ndarray[float],
-                 esinw: np.ndarray[float]) \
+def will_transit(rA_plus_rB: Union[np.ndarray[float], np.ndarray[UFloat]],
+                 k: Union[np.ndarray[float], np.ndarray[UFloat]],
+                 inc: Union[np.ndarray[float], np.ndarray[UFloat]],
+                 ecosw: Union[np.ndarray[float], np.ndarray[UFloat]],
+                 esinw: Union[np.ndarray[float], np.ndarray[UFloat]]) \
                         -> np.ndarray[bool]:
     """
     From the values given over 1 or more systems, this will indicate which will
@@ -421,6 +395,13 @@ def will_transit(rA_plus_rB: np.ndarray[float],
     :esinw: the e*sin(omega) Poincare elements
     :returns: flags indicating which systems will transit
     """
+    # Stop numpy choking on uncertainties; we only need the nominals to estimate a transit
+    rA_plus_rB = unumpy.nominal_values(rA_plus_rB)
+    k = unumpy.nominal_values(k)
+    inc = unumpy.nominal_values(inc)
+    ecosw = unumpy.nominal_values(ecosw)
+    esinw = unumpy.nominal_values(esinw)
+
     cosi = np.cos(np.deg2rad(inc))
     e = np.sqrt(np.add(np.square(ecosw), np.square(esinw)))
 
@@ -437,89 +418,24 @@ def will_transit(rA_plus_rB: np.ndarray[float],
     return np.bitwise_or(primary_trans, secondary_trans)
 
 
-def preds_vs_labels_dicts_to_csv(
-        predictions: np.ndarray[Union[Dict[str, float], Dict[str, Tuple[float, float]]]],
-        labels: np.ndarray[Dict[str, float]],
-        row_headings: np.ndarray[str]=None,
-        selected_label_names: np.ndarray[str]=None,
-        reverse_scaling: bool=False,
-        to: TextIOBase=None):
-    """
-    Will write a csv of the predicted nominal values vs the labels
-    with O-C, MAE and MSE metrics, to the requested output.
-
-    :labels: the labels values as a dict of labels per instance
-    :predictions: the prediction values as a dict of predictions per instance.
-    All the dicts may either be as { "key": val, "key_sigma": err } or { "key":(val, err) }
-    :row_headings: the optional heading for each row
-    :selected_label_names: a subset of the full list of labels/prediction names to render
-    :reverse_scaling: whether to reverse the scaling of the values to represent the model output
-    :to: the output to write the table to. Defaults to stdout.
-    """
-    # pylint: disable=too-many-arguments, too-many-locals
-    # We output the labels common to the all labels & predictions or those requested
-    if selected_label_names is None:
-        keys = [k for k in labels[0].keys() if k in predictions[0]]
-    else:
-        keys = selected_label_names
-    num_keys = len(keys)
-
-    if row_headings is None:
-        row_headings = (f"{ix:06d}" for ix in range(len(labels)))
-
-    # Extracts the raw values from the label and prediction List[Dict]s
-    (raw_labels, pred_noms, _, ocs) \
-        = get_label_and_prediction_raw_values(labels, predictions, keys, reverse_scaling)
-
-    print_it = not to
-    if print_it:
-        to = StringIO()
-
-    # Headings row
-    to.write(f"{'Target':>12s}, ")
-    to.writelines(f"{k+'_lbl':>15s}, {k:>15s}, {k+'_res':>15s}, " for k in keys)
-    to.write(f"{'MAE':>15s}, {'MSE':>15s}\n")
-
-    # The instance's predictions, labels & O-Cs and its MAE & MSE
-    for row_head, rlb, rnm, roc in zip(row_headings, raw_labels, pred_noms, ocs):
-        row_mae, row_mse = np.mean(np.abs(roc)), np.mean(np.power(roc, 2))
-        to.write(f"{row_head:>12s}, ")
-        to.writelines(f"{rlb[c]:15.9f}, {rnm[c]:15.9f}, {roc[c]:15.9f}, " for c in range(num_keys))
-        to.write(f"{row_mae:15.9f}, {row_mse:15.9f}\n")
-
-    # final MAE and then MSE rows
-    lbl_maes = [np.mean(np.abs(ocs[:, c])) for c in range(num_keys)]
-    lbl_mses = [np.mean(np.power(ocs[:, c], 2)) for c in range(num_keys)]
-    to.write(f"{'MAE':>12s}, ")
-    to.writelines(f"{' '*15}, {' '*15}, {lbl_maes[c]:15.9f}, " for c in range(num_keys))
-    to.write(f"{np.mean(np.abs(ocs)):15.9f}, {' '*15}\n")
-    to.write(f"{'MSE':>12s}, ")
-    to.writelines(f"{' '*15}, {' '*15}, {lbl_mses[c]:15.9f}, " for c in range(num_keys))
-    to.write(f"{' '*15}, {np.mean(np.power(ocs, 2)):15.9f}\n")
-    if print_it:
-        print(to.getvalue())
-
-
-def preds_vs_labels_dicts_to_table(
-        predictions: np.ndarray[Union[Dict[str, float], Dict[str, Tuple[float, float]]]],
-        labels: np.ndarray[Dict[str, float]],
-        block_headings: np.ndarray[str]=None,
-        selected_label_names: np.ndarray[str]=None,
-        reverse_scaling: bool=False,
-        comparison_head: str="Label",
-        prediction_head: str="Prediction",
-        title: str=None,
-        summary_only: bool=False,
-        to: TextIOBase=None):
+def predictions_vs_labels_to_table(predictions: np.rec.recarray[UFloat],
+                                   labels: np.rec.recarray[UFloat],
+                                   block_headings: np.ndarray[str]=None,
+                                   selected_param_names: np.ndarray[str]=None,
+                                   reverse_scaling: bool=False,
+                                   comparison_head: str="Label",
+                                   prediction_head: str="Prediction",
+                                   title: str=None,
+                                   summary_only: bool=False,
+                                   to: TextIOBase=None):
     """
     Will write a text table of the predicted nominal values vs the label values
     with O-C, MAE and MSE metrics, to the requested output.
 
-    :labels: the labels values as a dict of labels per instance
-    :predictions: the prediction values as a dict of predictions per instance.
-    All the dicts may either be as { "key": val, "key_sigma": err } or { "key":(val, err) }
+    :predictions: the predictions
+    :labels: the labels
     :block_headings: the heading for each block of preds-vs-labels
-    :selected_label_names: a subset of the full list of labels/prediction names to render
+    :selected_param_names: a subset of the full list of labels/prediction names to render
     :reverse_scaling: whether to reverse the scaling of the values to represent the model output
     :comparison_head: the text of the comparison row headings (10 chars or less)
     :prediction_head: the text of the prediction row headings (10 chars or less)
@@ -527,17 +443,18 @@ def preds_vs_labels_dicts_to_table(
     :summary_only: omit the body and just report the summary
     :to: the output to write the table to. Defaults to printing.
     """
-    # pylint: disable=too-many-arguments, too-many-locals
-    # We output the labels common to the all labels & predictions or those requested
-    if selected_label_names is None:
-        keys = [k for k in labels[0].keys() if k in predictions[0]]
+    # pylint: disable=too-many-arguments, too-many-locals, too-many-branches
+    # We output the params common to the all labels & predictions or those requested
+    if selected_param_names is None:
+        keys = np.array([k for k in labels.dtype.names if k in predictions.dtype.names])
+    elif isinstance(selected_param_names, str):
+        keys = np.array([selected_param_names])
     else:
-        keys = selected_label_names
+        keys = selected_param_names
 
-    # Extracts the raw values from the label and prediction List[Dict]s
-    # Expected to error if selected_label_names contains an unknown label/pred name
-    (raw_labels, pred_noms, _, ocs) \
-        = get_label_and_prediction_raw_values(labels, predictions, keys, reverse_scaling)
+    resids = calculate_residuals(predictions, labels, keys, reverse_scaling)
+    maes = unumpy.nominal_values([np.mean(np.abs(resids[k])) for k in keys])
+    mses = unumpy.nominal_values([np.mean(np.square(resids[k])) for k in keys])
 
     print_it = not to
     if print_it:
@@ -558,86 +475,71 @@ def preds_vs_labels_dicts_to_table(
         header_block("Summary")
     else:
         if block_headings is None or len(block_headings) == 0:
-            block_headings = (f"{n:04d}" for n in range(1, len(pred_noms)+1))
+            block_headings = (f"{n:04d}" for n in range(1, len(predictions)+1))
+        elif isinstance(block_headings, str):
+            block_headings = [block_headings]
 
-        for block_head, b_comp, b_preds, b_ocs in zip(block_headings, raw_labels, pred_noms, ocs):
+        # Make sure these are iterable; not always the case if we're given a single row
+        labels = np.expand_dims(labels, 0) if labels.shape == () else labels
+        predictions = np.expand_dims(predictions, 0) if predictions.shape == () else predictions
+        resids = np.expand_dims(resids, 0) if resids.shape == () else resids
+
+        for block_head, b_comp, b_preds, b_ocs in zip(block_headings, labels, predictions, resids):
             # A sub table for each block/instance with 3 rows; labels|controls, predictions and ocs
             header_block(block_head)
             horizontal_line("-")
-            b_ocs = np.concatenate([b_ocs, [np.mean(np.abs(b_ocs)), np.mean(np.power(b_ocs, 2))]])
             for row_head, row_vals in zip([comparison_head, prediction_head, "O-C"],
                                           [b_comp, b_preds, b_ocs]):
-                to.write(f"{row_head:<10s} | " + " ".join(f"{v:10.6f}" for v in row_vals))
+                to.write(f"{row_head:<10s} | " +
+                         " ".join(f"{row_vals[k].nominal_value:10.6f}" for k in keys))
+                if row_head == "O-C":
+                    to.write(f" {np.mean(np.abs(row_vals[keys].tolist())).nominal_value:10.6f}")
+                    to.write(f" {np.mean(np.square(row_vals[keys].tolist())).nominal_value:10.6f}")
                 to.write("\n")
 
     # Summary rows for aggregate stats over all of the rows
     horizontal_line("=")
-    to.write(f"{'MAE':<10s} | " + " ".join(f"{v:10.6f}" for v in np.mean(np.abs(ocs), 0)) +
-                 f" {np.mean(np.abs(ocs)):10.6f}\n")
-    to.write(f"{'MSE':<10s} | " + " ".join([f"{v:10.6f}" for v in np.mean(np.power(ocs, 2), 0)]) +
-                 " "*11 + f" {np.mean(np.power(ocs, 2)):10.6f}\n")
+    to.write(f"{'MAE':<10s} | " + " ".join(f"{v:10.6f}" for v in maes) +
+             f" {np.mean(np.abs(resids.tolist())).nominal_value:10.6f}\n")
+    to.write(f"{'MSE':<10s} | " + " ".join(f"{v:10.6f}" for v in mses) +
+             " "*11 + f" {np.mean(np.square(resids.tolist())).nominal_value:10.6f}\n")
     if print_it:
         print(to.getvalue())
 
 
-def get_label_and_prediction_raw_values(
-        labels: List[Union[Dict[str, float], Dict[str, Tuple[float, float]]]],
-        predictions: List[Union[Dict[str, float], Dict[str, Tuple[float, float]]]],
-        selected_label_names: List[str]=None,
-        reverse_scaling: bool=False) \
-            -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+def calculate_residuals(predictions: np.rec.recarray[UFloat],
+                        labels: np.rec.recarray[Union[UFloat, float]],
+                        selected_param_names: np.ndarray[str]=None,
+                        reverse_scaling: bool=False) -> np.rec.recarray[UFloat]:
     """
-    Utility function which takes the List[dicts] of predictions and labels and
-    extracts the raw values, calculates the O-C and returns all in a single tuple.
+    Calculates the residual by subtracted the predictions from the labels.
 
-    :labels: the labels List[dict] to compare them with - must be in the same order as
-    :predictions: the predictions List[dict] from either an Estimator or JKTEBOP
-    :chosen_labels: a subset of all the label names to work with
+    :predictions: the predictions
+    :labels: the labels
+    :selected_names: subset of the columns, or all predicted columns if None
     :reverse_scaling: whether to reapply label scaling to get the model's values
-    :returns: a tuple of (label_values, prediction_values, prediction_errs, O-Cs)
+    :returns: a recarray[UFloat] of the residuals over the selected names
     """
-    if selected_label_names is None:
-        selected_label_names = [k for k in predictions[0].keys() if not k.endswith("sigma")]
+    # We output the params common to the both labels & predictions or those requested
+    if selected_param_names is None:
+        selected_param_names = [n for n in labels.dtype.names if n in predictions.dtype.names]
 
-    def to_noms_and_errs(inputs, keys) -> np.ndarray:
-        # There are two format we expect for the List of input values;
-        #   - [{ "key": (value, uncertainty) }]
-        #   - [{ "key": value, "key_sigma": uncertainty }]
-        # In either case we need to separate out the nominal value and error bars
-        if isinstance(inputs[0][keys[0]], tuple):
-            # we have tuples of (value, uncertainty) for each key
-            nominals = np.array([[inp[l][0] for l in keys] for inp in inputs])
-            err_bars = np.array([[inp[l][1] for l in keys] for inp in inputs])
-        else:
-            # We have single value keys and (optional) separate key_sigma uncertainty values
-            nominals = np.array([[inp[l] for l in keys] for inp in inputs])
-            if f"{keys[0]}_sigma" in inputs[0]:
-                err_bars = [[inp.get(f"{l}_sigma", 0) for l in keys] for inp in inputs]
-                err_bars = np.array(err_bars)
-            else:
-                err_bars = np.zeros_like(nominals)
-        return nominals, err_bars
-
-    label_values, _ = to_noms_and_errs(labels, selected_label_names)
-    pred_noms, pred_errs = to_noms_and_errs(predictions, selected_label_names)
-
-    # Coalesce any None values to zero otherwise we'll get failures below
-    # pylint: disable=singleton-comparison
-    label_values[label_values == None] = 0.
-    pred_noms[pred_noms == None] = 0.
-    pred_errs[pred_errs == None] = 0.
-    # pylint: enable=singleton-comparison
-
-    # Optionally reverse any scaling of the values to get them in to the scale used by the ML model
+    # We may have to reverse the scaling
     if reverse_scaling:
-        scales = [deb_example.labels_and_scales[l] for l in selected_label_names]
-        label_values = np.multiply(label_values, scales)
-        pred_noms = np.multiply(pred_noms, scales)
-        pred_errs = np.multiply(pred_errs, scales)
+        for n in selected_param_names:
+            labels[n] *= deb_example.labels_and_scales[n]
+            predictions[n] *= deb_example.labels_and_scales[n]
 
-    # Currently O-C only considers the nominal values (as that's what we use in estimates)
-    ocs = np.subtract(label_values, pred_noms)
-    return (label_values, pred_noms, pred_errs, ocs)
+    # Can't seem to be able to do maths directly on the whole recarrays if they contain UFloats,
+    # however we're able to do it a "column" at a time.
+    dtype = [(n, UFloat) for n in selected_param_names]
+    resids = np.array([labels[n] - predictions[n] for n in selected_param_names]).transpose()
+    if len(resids.shape) > 1 and resids.shape[1]:
+        result = np.rec.fromrecords([tuple(row) for row in resids], dtype)
+    else:
+        # Handle working on a single row with no shape, so result has similar structure
+        result = np.rec.fromrecords([tuple(resids)], dtype)[0]
+    return result
 
 
 if __name__ == "__main__":
@@ -682,21 +584,20 @@ if __name__ == "__main__":
 
             # Report on fitting the formal-test-dataset based on estimator predictions. First run
             # through actually uses labels as the fit inputs to give us a set of control fit results
-            control_fit_dicts = None # To be set on the first, control fit run
-            for (pred_type, is_control_fit, iterations) in [
+            ctrl_fit_vals = None # To be set on the first, control fit run
+            for (pred_type, is_ctrl_fit, iterations) in [
                 ("control",     True,       0),
                 ("nonmc",       False,      1),
                 ("mc",          False,      1000),
             ]:
                 print(f"\nTesting JKTEBOP fitting of {pred_type} input values\n" + "="*80)
-                compare_dicts = None if is_control_fit else control_fit_dicts
-                fit_results_dicts = fit_against_formal_test_dataset(the_estimator,
-                                                                    formal_targs_cfg,
-                                                                    formal_targs,
-                                                                    iterations,
-                                                                    True,
-                                                                    is_control_fit,
-                                                                    compare_dicts,
-                                                                    result_dir)
-                if is_control_fit:
-                    control_fit_dicts = fit_results_dicts
+                fit_vals = fit_against_formal_test_dataset(the_estimator,
+                                                           formal_targs_cfg,
+                                                           formal_targs,
+                                                           iterations,
+                                                           True,
+                                                           is_ctrl_fit,
+                                                           None if is_ctrl_fit else ctrl_fit_vals,
+                                                           result_dir)
+                if is_ctrl_fit:
+                    ctrl_fit_vals = fit_vals
