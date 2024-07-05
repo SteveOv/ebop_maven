@@ -531,15 +531,10 @@ def calculate_residuals(predictions: np.rec.recarray[UFloat],
             predictions[n] *= deb_example.labels_and_scales[n]
 
     # Can't seem to be able to do maths directly on the whole recarrays if they contain UFloats,
-    # however we're able to do it a "column" at a time.
-    dtype = [(n, UFloat) for n in selected_param_names]
-    resids = np.array([labels[n] - predictions[n] for n in selected_param_names]).transpose()
-    if len(resids.shape) > 1 and resids.shape[1]:
-        result = np.rec.fromrecords([tuple(row) for row in resids], dtype)
-    else:
-        # Handle working on a single row with no shape, so result has similar structure
-        result = np.rec.fromrecords([tuple(resids)], dtype)[0]
-    return result
+    # however we're able to do it a "column" at a time. This calculation effectively transposes from
+    # (insts, cols) to (cols, insts) but it actually helps making the result recarray (insts, cols).
+    return np.rec.fromarrays(np.array([labels[n] - predictions[n] for n in selected_param_names]),
+                             dtype=[(n, UFloat) for n in selected_param_names])
 
 
 if __name__ == "__main__":
