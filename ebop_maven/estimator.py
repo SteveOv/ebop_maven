@@ -56,6 +56,8 @@ class Estimator(ABC):
         self._labels_and_scales = self._metadata.pop("labels_and_scales",\
                                                     deb_example.labels_and_scales)
         self._dtypes = [(name, np.dtype(UFloat.dtype)) for name in self._labels_and_scales]
+        self._scale_values = list(self._labels_and_scales.values())
+        self._scaling_applied = any(s != 1 for s in self._scale_values)
 
         print("The prediction inputs are:\n",
               f"\tmags_feature - numpy ndarray[float] shape (#instances, {self.mags_feature_bins})",
@@ -193,9 +195,11 @@ class Estimator(ABC):
             for _ in range(iterations)
         ])
 
-        # Undo any scaling applied to the labels (e.g. the model predicts inc/100)
-        if unscale:
-            raw_preds /= [*self._labels_and_scales.values()]
+        if unscale and self._scaling_applied:
+            # Undo any scaling applied to the labels (e.g. the model may predict inc/100).
+            # The scales list matches the size of the final labels dimension of the raw preds and
+            # it is broadcast over the other, iterations and instances, dimensions when re-scaling.
+            raw_preds /= self._scale_values
 
         preds = np.empty(shape=(insts, ), dtype=self._dtypes) # pre-allocate the results
         if is_mc:

@@ -121,6 +121,34 @@ class TestEstimator(unittest.TestCase):
         ext_features = np.array([[1.0] * (len(estimator.extra_feature_names)+1)]) # too wide
         self.assertRaises(ValueError, estimator.predict, mags_feature, ext_features)
 
+    def test_predict_valid_single_inst_assert_scaling(self):
+        """ Tests predict() assert scaling correctly applied """
+        estimator = Estimator(self._default_model_file)
+
+        mags_feature = np.array([[0.5] * (estimator.mags_feature_bins)])
+        ext_features = np.array([[1.0, 0.5]])
+        expected_preds = estimator.predict(mags_feature, ext_features, iterations=1, unscale=True)
+        print(expected_preds)
+
+        # We're going to have the same number of instances and MC iterations as the
+        # number of labels. This will allow us to test the scaling is applied to the correct axis.
+        # The inc label is scaled by 0.01, so it should be easy to detect this applied incorrectly.
+        num_labels = len(estimator.label_names)
+        mags_feature = np.array([[0.5] * (estimator.mags_feature_bins)] * num_labels)
+        ext_features = np.array([[1.0, 0.5]] * num_labels)
+
+        preds = estimator.predict(mags_feature, ext_features, iterations=num_labels, unscale=True)
+        print(preds)
+
+        for name in estimator.label_names:
+            for ix in range(num_labels):
+                # There will be slight differences due to the MC Dropout algo,
+                # but differences due to incorrectly applied scaling will be much larger.
+                exp_pred = expected_preds[0][name].nominal_value
+                pred = preds[0][name].nominal_value
+                self.assertAlmostEqual(exp_pred, pred, 3,
+                                       msg=f"Expected pred[{ix}][{name}]=={exp_pred} but is {pred}")
+
     def test_predict_valid_single_inst_assert_structure(self):
         """ Tests predict((1, #bins), (1, #feats), iterations=1) returns correctly structured result """
         estimator = Estimator(self._default_model_file)
