@@ -254,20 +254,63 @@ class Test_deb_example(unittest.TestCase):
                                                           labels=labels, scale_labels=False)
 
         # Only the two rows, yielded in the order requested, not the order they're stored in
-        # the same with the labels; in the order they are requested
         self.assertEqual(2, len(id_vals))
         self.assertEqual(identifiers[0], id_vals[0])        # CM Dra
-        self.assertAlmostEqual(0, lrows[0, 0], 3)           # L3
-        self.assertAlmostEqual(89.5514, lrows[0, 1], 3)     # inc
+        self.assertAlmostEqual(0, lrows[0]["L3"], 3)
+        self.assertAlmostEqual(89.5514, lrows[0]["inc"], 3)
         self.assertEqual(identifiers[1], id_vals[1])        # CW Eri
-        self.assertAlmostEqual(-0.0002, lrows[1, 0], 3)     # L3
-        self.assertAlmostEqual(86.381, lrows[1, 1], 3)      # inc
+        self.assertAlmostEqual(-0.0002, lrows[1]["L3"], 3)
+        self.assertAlmostEqual(86.381, lrows[1]["inc"], 3)
+
+    def test_read_dataset_labels_via_indices(self):
+        """ Tests read_dataset() -> rows & values accessed via numeric indices (backward compat) """
+        files = list((Path.cwd() / "datasets/formal-test-dataset/").glob("**/*.tfrecord"))
+
+        identifiers = ["CM Dra", "CW Eri"] # Not in the order they appear in the dataset
+        (id_vals, _, _, lrows) = deb_example.read_dataset(files, identifiers=identifiers)
+
+        l3_ix = list(deb_example.labels_and_scales.keys()).index("L3")
+        inc_ix = list(deb_example.labels_and_scales.keys()).index("inc")
+
+        # Only the two rows, yielded in the order requested, not the order they're stored in
+        self.assertEqual(2, len(id_vals))
+        self.assertEqual(identifiers[0], id_vals[0])        # CM Dra
+        self.assertAlmostEqual(0, lrows[0][l3_ix], 3)
+        self.assertAlmostEqual(89.5514, lrows[0][inc_ix], 3)
+        self.assertEqual(identifiers[1], id_vals[1])        # CW Eri
+        self.assertAlmostEqual(-0.0002, lrows[1][l3_ix], 3)
+        self.assertAlmostEqual(86.381, lrows[1][inc_ix], 3)
+
+    def test_read_dataset_identifers_no_match(self):
+        """ Tests read_dataset(with unknown id) -> no error but empty results returned """
+        files = list((Path.cwd() / "datasets/formal-test-dataset/").glob("**/*.tfrecord"))
+
+        (id_vals, mags, feats, labs) = deb_example.read_dataset(files, identifiers=["unknown"])
+
+        # No rows
+        self.assertEqual(id_vals.shape, (0, ))
+        self.assertEqual(mags.shape, (0, ))
+        self.assertEqual(feats.shape, (0, ))
+        self.assertEqual(labs.shape, (0, ))
+        self.assertEqual(len(labs["k"]), 0) # It knows the names but there is no data
+
+    def test_read_dataset_identifers_no_labels(self):
+        """ Tests read_dataset(with an unknown label) -> no error but empty labs returned """
+        files = list((Path.cwd() / "datasets/formal-test-dataset/").glob("**/*.tfrecord"))
+
+        (id_vals, _, _, labs) = deb_example.read_dataset(files,
+                                                         identifiers=["CW Eri", "CM Dra"],
+                                                         labels=[])
+        # Two matching rows, but the labs rows are empty
+        self.assertEqual(id_vals.shape, (2, ))
+        self.assertEqual(labs.shape, (2, ))
+        self.assertEqual(len(labs.dtype.names), 0)
 
     @unittest.skip("only run this interactively as it may take a long time")
     def test_read_dataset_scalability_test(self):
         """ Tests read_dataset(with large dataset) -> data is returned in seconds not minutes/hours """
 
-        # There are approx 116,000 rows in this dataset - should be done in ~20 s
+        # There are approx 20,000 rows in this dataset - should be done in ~20 s
         # As read_dataset() wraps iterate_dataset() this tests both functions' scalability
         files = list((Path.cwd() / "datasets/synthetic-mist-tess-dataset/").glob("**/*.tfrecord"))
         (id_vals, _, _, lrows) = deb_example.read_dataset(files, 4096, 0.75, scale_labels=False)

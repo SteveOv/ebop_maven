@@ -86,11 +86,7 @@ def evaluate_model_against_dataset(estimator: Union[Model, Estimator],
     if include_ids is not None:
         assert len(include_ids) == len(ids)
 
-    # TODO: Turn the label values into a recarray[UFloat] -> move this into deb_example?
-    lbl_vals = np.rec.fromrecords([tuple(ufloat(val, 0) for val in row) for row in lbl_vals],
-                                  dtype=[(col, UFloat) for col in ext_label_names])
-
-    # Make predictions, returned as a numpy recarray of shape (#insts, #labels) and dtype=UFloat
+    # Make predictions, returned as a structured array of shape (#insts, #labels) and dtype=UFloat
     print(f"The Estimator is making predictions on the {len(ids)} test instances",
           f"with {mc_iterations} iteration(s) (iterations >1 triggers MC Dropout algorithm).")
     pred_vals = estimator.predict(mags_vals, feat_vals, mc_iterations, unscale=not scaled)
@@ -137,8 +133,8 @@ def fit_against_formal_test_dataset(estimator: Union[Model, Estimator],
                                     mc_iterations: int=1,
                                     apply_fit_overrides: bool=True,
                                     do_control_fit: bool=False,
-                                    comparison_vals: np.rec.recarray[UFloat]=None,
-                                    report_dir: Path=None) -> np.rec.recarray[UFloat]:
+                                    comparison_vals: np.ndarray[UFloat]=None,
+                                    report_dir: Path=None) -> np.ndarray[UFloat]:
     """
     Will fit members of the formal test dataset, as configured in targets_config,
     based on the sets of input_params passed in returning the corresponding fitted params.
@@ -179,12 +175,7 @@ def fit_against_formal_test_dataset(estimator: Union[Model, Estimator],
                                                                 super_names,
                                                                 include_ids)
 
-
-    # TODO: Turn the label values into a recarray[UFloat] -> move this into deb_example?
-    lbl_vals = np.rec.fromrecords([tuple(ufloat(val, 0) for val in row) for row in lbl_vals],
-                                  dtype=[(col, UFloat) for col in super_names])
-
-    # Make predictions, returned as a numpy recarray of shape (#insts, #labels) and dtype=UFloat
+    # Make predictions, returned as a structured array of shape (#insts, #labels) and dtype=UFloat
     if do_control_fit:
         print("\nControl fits will use label values as 'predictions' and fitting inputs.")
         pred_vals = copy.deepcopy(lbl_vals)
@@ -195,9 +186,9 @@ def fit_against_formal_test_dataset(estimator: Union[Model, Estimator],
         if "inc" not in pred_vals.dtype.names:
             pred_vals = append_calculated_inc_predictions(pred_vals)
 
-    # Presize a recarray to hold the params which are output from each JKTEBOP fitting
-    fitted_vals = np.rec.recarray(shape=(len(targs), ),
-                                  dtype=[(name, UFloat) for name in super_names])
+    # Pre-allocate a structured array to hold the params which are output from each JKTEBOP fitting
+    fitted_vals = np.empty(shape=(len(targs), ),
+                           dtype=[(name, np.dtype(UFloat.dtype)) for name in super_names])
 
     # Finally, we have everything in place to fit our targets and report on the results
     for ix, targ in enumerate(targs):
@@ -225,8 +216,8 @@ def fit_against_formal_test_dataset(estimator: Union[Model, Estimator],
 
         params = {
             **base_jktebop_task3_params(period, pe, dat_fname.name, fit_stem, targ_config),
-            **{ n: pred_vals[ix][n].nominal_value for n in pred_vals.dtype.names }, # predictions
-            **fit_overrides,                                                        # overrides
+            **{ n: get_nom(pred_vals[ix][n]) for n in pred_vals.dtype.names },  # predictions
+            **fit_overrides,                                                    # overrides
         }
 
         # Add scale-factor poly fitting, chi^2 adjustment (to 1.0) and any light-ratio instructions
@@ -349,7 +340,7 @@ def base_jktebop_task3_params(period: float,
     }
 
 
-def append_calculated_inc_predictions(preds: np.rec.recarray[UFloat]) -> np.rec.recarray[UFloat]:
+def append_calculated_inc_predictions(preds: np.ndarray[UFloat]) -> np.ndarray[UFloat]:
     """
     Calculate the predicted inc value (in degrees) and append to the predictions
     if not already present.
@@ -361,18 +352,19 @@ def append_calculated_inc_predictions(preds: np.rec.recarray[UFloat]) -> np.rec.
     if "inc" not in names:
         if "bP" in names:
             # From primary impact param:  i = arccos(bP * r1 * (1+esinw)/(1-e^2))
-            r = preds.rA_plus_rB / (1 + preds.k)
-            inner = preds.bP * r * (1 + preds.esinw) / (1 - (preds.ecosw**2 + preds.esinw**2))
-            inc = np.array([degrees(acos(i)) for i in inner], dtype=UFloat)
+            r = preds["rA_plus_rB"] / (1+preds["k"])
+            csi = preds["bP"] * r * (1+preds["esinw"]) / (1-(preds["ecosw"]**2 + preds["esinw"]**2))
+            inc = np.array([degrees(acos(i)) for i in csi], dtype=UFloat)
         elif "cosi" in names:
-            inc = np.array([degrees(acos(val)) for val in preds["cosi"]], dtype=[("inc", UFloat)])
+            inc = np.array([degrees(acos(val)) for val in preds["cosi"]], dtype=UFloat)
         elif "sini" in names:
-            inc = np.array([degrees(asin(val)) for val in preds["sini"]], dtype=[("inc", UFloat)])
+            inc = np.array([degrees(asin(val)) for val in preds["sini"]], dtype=UFloat)
         else:
             raise KeyError("Missing bP, cosi or sini in predictions required to calc inc.")
 
-        # It's difficult to append a field to an existing object recarray so copy over to new inst
-        new = np.empty_like(preds, dtype=np.dtype(preds.dtype.descr + [("inc", UFloat)]))
+        # It's difficult to append a field to an "object" array or recarray so copy over to new inst
+        new = np.empty_like(preds,
+                            dtype=np.dtype(preds.dtype.descr + [("inc", np.dtype(UFloat.dtype))]))
         new[names] = preds[names]
         new["inc"] = inc
         return new
@@ -418,8 +410,8 @@ def will_transit(rA_plus_rB: Union[np.ndarray[float], np.ndarray[UFloat]],
     return np.bitwise_or(primary_trans, secondary_trans)
 
 
-def predictions_vs_labels_to_table(predictions: np.rec.recarray[UFloat],
-                                   labels: np.rec.recarray[UFloat],
+def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
+                                   labels: np.ndarray[UFloat],
                                    block_headings: np.ndarray[str]=None,
                                    selected_param_names: np.ndarray[str]=None,
                                    reverse_scaling: bool=False,
@@ -491,26 +483,29 @@ def predictions_vs_labels_to_table(predictions: np.rec.recarray[UFloat],
             for row_head, row_vals in zip([comparison_head, prediction_head, "O-C"],
                                           [b_comp, b_preds, b_ocs]):
                 to.write(f"{row_head:<10s} | " +
-                         " ".join(f"{row_vals[k].nominal_value:10.6f}" for k in keys))
+                         " ".join(f"{get_nom(row_vals[k]):10.6f}" for k in keys))
                 if row_head == "O-C":
-                    to.write(f" {np.mean(np.abs(row_vals[keys].tolist())).nominal_value:10.6f}")
-                    to.write(f" {np.mean(np.square(row_vals[keys].tolist())).nominal_value:10.6f}")
+                    to.write(f" {get_nom(np.mean(np.abs(row_vals[keys].tolist()))):10.6f}")
+                    to.write(f" {get_nom(np.mean(np.square(row_vals[keys].tolist()))):10.6f}")
                 to.write("\n")
 
     # Summary rows for aggregate stats over all of the rows
     horizontal_line("=")
-    to.write(f"{'MAE':<10s} | " + " ".join(f"{v:10.6f}" for v in maes) +
-             f" {np.mean(np.abs(resids.tolist())).nominal_value:10.6f}\n")
-    to.write(f"{'MSE':<10s} | " + " ".join(f"{v:10.6f}" for v in mses) +
-             " "*11 + f" {np.mean(np.square(resids.tolist())).nominal_value:10.6f}\n")
+    to.write(f"{'MAE':<10s} | " + " ".join(f"{get_nom(v):10.6f}" for v in maes) +
+             f" {get_nom(np.mean(np.abs(resids.tolist()))):10.6f}\n")
+    to.write(f"{'MSE':<10s} | " + " ".join(f"{get_nom(v):10.6f}" for v in mses) +
+             " "*11 + f" {get_nom(np.mean(np.square(resids.tolist()))):10.6f}\n")
     if print_it:
         print(to.getvalue())
 
+def get_nom(value):
+    """ Get the nominal value if the passed value is a UFloat other return as is """
+    return value.nominal_value if isinstance(value, UFloat) else value
 
-def calculate_residuals(predictions: np.rec.recarray[UFloat],
-                        labels: np.rec.recarray[Union[UFloat, float]],
+def calculate_residuals(predictions: np.ndarray[UFloat],
+                        labels: np.ndarray[Union[UFloat, float]],
                         selected_param_names: np.ndarray[str]=None,
-                        reverse_scaling: bool=False) -> np.rec.recarray[UFloat]:
+                        reverse_scaling: bool=False) -> np.ndarray[UFloat]:
     """
     Calculates the residual by subtracted the predictions from the labels.
 
@@ -518,23 +513,30 @@ def calculate_residuals(predictions: np.rec.recarray[UFloat],
     :labels: the labels
     :selected_names: subset of the columns, or all predicted columns if None
     :reverse_scaling: whether to reapply label scaling to get the model's values
-    :returns: a recarray[UFloat] of the residuals over the selected names
+    :returns: a structured NDArray[UFloat] of the residuals over the selected names
     """
     # We output the params common to the both labels & predictions or those requested
+    # (which we allow to error if a requested name is not found)
     if selected_param_names is None:
-        selected_param_names = [n for n in labels.dtype.names if n in predictions.dtype.names]
+        dtype = [(n, np.dtype(UFloat.dtype))
+                 for n in labels.dtype.names if n in predictions.dtype.names]
+    else:
+        dtype = [(n, np.dtype(UFloat.dtype)) for n in selected_param_names]
+
+    # Haven't found a way to do the subtract directly on the whole NDarray if they contain UFloats
+    # (no subtract in unumpy). We do it a (common) column/param at a time, which has the added
+    # benefit of being untroubled by the two arrays having different sets of cols (widths).
+    row_count = predictions.shape[0] if predictions.shape else 1
+    resids = np.empty(shape=(row_count, ), dtype=dtype)
 
     # We may have to reverse the scaling
     if reverse_scaling:
         for n in selected_param_names:
-            labels[n] *= deb_example.labels_and_scales[n]
-            predictions[n] *= deb_example.labels_and_scales[n]
-
-    # Can't seem to be able to do maths directly on the whole recarrays if they contain UFloats,
-    # however we're able to do it a "column" at a time. This calculation effectively transposes from
-    # (insts, cols) to (cols, insts) but it actually helps making the result recarray (insts, cols).
-    return np.rec.fromarrays(np.array([labels[n] - predictions[n] for n in selected_param_names]),
-                             dtype=[(n, UFloat) for n in selected_param_names])
+            resids[n] = (labels[n] - predictions[n]) * deb_example.labels_and_scales[n]
+    else:
+        for n in selected_param_names:
+            resids[n] = labels[n] - predictions[n]
+    return resids
 
 
 if __name__ == "__main__":

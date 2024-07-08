@@ -304,11 +304,17 @@ def read_dataset(dataset_files: Iterable[str],
                  identifiers: List[str]=None,
                  scale_labels: bool=False,
                  noise_stddev: float = 0.,
-                 roll_max: int = 0):
+                 roll_max: int = 0) \
+            -> Tuple[np.ndarray, np.ndarray[float], np.ndarray[float], np.ndarray[float]]:
     """
     Wrapper around iterate_dataset() which handles the iteration and returns separate
     np ndarrays for the dataset ids, mags values, feature values and label values.
 
+    The labels array is structured, so labels may be accessed with their names, for example;
+    ```Python
+    ecosw = labels[0]["ecosw"]
+    ```
+    
     This may not be hugely performant, especially with large datasets, but it's for convenience.
 
     :dataset_files: the set of dataset files to parse
@@ -320,10 +326,15 @@ def read_dataset(dataset_files: Iterable[str],
     :scale_values: if True values will be scaled
     :noise_stddev: the standard deviation of Gaussian Noise to add to the mags feature
     :roll_max: the maximum random roll to apply to the mags feature
-    :returns: Tuple[
-    NDArray[#insts, 1], NDArray[#insts, #bins], NDArray[#insts, #feats], NDArray[#insts, #labels]]
+    :returns: a Tuple[NDArray[#insts, 1], NDArray[#insts, #bins], NDArray[#insts, #feats],
+    NDArray[#insts, #labels]], with the labels being a structured NDArray supporting named columns
     """
     # pylint: disable=too-many-arguments, too-many-locals
+    if labels is not None:
+        labels = [l for l in labels if l in labels_and_scales]
+    else:
+        labels = list(labels_and_scales.keys())
+
     ids, mags_vals, feature_vals, label_vals = [], [], [], []
     for row in iterate_dataset(dataset_files, mags_bins, mags_wrap_phase,
                                ext_features, labels, identifiers, scale_labels,
@@ -331,7 +342,7 @@ def read_dataset(dataset_files: Iterable[str],
         ids += [row[0]]
         mags_vals += [row[1]]
         feature_vals += [row[2]]
-        label_vals += [row[3]]
+        label_vals += [tuple(row[3])]
 
     # Need to sort the data in the order of the requested ids (if given).
     # Not hugely performant, but we only ever expect short lists of indices.
@@ -342,7 +353,9 @@ def read_dataset(dataset_files: Iterable[str],
         feature_vals = [feature_vals[ix] for ix in indices]
         label_vals = [label_vals[ix] for ix in indices]
 
-    return np.array(ids), np.array(mags_vals), np.array(feature_vals), np.array(label_vals)
+    # Turn label vals into a structured array
+    dtype = [(name, np.dtype(float)) for name in labels]
+    return np.array(ids), np.array(mags_vals), np.array(feature_vals), np.array(label_vals, dtype)
 
 
 #

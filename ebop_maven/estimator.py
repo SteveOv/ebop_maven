@@ -6,7 +6,7 @@ from abc import ABC
 from inspect import getsourcefile
 
 import numpy as np
-from uncertainties import ufloat, UFloat
+from uncertainties import UFloat, unumpy
 import tensorflow as tf
 from keras import Model
 
@@ -55,7 +55,7 @@ class Estimator(ABC):
                                                     deb_example.extra_features_and_defaults)
         self._labels_and_scales = self._metadata.pop("labels_and_scales",\
                                                     deb_example.labels_and_scales)
-        self._dtypes = [(name, UFloat) for name in self._labels_and_scales]
+        self._dtypes = [(name, np.dtype(UFloat.dtype)) for name in self._labels_and_scales]
 
         print("The prediction inputs are:\n",
               f"\tmags_feature - numpy ndarray[float] shape (#instances, {self.mags_feature_bins})",
@@ -124,17 +124,21 @@ class Estimator(ABC):
         in the form of two NDArrays, one for the instances' mags data in the shape
         (#insts, #mags_bins, 1) or (#insts, #mags_bins) and another for
         extra features in the shape (#insts, #features, 1) or (#insts, #features).
-        The predictions are returned as an recarray of UFloats of shape (#insts, #labels), with
-        the labels accessible by the names given in self.label_names, and if include_raw_preds is
-        set, an NDArray of the raw predictions in the shape (#insts, #labels, #iterations)
+        The predictions are returned as a structured NDArray of UFloats of shape (#insts, #labels),
+        with the labels accessible by the names given in self.label_names, and if include_raw_preds
+        is set, an NDArray of the raw predictions in the shape (#insts, #labels, #iterations)
 
         Examples:
         ```Python
-        preds = estimator.predict2(mags, ext, 1000)
-        print(preds[0]['k'].nominal_value)
+        # Using named columns
+        preds = estimator.predict(mags, ext_features, 1000)
+        ratio_radii = preds[0]['k'].nominal_value
 
-        # masking support
+        # Using masked rows
         transiting = preds[transit_flags]
+
+        # Support for raw_preds
+        (preds, raw_preds) = estimator.predict(mags, ext_features, 1000, include_raw_preds=True)
         ```
         
         :mags_feature: numpy NDArray of shape (#insts, #bins, 1)
@@ -144,8 +148,8 @@ class Estimator(ABC):
         the model may predict inc*0.01 and unscale would undo this returning inc as prediction/0.01
         :include_raw_preds: if True the raw preds will also be returned as the 2nd item of a tuple
         :seed: random seed for Tensorflow
-        :returns: a numpy recarray[UFloat] with the predictions in the shape (#insts, #labels) and
-        optionally an NDArray of the raw predictions in the shape (#insts, #labels, #iterations)
+        :returns: a structured NDarray[UFloat] with the predictions in the shape (#insts, #labels)
+        and optionally an NDArray of the raw predictions in the shape (#insts, #labels, #iterations)
         """
         # pylint: disable=too-many-arguments, too-many-branches
         iterations = self._iterations if iterations is None else iterations
@@ -182,28 +186,28 @@ class Estimator(ABC):
 
         # If dropout, we make multiple predictions for each inst with training switched on so that
         # each prediction is with a statistically unique subset of the model's net: the MC Dropout
-        # algorithm. Predictions are output in shape (#iterations, #insts, #labels)
+        # algorithm. These raw predictions will be in the shape (#iterations, #insts, #labels)
         tf.random.set_seed(seed)
-        stkd_prds = np.stack([
+        raw_preds = np.stack([
             self._model((mags_feature, extra_features), training=is_mc)
             for _ in range(iterations)
         ])
 
         # Undo any scaling applied to the labels (e.g. the model predicts inc/100)
         if unscale:
-            stkd_prds /= [*self._labels_and_scales.values()]
+            raw_preds /= [*self._labels_and_scales.values()]
 
-        # Calc the means/stddevs, over the #iters axis to go to lists of records [(ufloats, ...)]
+        preds = np.empty(shape=(insts, ), dtype=self._dtypes) # pre-allocate the results
         if is_mc:
-            # We have multiple predictions per input. Summarize over #iters axis
-            records = [
-                tuple(ufloat(n, s) for (n, s) in zip(noms, sigs))
-                    for (noms, sigs) in zip(np.mean(stkd_prds, axis=0), np.std(stkd_prds, axis=0))
-            ]
+            # We have multiple predictions per input. Summarize over the iterations axis
+            for inst, (noms, errs) in enumerate(zip(np.mean(raw_preds, axis=0),
+                                                    np.std(raw_preds, axis=0))):
+                preds[inst] = tuple(unumpy.uarray(noms, errs))
         else:
-            # Not MC; only 1 set of predictions per instance so drop #iters axis and assume zero std
-            records = [tuple(ufloat(n, 0) for n in noms) for noms in stkd_prds[0, ...]]
+            # Not MC; only 1 set of predictions per instance so ignore #iters and assume zero std
+            for inst in range(insts):
+                preds[inst] = tuple(unumpy.uarray(raw_preds[0, inst, ...], 0))
 
         if not include_raw_preds:
-            return np.rec.fromrecords(records, dtype=self._dtypes)
-        return np.rec.fromrecords(records, dtype=self._dtypes), stkd_prds.transpose([1, 2, 0])
+            return preds
+        return preds, raw_preds.transpose([1, 2, 0])

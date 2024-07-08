@@ -129,7 +129,7 @@ class TestEstimator(unittest.TestCase):
         ext_features = np.array([[1.0, 0.5]])
         preds = estimator.predict(mags_feature, ext_features, iterations=1)
 
-        self.assertIsInstance(preds, np.rec.recarray)
+        self.assertIsInstance(preds, np.ndarray)
         self.assertEqual(preds.shape, (1, ))
         self.assertListEqual(list(preds.dtype.names), estimator.label_names)
 
