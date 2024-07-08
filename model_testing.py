@@ -98,6 +98,7 @@ def evaluate_model_against_dataset(estimator: Union[Model, Estimator],
 
     # Now report on the quality of the predictions, for which we will need the residuals
     resids = calculate_residuals(pred_vals, lbl_vals, estimator.label_names)
+    pnames = [n for n in pred_vals.dtype.names if n not in ["ecosw", "esinw"]] + ["ecosw", "esinw"]
     for (subset, tmask) in [("",                 [True]*lbl_vals.shape[0]),
                             (" transiting",      tflags),
                             (" non-transiting",  ~tflags)]:
@@ -113,6 +114,11 @@ def evaluate_model_against_dataset(estimator: Union[Model, Estimator],
                 fig = plots.plot_prediction_boxplot(resids[tmask], show_fliers="formal" in ds_name,
                                                     ylabel="Residual")
                 fig.savefig(report_dir / f"predictions-{mc_type}-box-{ds_name}{sub_suffix}.pdf")
+
+                rep_flags = tflags if len(subset) == 0 else tflags[tmask]
+                fig = plots.plot_predictions_vs_labels(pred_vals[tmask], lbl_vals[tmask],
+                                                       rep_flags, pnames, show_errorbars=False)
+                fig.savefig(report_dir/f"predictions-{mc_type}-vs-labels-{ds_name}{sub_suffix}.pdf")
 
             if report_dir and "formal" not in ds_name:
                 # Break down the predictions into bins then plot the MAE against mean label to give

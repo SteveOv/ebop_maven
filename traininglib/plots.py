@@ -260,16 +260,21 @@ def plot_predictions_vs_labels(predictions: np.rec.recarray[UFloat],
         ax = axes[ax_ix]
         ax.plot(diag, diag, color="gray", linestyle="-", linewidth=0.5)
 
-        # Plot the preds vs labels, with those with transits highlighted
-        # We want to set the fillstyle by transit flag which means plotting each item alone
+        # If we have lots of data, reduce the size of the maker and add in an alpha
+        (fmt, ms, alpha) = ("o", 5.0, 1.0) if len(lbl_vals) < 100 else (".", 2.0, 0.25)
+
+        # Plot the preds vs labels, with those with transits filled.
         show_errorbars = show_errorbars if show_errorbars else max(np.abs(pred_sigmas)) > 0
-        for x, y, yerr, transiting in zip(lbl_vals, pred_vals, pred_sigmas, transit_flags):
-            (f, z) = ("full", 10) if transiting else ("none", 0)
-            if show_errorbars:
-                ax.errorbar(x=x, y=y, yerr=yerr, fmt="o", c="tab:blue", ms=5.0, lw=1.0,
-                            capsize=2.0, markeredgewidth=0.5, fillstyle=f, zorder=z)
-            else:
-                ax.errorbar(x=x, y=y, fmt="o", c="tab:blue", ms=5.0, lw=1.0, fillstyle=f, zorder=z)
+        for tmask, transiting in [(transit_flags, True), (~transit_flags, False)]:
+            if any(tmask):
+                (f, z) = ("full", 10) if transiting else ("none", 0)
+                if show_errorbars:
+                    ax.errorbar(x=lbl_vals[tmask], y=pred_vals[tmask], yerr=pred_sigmas[tmask],
+                                fmt=fmt, c="tab:blue", ms=ms, lw=1.0, alpha=alpha,
+                                capsize=2.0, markeredgewidth=0.5, fillstyle=f, zorder=z)
+                else:
+                    ax.errorbar(x=lbl_vals[tmask], y=pred_vals[tmask], fmt=fmt, c="tab:blue",
+                                alpha=alpha, ms=ms, lw=1.0, fillstyle=f, zorder=z)
 
         format_axes(ax, xlim=diag, ylim=diag, xlabel=f"{xlabel_prefix} {param_caption}",
                     ylabel=f"{ylabel_prefix} {param_caption}")
