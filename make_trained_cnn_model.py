@@ -27,16 +27,16 @@ CHOSEN_FEATURES = []
 MAGS_BINS = 4096
 MAGS_WRAP_PHASE = 0.75
 CHOSEN_LABELS = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "bP"]
-TRAINSET_SIZE = "250k"
+TRAINSET_SUFFIX = "250k"
 
 MODEL_NAME = f"CNN-New-Ext{len(CHOSEN_FEATURES)}-{'-'.join(CHOSEN_LABELS[5:])}-" \
-                            + f"{MAGS_BINS}-{MAGS_WRAP_PHASE}-{TRAINSET_SIZE}"
+                            + f"{MAGS_BINS}-{MAGS_WRAP_PHASE}-{TRAINSET_SUFFIX}"
 MODEL_FILE_NAME = "default-model"
 SAVE_DIR = Path("./drop/training") / MODEL_NAME.lower()
 PLOTS_DIR = SAVE_DIR / "plots"
 
 # We can now specify paths to train/val/test datasets separately for greater flexibility.
-TRAINSET_NAME = "formal-training-dataset-" + TRAINSET_SIZE
+TRAINSET_NAME = "formal-training-dataset-" + TRAINSET_SUFFIX
 TRAINSET_DIR = Path(".") / "datasets" / TRAINSET_NAME / "training"
 VALIDSET_DIR = Path(".") / "datasets" / TRAINSET_NAME / "validation"
 TESTSET_DIR = Path(".") / "datasets" / "synthetic-mist-tess-dataset"
