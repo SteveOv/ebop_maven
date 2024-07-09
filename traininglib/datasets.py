@@ -227,6 +227,8 @@ def make_dataset_file(trainset_file: Path,
     for counter, params in enumerate(read_param_sets_from_csv(trainset_file), 1):
         params.setdefault("gravA", 0.)
         params.setdefault("gravB", 0.)
+
+        # Large negative values force JKTEBOP task2 to calculate the reflection coefficients
         params.setdefault("reflA", -100)
         params.setdefault("reflB", -100)
 
@@ -255,7 +257,7 @@ def make_dataset_file(trainset_file: Path,
                     bin_model_data = np.roll(bin_model_data, shift, axis=1)
                 mags_features[mag_name] = bin_model_data[1]
 
-            # These are the extra features used for predictions alongside the LC.
+            # These are the extra features which may be used for predictions alongside the LC.
             extra_features = {
                 "phiS": orbital.secondary_eclipse_phase(params["ecosw"], params["ecc"]),
                 "dS_over_dP": orbital.ratio_of_eclipse_duration(params["esinw"]),
