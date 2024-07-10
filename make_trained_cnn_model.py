@@ -185,7 +185,7 @@ if __name__ == "__main__":
             # With pip I can't get graphviz beyond 0.2.0 which leads to pydot errors here.
             # At least with the try block I can degrade gracefully.
             PLOTS_DIR.mkdir(parents=True, exist_ok=True)
-            keras.utils.plot_model(model, to_file=PLOTS_DIR / f"{MODEL_FILE_NAME}.png",
+            keras.utils.plot_model(model, to_file=PLOTS_DIR / f"{MODEL_FILE_NAME}.pdf",
                     show_layer_names=True, show_shapes=True, show_layer_activations=True,
                     show_dtype=False, show_trainable=False, rankdir="TB", dpi=300)
         except ImportError:
@@ -222,7 +222,7 @@ if __name__ == "__main__":
             ax.plot(history.history['val_loss'], label="validation")
             plotting.format_axes(ax, xlabel="Epoch", ylabel="Loss", legend_loc="best")
             PLOTS_DIR.mkdir(parents=True, exist_ok=True)
-            fig.savefig(PLOTS_DIR / f"{MODEL_FILE_NAME}-learning-curves.eps", dpi=300)
+            fig.savefig(PLOTS_DIR / f"{MODEL_FILE_NAME}-learning-curves.pdf", dpi=300)
         except tf.errors.InvalidArgumentError as exc:
             if ("lc" in exc.message or "mags" in exc.message) \
                     and "Can't parse serialized" in exc.message:
