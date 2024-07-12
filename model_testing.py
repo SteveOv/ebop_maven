@@ -66,22 +66,13 @@ def evaluate_model_against_dataset(estimator: Union[Model, Estimator],
     ds_name = test_dataset_dir.name
     tfrecord_files = sorted(test_dataset_dir.glob("**/*.tfrecord"))
     print(f"found {len(tfrecord_files)} file(s).")
-
-    # Set up augmentations to perturb synthetic data as we do for the full training pipeline
-    noise_stddev, roll_max = 0, 0
-    if test_dataset_dir != FORMAL_TEST_DATASET_DIR:
-        noise_stddev = 0.005
-        roll_max = 36
-
     ids, mags_vals, feat_vals, lbl_vals = deb_example.read_dataset(tfrecord_files,
                                                                 estimator.mags_feature_bins,
                                                                 estimator.mags_feature_wrap_phase,
                                                                 estimator.extra_feature_names,
                                                                 ext_label_names,
                                                                 include_ids,
-                                                                scaled,
-                                                                noise_stddev,
-                                                                roll_max)
+                                                                scaled)
 
     if include_ids is not None:
         assert len(include_ids) == len(ids)

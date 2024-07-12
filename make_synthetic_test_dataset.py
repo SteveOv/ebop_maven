@@ -18,6 +18,7 @@ if not "JKTEBOP_DIR" in os.environ:
 from traininglib import datasets, plots
 from traininglib.mistisochrones import MistIsochrones
 
+from ebop_maven import deb_example
 from ebop_maven.libs import orbital, limb_darkening
 from ebop_maven.libs.mission import Mission
 from ebop_maven.libs.tee import Tee
@@ -67,6 +68,7 @@ def generate_instances_from_mist_models(instance_count: int, label: str, verbose
 
     feh_values = _mist_isochones.list_metallicities()
     min_phase, max_phase = 0.0, 2.0 # M-S to RGB
+    min_mass_value, max_mass_value = 0.4, 20.0
     cols = ["star_mass", "log_R", "log_Teff", "log_L", "log_g"]
 
     while usable_counter < instance_count:
@@ -78,13 +80,22 @@ def generate_instances_from_mist_models(instance_count: int, label: str, verbose
                 age = np.random.choice(ages) * u.dex(u.yr)
                 init_masses = _mist_isochones.list_initial_masses(feh, age.value,
                                                                   min_phase, max_phase,
-                                                                  min_mass=0.4, max_mass=20.0)
+                                                                  min_mass_value, max_mass_value)
                 if len(init_masses):
                     break
 
+            # First choose the primary mass based on an IMF and multiplicity probability function
             # Choose our stars and then get the basic physical params from the isochrones
-            init_MA = np.random.choice(init_masses) * u.solMass
-            init_MB = np.random.choice(init_masses[init_masses <= init_MA.value]) * u.solMass
+            probs = np.power(init_masses, -2.35)        # Salpeter IMF
+            probs *= np.tanh(0.31 * init_masses + .18)  # Wells & Prsa Primary multiplicity frac
+            probs = np.divide(probs, np.sum(probs))     # Scaled to get a pmf() == 1
+            init_MA = np.random.choice(init_masses, p=probs) * u.solMass
+
+            init_MB_mask = (init_masses >= min_mass_value) & (init_masses < init_MA.value)
+            if any(init_MB_mask):
+                init_MB = np.random.choice(init_masses[init_MB_mask]) * u.solMass
+            else:
+                init_MB = init_MA
 
             results = _mist_isochones.lookup_stellar_params(feh, age.value, init_MA.value, cols)
             MA          = results["star_mass"] * u.solMass
@@ -100,13 +111,25 @@ def generate_instances_from_mist_models(instance_count: int, label: str, verbose
             LB          = np.power(10, results["log_L"]) * u.solLum
             loggB       = results["log_g"] * u.dex(u.cm / u.s**2)
 
-            # We generate period, inc, ecc and omega (argument of periastron) from
-            # appropriate distributions and then we subsequently calculate the values
-            # of the esinw and ecosw labels and primary/secondary impact params.
-            per         = np.random.uniform(low=2.5, high=25) * u.d
+            # Now find the minimum separation, to give the min period, which will be the greater of:
+            # . 3(RA+RB) / 2(1-e) (Wells & Prsa) (assuming e==0 for now)
+            # . max(5*RA, 5*RB) (based on JKTEBOP recommendation for rA <= 0.2, rB <= 0.2)
+            a_min = max(3/2*(RA+RB), 5*RA, 5*RB)
+            per_min = orbital.orbital_period(MA, MB, a_min)
+
+            # We generate period, inc, and omega (argument of periastron) from uniform distributions
+            per         = np.random.uniform(low=per_min.to(u.d).value, high=25) * u.d
             inc         = np.random.uniform(low=50., high=90.00001) * u.deg
-            ecc         = np.abs(np.random.normal(loc=0.0, scale=0.2))
             omega       = np.random.uniform(low=0., high=360.) * u.deg
+
+            # Eccentricity from uniform distribution, subject to a maximum value which depends on
+            # orbital period/seperation (again, based on Wells & Prsa; Moe & Di Stefano)
+            a = orbital.semi_major_axis(MA, MB, per)
+            if per <= 2 * u.d:
+                ecc = 0
+            else:
+                e_max = max(min(1-(per.value/2)**(-2/3), 1-(1.5*(RA+RB)/a).value), 0)
+                ecc = np.random.uniform(low=0, high=e_max)
 
             # We're once more predicting L3 as JKTEBOP is being updated to support
             # negative L3 input values (so it's now fully trainable)
@@ -115,7 +138,6 @@ def generate_instances_from_mist_models(instance_count: int, label: str, verbose
 
             # Now we can calculate other params which we need to decide whether to use this
             q = (MB / MA).value
-            a = orbital.semi_major_axis(MA, MB, per)
             rA = (RA.to(u.solRad) / a.to(u.solRad)).value
             rB = (RB.to(u.solRad) / a.to(u.solRad)).value
             inc_rad = inc.to(u.rad).value
@@ -140,6 +162,12 @@ def generate_instances_from_mist_models(instance_count: int, label: str, verbose
         ld_coeffs_A = limb_darkening.lookup_tess_pow2_ld_coeffs(loggA, max(T_eff_A, 3500 * u.K))
         ld_coeffs_B = limb_darkening.lookup_tess_pow2_ld_coeffs(loggB, max(T_eff_B, 3500 * u.K))
 
+        # Now we have to decide an appropriate Gaussian noise SNR to apply.
+        # Randomly choose an apparent mag in the TESS photometric range then derive
+        # the SNR (based on a linear regression fit of Álvarez et al. (2024) Table 2).
+        apparent_mag = np.random.uniform(6, 18)
+        snr = np.add(np.multiply(apparent_mag, -2.32), 59.4)
+
         yield {
             "id":           inst_id,
 
@@ -161,6 +189,9 @@ def generate_instances_from_mist_models(instance_count: int, label: str, verbose
             "LDB1":         ld_coeffs_B[0],
             "LDA2":         ld_coeffs_A[1],
             "LDB2":         ld_coeffs_B[1],
+
+            # Will be used to add Gaussian noise to the light-curve data generated from these params
+            "snr":          snr,
 
             # Further params for potential use as labels/features
             "sini":         np.sin(inc_rad),
@@ -220,3 +251,9 @@ if __name__ == "__main__":
                                     max_workers=5,
                                     verbose=True,
                                     simulate=False)
+
+    # Simple diagnostic plot of the mags feature of randomly sampled instances.
+    dataset_files = list(dataset_dir.glob("**/*.tfrecord"))
+    ids, _, _, _ = deb_example.read_dataset(dataset_files)
+    fig = plots.plot_dataset_instance_mags_features(dataset_files, np.random.choice(ids, 30))
+    fig.savefig(dataset_dir / "sample.pdf")
