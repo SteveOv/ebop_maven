@@ -13,7 +13,7 @@ from uncertainties import UFloat, unumpy
 from ebop_maven.plotting import format_axes
 from ebop_maven import deb_example
 
-from .datasets import read_param_sets_from_csvs
+from .datasets import read_param_sets_from_csvs, get_field_names_from_csvs
 from .mistisochrones import MistIsochrones
 
 all_param_captions = {
@@ -43,7 +43,12 @@ all_histogram_params = {
     "esinw":        (100, r"$e\,\sin{\omega}$"),
     "rA":           (100, r"$r_A$"),
     "rB":           (100, r"$r_B$"),
-    "bP":           (100, r"$b_{prim}$")
+    "bP":           (100, r"$b_{prim}$"),
+    "bS":           (100, r"$b_{sec}$"),
+    "RA":           (100, r"$R_{A}~(\text{R}_{\odot})$"),
+    "RB":           (100, r"$R_{B}~(\text{R}_{\odot})$"),
+    "MA":           (100, r"$M_{A}~(\text{M}_{\odot})$"),
+    "MB":           (100, r"$M_{B}~(\text{M}_{\odot})$"),
 }
 
 
@@ -66,11 +71,11 @@ def plot_trainset_histograms(trainset_dir: Path,
     :verbose: whether to print verbose progress/diagnostic messages
     """
     # pylint: disable=too-many-arguments
-    if not params:
-        param_specs = all_histogram_params
-    else:
-        param_specs = { p: all_histogram_params[p] for p in params if p in all_histogram_params }
     csvs = sorted(trainset_dir.glob("trainset*.csv"))
+
+    if not params:
+        params = get_field_names_from_csvs(csvs)
+    param_specs = { p: all_histogram_params[p] for p in params if p in all_histogram_params }
 
     if param_specs and csvs:
         rows = math.ceil(len(param_specs) / cols)

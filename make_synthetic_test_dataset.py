@@ -205,7 +205,7 @@ if __name__ == "__main__":
                                        verbose=True,
                                        simulate=False)
 
-    plots.plot_trainset_histograms(dataset_dir, dataset_dir / "synth-histogram-full.png", cols=3)
+    plots.plot_trainset_histograms(dataset_dir, dataset_dir / "synth-histogram-full.png", cols=4)
     plots.plot_trainset_histograms(dataset_dir, dataset_dir / "synth-histogram-main.eps", cols=2,
                                    params=["rA_plus_rB", "k", "J", "inc", "ecosw", "esinw"])
 

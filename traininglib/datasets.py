@@ -362,6 +362,25 @@ def read_param_sets_from_csvs(file_names: list[Path]) -> Generator[dict, any, No
             yield param_set
 
 
+def get_field_names_from_csvs(file_names: list[Path]) -> list[str]:
+    """
+    Returns a list of the field names common to all of the passed CSV files.
+
+    :file_names: the full names of the csv files containing the parameter sets
+    :returns: a list[str] of the common names
+    """
+    names: list[str] = None
+    for file_name in file_names:
+        # pylint: disable=not-an-iterable
+        with open(file_name, mode="r", encoding="utf8") as pf:
+            csv_reader = csv.reader(pf, quotechar="'", quoting=csv.QUOTE_NONNUMERIC)
+            this_names = next(csv_reader)
+
+        # Modify names so that it hold the names common to both
+        names = [n for n in names if n in this_names] if names is not None else this_names
+    return names
+
+
 def is_usable_system(rA: float, rB: float, J: float, qphot: float,
                     ecc: float, inc: float, imp_params: tuple[float], eclipse_baseline=1) -> bool:
     """
