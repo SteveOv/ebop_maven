@@ -209,6 +209,7 @@ def make_dataset_file(trainset_file: Path,
     label = trainset_file.stem
     output_dir = trainset_file.parent if output_dir is None else output_dir
     this_seed = f"{trainset_file.name}/{seed}"
+    noise_generator = np.random.default_rng(abs(hash(this_seed)))
 
     # Work out the subsets & files now, before generating, to see if we can skip on resume
     subsets = ["training", "validation", "testing"]
@@ -243,6 +244,17 @@ def make_dataset_file(trainset_file: Path,
                 # issue was caused by passing "bad" params to JKTEBOP which is why it's not repeated
                 print(f"{label}[{params['id']}]: Replacing NaN/Inf in processed LC.")
                 np.nan_to_num(x=model_data[1], copy=False)
+
+            # Optionally, add Gaussian flux noise based on the instance's SNR
+            snr = params.get("snr", None)
+            if snr:
+                # We apply the noise to fluxes, so revert delta mags to normalized flux
+                # and base the noise sigma on the instance's SNR and mean flux
+                fluxes = np.power(10, np.divide(model_data[1], -2.5))
+                noise_sigma = np.divide(np.mean(fluxes), np.power(10, np.divide(snr, 10)))
+                if noise_sigma:
+                    noise = noise_generator.normal(0., scale=noise_sigma, size=len(fluxes))
+                    model_data[1] = np.multiply(-2.5, np.log10(fluxes + noise))
 
             # We apply and store various supported configs of bins and wrap phase
             interpolator = interp1d(model_data[0], model_data[1], kind=interp_kind)
