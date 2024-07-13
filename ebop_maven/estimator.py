@@ -45,7 +45,8 @@ class Estimator(ABC):
 
         # The output layer should hold model metadata with details of inputs and outputs
         output_layer = self._model.get_layer("Output")
-        if output_layer and isinstance(output_layer, modelling.OutputLayer):
+        if output_layer \
+                and isinstance(output_layer, (modelling.OutputLayer, modelling.OutputLayerConcat)):
             self._metadata = output_layer.metadata
         else:
             self._metadata = {}

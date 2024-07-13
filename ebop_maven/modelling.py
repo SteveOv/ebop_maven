@@ -1,6 +1,8 @@
 """ Contains functions for building and persisting ML functional models """
 from typing import Union, List, Dict, Tuple, Callable
 from pathlib import Path
+from itertools import groupby
+from warnings import warn
 
 from keras import layers, models, KerasTensor
 from keras.src.layers.pooling.base_pooling import BasePooling
@@ -9,7 +11,11 @@ from . import deb_example
 
 
 class OutputLayer(layers.Dense):
-    """ A custom OutputLayer which can store metadata about the layer and model. """
+    """
+    A custom OutputLayer which can store metadata about the layer and model.
+    This is deprecated, being superceded with the OutputLayerConcat below. It is retained solely so
+    that previously saved models, where this OutputLayer class has been used, can be re-loaded.
+    """
     # pylint: disable=abstract-method, too-many-ancestors, too-many-arguments
 
     @property
@@ -33,12 +39,46 @@ class OutputLayer(layers.Dense):
         :name: the name of the layer
         :metadata: dictionary of metadata to store with the layer
         """
+        warn("OutputLayerOld is deprecated and is not intended for use.", DeprecationWarning, 2)
         self._metadata = metadata if metadata else {}
         super().__init__(units,
                          kernel_initializer=kernel_initializer,
                          activation=activation,
                          name=name,
                          **kwargs)
+
+    def get_config(self):
+        """ Serializes this layer. """
+        return { **super().get_config(), "metadata": self._metadata }
+
+
+class OutputLayerConcat(layers.Concatenate):
+    """
+    A custom output layer based on Concatenate, which can also store metadata for the model.
+    This is effectively a replacement for the OutputLayer (above) but it is used in a different
+    way. This output layer is a Concatenate layer, so it is used to aggregate 1+ Dense layers which
+    go to make up the output neurons. In this way the model can support both metadata and varied
+    hyperparameters across the output neurons (most notably varying the activation function).
+    """
+    # pylint: disable=abstract-method, too-many-ancestors, too-many-arguments
+
+    @property
+    def metadata(self) -> Dict[str, any]:
+        """ Generic metadata associated with this layer and the model as a whole"""
+        return self._metadata
+
+    def __init__(self,
+                 axis: int=-1,
+                 metadata: Dict[str, any]=None,
+                 **kwargs):
+        """
+        Initializes a new OutputLayer
+
+        :axis: Axis along which to concatenate
+        :metadata: dictionary of metadata to store with the layer
+        """
+        self._metadata = metadata if metadata else {}
+        super().__init__(axis=axis, **kwargs)
 
     def get_config(self):
         """ Serializes this layer. """
@@ -217,7 +257,7 @@ def ext_input_layer(shape: Tuple[int, int]=(len(deb_example.extra_features_and_d
 
 def output_layer(metadata: Dict[str, any]=None,
                  kernel_initializer: str="glorot_uniform",
-                 activation: str="linear",
+                 activation: Union[str, List[str]]="linear",
                  name: str="Output",
                  verbose: bool=False) -> KerasTensor:
     """
@@ -225,7 +265,7 @@ def output_layer(metadata: Dict[str, any]=None,
 
     :metadata: the dictionary of metadata about the layer and model
     :kernel_initializer: the initializer
-    :activation: the activation function
+    :activation: the activation function, or a list of activation functions (one per output neuron)
     :name: the name of the layer
     :verbose: print out info of what's happening
     :returns: the output tensor of the new layer
@@ -237,15 +277,26 @@ def output_layer(metadata: Dict[str, any]=None,
     metadata.setdefault("mags_bins", deb_example.default_mags_bins)
     metadata.setdefault("mags_wrap_phase", deb_example.default_mags_wrap_phase)
 
+    # We need to work out the groupings of like activations
+    units = len(metadata["labels_and_scales"])
+    if isinstance(activation, str):
+        grouped_acts = { activation: units }
+    elif len(activation) == units:
+        grouped_acts = { act: len(list(grp)) for act, grp in groupby(activation) }
+    else:
+        raise ValueError("The activation must be a single str or a list[str] of length units")
+
     def layer_func(input_tensor: KerasTensor) -> KerasTensor:
-        units = len(metadata["labels_and_scales"])
-        output_tensor = OutputLayer(units=units,
-                                    kernel_initializer=kernel_initializer,
-                                    activation=activation,
-                                    metadata=metadata,
-                                    name=name)(input_tensor)
+        outputs = [KerasTensor] * len(grouped_acts)
+        for grp_ix, (grp_act, grp_units) in enumerate(grouped_acts.items()):
+            outputs[grp_ix] = layers.Dense(units=grp_units,
+                                           kernel_initializer=kernel_initializer,
+                                           activation=grp_act,
+                                           name=f"Out-Grp-{grp_ix+1}")(input_tensor)
+        output_tensor = OutputLayerConcat(axis=1, metadata=metadata, name="Output")(outputs)
+
         if verbose:
-            print(f"Creating OutputLayer('{name}', units={units},",
+            print(f"Creating OutputLayerConcat('{name}', units={units},",
                   f"kernel_initializer={kernel_initializer}, activation={activation},",
                   f"metadata={metadata})",
                   f"({input_tensor.shape}) -> {output_tensor.shape}")
@@ -353,6 +404,7 @@ def load_model(file_name: Path) -> models.Model:
     return models.load_model(file_name,
                              custom_objects={
                                  "OutputLayer": OutputLayer,
+                                 "OutputLayerConcat": OutputLayerConcat,
                                  # I shouldn't *have* to do this; fails to deserialize otherwise!
                                  "ReLU": layers.ReLU,
                                  "LeakyReLU": layers.LeakyReLU,
