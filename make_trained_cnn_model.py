@@ -123,7 +123,8 @@ def make_best_model(chosen_features: list[str]=CHOSEN_FEATURES,
             modelling.hidden_layers(1, int(dnn_num_taper_units), dnn_initializer, dnn_activation,
                                     0, ("Taper-",), verbose) if dnn_num_taper_units else None
         ],
-        output=modelling.output_layer(metadata, dnn_initializer, "linear", "Output", verbose),
+        output=modelling.output_layer(metadata, dnn_initializer,
+                                      ["softplus"]*3 + ["linear"]*3, "Output", verbose),
         post_build_step=None,
         name=model_name,
         verbose=verbose

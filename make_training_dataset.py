@@ -57,9 +57,9 @@ def generate_instances_from_distributions(instance_count: int, label: str, verbo
         while True: # imitate "loop and a half" / "repeat ... until" logic
             # These are the "label" params for which we have defined distributions
             rA_plus_rB  = np.random.uniform(low=0.001, high=0.45001)
-            k           = np.random.normal(loc=0.8, scale=0.6)
+            k           = np.random.normal(loc=0.8, scale=0.4)
             inc         = np.random.uniform(low=50., high=90.00001) * u.deg
-            J           = np.random.normal(loc=0.8, scale=0.6)
+            J           = np.random.normal(loc=0.8, scale=0.4)
 
             # We need a version of JKTEBOP which supports negative L3 input values
             # (not so for version 43) in order to train a model to predict L3.
@@ -75,11 +75,7 @@ def generate_instances_from_distributions(instance_count: int, label: str, verbo
 
             # We generate ecc and omega (argument of periastron) from appropriate distributions.
             # They're not used directly as labels, but they make up ecosw and esinw which are.
-            # Use a Laplace distribution, rather than normal, as tests found this trains a better
-            # model. The Laplace distribution is characterised by a higher peak and fatter tails.
-            # This should give us more systems around e~0 but also more at the extremes.
-            # f(x|\mu, b) = 1/2b exp(-|x-\mu|/b), where b is the scale param.
-            ecc         = np.abs(np.random.laplace(loc=0.0, scale=0.2))
+            ecc         = np.abs(np.random.normal(loc=0.0, scale=0.2))
             omega       = np.random.uniform(low=0., high=360.) * u.deg
 
             # Now we can calculate the derived values, sufficient to check we've a usable system
