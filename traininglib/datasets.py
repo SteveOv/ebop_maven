@@ -74,8 +74,6 @@ def generate_dataset_csvs(instance_count: int,
     :verbose: whether to print verbose progress/diagnostic messages
     :simulate: whether to simulate the process, skipping only file/directory actions
     """
-    if not output_dir:
-        output_dir = Path("~/datasets/formal-trainset/").expanduser()
     if not simulate:
         output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -97,7 +95,7 @@ The random seed to use for selections:  {seed}\n""")
     # This is reasonably quick so there's no need to use a process pool here.
     # Also, a pool may mess with the repeatability of the psuedo random behaviour.
     np.random.seed(seed)
-    for ix, file_inst_count in enumerate(_calculate_file_splits(instance_count, file_count), 1):
+    for ix, file_inst_count in enumerate(_calculate_file_splits(instance_count, file_count), 0):
         out_file = output_dir / file_pattern.format(ix)
         psets = [*generator_func(file_inst_count, out_file.stem, verbose)]
         if verbose:
