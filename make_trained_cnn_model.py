@@ -37,6 +37,7 @@ PLOTS_DIR = SAVE_DIR / "plots"
 
 # We can now specify paths to train/val/test datasets separately for greater flexibility.
 TRAINSET_NAME = "formal-training-dataset-" + TRAINSET_SUFFIX
+TRAINSET_GLOB_TERM = "trainset*.tfrecord"
 TRAINSET_DIR = Path(".") / "datasets" / TRAINSET_NAME / "training"
 VALIDSET_DIR = Path(".") / "datasets" / TRAINSET_NAME / "validation"
 TESTSET_DIR = Path(".") / "datasets" / "synthetic-mist-tess-dataset"
@@ -162,7 +163,7 @@ if __name__ == "__main__":
                                                             [], -ROLL_MAX, ROLL_MAX+1, tf.int32))
         for ds_ix, (label, set_dir) in enumerate([("training", TRAINSET_DIR),
                                                 ("valiation", VALIDSET_DIR)]):
-            files = list(set_dir.glob("**/*.tfrecord"))
+            files = list(set_dir.glob(TRAINSET_GLOB_TERM))
             if ds_ix == 0:
                 (datasets[ds_ix], counts[ds_ix]) = \
                     deb_example.create_dataset_pipeline(files, BATCH_FRACTION, map_func,
@@ -172,7 +173,8 @@ if __name__ == "__main__":
             else:
                 (datasets[ds_ix], counts[ds_ix]) = \
                     deb_example.create_dataset_pipeline(files, BATCH_FRACTION, map_func)
-            print(f"Found {counts[ds_ix]:,} {label} insts over {len(files)} tfrecords in", set_dir)
+            print(f"Found {counts[ds_ix]:,} {label} insts over {len(files)}",
+                  f"tfrecords matching glob '{TRAINSET_GLOB_TERM}' within", set_dir)
 
         # -----------------------------------------------------------
         # Define the model
