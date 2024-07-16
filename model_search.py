@@ -31,7 +31,8 @@ MAGS_BINS = 4096
 MAGS_WRAP_PHASE = 0.75
 CHOSEN_LABELS = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "bP"]
 
-TRAINSET_NAME = "formal-training-dataset/"
+TRAINSET_NAME = "formal-training-dataset-250k/"
+TRAINSET_GLOB_TERM = "trainset00?.tfrecord" # Just the first 10 files, so 80k train/20k validation
 TRAINSET_DIR = Path(".") / "datasets" / TRAINSET_NAME / "training"
 VALIDSET_DIR = Path(".") / "datasets" / TRAINSET_NAME / "validation"
 TESTSET_DIR = Path(".") / "datasets" / "synthetic-mist-tess-dataset"
@@ -493,10 +494,11 @@ def train_and_test_model(trial_kwargs):
                           roll_steps=lambda: tf.random.uniform([], -roll_max, roll_max+1, tf.int32))
     train_ds, train_ct = [tf.data.TFRecordDataset] * 2, [int] * 2
     for ix, (dn, dd) in enumerate(zip(["training", "validation"],[TRAINSET_DIR, VALIDSET_DIR])):
-        files = list(dd.glob("**/*.tfrecord"))
+        files = list(dd.glob(TRAINSET_GLOB_TERM))
         (train_ds[ix], train_ct[ix]) = deb_example.create_dataset_pipeline(
                     files, BATCH_FRACTION, tr_map_func, None, True, True, MAX_BUFFER_SIZE, 1, SEED)
-        print(f"Found {train_ct[ix]:,} {dn} instances over {len(files)} tfrecord files in", dd)
+        print(f"Found {train_ct[ix]:,} {dn} instances over {len(files)}",
+              f"tfrecord file(s) matching glob '{TRAINSET_GLOB_TERM}' within", dd)
 
     weighted_loss = candidate = history = None
     status = STATUS_FAIL
