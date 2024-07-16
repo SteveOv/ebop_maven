@@ -46,7 +46,7 @@ TRAINING_EPOCHS = 250           # Set high if we're using early stopping
 BATCH_FRACTION = 0.001          # larger -> quicker training per epoch but more to converge
 MAX_BUFFER_SIZE = 20000000      # Size of Dataset shuffle buffer (in instances)
 PATIENCE = 7                    # Number of epochs w/o improvement before training is stopped
-TRAINING_TIMEOUT = 7200         # Timeout training if not completed within this time (seconds)
+TRAINING_TIMEOUT = 3600         # Timeout training if not completed within this time (seconds)
 
 ENFORCE_REPEATABILITY = True    # If true, avoid GPU/CUDA cores for repeatable results
 SEED = 42                       # Standard random seed ensures repeatable randomization
@@ -258,9 +258,8 @@ cnn_activation_choices = ["relu"]
 dnn_initializer_choices = ["he_uniform", "he_normal", "glorot_uniform"]
 dnn_activation_choices = ["relu", "leaky_relu", "elu"]
 loss_function_choices = [["mae"], ["mse"]] #, ["huber"]]
-lr_qlogu_kwargs = { "low": -12, "high": -3, "q": 1e-6 }
+lr_qlogu_kwargs = { "low": -8, "high": -3, "q": 1e-4 }
 sgd_momentum_uniform_kwargs = { "low": 0.0, "high": 1.0 }
-sgd_lr_qlogu_kwargs = { "low": -8, "high": -1, "q": 1e-4 }
 
 # Genuinely shared choice between DNN layers and output layer
 dnn_kernel_initializer_choice = hp.choice("dnn_init", dnn_initializer_choices)
@@ -356,13 +355,15 @@ trials_pspace = hp.pchoice("train_and_test_model", [
                     {
                         "class": optimizers.schedules.PiecewiseConstantDecay,
                         "boundaries": hp.choice("best_nadam_pw_boundaries", [[5000, 30000], [20000, 40000]]),
-                        "values": hp.choice("best_nadam_pw_values", [[0.005, 0.0005, 0.00005], [0.001, 0.0001, 0.00001]]),
+                        "values": hp.choice("best_nadam_pw_values", [[0.001, 0.0001, 0.00001],
+                                                                     [0.005, 0.0005, 0.00005],
+                                                                     [0.0005, 0.005, 0.0005]]),
                     },
                 ])
             },
             # { # Covers both vanilla SGD and Nesterov momentum
             #     "class": optimizers.SGD,
-            #     "learning_rate":            hp.qloguniform("best_sgd_lr", **sgd_lr_qlogu_kwargs), 
+            #     "learning_rate":            hp.qloguniform("best_sgd_lr", **lr_qlogu_kwargs), 
             #     "momentum":                 hp.uniform("best_sgd_momentum", **sgd_momentum_uniform_kwargs),
             #     "nesterov":                 hp.choice("best_sgd_nesterov", [True, False])
             # }
