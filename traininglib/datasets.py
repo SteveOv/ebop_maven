@@ -392,7 +392,8 @@ def get_field_names_from_csvs(file_names: list[Path]) -> list[str]:
 
 
 def is_usable_system(rA: float, rB: float, J: float, qphot: float,
-                    ecc: float, inc: float, imp_params: tuple[float], eclipse_baseline=1) -> bool:
+                    ecc: float, inc: float, imp_params: tuple[float],
+                    eclipse_baseline=1, r_limit=0.2) -> bool:
     """
     Checks various  values to decide whether this represents a usable system.
     Checks on;
@@ -418,7 +419,7 @@ def is_usable_system(rA: float, rB: float, J: float, qphot: float,
     if usable:
         if isinstance(inc, u.Quantity):
             inc = inc.to(u.deg).value
-        usable = rA < 0.2 and rB < 0.2 and inc > 50
+        usable = rA <= r_limit and rB <= r_limit and inc > 50
     return usable
 
 
