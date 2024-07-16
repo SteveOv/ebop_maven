@@ -289,7 +289,7 @@ trials_pspace = hp.pchoice("train_and_test_model", [
         "optimizer": make_trained_cnn_model.OPTIMIZER,
         "loss_function": make_trained_cnn_model.LOSS,
     }),
-    (0.49, {
+    (0.74, {
         "description": "Best: current best model structure with varied dnn and hyperparams",
         "model": { 
             "func": make_trained_cnn_model.make_best_model,
@@ -310,11 +310,55 @@ trials_pspace = hp.pchoice("train_and_test_model", [
         "optimizer": hp.choice("best_optimizer", [
             {
                 "class": optimizers.Adam,
-                "learning_rate":            hp.qloguniform("best_adam_lr", **lr_qlogu_kwargs)
+                "learning_rate": hp.choice("best_adam_lr", [
+                    hp.qloguniform("best_adam_lr_fixed", **lr_qlogu_kwargs),
+                    {
+                        "class": optimizers.schedules.ExponentialDecay,
+                        "initial_learning_rate": hp.qloguniform("best_adam_exp_lr", **lr_qlogu_kwargs),
+                        "decay_steps": 1000,
+                        "decay_rate": hp.uniform("best_adam_exp_dr", low=0.90, high=0.98),
+                        "staircase": hp.choice("best_adam_exp_staircase", [True, False])
+                    },
+                    {
+                        "class": optimizers.schedules.CosineDecay,
+                        "initial_learning_rate": 0.0,
+                        "warmup_steps": hp.quniform("best_adam_cos_warmup_steps", low=0, high=3000, q=1000),
+                        "warmup_target": hp.qloguniform("best_adam_cos_warmup_target", **lr_qlogu_kwargs),
+                        "decay_steps": hp.quniform("best_adam_cos_decay_steps", low=50000, high=200000, q=10000),
+                        "alpha": hp.choice("best_adam_cos_alpha", [0.01, 0.001]),
+                    },
+                    {
+                        "class": optimizers.schedules.PiecewiseConstantDecay,
+                        "boundaries": hp.choice("best_adam_pw_boundaries", [[5000, 30000], [20000, 40000]]),
+                        "values": hp.choice("best_adam_pw_values", [[0.005, 0.0005, 0.00005], [0.001, 0.0001, 0.00001]]),                        
+                    },
+                ])
             },
             {
                 "class": optimizers.Nadam,
-                "learning_rate":            hp.qloguniform("best_nadam_lr", **lr_qlogu_kwargs)
+                "learning_rate": hp.choice("best_nadam_lr", [
+                    hp.qloguniform("best_nadam_lr_fixed", **lr_qlogu_kwargs),
+                    {
+                        "class": optimizers.schedules.ExponentialDecay,
+                        "initial_learning_rate": hp.qloguniform("best_nadam_exp_lr", **lr_qlogu_kwargs),
+                        "decay_steps": 1000,
+                        "decay_rate": hp.uniform("best_nadam_exp_dr", low=0.90, high=0.98),
+                        "staircase": hp.choice("best_nadam_exp_staircase", [True, False])
+                    },
+                    {
+                        "class": optimizers.schedules.CosineDecay,
+                        "initial_learning_rate": 0.0,
+                        "warmup_steps": hp.quniform("best_nadam_cos_warmup_steps", low=0, high=3000, q=1000),
+                        "warmup_target": hp.qloguniform("best_nadam_cos_warmup_target", **lr_qlogu_kwargs),
+                        "decay_steps": hp.quniform("best_nadam_cos_decay_steps", low=50000, high=200000, q=10000),
+                        "alpha": hp.choice("best_nadam_cos_alpha", [0.01, 0.001]),
+                    },
+                    {
+                        "class": optimizers.schedules.PiecewiseConstantDecay,
+                        "boundaries": hp.choice("best_nadam_pw_boundaries", [[5000, 30000], [20000, 40000]]),
+                        "values": hp.choice("best_nadam_pw_values", [[0.005, 0.0005, 0.00005], [0.001, 0.0001, 0.00001]]),
+                    },
+                ])
             },
             # { # Covers both vanilla SGD and Nesterov momentum
             #     "class": optimizers.SGD,
@@ -325,7 +369,7 @@ trials_pspace = hp.pchoice("train_and_test_model", [
         ]),
         "loss_function":                hp.choice("best_loss", loss_function_choices),
     }),
-    (0.50, {
+    (0.25, {
         "description": "Free: explore model structure and hyperparams",
         "model": {
             "func": modelling.build_mags_ext_model,
