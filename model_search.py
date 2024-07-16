@@ -31,7 +31,7 @@ MAGS_BINS = 4096
 MAGS_WRAP_PHASE = 0.75
 CHOSEN_LABELS = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "bP"]
 
-TRAINSET_NAME = "formal-training-dataset-250k/"
+TRAINSET_NAME = "formal-training-dataset-250k"
 TRAINSET_GLOB_TERM = "trainset00?.tfrecord" # Just the first 10 files, so 80k train/20k validation
 TRAINSET_DIR = Path(".") / "datasets" / TRAINSET_NAME / "training"
 VALIDSET_DIR = Path(".") / "datasets" / TRAINSET_NAME / "validation"
@@ -260,6 +260,12 @@ dnn_activation_choices = ["relu", "leaky_relu", "elu"]
 loss_function_choices = [["mae"], ["mse"]] #, ["huber"]]
 lr_qlogu_kwargs = { "low": -8, "high": -3, "q": 1e-4 }
 sgd_momentum_uniform_kwargs = { "low": 0.0, "high": 1.0 }
+lr_exp_decay_rate_kwargs = { "low": 0.90, "high": 0.98 }
+lr_cos_warmup_steps_kwargs = { "low": 0, "high": 3000, "q": 1000 }
+lr_cos_decay_steps_kwargs = { "low": 50000, "high": 150000, "q": 10000 }
+lr_cos_alpha_choices = [0.01, 0.001]
+lr_pw_boundary_choices = [[5000, 30000], [20000, 40000]]
+lr_pw_value_choices = [[0.001, 0.0001, 0.00001], [0.005, 0.0005, 0.00005], [0.0005, 0.005, 0.0005]]
 
 # Genuinely shared choice between DNN layers and output layer
 dnn_kernel_initializer_choice = hp.choice("dnn_init", dnn_initializer_choices)
@@ -315,21 +321,21 @@ trials_pspace = hp.pchoice("train_and_test_model", [
                         "class": optimizers.schedules.ExponentialDecay,
                         "initial_learning_rate": hp.qloguniform("best_adam_exp_lr", **lr_qlogu_kwargs),
                         "decay_steps": 1000,
-                        "decay_rate": hp.uniform("best_adam_exp_dr", low=0.90, high=0.98),
+                        "decay_rate": hp.uniform("best_adam_exp_dr", **lr_exp_decay_rate_kwargs),
                         "staircase": hp.choice("best_adam_exp_staircase", [True, False])
                     },
                     {
                         "class": optimizers.schedules.CosineDecay,
                         "initial_learning_rate": 0.0,
-                        "warmup_steps": hp.quniform("best_adam_cos_warmup_steps", low=0, high=3000, q=1000),
+                        "warmup_steps": hp.quniform("best_adam_cos_warmup_steps", **lr_cos_warmup_steps_kwargs),
                         "warmup_target": hp.qloguniform("best_adam_cos_warmup_target", **lr_qlogu_kwargs),
-                        "decay_steps": hp.quniform("best_adam_cos_decay_steps", low=50000, high=200000, q=10000),
-                        "alpha": hp.choice("best_adam_cos_alpha", [0.01, 0.001]),
+                        "decay_steps": hp.quniform("best_adam_cos_decay_steps", **lr_cos_decay_steps_kwargs),
+                        "alpha": hp.choice("best_adam_cos_alpha", lr_cos_alpha_choices),
                     },
                     {
                         "class": optimizers.schedules.PiecewiseConstantDecay,
-                        "boundaries": hp.choice("best_adam_pw_boundaries", [[5000, 30000], [20000, 40000]]),
-                        "values": hp.choice("best_adam_pw_values", [[0.005, 0.0005, 0.00005], [0.001, 0.0001, 0.00001]]),                        
+                        "boundaries": hp.choice("best_adam_pw_boundaries", lr_pw_boundary_choices),
+                        "values": hp.choice("best_adam_pw_values", lr_pw_value_choices),                  
                     },
                 ])
             },
@@ -341,29 +347,27 @@ trials_pspace = hp.pchoice("train_and_test_model", [
                         "class": optimizers.schedules.ExponentialDecay,
                         "initial_learning_rate": hp.qloguniform("best_nadam_exp_lr", **lr_qlogu_kwargs),
                         "decay_steps": 1000,
-                        "decay_rate": hp.uniform("best_nadam_exp_dr", low=0.90, high=0.98),
+                        "decay_rate": hp.uniform("best_nadam_exp_dr", **lr_exp_decay_rate_kwargs),
                         "staircase": hp.choice("best_nadam_exp_staircase", [True, False])
                     },
                     {
                         "class": optimizers.schedules.CosineDecay,
                         "initial_learning_rate": 0.0,
-                        "warmup_steps": hp.quniform("best_nadam_cos_warmup_steps", low=0, high=3000, q=1000),
+                        "warmup_steps": hp.quniform("best_nadam_cos_warmup_steps", **lr_cos_warmup_steps_kwargs),
                         "warmup_target": hp.qloguniform("best_nadam_cos_warmup_target", **lr_qlogu_kwargs),
-                        "decay_steps": hp.quniform("best_nadam_cos_decay_steps", low=50000, high=200000, q=10000),
-                        "alpha": hp.choice("best_nadam_cos_alpha", [0.01, 0.001]),
+                        "decay_steps": hp.quniform("best_nadam_cos_decay_steps", **lr_cos_decay_steps_kwargs),
+                        "alpha": hp.choice("best_nadam_cos_alpha", lr_cos_alpha_choices),
                     },
                     {
                         "class": optimizers.schedules.PiecewiseConstantDecay,
-                        "boundaries": hp.choice("best_nadam_pw_boundaries", [[5000, 30000], [20000, 40000]]),
-                        "values": hp.choice("best_nadam_pw_values", [[0.001, 0.0001, 0.00001],
-                                                                     [0.005, 0.0005, 0.00005],
-                                                                     [0.0005, 0.005, 0.0005]]),
+                        "boundaries": hp.choice("best_nadam_pw_boundaries", lr_pw_boundary_choices),
+                        "values": hp.choice("best_nadam_pw_values", lr_pw_value_choices),
                     },
                 ])
             },
             # { # Covers both vanilla SGD and Nesterov momentum
             #     "class": optimizers.SGD,
-            #     "learning_rate":            hp.qloguniform("best_sgd_lr", **lr_qlogu_kwargs), 
+            #     "learning_rate":            hp.qloguniform("best_sgd_lr", **lr_qlogu_kwargs),
             #     "momentum":                 hp.uniform("best_sgd_momentum", **sgd_momentum_uniform_kwargs),
             #     "nesterov":                 hp.choice("best_sgd_nesterov", [True, False])
             # }
