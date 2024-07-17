@@ -1,5 +1,5 @@
 """
-Searches for the best set of hyperparams for the Mags/Extra-Features model
+Searches for the best model/hyperparams/training for the Mags/Extra-Features model
 """
 # pylint: disable=too-many-arguments, too-many-locals
 from pathlib import Path
@@ -7,15 +7,15 @@ from contextlib import redirect_stdout
 import os
 import random as python_random
 import json
+from io import StringIO
 
 import numpy as np
 import tensorflow as tf
 import keras
-
 from keras import layers, optimizers, callbacks as cb
 from tensorflow.python.framework.errors_impl import OpError # pylint: disable=no-name-in-module
 
-from hyperopt import fmin, tpe, hp, Trials, space_eval, STATUS_OK, STATUS_FAIL
+from hyperopt import fmin, tpe, hp, space_eval, STATUS_OK, STATUS_FAIL
 from hyperopt.pyll import scope
 
 from ebop_maven import modelling, deb_example
@@ -330,9 +330,7 @@ def train_and_test_model(trial_kwargs):
     weighted_loss = candidate = history = None
     status = STATUS_FAIL
 
-    # Reset so shuffling & other "random" behaviour is repeated got each trial
-    np.random.seed(SEED)
-    python_random.seed(SEED)
+    # Reset so shuffling & other tf "random" behaviour is repeated for each trial
     tf.random.set_seed(SEED)
 
     # Set up the training and validation dataset pipelines
@@ -351,17 +349,26 @@ def train_and_test_model(trial_kwargs):
         print(f"Found {train_ct[ix]:,} {dn} instances over {len(files)}",
               f"tfrecord file(s) matching glob '{TRAINSET_GLOB_TERM}' within", dd)
 
+    # Set up the training optimizer, loss and metrics
     optimizer = model_search_helpers.get_trial_value(trial_kwargs, "optimizer")
     loss_function = model_search_helpers.get_trial_value(trial_kwargs, "loss_function")
     if not isinstance(loss_function, list):
         loss_function = [loss_function]
     fixed_metrics = ["mae", "mse", "r2_score"]
+
     try:
         # Build and Compile the trial model
         # always use the same metrics as we use them for trial evaluation
         candidate = model_search_helpers.get_trial_value(trial_kwargs, "model", False)
         candidate.compile(optimizer=optimizer, loss=loss_function, metrics=fixed_metrics)
-        candidate.summary(line_length=120, show_trainable=True)
+
+        # Capture a summary of the newly built model
+        with StringIO() as stream:
+            candidate.summary(line_length=120, show_trainable=True,
+                              print_fn=lambda line: stream.write(line + "\n"))
+            model_summary = stream.getvalue()
+        print(model_summary)
+
         print()
         train_callbacks = [
             cb.EarlyStopping("val_loss", restore_best_weights=True, patience=PATIENCE, verbose=1),
@@ -405,8 +412,10 @@ count(trainable weights) = {weights:,d} yielding params(ln[weights]) = {params:.
         print(f"*** Training failed! *** Caught a {type(exc).__name__}: {exc.op} / {exc.message}")
         print(f"The problem hyperparam set is: {trial_kwargs}\n")
 
+    # Make sure anything returned is easily serialized into a pickle so we can save progress.
     return { "loss": mae, "status": status, "mae": mae, "mse": mse,
-            "weighted_loss": weighted_loss, "AIC": aic, "BIC": bic, "model": candidate, "history": history }
+            "weighted_loss": weighted_loss, "AIC": aic, "BIC": bic,
+            "model_summary": model_summary, "history": history }
 
 
 def early_stopping_to_report_progress(this_trials, *early_stop_args):
@@ -414,7 +423,7 @@ def early_stopping_to_report_progress(this_trials, *early_stop_args):
     Callback for early stopping. We don't use it for early stopping but it is
     useful for reporting on the current status of the trials without the
     progress_bar making a mess when capturing the stdout output to a file.
-    We also use it to save the best model & params as we go.
+    We also use it to save the current best model details & params as we go.
     """
     no_no_dont_stop = False # Will stop the trial if set to True
     if this_trials and this_trials.best_trial:
@@ -430,19 +439,12 @@ def early_stopping_to_report_progress(this_trials, *early_stop_args):
 
         if this_iter == best_iter:
             # This is the new best: persist its details so we don't loose them
-            best_model = br.get("model", None)
-            if best_model:
-                model_file = results_dir / "best_model.keras"
+            model_summary = br.get("model_summary", None)
+            if model_summary:
                 summary_file = results_dir / "best_model_summary.txt"
-                print(f"Saving model to {model_file}\nSaving summary to {summary_file}")
-                modelling.save_model(model_file, best_model)
+                print(f"Saving model summary to {summary_file}")
                 with open(summary_file, mode="w", encoding="utf8") as f:
-                    # Careful here. There's been a recent change to hyperopt. Previously print_fn
-                    # expected a line_break arg, but it appears to have been dropped at some point.
-                    # Depending on the version it may expect; lambda line, line_break: f.write(...)
-                    best_model.summary(show_trainable=True,
-                                       print_fn=lambda line: f.write(line + "\n"))
-                del br["model"] # Now it's save we don't need this in memory
+                    f.write(model_summary)
 
             # We have to convert the misc vals dict, which has items like "activation": [2]
             # into the form returned by fmin; the equivalent dict where above is "activation": 2
@@ -463,17 +465,30 @@ def early_stopping_to_report_progress(this_trials, *early_stop_args):
 # Conduct the trials
 # -----------------------------------------------------------
 if __name__ == "__main__":
-    with redirect_stdout(Tee(open(results_dir / "trials.log", "w", encoding="utf8"))):
-        trials = Trials()
+
+    trials_log_file = results_dir / "trials.log"
+    trials_save_file = results_dir / "trials.pkl"
+    resume = trials_save_file.exists()
+    if resume:
+        print(f"\nTrials progress '{trials_save_file.name}' exists and hyperopt will resume.")
+        print("You will need to delete this file and restart this module for a fresh trial.")
+
+    with redirect_stdout(Tee(open(trials_log_file, "a" if resume else "w", encoding="utf8"))):
+        if resume:
+            print("\nResuming the previous trials...\n")
+        else:
+            print("\nStarting a new trials\n")
+
         best = fmin(fn = train_and_test_model,
                     space = trials_pspace,
-                    trials = trials,
+                    trials = None, # Have fmin create new or deserialize the saved trials
                     algo = tpe.suggest,
                     max_evals = MAX_HYPEROPT_EVALS,
                     loss_threshold = HYPEROPT_LOSS_TH,
                     catch_eval_exceptions = True,
                     rstate=np.random.default_rng(SEED),
                     early_stop_fn=early_stopping_to_report_progress,
+                    trials_save_file=f"{trials_save_file}",
                     verbose=True,
                     show_progressbar=False) # Can't use progressbar as it makes a mess of logging
 
