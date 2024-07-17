@@ -468,16 +468,18 @@ if __name__ == "__main__":
 
     trials_log_file = results_dir / "trials.log"
     trials_save_file = results_dir / "trials.pkl"
-    resume = trials_save_file.exists()
-    if resume:
-        print(f"\nTrials progress '{trials_save_file.name}' exists and hyperopt will resume.")
-        print("You will need to delete this file and restart this module for a fresh trial.")
+    if trials_save_file.exists():
+        print(f"\nFound an existing trials progress file ({trials_save_file}) from which",
+              "hyperopt will attempt to resume the trials.\nIf you don't want to resume",
+              "these trials now is your chance to delete this progress file before continuing.")
+        input("Press enter to continue or Ctrl+C | Ctrl+Z to exit.")
 
+    resume = trials_save_file.exists()
     with redirect_stdout(Tee(open(trials_log_file, "a" if resume else "w", encoding="utf8"))):
         if resume:
-            print("\nResuming the previous trials...\n")
+            print("\nResuming the previous Hyperopt trials...\n")
         else:
-            print("\nStarting a new trials\n")
+            print("\nStarting a new Hyperopt trials\n")
 
         best = fmin(fn = train_and_test_model,
                     space = trials_pspace,
