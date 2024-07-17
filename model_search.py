@@ -2,7 +2,6 @@
 Searches for the best set of hyperparams for the Mags/Extra-Features model
 """
 # pylint: disable=too-many-arguments, too-many-locals
-from typing import Callable, Union, List, Dict, Tuple
 from pathlib import Path
 from contextlib import redirect_stdout
 import os
@@ -23,6 +22,7 @@ from ebop_maven import modelling, deb_example
 from ebop_maven.libs.keras_custom.callbacks import TrainingTimeoutCallback
 from ebop_maven.libs.tee import Tee
 
+from traininglib import model_search_helpers
 import make_trained_cnn_model
 
 # Configure the inputs and outputs of the model
@@ -54,6 +54,8 @@ np.random.seed(SEED)
 python_random.seed(SEED)
 tf.random.set_seed(SEED)
 
+results_dir = Path(".") / "drop" / "model_search"
+results_dir.mkdir(parents=True, exist_ok=True)
 
 print("\n".join(f"{lib.__name__} v{lib.__version__}" for lib in [tf, keras]))
 if ENFORCE_REPEATABILITY:
@@ -68,7 +70,7 @@ print(f"Found {len(tf.config.list_physical_devices('GPU'))} GPU(s)\n")
 # -----------------------------------------------------------
 # Set up the test datasets - we don't need to recreate per trial
 # -----------------------------------------------------------
- # No added noise or roll
+# No added noise or roll as this is already present in the datasets
 test_map_func = deb_example.create_map_func(mags_bins=MAGS_BINS, mags_wrap_phase=MAGS_WRAP_PHASE,
                                             ext_features=CHOSEN_FEATURES, labels=CHOSEN_LABELS)
 test_ds, test_ct = [tf.data.TFRecordDataset] * 2, [int] * 2
@@ -77,165 +79,6 @@ for ti, (tname, tdir) in enumerate(zip(["test", "formal-test"], [TESTSET_DIR, FO
     (test_ds[ti], test_ct[ti]) = \
         deb_example.create_dataset_pipeline(tfiles, BATCH_FRACTION, test_map_func)
     print(f"Found {test_ct[ti]:,} {tname} insts in {len(tfiles)} tfrecord files in", tdir)
-
-
-# -----------------------------------------------------------
-# Constructors for variously structured network building blocks
-# -----------------------------------------------------------
-def cnn_with_pooling(num_layers: int=4,
-                     filters: Union[int, List[int]]=64,
-                     kernel_size: Union[int, List[int]]=8,
-                     strides: Union[int, List[int]]=None,
-                     strides_fraction: float=0.5,
-                     padding: str="same",
-                     activation: str="relu",
-                     pooling_ixs: Union[int, List[int]]=None,
-                     pooling_type: layers.Layer=None,
-                     pooling_kwargs: Union[Dict, List[Dict]]=None):
-    """
-    Prototype of creating a set of CNN layers with optional pooling at given indices.
-
-    Useful for a less structured approach than 2*conv+pooling of the other cnn methods.
-    """
-    if not isinstance(filters, List):
-        filters = [filters] * num_layers
-    if not isinstance(kernel_size, List):
-        kernel_size = [kernel_size] * num_layers
-    if not isinstance(strides, List):
-        strides = [strides] * num_layers
-    if pooling_kwargs is None:
-        pooling_kwargs = { "pool_size": 2, "strides": 2 }
-    if pooling_ixs and pooling_type and pooling_kwargs and isinstance(pooling_kwargs, dict):
-        num_pools = len(pooling_ixs)
-        pooling_kwargs = [pooling_kwargs] * num_pools
-    def layers_func(input_tensor: keras.KerasTensor) -> keras.KerasTensor:
-        # Expected failure if any list isn't num_layers long
-        pooling_ix = 0
-        for cnn_ix in range(num_layers):
-            if pooling_ixs and pooling_type and cnn_ix+pooling_ix in pooling_ixs:
-                input_tensor = pooling_type(name=f"Pool-{pooling_ix+1}",
-                                            **pooling_kwargs[pooling_ix])(input_tensor)
-                pooling_ix += 1
-
-            if not strides[cnn_ix]:
-                strides[cnn_ix] = max(1, int(kernel_size[cnn_ix] * strides_fraction))
-            if strides[cnn_ix] > kernel_size[cnn_ix]:
-                strides[cnn_ix] = kernel_size[cnn_ix]
-
-            input_tensor = layers.Conv1D(filters=int(filters[cnn_ix]),
-                                         kernel_size=int(kernel_size[cnn_ix]),
-                                         strides=int(strides[cnn_ix]),
-                                         padding=padding,
-                                         activation=activation,
-                                         name=f"Conv-{cnn_ix+1}")(input_tensor)
-        return input_tensor
-    return layers_func
-
-def cnn_scaled_pairs_with_pooling(num_pairs: int=2,
-                                  filters: int=32,
-                                  kernel_size: int=16,
-                                  strides: int=None,
-                                  strides_fraction: float=0.5,
-                                  scaling_multiplier: int=2,
-                                  padding: str="same",
-                                  activation: str="relu",
-                                  pooling_type: layers.Layer=None,
-                                  pooling_kwargs: Union[Dict, List[Dict]]=None,
-                                  trailing_pool: bool=True):
-    """
-    Pairs of Conv1d layers where the filters & kernel_size can optionally be
-    scaled up/down for each successive pair (by scaling_multiplier). Each pair
-    can optionally be followed with a pooling layer. If we are including
-    pooling layers the trailing_pool flag dictates whether the pooling layer
-    after the final pair of Conv1ds is appended or not.
-
-    strides can be specified either as a fixed value (strides) or as a fraction
-    of the kernel (strides_fraction) even as the kernel_size is itself scaled.
-    If both set, strides takes precendent.
-
-    The pattern of repeating 2*Conv+1*pool with increasing filters/decreasing
-    kernels crops up regularly in known/documented CNNs such as;
-    - LeNet-5 (LeCun+98)
-    - AlexNet (Krishevsky+12)
-    - Shallue & Vanderburg (2018, AJ, 155); especially relevant as based on Kepler LCs
-    """
-    if pooling_kwargs is None:
-        pooling_kwargs = { "pool_size": 2, "strides": 2 }
-    if not strides and not strides_fraction:
-        strides_fraction = 0.5
-
-    def layer_func(input_tensor: keras.KerasTensor) -> keras.KerasTensor:
-        this_filters = int(filters)
-        this_kernel_size = int(kernel_size)
-        this_strides = int(strides) if strides else max(1, int(this_kernel_size * strides_fraction))
-
-        for ix in range(num_pairs):
-            for sub_ix in range(2):
-                input_tensor = layers.Conv1D(filters=this_filters,
-                                             kernel_size=this_kernel_size,
-                                             strides=this_strides,
-                                             padding=padding,
-                                             activation=activation,
-                                             name=f"Conv-{ix+1}-{sub_ix+1}")(input_tensor)
-
-            if pooling_type and (trailing_pool or ix < num_pairs-1):
-                input_tensor = pooling_type(name=f"Pool-{ix+1}", **pooling_kwargs)(input_tensor)
-
-            if scaling_multiplier != 1:
-                this_filters *= scaling_multiplier
-                this_kernel_size = max(1, this_kernel_size // scaling_multiplier)
-                if not strides or this_strides > this_kernel_size:
-                    this_strides = max(1, int(this_kernel_size * strides_fraction))
-        return input_tensor
-    return layer_func
-
-def cnn_fixed_pairs_with_pooling(num_pairs: int=2,
-                                 filters: int=64,
-                                 kernel_size: int=4,
-                                 strides: int=None,
-                                 strides_fraction: float=0.5,
-                                 padding: str="same",
-                                 activation: str="relu",
-                                 pooling_type: layers.Layer=None,
-                                 pooling_kwargs: Union[Dict, List[Dict]]=None,
-                                 trailing_pool: bool=True):
-    """
-    Pairs of Conv1d layers with fixed filters, kernel_size and strided and
-    optionally followed with a pooling layer.
-
-    Another repeated 2*conv+1*pool structure but this time the
-    filters/kernels/strides remain constant across all the conv1d layers.
-    It's a very simple structure with the filters "seeing" an ever larger
-    FOV as the spatial extent of the input data is reduced as it proceeds
-    through the layers.
-
-    strides can be specified either as an explicit value (strides) or a fraction
-    of the kernel (strides_fraction). If both set, strides takes precendent.
-    
-    Experimentation has shown that variations on this structure appear to offer
-    a good baseline level of performance.
-    """
-    return cnn_scaled_pairs_with_pooling(num_pairs, filters, kernel_size,
-                                         strides, strides_fraction, 1,
-                                         padding, activation,
-                                         pooling_type, pooling_kwargs, trailing_pool)
-
-def dnn_with_taper(num_layers: int,
-                   units: int,
-                   kernel_initializer: any,
-                   activation: any,
-                   dropout_rate: float=0,
-                   taper_units: int=0) -> Callable[[keras.KerasTensor], keras.KerasTensor]:
-    """ Creates the function to build the requested DNN layers """
-    def layers_func(prev_tensor: keras.KerasTensor) -> keras.KerasTensor:
-        prev_tensor = modelling.hidden_layers(int(num_layers), int(units), kernel_initializer,
-                                              activation, dropout_rate,
-                                              name_prefix=("Hidden-", "Dropout-"))(prev_tensor)
-        if taper_units:
-            prev_tensor = modelling.hidden_layers(1, int(taper_units), kernel_initializer,
-                                                  activation, name_prefix=("Taper-", ))(prev_tensor)
-        return prev_tensor
-    return layers_func
 
 
 # -----------------------------------------------------------
@@ -270,7 +113,8 @@ lr_pw_value_choices = [[0.001, 0.0001, 0.00001], [0.005, 0.0005, 0.00005], [0.00
 # Genuinely shared choice between DNN layers and output layer
 dnn_kernel_initializer_choice = hp.choice("dnn_init", dnn_initializer_choices)
 
-metadata = { # This will augment the model, giving an Estimator context information
+# This will augment the model, giving an Estimator context information
+metadata = {
     "extra_features_and_defaults": 
                 {f: deb_example.extra_features_and_defaults[f] for f in CHOSEN_FEATURES },
     "mags_bins": MAGS_BINS,
@@ -295,7 +139,7 @@ trials_pspace = hp.pchoice("train_and_test_model", [
         "loss_function": make_trained_cnn_model.LOSS,
     }),
     (0.74, {
-        "description": "Best: current best model structure with varied dnn and hyperparams",
+        "description": "Best: current best model structure with varied dnn, hyperparams and training",
         "model": { 
             "func": make_trained_cnn_model.make_best_model,
             "chosen_features":          CHOSEN_FEATURES,
@@ -389,7 +233,7 @@ trials_pspace = hp.pchoice("train_and_test_model", [
             "mags_layers": hp.choice("free_mags_layers", [
                 {
                     # Pairs of Conv1ds with fixed filters/kernels/strides and optional pooling layers
-                    "func": cnn_fixed_pairs_with_pooling,
+                    "func": model_search_helpers.cnn_fixed_pairs_with_pooling,
                     "num_pairs":            hp.uniformint("free_cnn_fixed_num_pairs", low=2, high=4),
                     "filters":              hp.quniform("free_cnn_fixed_filters", low=32, high=96, q=16),
                     "kernel_size":          hp.quniform("free_cnn_fixed_kernel_size", low=4, high=12, q=4),
@@ -404,7 +248,7 @@ trials_pspace = hp.pchoice("train_and_test_model", [
                 {
                     # Pairs of Conv1ds with doubling filters & halving kernels/strides per pair
                     # and optional pooling layers
-                    "func": cnn_scaled_pairs_with_pooling,
+                    "func": model_search_helpers.cnn_scaled_pairs_with_pooling,
                     "num_pairs":            hp.choice("free_cnn_scaled_num_pairs", [3]),
                     "filters":              hp.quniform("free_cnn_scaled_filters", low=16, high=32, q=16),
                     "kernel_size":          hp.quniform("free_cnn_scaled_kernel_size", low=8, high=32, q=8),
@@ -419,7 +263,7 @@ trials_pspace = hp.pchoice("train_and_test_model", [
                 },
                 {
                     # Randomized CNN with/without pooling.
-                    "func": cnn_with_pooling,
+                    "func": model_search_helpers.cnn_with_pooling,
                     "num_layers":           hp.uniformint("free_cnn_num_layers", low=3, high=5),
                     "filters":              hp.quniform("free_cnn_filters", low=32, high=64, q=16),
                     "kernel_size":          hp.quniform("free_cnn_kernel_size", low=4, high=16, q=4),
@@ -435,7 +279,7 @@ trials_pspace = hp.pchoice("train_and_test_model", [
             "ext_layers": None,
             "dnn_layers": hp.choice("dnn_layers", [
                 {
-                    "func": dnn_with_taper,
+                    "func": model_search_helpers.dnn_with_taper,
                     "num_layers":           hp.uniformint("free_dnn_num_layers", low=1, high=4),
                     "units":                hp.quniform("free_dnn_units", low=128, high=512, q=64),
                     "kernel_initializer":   dnn_kernel_initializer_choice,
@@ -461,8 +305,8 @@ trials_pspace = hp.pchoice("train_and_test_model", [
                 "learning_rate":            hp.qloguniform("free_nadam_lr", **lr_qlogu_kwargs)
             },
             # { # Covers both vanilla SGD and Nesterov momentum
-            #     "class": optimizers.SGD, 
-            #     "learning_rate":            hp.qloguniform("free_sgd_lr", **sgd_lr_qlogu_kwargs), 
+            #     "class": optimizers.SGD,
+            #     "learning_rate":            hp.qloguniform("free_sgd_lr", **sgd_lr_qlogu_kwargs),
             #     "momentum":                 hp.uniform("free_sgd_momentum", **sgd_momentum_uniform_kwargs),
             #     "nesterov":                 hp.choice("free_sgd_nesterov", [True, False])
             # }
@@ -472,53 +316,8 @@ trials_pspace = hp.pchoice("train_and_test_model", [
 ])
 
 
-def get_trial_value(trial_dict: dict,
-                    key: str,
-                    pop_it: bool=False,
-                    tuples_to_lists: bool=True) -> Union[Callable, any]:
-    """
-    Will get the requested value from the trial dictionary. Specifically handles the special
-    case where we are getting a function/class with hp.choices over the args by parsing the
-    function and its kwargs list and then executing it.
-
-    Example of get the "model" which is the result of the build_mags_ext_model() function
-    with the accompanying kwargs. Also, handles that build_dnn_layers kwarg is a nested function.
-
-    "model": {
-        "func": "<function build_mags_ext_model at 0x7d0270610d60>"
-        "build_dnn_layers": {
-          "func": "<function dnn_with_taper at 0x7d0270543920>",
-          "activation": "leaky_rely",
-          ...
-        },
-        "build_ext_layers": {
-          "func": "<function empty_layer at 0x7d0270610360>"
-        },
-        ...
-    """
-    # We want a KeyError if item not found
-    target_value = trial_dict.pop(key) if pop_it else trial_dict.get(key)
-
-    # Workaround for the nasty behaviour in hyperopt where lists get silently converted to tuples
-    # (see: https://github.com/hyperopt/hyperopt/issues/526)
-    if isinstance(target_value, Tuple) and tuples_to_lists:
-        target_value = list(target_value)
-
-    # We're looking for the special case: a dict with a func/class item and the rest the kwargs.
-    if isinstance(target_value, dict) and ("func" in target_value or "class" in target_value):
-        the_callable = target_value.get("func", target_value.get("class"))
-        if isinstance(the_callable, str): # support it being a str (easier to read when reporting)
-            the_callable = eval(the_callable) # pylint: disable=eval-used
-        callable_kwargs = {}
-        for kwarg in target_value: # recurse to handle funcs which have funcs as args
-            if kwarg not in ["func", "class"]:
-                callable_kwargs[kwarg] = get_trial_value(target_value, kwarg)
-        return the_callable(**callable_kwargs)
-    return target_value
-
-
 # -----------------------------------------------------------
-# Conduct the trials
+# Trials functions
 # -----------------------------------------------------------
 def train_and_test_model(trial_kwargs):
     """
@@ -527,6 +326,9 @@ def train_and_test_model(trial_kwargs):
     print("\n" + "-"*80 + "\n",
           "Evaluating model and hyperparameters based on the following trial_kwargs:\n",
           json.dumps(trial_kwargs, indent=4, sort_keys=False, default=str) + "\n")
+
+    weighted_loss = candidate = history = None
+    status = STATUS_FAIL
 
     # Reset so shuffling & other "random" behaviour is repeated got each trial
     np.random.seed(SEED)
@@ -549,18 +351,15 @@ def train_and_test_model(trial_kwargs):
         print(f"Found {train_ct[ix]:,} {dn} instances over {len(files)}",
               f"tfrecord file(s) matching glob '{TRAINSET_GLOB_TERM}' within", dd)
 
-    weighted_loss = candidate = history = None
-    status = STATUS_FAIL
-
-    optimizer = get_trial_value(trial_kwargs, "optimizer")
-    loss_function = get_trial_value(trial_kwargs, "loss_function")
-    if not isinstance(loss_function, List):
+    optimizer = model_search_helpers.get_trial_value(trial_kwargs, "optimizer")
+    loss_function = model_search_helpers.get_trial_value(trial_kwargs, "loss_function")
+    if not isinstance(loss_function, list):
         loss_function = [loss_function]
     fixed_metrics = ["mae", "mse", "r2_score"]
     try:
         # Build and Compile the trial model
         # always use the same metrics as we use them for trial evaluation
-        candidate = get_trial_value(trial_kwargs, "model", False)
+        candidate = model_search_helpers.get_trial_value(trial_kwargs, "model", False)
         candidate.compile(optimizer=optimizer, loss=loss_function, metrics=fixed_metrics)
         candidate.summary(line_length=120, show_trainable=True)
         print()
@@ -601,6 +400,7 @@ count(trainable weights) = {weights:,d} yielding params(ln[weights]) = {params:.
               BIC = {bic:,.3f}
 {'-'*80}
 """)
+
     except OpError as exc:
         print(f"*** Training failed! *** Caught a {type(exc).__name__}: {exc.op} / {exc.message}")
         print(f"The problem hyperparam set is: {trial_kwargs}\n")
@@ -658,24 +458,26 @@ def early_stopping_to_report_progress(this_trials, *early_stop_args):
                         json.dump(params, f, indent=4, default=str)
     return no_no_dont_stop, early_stop_args
 
-# Conduct the trials
-results_dir = Path(".") / "drop" / "model_search"
-results_dir.mkdir(parents=True, exist_ok=True)
-with redirect_stdout(Tee(open(results_dir / "trials.log", "w", encoding="utf8"))):
-    trials = Trials()
-    best = fmin(fn = train_and_test_model,
-                space = trials_pspace,
-                trials = trials,
-                algo = tpe.suggest,
-                max_evals = MAX_HYPEROPT_EVALS,
-                loss_threshold = HYPEROPT_LOSS_TH,
-                catch_eval_exceptions = True,
-                rstate=np.random.default_rng(SEED),
-                early_stop_fn=early_stopping_to_report_progress,
-                verbose=True,
-                show_progressbar=False) # Can't use progressbar as it makes a mess of logging
 
-    # Report on the outcome (we saved the best to files as we went along)
-    best_params = space_eval(trials_pspace, best)
-    print("\nBest model hyperparameter set is:\n"
-        + json.dumps(best_params, indent=4, sort_keys=False, default=str))
+# -----------------------------------------------------------
+# Conduct the trials
+# -----------------------------------------------------------
+if __name__ == "__main__":
+    with redirect_stdout(Tee(open(results_dir / "trials.log", "w", encoding="utf8"))):
+        trials = Trials()
+        best = fmin(fn = train_and_test_model,
+                    space = trials_pspace,
+                    trials = trials,
+                    algo = tpe.suggest,
+                    max_evals = MAX_HYPEROPT_EVALS,
+                    loss_threshold = HYPEROPT_LOSS_TH,
+                    catch_eval_exceptions = True,
+                    rstate=np.random.default_rng(SEED),
+                    early_stop_fn=early_stopping_to_report_progress,
+                    verbose=True,
+                    show_progressbar=False) # Can't use progressbar as it makes a mess of logging
+
+        # Report on the outcome (we saved the best to files as we went along)
+        best_params = space_eval(trials_pspace, best)
+        print("\nBest model hyperparameter set is:\n"
+            + json.dumps(best_params, indent=4, sort_keys=False, default=str))
