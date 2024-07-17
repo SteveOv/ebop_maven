@@ -26,6 +26,7 @@ labels_and_scales = {
     "rA_plus_rB": 1.,
     "k": 1.,
     "J": 1.,
+    "qphot": 1.,
     "ecosw": 1.,
     "esinw": 1.,
     "inc": 0.01,
