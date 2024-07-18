@@ -13,6 +13,7 @@ label_text = {
     "k": "$k$",
     "inc": "$i$",
     "J": "$J$",
+    "qphot": r"$q_{phot}$",
     "ecosw": r"$e\,\cos{\omega}$",
     "esinw": r"$e\,\sin{\omega}$",
     "L3": "$L_3$",
@@ -203,7 +204,7 @@ def plot_prediction_distributions_on_axes(ax: Axes,
         ax.boxplot(xdata, showmeans=False, meanline=True, vert=True, patch_artist=False,
                    showfliers=show_fliers, flierprops=flier_props)
 
-    label_names = [label_text[k] or k for k in label_names]
+    label_names = [label_text.get(k, k) for k in label_names]
     ax.set_xticks(ticks=[r+1 for r in range(len(label_names))], labels=label_names)
 
     if show_zero_value_line:
