@@ -21,6 +21,7 @@ all_param_captions = {
     "k":            r"$k$",
     "inc":          r"$i$",
     "J":            r"$J$",
+    "qphot":        r"$q_{phot}$",
     "ecosw":        r"$e\,\cos{\omega}$",
     "esinw":        r"$e\,\sin{\omega}$",
     "L3":           r"$L_{3}$",
