@@ -405,8 +405,8 @@ def is_usable_system(rA: float, rB: float, J: float, qphot: float,
 
     k = rB / rA
 
-    # Physically plausible
-    usable = k > 0 and J > 0 and qphot > 0 and ecc < 1
+    # Physically plausible (qphot of -100 is a magic number to force spherical)
+    usable = k > 0 and J > 0 and (qphot > 0 or qphot == -100) and ecc < 1
 
     # Will eclipse
     if usable:
