@@ -382,7 +382,7 @@ def train_and_test_model(trial_kwargs):
         print()
         train_callbacks = [
             cb.EarlyStopping("val_loss", restore_best_weights=True,
-                             patience=TRAIN_PATIENCE, verbose=1),
+                             patience=TRAIN_PATIENCE, start_from_epoch=5, verbose=1),
             cb.LambdaCallback(on_epoch_end=on_epoch_end)
         ]
         history = candidate.fit(x=train_ds[0], epochs=TRAINING_EPOCHS, callbacks=train_callbacks,
