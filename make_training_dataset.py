@@ -90,7 +90,7 @@ def generate_instances_from_distributions(instance_count: int, label: str, verbo
 
             generated_counter += 1
             inst_id = f"{set_id}/{generated_counter:06d}"
-            if datasets.is_usable_system(rA, rB, J, qphot, ecc, inc, imp_prm):
+            if datasets.is_usable_system(rA, rB, J, qphot, ecc, inc, imp_prm, r_limit=0.23):
                 break
 
         # Create the pset dictionary.
