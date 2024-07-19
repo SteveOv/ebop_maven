@@ -8,6 +8,7 @@ import os
 import random as python_random
 import json
 from io import StringIO
+from datetime import datetime, timedelta
 
 import numpy as np
 import tensorflow as tf
@@ -19,7 +20,6 @@ from hyperopt import fmin, tpe, hp, space_eval, STATUS_OK, STATUS_FAIL
 from hyperopt.pyll import scope
 
 from ebop_maven import modelling, deb_example
-from ebop_maven.libs.keras_custom.callbacks import TrainingTimeoutCallback
 from ebop_maven.libs.tee import Tee
 
 from traininglib import model_search_helpers
@@ -40,13 +40,13 @@ FORMAL_TESTSET_DIR = Path(".") / "datasets/formal-test-dataset/"
 
 MODEL_FILE_NAME = "parameter-search-model"
 
-MAX_HYPEROPT_EVALS = 500        # Maximum number of distinct Hyperopt evals to run
-HYPEROPT_LOSS_TH = 0.01         # Will stop search in the unlikely event we get below this loss
-TRAINING_EPOCHS = 250           # Set high if we're using early stopping
-BATCH_FRACTION = 0.001          # larger -> quicker training per epoch but more to converge
-MAX_BUFFER_SIZE = 20000000      # Size of Dataset shuffle buffer (in instances)
-PATIENCE = 7                    # Number of epochs w/o improvement before training is stopped
-TRAINING_TIMEOUT = 3600         # Timeout training if not completed within this time (seconds)
+MAX_HYPEROPT_EVALS = 500            # Maximum number of distinct Hyperopt evals to run
+HYPEROPT_LOSS_TH = 0.01             # Will stop search in the unlikely event we get below this loss
+TRAINING_EPOCHS = 250               # Set high if we're using early stopping
+BATCH_FRACTION = 0.001              # larger -> quicker training per epoch but more to converge
+MAX_BUFFER_SIZE = 20000000          # Size of Dataset shuffle buffer (in instances)
+TRAIN_PATIENCE = 7                  # Number of epochs w/o improvement before training is stopped
+TRAIN_TIMEOUT = timedelta(hours=1)  # Timeout training if not completed within this time
 
 ENFORCE_REPEATABILITY = True    # If true, avoid GPU/CUDA cores for repeatable results
 SEED = 42                       # Standard random seed ensures repeatable randomization
@@ -369,10 +369,21 @@ def train_and_test_model(trial_kwargs):
             model_summary = stream.getvalue()
         print(model_summary)
 
+        # Handle timing out the training - coarse but effective.
+        # Once EarlyStopping is also active that callback will restore best weights.
+        end_by = datetime.now() + TRAIN_TIMEOUT
+        print(f"The time is now {datetime.now():%x %X}.",
+             f"Training will be stopped early if not completed by {end_by:%x %X}.")
+        def on_epoch_end(epoch, logs): # pylint: disable=unused-argument
+            if datetime.now() > end_by:
+                print(f"*** Training timer elapsed at {datetime.now():%x %X}. Now stopping. ***")
+                candidate.stop_training = True
+
         print()
         train_callbacks = [
-            cb.EarlyStopping("val_loss", restore_best_weights=True, patience=PATIENCE, verbose=1),
-            TrainingTimeoutCallback(timeout=TRAINING_TIMEOUT, verbose=1)
+            cb.EarlyStopping("val_loss", restore_best_weights=True,
+                             patience=TRAIN_PATIENCE, verbose=1),
+            cb.LambdaCallback(on_epoch_end=on_epoch_end)
         ]
         history = candidate.fit(x=train_ds[0], epochs=TRAINING_EPOCHS, callbacks=train_callbacks,
                                 validation_data=train_ds[1], verbose=2)
