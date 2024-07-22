@@ -8,7 +8,8 @@ import os
 import random as python_random
 import json
 from io import StringIO
-from datetime import datetime, timedelta
+from datetime import timedelta
+import traceback
 
 import numpy as np
 import tensorflow as tf
@@ -20,6 +21,7 @@ from hyperopt import fmin, tpe, hp, space_eval, STATUS_OK, STATUS_FAIL
 from hyperopt.pyll import scope
 
 from ebop_maven import modelling, deb_example
+from ebop_maven.libs.keras_custom.callbacks import TrainingTimeoutCallback
 from ebop_maven.libs.tee import Tee
 
 from traininglib import model_search_helpers
@@ -108,7 +110,7 @@ lr_cos_warmup_steps_kwargs = { "low": 0, "high": 3000, "q": 1000 }
 lr_cos_decay_steps_kwargs = { "low": 50000, "high": 150000, "q": 10000 }
 lr_cos_alpha_choices = [0.01, 0.001]
 lr_pw_boundary_choices = [[5000, 30000], [20000, 40000]]
-lr_pw_value_choices = [[0.001, 0.0001, 0.00001], [0.005, 0.0005, 0.00005], [0.0005, 0.005, 0.0005]]
+lr_pw_value_choices = [[0.001, 0.0001, 0.00001], [0.0005, 0.00005, 0.00001], [0.0001, 0.001, 0.0001]]
 
 # Genuinely shared choice between DNN layers and output layer
 dnn_kernel_initializer_choice = hp.choice("dnn_init", dnn_initializer_choices)
@@ -327,7 +329,7 @@ def train_and_test_model(trial_kwargs):
           "Evaluating model and hyperparameters based on the following trial_kwargs:\n",
           json.dumps(trial_kwargs, indent=4, sort_keys=False, default=str) + "\n")
 
-    weighted_loss = candidate = history = None
+    weighted_loss = candidate = None
     status = STATUS_FAIL
 
     # Reset so shuffling & other tf "random" behaviour is repeated for each trial
@@ -369,24 +371,14 @@ def train_and_test_model(trial_kwargs):
             model_summary = stream.getvalue()
         print(model_summary)
 
-        # Handle timing out the training - coarse but effective.
-        # Once EarlyStopping is also active that callback will restore best weights.
-        end_by = datetime.now() + TRAIN_TIMEOUT
-        print(f"The time is now {datetime.now():%x %X}.",
-             f"Training will be stopped early if not completed by {end_by:%x %X}.")
-        def on_epoch_end(epoch, logs): # pylint: disable=unused-argument
-            if datetime.now() > end_by:
-                print(f"*** Training timer elapsed at {datetime.now():%x %X}. Now stopping. ***")
-                candidate.stop_training = True
-
         print()
         train_callbacks = [
-            cb.EarlyStopping("val_loss", restore_best_weights=True,
+            cb.EarlyStopping("val_loss", min_delta=5e-5, restore_best_weights=True,
                              patience=TRAIN_PATIENCE, start_from_epoch=5, verbose=1),
-            cb.LambdaCallback(on_epoch_end=on_epoch_end)
+            TrainingTimeoutCallback(TRAIN_TIMEOUT, verbose=1)
         ]
-        history = candidate.fit(x=train_ds[0], epochs=TRAINING_EPOCHS, callbacks=train_callbacks,
-                                validation_data=train_ds[1], verbose=2)
+        candidate.fit(x=train_ds[0], epochs=TRAINING_EPOCHS, callbacks=train_callbacks,
+                      validation_data=train_ds[1], verbose=2)
 
         print(f"\nEvaluating model against {test_ct[0]} test dataset instances.")
         results = candidate.evaluate(x=test_ds[0], y=None, verbose=2)
@@ -419,14 +411,20 @@ count(trainable weights) = {weights:,d} yielding params(ln[weights]) = {params:.
 {'-'*80}
 """)
 
-    except OpError as exc:
-        print(f"*** Training failed! *** Caught a {type(exc).__name__}: {exc.op} / {exc.message}")
-        print(f"The problem hyperparam set is: {trial_kwargs}\n")
+    except Exception as exc:
+        # Log then rethrow any exception
+        print(f"\n*** Training failed! *** Caught a {type(exc).__name__}")
+        if isinstance(exc, OpError):
+            print(f"Details: {exc.op} / {exc.message}")
+        else:
+            print(f"Details: {exc}")
+        print(f"The call stack is: {traceback.print_exc()}\n")
+        raise
 
     # Make sure anything returned is easily serialized into a pickle so we can save progress.
     return { "loss": mae, "status": status, "mae": mae, "mse": mse,
             "weighted_loss": weighted_loss, "AIC": aic, "BIC": bic,
-            "model_summary": model_summary, "history": history }
+            "model_summary": model_summary }
 
 
 def early_stopping_to_report_progress(this_trials, *early_stop_args):
@@ -451,11 +449,13 @@ def early_stopping_to_report_progress(this_trials, *early_stop_args):
         if this_iter == best_iter:
             # This is the new best: persist its details so we don't loose them
             model_summary = br.get("model_summary", None)
+            summary_file = results_dir / "best_model_summary.txt"
             if model_summary:
-                summary_file = results_dir / "best_model_summary.txt"
                 print(f"Saving model summary to {summary_file}")
                 with open(summary_file, mode="w", encoding="utf8") as f:
                     f.write(model_summary)
+            else:
+                summary_file.unlink(missing_ok=True)
 
             # We have to convert the misc vals dict, which has items like "activation": [2]
             # into the form returned by fmin; the equivalent dict where above is "activation": 2
