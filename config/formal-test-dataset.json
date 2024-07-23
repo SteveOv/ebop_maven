@@ -291,7 +291,7 @@
         "transits": false,
         "eclipses_similar": false,
         "components_similar": true,
-        "notes": "e=0.376 (fixed); rA_plus_rB & k & ecosw & esinw derived from table 11; J approximated from Teff; bP derived from rA, inc, e & esinw; control fit with JKTEBOP is poor (as components likely too distorted for JKTEBOP simplified model) - best MAE~1.34;",
+        "notes": "e=0.376 (fixed); rA_plus_rB & k & ecosw & esinw derived from table 11; J approximated from Teff; bP derived from rA, inc, e & esinw; bbest control fit (fixed at published qphot and L3) gives MAE~0.38 which is not usable (likely components too distorted for JKTEBOP simplified model); without fixing L3 fits are even worse with a large negative L3;",
         "primary_epoch": 1754.155893449,
         "period": 3.782090049,
         "ecc": 0.376,           "ecc_err": null,
@@ -309,8 +309,16 @@
         },
         "sectors": {
             "16": {
-                "quality_bitmask": "hardest"
+                "quality_bitmask": "hardest",
+                "detrend_order": 3,
+                "detrend_gap_threshold": 0.5
             }
+        },
+        "fit_overrides": {
+            "qphot": 0.99,
+            "qphot_fit": 0,
+            "L3": 0.15,
+            "L3_fit": 0
         }
     },
     "V1229 Tau": {
