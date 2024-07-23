@@ -70,11 +70,11 @@
         "logLB": 2.993,         "logLB_err": 0.052,
         "rA": 0.22171,          "rA_err": 0.00055,
         "rB": 0.1742,           "rB_err": 0.0016,
-        "desc": "An eccentric orbit with eclipses of approximate depth 0.45 and 0.40 mag and the secondary near phase 0.45. Primary fractional radius of 0.22 is beyond JKTEBOP's recommended maximum (0.2). This and the presence of SLF variability make it difficult to fit.",
+        "desc": "An eccentric orbit with eclipses of approximate depth 0.45 and 0.40 mag and the secondary near phase 0.45. The presence of apsidal motion makes it preferable to fit the sectors separately. Primary fractional radius of 0.22 is beyond JKTEBOP's usually recommended maximum (0.2). This and the presence of SLF variability could make it difficult to predict and fit.",
         "transits": false,
         "eclipses_similar": false,
         "components_similar": false,
-        "notes": "bP derived from rA, inc, e & esinw; control fit of sector 13 SAP data (L3 fixed at published value) yields MAE~0.06 (however fit to inc is poor at 84.830; S39 worse);",
+        "notes": "bP label derived from rA, inc, e & esinw; qphot label from published masses; control fit of sector 13 SAP data yields MAE~0.01 (S39 worse);",
         "primary_epoch": 1671.167003858,
         "period": 3.169080048,
         "ecc": 0.0555,              "ecc_err": 0.0011,
@@ -93,11 +93,13 @@
         "sectors": {
             "13": {
                 "quality_bitmask": "hardest",
-                "detrend_order": 1
+                "detrend_gap_threshold": 0.5,
+                "detrend_order": 2
             }
         },
         "fit_overrides": {
-            "L3_fit": 0
+            "qphot": 0.0,
+            "qphot_fit": 0
         }
     },
     "MU Cas": {
