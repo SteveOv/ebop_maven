@@ -124,7 +124,7 @@
         "transits": false,
         "eclipses_similar": false,
         "components_similar": true,
-        "notes": "k calculated from rB/rA as published value based on k==rA/rB; bP derived from rA, inc, e & esinw; best control fit is with s24, and yields MAE 0.024 (with poor fit to k);",
+        "notes": "k calculated from rB/rA as published value based on k==rA/rB; bP derived from rA, inc, e & esinw; best control fit is with s24 and yields MAE 0.023 (with poor fit to k; 1.06 not 1.14);",
         "primary_epoch": 1961.8515978654314,
         "period": 9.652929,
         "ecc": 0.1930,              "ecc_err": 0.0003,
@@ -148,17 +148,10 @@
             }
         },
         "fit_overrides": {
-            "LDA": "lin",
-            "LDB": "same",
-            "LDA1": 0.56,
-            "LDB1": 0.56,
-            "LDA2": 0.0,
-            "LDB2": 0.0,
-            "LDA1_fit": 1,
-            "LDB1_fit": 1,
+            "qphot": 1.019,
+            "qphot_fit": 0,
             "gravA": 1.0,
             "gravB": 1.0,
-            "qphot": 1.019,
             "lrat": ["1960.0 1.26 0.06"]
         }
     },
