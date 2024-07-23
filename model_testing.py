@@ -326,6 +326,7 @@ def base_jktebop_task3_params(period: float,
         "period": period,
         "primary_epoch": primary_epoch,
 
+        "qphot_fit": 0,
         "ecosw_fit": 1,     "esinw_fit": 1,
         "L3_fit": l3_fit,
         "LDA1_fit": 1,      "LDB1_fit": 1,

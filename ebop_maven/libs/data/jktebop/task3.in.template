@@ -13,7 +13,7 @@
  ${primary_epoch}           Reference time of primary minimum (JD)
  
  1 1  Adjust RADII SUM    or  RADII RATIO    (0, 1, 2, 3)
- 1 0  Adjust INCLINATION  or  MASSRATIO      (0, 1, 2, 3)
+ 1 ${qphot_fit}  Adjust INCLINATION  or  MASSRATIO      (0, 1, 2, 3)
  ${ecosw_fit} ${esinw_fit}  Adjust ECOSW-or-E   or  ESINW-or-OMEGA (0, 1, 2, 3)     
  0 0  Adjust GRAVDARK1    or  GRAVDARK2      (0, 1, 2, 3)
  1 ${L3_fit}  Adjust SURFBRIGHT2  or  THIRDLIGHT     (0, 1, 2, 3)     

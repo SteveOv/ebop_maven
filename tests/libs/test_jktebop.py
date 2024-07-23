@@ -47,6 +47,7 @@ class Testjktebop(unittest.TestCase):
         "reflA": 0.,        "reflB": 0.,
         "period": 2.5,
         "primary_epoch": 59876.54321,
+        "qphot_fit": 1,
         "ecosw_fit": 1,     "esinw_fit": 1,
                             "L3_fit": 1,
         "LDA1_fit": 1,      "LDB1_fit": 1,
