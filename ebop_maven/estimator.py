@@ -61,17 +61,17 @@ class Estimator(ABC):
         self._scaling_applied = any(s != 1 for s in self._scale_values)
 
         print("The prediction inputs are:\n",
-              f"\tmags_feature - numpy ndarray[float] shape (#instances, {self.mags_feature_bins})",
+              f"\tmags_feature - numpy NDarray[float] shape (#instances, {self.mags_feature_bins})",
               f"with the phases after {self.mags_feature_wrap_phase} wrapped by -1")
         if len(self.extra_feature_names):
-            print( "\textra_features - numpy ndarray[float] shape (#instances, ",
+            print( "\textra_features - numpy NDarray[float] shape (#instances, ",
                   f"{len(self.extra_feature_names)}) for the features;",
                    ", ".join(self.extra_feature_names))
         else:
-            print("\textra_features - numpy ndarray shape (#instances, 0) or None",
+            print("\textra_features - numpy NDarray shape (#instances, 0) or None",
                   "as extra_features are not used for predictions")           
         print("The prediction results are:\n",
-               "\tpredicted values as an numpy recarray[UFloat] of shape",
+               "\tpredicted values as an numpy structured NDarray[UFloat] of shape",
               f"(#instances, [{', '.join(self.label_names)}])\n",
                "\toptionally raw predictions as a numpy NDArray[float] of shape",
               f"(#instances, {len(self.label_names)}, #iterations), if include_raw==True")
@@ -121,7 +121,7 @@ class Estimator(ABC):
                 unscale: bool=True,
                 include_raw_preds: bool=False,
                 seed: int=42) \
-            -> Union[np.rec.recarray[UFloat], Tuple[np.rec.recarray[UFloat], np.ndarray[float]]]:
+            -> Union[np.ndarray[UFloat], Tuple[np.ndarray[UFloat], np.ndarray[float]]]:
         """
         Make predictions on one or more instances' features. The instances are
         in the form of two NDArrays, one for the instances' mags data in the shape
