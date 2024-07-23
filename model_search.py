@@ -137,7 +137,7 @@ trials_pspace = hp.pchoice("train_and_test_model", [
             "trainset_name": TRAINSET_NAME,
             "verbose": True
         },
-        "optimizer": make_trained_cnn_model.OPTIMIZER,
+        "optimizer": optimizers.Nadam(learning_rate=5e-4),
         "loss_function": make_trained_cnn_model.LOSS,
     }),
     (0.74, {
