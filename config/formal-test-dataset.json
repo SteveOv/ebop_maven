@@ -264,6 +264,8 @@
         "bin_time": 300,
         "fit_overrides": {
             "qphot": 0.65,
+            "qphot_fit": 0,
+            "L3_fit": 0,
             "gravA": 1.0,
             "gravB": 1.0
         }
