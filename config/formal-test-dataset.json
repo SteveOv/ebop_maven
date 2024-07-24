@@ -874,7 +874,7 @@
         "transits": false,
         "eclipses_similar": true,
         "components_similar": true,
-        "notes": "e=0 & ω=0 (fixed); bP derived from rA, inc, e & esinw; control fit uses quality flags from source article, with sector 50 giving an MAE~0.001;",
+        "notes": "e=0 & ω=0 (fixed); bP derived from rA, inc, e & esinw; control fit uses quality flags and LD params from source article, with sector 50 giving an MAE~0.001;",
         "primary_epoch": 2676.090124290,
         "period": 4.991767756,
         "labels": { 
@@ -895,6 +895,14 @@
                 "detrend_gap_threshold": 0.5,
                 "detrend_order": 1
             }
+        },
+        "fit_overrides": {
+            "LDA": "quad",
+            "LDB": "quad",
+            "LDA1": 0.246,
+            "LDB1": 0.246,
+            "LDA2": 0.22,
+            "LDB2": 0.22
         }
     },
     "V570 Per": {
