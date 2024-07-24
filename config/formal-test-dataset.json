@@ -699,11 +699,17 @@
         },
         "sectors": {
             "14": {
-                "quality_bitmask": "default"
+                "quality_bitmask": "default",
+                "detrend_order": 2,
+                "detrend_gap_threshold": 0.5
             },
             "15": {
-                "quality_bitmask": "default"
+                "quality_bitmask": "default",
+                "detrend_order": 2,
+                "detrend_gap_threshold": 0.5
             }
+        },
+        "fit_overrides": {
         }
     },
     "GW Eri": {
