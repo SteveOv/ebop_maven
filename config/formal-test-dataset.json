@@ -201,6 +201,8 @@
         "fit_overrides": {
             "qphot": 0.0,
             "qphot_fit": 0,
+            "L3": 0.0,
+            "L3_fit": 0,
             "gravA": 0.55,
             "gravB": 0.88,
             "reflA": 0.0012,
