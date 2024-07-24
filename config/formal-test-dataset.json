@@ -1141,7 +1141,7 @@
         "transits": false,
         "eclipses_similar": true,
         "components_similar": true,
-        "notes": "e=0 & ω=0 & L3=0 (fixed); bP derived from rA, inc, e & esinw; control fit on S18 gives MAE~0.0031;",
+        "notes": "e=0 & ω=0 & L3=0 (fixed); bP derived from rA, inc, e & esinw; control fit on S18, with published (fixed) L3 and LD params, gives MAE~0.0031;",
         "primary_epoch": 1806.960762116,
         "period": 4.222017264,
         "labels": { 
@@ -1161,6 +1161,16 @@
                 "flatten": { "mask_time_ranges": [[1806.8, 1807.1], [1808.9, 1809.2]] },
                 "detrend_order": 1
             }
+        },
+        "fit_overrides": {
+            "L3": 0,
+            "L3_fit": 0,
+            "LDA": "quad",
+            "LDB": "quad",
+            "LDA1": 0.261,
+            "LDB1": 0.261,
+            "LDA2": 0.23,
+            "LDB2": 0.23
         }
     },
     "AI Phe": {
