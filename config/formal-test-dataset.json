@@ -651,8 +651,9 @@
         "sectors": {
             "67": {
                 "quality_bitmask": "hard",
-                "quality_masks": [[3120.0, 3126.0], [3132.5, 3133.9], [3146.6, 3148.3], [3152.0, 3155]],
-                "detrend_order": 1
+                "quality_masks": [[3120.0, 3126.0], [3132.5, 3133.7], [3146.6, 3148.3], [3152.0, 3155]],
+                "detrend_order": 1,
+                "detrend_gap_threshold": 2.0
             }
         },
         "fit_overrides": {
