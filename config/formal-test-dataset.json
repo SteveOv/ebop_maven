@@ -1316,7 +1316,11 @@
                 "detrend_order": 1
             }
         },
-        "flux_column": "pdcsap_flux"
+        "flux_column": "pdcsap_flux",
+        "fit_overrides": {
+            "L3": 0,
+            "L3_fit": 0
+        }
     },
     "V963 Cen": {
         "source": "DEBCat and Graczyk et al. (2022) who use WD for fitting. Assuming TESS sector 38 was used. Sectors 64 and 65 have since been released.",
