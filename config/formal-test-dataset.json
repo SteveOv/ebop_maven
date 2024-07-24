@@ -1420,6 +1420,8 @@
             }
         },
         "fit_overrides": {
+            "L3": 0,
+            "L3_fit": 0,
             "LDA": "pow2",
             "LDB": "pow2",
             "LDA1": 0.623,
