@@ -295,11 +295,12 @@ def base_jktebop_task3_params(period: float,
     Get the basic testing set of JKTEBOP task3 in file parameters.
     This sets up mainly fixed values for qphot, grav darkening etc.
 
+    L3 defaults to zero and fitted
+
+    qphot defaults to zero and not fitted
+
     However, quad limb darkening algo and coeffs are found by lookup based
-    on the stars' masses, radii and effective temps
-    
-    L3 is taken from the labels as we currently don't estimate this.
-    If the L3 is zero we set it to fixed too.
+    on the stars' masses and radii (for logg) and effective temps, as held in sector_cfg.
     """
     # Calculate star specific LD params
     ld_params = {}
@@ -310,15 +311,10 @@ def base_jktebop_task3_params(period: float,
         ld_params[f"LD{star}1"] = coeffs[0]
         ld_params[f"LD{star}2"] = coeffs[1]
 
-    l3 = sector_cfg["labels"].get("L3", 0)
-    l3_fit = 0 if l3 == 0 else 1
-    if not jktebop.get_jktebop_support_neg_l3():
-        l3 = max(0, l3)
-
     return {
         "qphot": 0.,
         "gravA": 0.,        "gravB": 0.,
-        "L3": l3,
+        "L3": 0.,
 
         **ld_params,
 
@@ -328,7 +324,7 @@ def base_jktebop_task3_params(period: float,
 
         "qphot_fit": 0,
         "ecosw_fit": 1,     "esinw_fit": 1,
-        "L3_fit": l3_fit,
+        "L3_fit": 1,
         "LDA1_fit": 1,      "LDB1_fit": 1,
         "LDA2_fit": 0,      "LDB2_fit": 0,
         "period_fit": 1,
