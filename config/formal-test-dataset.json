@@ -42,8 +42,6 @@
             }
         },
         "fit_overrides": {
-            "qphot": 0.0,
-            "qphot_fit": 0,
             "period_fit": 0,
             "LDA": "quad",
             "LDB": "quad",
