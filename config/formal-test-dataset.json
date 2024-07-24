@@ -1090,7 +1090,7 @@
         "transits": false,
         "eclipses_similar": true,
         "components_similar": true,
-        "notes": "bP derived from rA, inc, e & esinw; control fit on S20 gives MAE~0.0022;",
+        "notes": "bP derived from rA, inc, e & esinw; control fit on S20 with published LD params gives MAE~0.0020;",
         "primary_epoch": 1847.487096393,
         "period": 3.145776615,
         "ecc": 0.00985,         "ecc_err": 0.00027,
@@ -1112,6 +1112,14 @@
                 "detrend_order": 2,
                 "detrend_gap_threshold": 0.5
             }
+        },
+        "fit_overrides": {
+            "LDA": "quad",
+            "LDB": "quad",
+            "LDA1": 0.221,
+            "LDB1": 0.221,
+            "LDA2": 0.22,
+            "LDB2": 0.22
         }
     },
     "V505 Per": {
