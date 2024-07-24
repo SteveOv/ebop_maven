@@ -977,7 +977,7 @@
         "transits": true,
         "eclipses_similar": false,
         "components_similar": false,
-        "notes": "L3=0 (fixed); bP derived from rA, inc, e & esinw; source article based sectors 19, 25 & 26 FFIs - we use sectors 52 & 53 @ 600 s cadence to get full coverage of the orbit giving MAE~0.014;",
+        "notes": "L3=0 (fixed); bP derived from rA, inc, e & esinw; source article based sectors 19, 25 & 26 FFIs - we use sectors 52 & 53 @ 600 s cadence to get full coverage of the orbit giving MAE~0.015;",
         "primary_epoch": 2726.954043296,
         "period": 20.999146855,
         "ecc": 0.4676,          "ecc_err": 0.0002,
@@ -1007,7 +1007,17 @@
         },
         "author": "TESS-SPOC",
         "flux_column": "sap_flux",
-        "exptime": 600
+        "exptime": 600,
+        "fit_overrides": {
+            "L3": 0,
+            "L3_fit": 0,
+            "LDA": "quad",
+            "LDB": "quad",
+            "LDA1": 0.190,
+            "LDB1": 0.190,
+            "LDA2": 0.22,
+            "LDB2": 0.22
+        }
     },
     "IT Cas": {
         "source": "DEBCat and Rediscussion XIII, Table II (sector 17). TESS sectors 17, 24 and 57 SAP photometry analysed with JKTEBOP version 43.",
