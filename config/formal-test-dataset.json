@@ -1524,6 +1524,10 @@
         },
         "author": "TESS-SPOC",
         "flux_column": "pdcsap_flux",
-        "exptime": 200
+        "exptime": 200,
+        "fit_overrides": {
+            "L3": 0,
+            "L3_fit": 0
+        }
     }
 }
