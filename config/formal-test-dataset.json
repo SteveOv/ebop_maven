@@ -442,25 +442,33 @@
         "transits": false,
         "eclipses_similar": false,
         "components_similar": true,
-        "notes": "e=0.0 & ω=0.0 & L3=0 (fixed); bP derived from rA, inc, e & esinw; best control fit is sector 20 only SAP flux which yields MAE~0.018;",
+        "notes": "e=0.0 & ω=0.0 & L3=0 (fixed); bP derived from rA, inc, e & esinw; best control fit is sector 20 only SAP flux which yields MAE~0.031 (allowing L3 to fit);",
         "primary_epoch": 1862.339276176,
         "period": 2.525018489,
         "labels": {
             "rA_plus_rB": 0.3118,   "rA_plus_rB_err": 0.0009,
             "k": 0.996,             "k_err": 0.041,
             "J": 0.869,             "J_err": 0.027,
-            "qphot": 0.924,         "qphot_err":0.005,
+            "qphot": 0.9235,        "qphot_err": 0.0027,
             "bP": 0.26,             "bP_err": 0.01,
             "inc": 87.64,           "inc_err": 0.11,
             "ecosw": 0.0,           "ecosw_err": null,
             "esinw": 0.0,           "esinw_err": null,
-            "L3": 0.0,               "L3_err": null
+            "L3": 0.0,              "L3_err": null
         },
         "sectors": {
             "20": {
-                "quality_bitmask": "hard",
-                "quality_masks": [[1856.0, 1857.0]]
+                "quality_bitmask": "hardest",
+                "quality_masks": [[1856.0, 1857.0]],
+                "detrend_order": 2
             }
+        },
+        "fit_overrides":{
+            "qphot": 0.9235,
+            "qphot_fit": 0,
+            "L3_fit": 1,
+            "gravA": 1.0,
+            "gravB": 1.0
         }
     },
     "V788 Cen": {
