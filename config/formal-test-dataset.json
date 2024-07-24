@@ -1038,7 +1038,7 @@
         "transits": false,
         "eclipses_similar": true,
         "components_similar": true,
-        "notes": "Using values from table II, Sector 24; bP derived from rA, inc, e & esinw; best control fit with S24, including clipped regions from source article, gives MAE~0.0029;",
+        "notes": "Using values from table II, Sector 24; bP derived from rA, inc, e & esinw; best control fit with S24, including clipped regions and sector specific LD param from source article, gives MAE~0.0025;",
         "primary_epoch": 1977.037849879,
         "period": 3.896637360,
         "ecc": 0.08878,         "ecc_err": 0.00015,
@@ -1061,6 +1061,14 @@
                 "flatten": { "mask_time_ranges": [[1976.8, 1977.2], [1979.0, 1979.35]] },
                 "detrend_order": 1
             }
+        },
+        "fit_overrides": {
+            "LDA": "pow2",
+            "LDB": "pow2",
+            "LDA1": 0.540,
+            "LDB1": 0.540,
+            "LDA2": 0.50,
+            "LDB2": 0.50
         }
     },
     "V455 Aur": {
