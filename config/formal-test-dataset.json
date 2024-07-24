@@ -1261,6 +1261,8 @@
             }
         },
         "fit_overrides": {
+            "L3": 0,
+            "L3_fit": 0,
             "LDA": "quad",
             "LDB": "quad",
             "LDA1": 0.328,
