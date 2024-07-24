@@ -96,8 +96,6 @@
             }
         },
         "fit_overrides": {
-            "qphot": 0.0,
-            "qphot_fit": 0
         }
     },
     "MU Cas": {
