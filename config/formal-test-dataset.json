@@ -392,7 +392,7 @@
         "transits": false,
         "eclipses_similar": false,
         "components_similar": true,
-        "notes": "ecosw & esinw derived from table 9; bP derived from rA, inc, e & esinw; best control fit with sector 54 SAP flux, fixed published period & lrat yields MAE~0.0056;",
+        "notes": "ecosw & esinw derived from table 9; bP derived from rA, inc, e & esinw; best control fit with sector 54 SAP flux, fixed published period & lrat yields MAE~0.005;",
         "primary_epoch": 2772.124954368,
         "period": 11.120757,
         "ecc": 0.3750,          "ecc_err": 0.0013,
@@ -411,7 +411,8 @@
         "sectors": {
             "54": {
                 "quality_bitmask": "hardest",
-                "detrend_order": 2            
+                "detrend_order": 2,
+                "detrend_gap_threshold": 0.5
             }
         },
         "mission": "HLSP",
