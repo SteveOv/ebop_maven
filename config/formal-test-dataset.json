@@ -772,9 +772,9 @@
         "transits": false,
         "eclipses_similar": true,
         "components_similar": false,
-        "notes": "e=0 & ω=0 (fixed); bP derived from rA, inc, e & esinw; control fit on S55, with masked range from source article, yields MAE~0.028;",
+        "notes": "e=0 & ω=0 (fixed); bP derived from rA, inc, e & esinw; control fit on S55, with masked range and LD params from source article and L3 fixed at zero yields MAE~0.021;",
         "primary_epoch": 2813.984145622,
-        "period": 2.984658266,
+        "period": 2.9846559,
         "labels": { 
             "rA_plus_rB": 0.30576,  "rA_plus_rB_err": 0.00020,
             "k": 0.8983,            "k_err": 0.0038,
@@ -789,12 +789,24 @@
         "sectors": {
             "55": {
                 "quality_bitmask": "hard",
-                "quality_masks": [[2804.25, 2811.7]]
+                "quality_masks": [[2804.25, 2811.7]],
+                "detrend_order": 1,
+                "detrend_gap_threshold": 0.5
             }
         },
         "author": "TESS-SPOC",
         "flux_column": "sap_flux",
-        "exptime": 600
+        "exptime": 600,
+        "fit_overrides": {
+            "L3": 0,
+            "L3_fit": 0,
+            "LDA": "pow2",
+            "LDB": "pow2",
+            "LDA1": 0.709,
+            "LDB1": 0.709,
+            "LDA2": 0.431,
+            "LDB2": 0.431
+        }
     },
     "CW Eri": {
         "source": "DEBCat and Rediscussion XVII, Table III. TESS sectors 4 and 31 SAP photometry analysed with JKTEBOP version 43.",
