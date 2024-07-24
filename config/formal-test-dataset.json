@@ -1343,7 +1343,7 @@
         "transits": false,
         "eclipses_similar": false,
         "components_similar": true,
-        "notes": "rA_plus_rB & k derived from rA & rB in table 8; bP derived from rA, inc, e & esinw; best control fit with S38, with flattening to dampen variability, yields MAE 0.048 (but it's not good, with O-C of 0.14 for k and JKTEBOP Task 8 throwing up many 'failure to converge' retries and giving >15% 1-sigma error bar of k);",
+        "notes": "rA_plus_rB & k derived from rA & rB in table 8; bP derived from rA, inc, e & esinw; best control fit with S38, with flattening to dampen variability, yields MAE 0.057 (it's not a good fit; the O-Cs of k=0.185 & inc=0.147, L3 fits to +0.031 whereas the published value is -0.028 and task 8 encounters frequent 'failed to converge' issues);",
         "primary_epoch": 2341.076459212,
         "period": 15.269043383,
         "ecc": 0.4223,          "ecc_err": 0.0016,
