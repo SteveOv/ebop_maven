@@ -827,7 +827,7 @@
         "transits": false,
         "eclipses_similar": false,
         "components_similar": false,
-        "notes": "bP derived from rA, inc, e & esinw; control fit on sectors 31 gives MAE~0.0075",
+        "notes": "bP derived from rA, inc, e & esinw; control fit on sectors 31 with fixed qphot (as used in source paper) gives MAE~0.005",
         "primary_epoch": 2163.056459177,
         "period": 2.728370923,
         "ecc": 0.01310,         "ecc_err": 0.00067,
@@ -845,8 +845,14 @@
         },
         "sectors": {
             "31": {
-                "quality_bitmask": "hardest"
+                "quality_bitmask": "hardest",
+                "detrend_order": 1,
+                "detrend_gap_threshold": 0.5
             }
+        },
+        "fit_overrides":{
+            "qphot": 0.836,
+            "qphot_fit": 0
         }
     },
     "ZZ Boo": {
