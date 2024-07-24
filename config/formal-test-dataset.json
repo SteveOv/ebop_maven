@@ -1475,7 +1475,9 @@
             }
         },
         "fit_overrides": {
-            "qphot": 0.5932
+            "qphot": 0.5932,
+            "L3": 0,
+            "L3_fit": 0
         }
     },  
     "CM Dra": {
