@@ -924,7 +924,7 @@
         "transits": false,
         "eclipses_similar": false,
         "components_similar": false,
-        "notes": "e=0 & ω=0 & L3=0 (fixed); bP derived from rA, inc, e & esinw; control fit includes time masks and lrat from source article and sector 18 to give an MAE~0.0102",
+        "notes": "e=0 & ω=0 & L3=0 (fixed); bP derived from rA, inc, e & esinw; control fit includes time masks, LD params, fixed L3 and lrat from source article and sector 18 to give an MAE~0.0078",
         "primary_epoch": 1808.957210950,
         "period": 1.900928407,
         "labels": { 
@@ -941,12 +941,20 @@
         "sectors": {
             "18": {
                 "quality_bitmask": "hardest",
-                "quality_masks": [[58790.6, 58792.5], [58801.0, 58804.7]],
+                "quality_masks": [[1790.6, 1792.5], [1801.0, 1804.7]],
                 "detrend_order": 1,
                 "detrend_gap_threshold": 0.5
             }
         },
         "fit_overrides": {
+            "L3": 0,
+            "L3_fit": 0,
+            "LDA": "pow2",
+            "LDB": "pow2",
+            "LDA1": 0.548,
+            "LDB1": 0.516,
+            "LDA2": 0.498,
+            "LDB2": 0.467,
             "lrat": ["1809.42 0.703 0.057"]
         }
     },
