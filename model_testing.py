@@ -212,7 +212,7 @@ def fit_against_formal_test_dataset(estimator: Union[Model, Estimator],
         lrats = fit_overrides.get("lrat", [])
 
         params = {
-            **base_jktebop_task3_params(period, pe, dat_fname.name, fit_stem, targ_config),
+            **base_jktebop_fit_params(3, period, pe, dat_fname.name, fit_stem, targ_config),
             **{ n: get_nom(pred_vals[ix][n]) for n in pred_vals.dtype.names },  # predictions
             **fit_overrides,                                                    # overrides
         }
@@ -222,7 +222,7 @@ def fit_against_formal_test_dataset(estimator: Union[Model, Estimator],
         append_lines = jktebop.build_poly_instructions(segments, "sf", 1)
         append_lines += ["", "chif", ""] + [ f"lrat {l}" for l in lrats ]
 
-        jktebop.write_in_file(in_fname, task=3, append_lines=append_lines, **params)
+        jktebop.write_in_file(in_fname, append_lines=append_lines, **params)
         jktebop.write_light_curve_to_dat_file(
                     lc, dat_fname, column_formats=[lambda t: f"{t.value:.6f}", "%.6f", "%.6f"])
 
@@ -286,14 +286,17 @@ def fit_against_formal_test_dataset(estimator: Union[Model, Estimator],
     return fitted_vals
 
 
-def base_jktebop_task3_params(period: float,
-                              primary_epoch: float,
-                              dat_file_name: str,
-                              file_name_stem: str,
-                              sector_cfg: Dict[str, any]) -> Dict[str, any]:
+def base_jktebop_fit_params(task: int,
+                            period: float,
+                            primary_epoch: float,
+                            dat_file_name: str,
+                            file_name_stem: str,
+                            sector_cfg: Dict[str, any],
+                            simulations: int=100) -> Dict[str, any]:
     """
-    Get the basic testing set of JKTEBOP task3 in file parameters.
+    Get the basic testing set of JKTEBOP task 3, 8 or 9 in file parameters.
     This sets up mainly fixed values for qphot, grav darkening etc.
+    but includes setting up suitable simulation iterations
 
     L3 defaults to zero and fitted
 
@@ -311,7 +314,11 @@ def base_jktebop_task3_params(period: float,
         ld_params[f"LD{star}1"] = coeffs[0]
         ld_params[f"LD{star}2"] = coeffs[1]
 
+    if task == 3:
+        simulations = "" # The only valid option for task 3
+
     return {
+        "task": task,
         "qphot": 0.,
         "gravA": 0.,        "gravB": 0.,
         "L3": 0.,
@@ -321,6 +328,8 @@ def base_jktebop_task3_params(period: float,
         "reflA": 0.,        "reflB": 0.,
         "period": period,
         "primary_epoch": primary_epoch,
+
+        "simulations": simulations,
 
         "qphot_fit": 0,
         "ecosw_fit": 1,     "esinw_fit": 1,

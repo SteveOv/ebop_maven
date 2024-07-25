@@ -20,7 +20,7 @@ from ebop_maven.libs.jktebop import write_in_file, write_light_curve_to_dat_file
 # pylint: disable=invalid-name, too-many-public-methods, line-too-long, protected-access
 class Testjktebop(unittest.TestCase):
     """ Unit tests for the jktebop module. """
-    _prefix = "test_deblib_"
+    _prefix = "test_jktebop_"
     _task2_params = { # set of valid param/tokens & values for task 2
         "ring": 2,
         "rA_plus_rB": 0.3,  "k": ufloat(0.5, 0.0),
@@ -388,6 +388,18 @@ class Testjktebop(unittest.TestCase):
         params = _prepare_params_for_task(3, { "reflA": 0, "reflB": 0 }, calc_refl_coeffs=True)
         self.assertEqual(params["reflA"], 0)
         self.assertEqual(params["reflB"], 0)
+
+    def test__prepare_params_for_task_assert_iterations_default(self):
+        """ Test _prepare_params_for_task(task=3 | 8 | 9, no simulations param) check correct default """
+        for task, exp_sims in [(3, ""), (8, 1), (9, 1)]:
+            sims = _prepare_params_for_task(task, { })["simulations"]
+            self.assertEqual(sims, exp_sims, f"expected default simulations token for task {task}")
+
+    def test__prepare_params_for_task_assert_iterations(self):
+        """ Test _prepare_params_for_task(task=3 | 8 | 9, { "simulations": x }) check not overriden """
+        for task, exp_sims in [(3, "# nothing"), (8, 800), (9, 900)]:
+            sims = _prepare_params_for_task(task, { "simulations": exp_sims })["simulations"]
+            self.assertEqual(sims, exp_sims, f"expected simulations token for task {task}")
 
     def test__prepare_params_for_task_with_floats(self):
         """ Test _prepare_params_for_task(params as floats (separate sigma values)) values passed on """

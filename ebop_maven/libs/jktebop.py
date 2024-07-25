@@ -21,7 +21,7 @@ from astropy.time import Time
 _this_dir = Path(getsourcefile(lambda:0)).parent
 _template_files = {
     2: _this_dir / "data/jktebop/task2.in.template",
-    3: _this_dir / "data/jktebop/task3.in.template"
+    **dict.fromkeys([3, 8, 9], _this_dir / "data/jktebop/taskn.in.template")
 }
 
 _jktebop_directory = \
@@ -168,7 +168,7 @@ def generate_model_light_curve(file_prefix: str, **params) -> np.ndarray:
         in_filename = Path(wf.name)
         out_filename = in_filename.parent / (in_filename.stem + ".out")
         in_params["out_filename"] = f"{out_filename.name}"
-        write_in_file(in_filename, 2, **in_params)
+        write_in_file(in_filename, **in_params)
 
     # Call out to jktebop to process the in file & generate the corresponding .out file
     # with the modelled LC data, which we parse and return as shape [2, #rows]
@@ -360,7 +360,8 @@ def _prepare_params_for_task(task: int,
     # JKTEBOP will only take nominal values as input
     params = { k: v.nominal_value if isinstance(v, UFloat) else v for (k, v) in params.items() }
 
-    # Apply any defaults for rarely used params
+    # Apply any defaults for params rarely set explicitly
+    params.setdefault("task", task)
     params.setdefault("ring", 5)
 
     if fit_rA_and_rB:
@@ -382,5 +383,11 @@ def _prepare_params_for_task(task: int,
         # To signal this set the coeffs to a large negative value.
         params["reflA"] = -100
         params["reflB"] = -100
+    elif task == 3:
+        params.setdefault("simulations", "")
+    elif task == 8:
+        params.setdefault("simulations", 1)
+    elif task == 9:
+        params.setdefault("simulations", 1)
 
     return params

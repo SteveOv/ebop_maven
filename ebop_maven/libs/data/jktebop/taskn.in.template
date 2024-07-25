@@ -1,4 +1,4 @@
- 3              ${ring}     Task to do (from 2 to 9)   Integ. ring size (deg)  
+ ${task}        ${ring}     Task to do (from 2 to 9)   Integ. ring size (deg)  
  ${rA_plus_rB}  ${k}        Sum of fractional radii    Ratio of the radii      
  ${inc}         ${qphot}    Orbital inclination (deg)  Mass ratio of system    
  ${ecosw}       ${esinw}    ecosw or eccentricity      esinw or periastron long
@@ -11,7 +11,7 @@
  0.000          0.000       Phase of primary eclipse   Light scale factor (mag)
  ${period}                  Orbital period of eclipsing binary system (days)
  ${primary_epoch}           Reference time of primary minimum (JD)
- 
+ ${simulations}
  1 1  Adjust RADII SUM    or  RADII RATIO    (0, 1, 2, 3)
  1 ${qphot_fit}  Adjust INCLINATION  or  MASSRATIO      (0, 1, 2, 3)
  ${ecosw_fit} ${esinw_fit}  Adjust ECOSW-or-E   or  ESINW-or-OMEGA (0, 1, 2, 3)     
@@ -28,4 +28,4 @@
  ${file_name_stem}.out
  ${file_name_stem}.fit
 
-# Source Template: /libs/data/jktebop/task3.in.template
+# Source Template: /libs/data/jktebop/taskn.in.template
