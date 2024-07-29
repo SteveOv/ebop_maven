@@ -72,6 +72,10 @@ class Test_deb_example(unittest.TestCase):
             input_lc_feature = { deb_example.default_mags_key: np.arange(mags_bins) }
             deb = deb_example.serialize("t1", input_labels, input_lc_feature, {})
 
+            # With wrap_phase we're specifying the last phase in the output; any input phased after
+            # this value will "wrapped" round to a negative phase (unless it is zero, when it is
+            # ignored). For example, if wrap_phase=0.75 we expect the output phases to cover
+            # (-0.25, 0.75], effectively shifting the zero phase "right" by 25% of the data's length
             for wrap_phase, exp_phase_zero_ix in [(0.0, 0),
                                                   (1.0, 0),
                                                   (0.5, mags_bins * 0.5),
@@ -164,6 +168,42 @@ class Test_deb_example(unittest.TestCase):
                 for lb_ix in np.arange(500, 600, 1):
                     self.assertEqual(lc_feature[lb_ix + roll_by],
                                      input_lc_feature[deb_example.default_mags_key][lb_ix])
+
+    def test_create_map_func_with_mags_wrap_and_roll(self):
+        """ Tests the created map_func's mags_wrap and roll_steps combine as expected """
+        with self.__class__.lock:
+            # Set up a feature (light-curve) amd labels and with tracable values
+            # so the contents of each mags_bin matches its initial index with phase 0 at ix [0]
+            input_labels = { k: v for v, k in enumerate(deb_example.labels_and_scales) }
+            mags_bins = deb_example.default_mags_bins
+            input_lc_feature = { deb_example.default_mags_key: np.arange(mags_bins) }
+            deb = deb_example.serialize("t1", input_labels, input_lc_feature, {})
+
+            # We expect the wrap_phase and roll_steps to be additive.
+            # Wrap phase specifies the last phase of the output, with any input data phased beyond
+            # this wrapped to negative phase (except if it is zero when it is ignored).
+            # To this we add the roll_steps for augmentation/perturbation to the phase of the
+            # datapoints, given directly as the number of bins to roll the data left or right.
+            for wrap_phase, roll_steps, exp_phase_zero_ix in [(0.0, 0, 0),
+                                                              (0.0, 5, 5),
+                                                              (0.0, -5, mags_bins-5),
+                                                              (1.0, 5, 5),
+                                                              (1.0, -5, mags_bins-5),
+                                                              (0.75, 10, (mags_bins*0.25)+10),
+                                                              (0.75, -10, (mags_bins*0.25)-10),
+                                                              (-0.25, -10, (mags_bins*0.25)-10),
+                                                              (0.5, 15, (mags_bins*0.5)+15),
+                                                              (0.25, -25, (mags_bins*0.75)-25)]:
+                # pylint: disable=cell-var-from-loop
+                # Execute a graph instance of the map_func, with wrap, to mimic a Dateset pipeline.
+                map_parse_fn = tf.function(deb_example.create_map_func(mags_wrap_phase=wrap_phase,
+                                                                       roll_steps=lambda: roll_steps))
+                ((lc_feature, _), _) = map_parse_fn(deb)
+
+                # Asserting the phase zero (originally zeroth bin) is rolled to where we expect
+                lc_feature = lc_feature.numpy()[:, 0]
+                phase_zero_ix = np.where(lc_feature == 0)[0]
+                self.assertEqual(phase_zero_ix, exp_phase_zero_ix)
 
     def test_create_map_func_with_noise(self):
         """ Tests the created map_func's roll functionality """
