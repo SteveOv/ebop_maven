@@ -66,16 +66,12 @@ def generate_instances_from_distributions(instance_count: int, label: str, verbo
             L3          = np.random.normal(0., 0.1)
             L3          = 0 # continue to override until revised JKTEBOP released
 
-            # The qphot mass ratio (MB/MA) affects the lightcurve with the ellipsoidal effect from
-            # distortion of the stars' shape. Set to -100 to force spherical stars or derive a value
-            # Here we are using the k-q relations of Demircan & Kahraman (1991, Ap&SS, 181, pp320);
-            #   - both stars <1.66 M_sun: k=q^0.935, so q=k^1.07
-            #   - both stars >1.66 M_sun: k=q^0.542, so q=k^1.85
-            #   - low-mass MB / high-mass MA: k=q^0.724, so q=k^1.38
-            #   - general/single empirical fit; R=1.01*M^0.724 (0.1 < M < 18.1 M_sun), so q~k^1.4
-            # Various combinations tried and the most effective Model found when trained on the
-            # last of these relations "spiced" with a normal distribution.
-            qphot       = k**np.random.normal(1.4, scale=0.2)
+            # The qphot mass ratio value (MB/MA) affects the lightcurve via the ellipsoidal effect
+            # from the distortion of the stars' shape. Generate a value from the ratio of the radii
+            # (or set to -1 to force spherical). Standard homology M-R ratios are a starting point;
+            # - low mass M-S stars;     M \propto R^2.5
+            # - high-mass M-S stars;    M \propto R^1.25
+            qphot       = np.random.normal(loc=k**2, scale=0.1)
 
             # We generate ecc and omega (argument of periastron) from appropriate distributions.
             # They're not used directly as labels, but they make up ecosw and esinw which are.
