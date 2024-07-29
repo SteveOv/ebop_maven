@@ -204,6 +204,7 @@ def make_dataset_file(trainset_file: Path,
     :verbose: whether to print verbose progress/diagnostic messages
     :simulate: whether to simulate the process, skipping only file/directory actions
     """
+    # pylint: disable=too-many-statements, too-many-branches
     label = trainset_file.stem
     output_dir = trainset_file.parent if output_dir is None else output_dir
     this_seed = f"{trainset_file.name}/{seed}"
@@ -254,17 +255,13 @@ def make_dataset_file(trainset_file: Path,
                     noise = noise_generator.normal(0., scale=noise_sigma, size=len(fluxes))
                     model_data[1] = np.multiply(-2.5, np.log10(fluxes + noise))
 
-            # We apply and store various supported configs of bins and wrap phase
+            # We store mags_features for various supported bins values
             interpolator = interp1d(model_data[0], model_data[1], kind=interp_kind)
             mags_features = {}
-            for mag_name, (mags_bins, wrap_phase) in deb_example.stored_mags_features.items():
-                # Ensure we don't waste a row on a phase 1.0 value already covered by phase 0.0
+            for mag_name, mags_bins in deb_example.stored_mags_features.items():
+                # Ensure we don't waste a bin repeating the value for phase 0.0 & 1.0
                 new_phases = np.linspace(0., 1., mags_bins + 1)[:-1]
                 bin_model_data = np.array([new_phases, interpolator(new_phases)], dtype=np.double)
-                if wrap_phase and 0 < wrap_phase < 1:
-                    bin_model_data[0, bin_model_data[0] > wrap_phase] -= 1.
-                    shift = bin_model_data.shape[1] - np.argmin(bin_model_data[0])
-                    bin_model_data = np.roll(bin_model_data, shift, axis=1)
                 mags_features[mag_name] = bin_model_data[1]
 
             # These are the extra features which may be used for predictions alongside the LC.

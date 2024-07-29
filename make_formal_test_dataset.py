@@ -113,14 +113,15 @@ Selected targets are:               {', '.join(target_names) if target_names els
             pe = pipeline.to_lc_time(target_cfg["primary_epoch"], lc)
             period = target_cfg["period"] * u.d
 
-            # Produce multiple mags set (varying #bins & wrap phase) available for serialization
+            # Produce multiple mags set (varying #bins) available for serialization
             if verbose:
                 print(f"{target}: Creating phase normalized, folded lightcurves about",
                         f"{pe.format} {pe} & {period}.")
             mags_features = {}
-            for mag_name, (mags_bins, wrap_phase) in deb_example.stored_mags_features.items():
+            for mag_name, mags_bins in deb_example.stored_mags_features.items():
                 # Phase folding the light-curve, then interpolate for the mags features
-                wrap_phase = u.Quantity(wrap_phase)
+                # Make sure the normalized fold has the primary/phase-zero at index 0 (like JKTEBOP)
+                wrap_phase = u.Quantity(1.0)
                 fold_lc = lc.fold(period, pe, wrap_phase=wrap_phase, normalize_phase=True)
                 _, mags = pipeline.get_sampled_phase_mags_data(fold_lc, mags_bins, wrap_phase)
                 mags_features[mag_name] = mags

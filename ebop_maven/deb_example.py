@@ -9,15 +9,13 @@ import tensorflow as tf
 
 # We can store multiple configuration of the mags feature but we can publish only one.
 stored_mags_features = {
-    "mags_1024_0.75": (1024, 0.75),
-    "mags_1024_1.0": (1024, 1.0),
-    # "mags_2048_0.75": (2048, 0.75),
-    # "mags_2048_1.0": (2048, 1.0),
-    "mags_4096_0.75": (4096, 0.75),
-    "mags_4096_1.0": (4096, 1.0),
+    "mags_1024": 1024,
+    # "mags_2048": 2048,
+    "mags_4096": 4096,
 }
-default_mags_key = "mags_1024_0.75"                                                     # pylint: disable=invalid-name
-(default_mags_bins, default_mags_wrap_phase) = stored_mags_features[default_mags_key]   # pylint: disable=invalid-name
+default_mags_key = "mags_1024"                                  # pylint: disable=invalid-name
+default_mags_bins = stored_mags_features[default_mags_key]      # pylint: disable=invalid-name
+default_mags_wrap_phase = 1.0                                   # pylint: disable=invalid-name
 
 
 # Python 3.7+ language spec ensures dictionary order is preserved
@@ -53,19 +51,19 @@ description = {
 
     # Complex features: multiple configs of the phase folded light-curve mags
     **{ k: tf.io.FixedLenFeature((bins,), tf.float32, [0.] * bins)
-                        for (k, (bins, _)) in stored_mags_features.items() },
+                        for k, bins in stored_mags_features.items() },
 
     # Extra features are expected to have a single float value each
-    **{ k: tf.io.FixedLenFeature([], tf.float32, default_value=v)
-                        for k, v in extra_features_and_defaults.items() },
+    **{ k: tf.io.FixedLenFeature([], tf.float32, default_value=default_val)
+                        for k, default_val in extra_features_and_defaults.items() },
 }
 
 # Common options used when reading or writing a deb Example dataset file
 ds_options = tf.io.TFRecordOptions(compression_type=None)
 
-def create_mags_key(mags_bins: int, mags_wrap_phase: float) -> str:
+def create_mags_key(mags_bins: int) -> str:
     """ Helper function to format a key to the stored_mags_features dict """
-    return f"mags_{int(mags_bins)}_{float(mags_wrap_phase)}"
+    return f"mags_{int(mags_bins)}"
 
 def serialize(identifier: str,
               labels: Dict[str, float],
@@ -132,7 +130,9 @@ def create_map_func(mags_bins: int = default_mags_bins,
     negative values roll to the left and positive values to the right
     :returns: the configured map function
     """
-    mags_key = create_mags_key(mags_bins, mags_wrap_phase)
+    # pylint: disable=too-many-arguments
+    mags_key = create_mags_key(mags_bins)
+    mags_wrap_phase = mags_wrap_phase % 1 # Treat the wrap a cyclic & force it into the range [0, 1)
     if ext_features is not None:
         chosen_ext_feat_and_defs = { ef: extra_features_and_defaults[ef] for ef in ext_features}
     else:
@@ -150,16 +150,23 @@ def create_map_func(mags_bins: int = default_mags_bins,
         # so basically a change from (#bins,) to (#bins, 1)
         mags_feature = tf.reshape(example[mags_key], shape=(mags_bins, 1))
 
-        # Apply any perturbations to the model mags
+        # Apply any noise augmentations to the model mags
         if noise_stddev:
             stddev = noise_stddev()
             if stddev != 0.:
                 mags_feature += tf.random.normal(mags_feature.shape, stddev=stddev)
 
+        # Now roll the mags to match the requested wrap phase. For example, if the wrap phase
+        # is 0.75 then the mags will be rolled right by 0.25 phase so that those mags originally
+        # beyond phase 0.75 are rolled round to lie before phase 0 (as phases -0.25 to 0).
+        # Combine with any roll augmentation so we only incur the overhead of rolling once
+        roll_bins = 0 if mags_wrap_phase == 0 else int(mags_bins * (1.0 - mags_wrap_phase))
         if roll_steps:
-            roll_by = roll_steps()
-            if roll_by != 0:
-                mags_feature = tf.roll(mags_feature, [roll_by], axis=[0])
+            roll_bins += roll_steps()
+        if roll_bins != 0:
+            if roll_bins > mags_bins // 2:
+                roll_bins -= mags_bins
+            mags_feature = tf.roll(mags_feature, [roll_bins], axis=[0])
 
         # The Extra features: ignore unknown fields and use default if not found
         ext_features = [example.get(k, d) for (k, d) in chosen_ext_feat_and_defs.items()]
@@ -196,6 +203,7 @@ def create_dataset_pipeline(dataset_files: Iterable[str],
     :returns: a tuple of (dataset pipeline, row count). The row count is the total
     rows without any optional filtering applied.
     """
+    # pylint: disable=too-many-arguments
     # Read through once to get the total number of records
     ds = tf.data.TFRecordDataset(list(dataset_files), num_parallel_reads=100,
                                  compression_type=ds_options.compression_type)
@@ -258,7 +266,8 @@ def iterate_dataset(dataset_files: Iterable[str],
     :returns: for each matching row yields a tuple of (id, mags vals, ext feature vals, label vals)
     """
     # pylint: disable=too-many-arguments, too-many-locals
-    mags_key = create_mags_key(mags_bins, mags_wrap_phase)
+    mags_key = create_mags_key(mags_bins)
+    mags_wrap_phase = mags_wrap_phase % 1 # Treat the wrap a cyclic & force it into the range [0, 1)
     if ext_features is not None:
         chosen_ext_feats = {
             f: extra_features_and_defaults[f] for f in ext_features if f != "mags" }
@@ -277,10 +286,17 @@ def iterate_dataset(dataset_files: Iterable[str],
         if noise_stddev:
             mags_feature += tf.random.normal(mags_feature.shape, stddev=noise_stddev)
 
+        # Now roll the mags to match the requested wrap phase. For example, if the wrap phase
+        # is 0.75 then the mags will be rolled right by 0.25 phase so that those mags originally
+        # beyond phase 0.75 are rolled round to lie before phase 0 (as phases -0.25 to 0).
+        # Combine with any roll augmentation so we only incur the overhead of rolling once
+        roll_bins = 0 if mags_wrap_phase == 0 else int(mags_bins * (1.0 - mags_wrap_phase))
         if roll_max:
-            roll_by = tf.random.uniform([], -roll_max, roll_max+1, tf.int32)
-            if roll_by != 0:
-                mags_feature = tf.roll(mags_feature, [roll_by], axis=[0])
+            roll_bins += tf.random.uniform([], -roll_max, roll_max+1, tf.int32)
+        if roll_bins != 0:
+            if roll_bins > mags_bins // 2:
+                roll_bins -= mags_bins
+            mags_feature = tf.roll(mags_feature, [roll_bins], axis=[0])
 
         ext_features = [example.get(k, d) for (k, d) in chosen_ext_feats.items()]
         if scale_labels:

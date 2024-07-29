@@ -15,17 +15,12 @@ class Test_deb_example(unittest.TestCase):
     lock = Lock()
 
     #
-    #   TEST create_mags_key(mags_bins: int, mags_wrap_phse: float) -> str
+    #   TEST create_mags_key(mags_bins: int) -> str
     #
     def test_create_mags_key_integers(self):
-        """ Tests create_map_key() make sure that int values are formatted as mags_int_float"""
-        self.assertEqual("mags_1024_2.0", deb_example.create_mags_key(1024, 2))
-
-    def test_create_mags_key_floats(self):
-        """ Tests create_map_key() make sure that float values are formatted as mags_int_float"""
-        self.assertEqual("mags_1024_0.2", deb_example.create_mags_key(1024.0, 0.2))
-        self.assertEqual("mags_1024_0.75", deb_example.create_mags_key(1024.1, 0.75))
-        self.assertEqual("mags_1024_0.666", deb_example.create_mags_key(1024.9, 0.666))
+        """ Tests create_map_key() make sure that int values are formatted as mags_int"""
+        self.assertEqual("mags_1024", deb_example.create_mags_key(1024))
+        self.assertEqual("mags_512", deb_example.create_mags_key(512.0))
 
 
     #
@@ -66,6 +61,33 @@ class Test_deb_example(unittest.TestCase):
             for label, exp_value in zip(labels, exp_values):
                 # Some loss of fidelity in encoding/decoding a tf.Tensor so can't do exact assert
                 self.assertAlmostEqual(label.numpy(), exp_value, 6)
+
+    def test_create_map_func_wrap_phase(self):
+        """ Tests the created map_func's wrap_phase functionality """
+        with self.__class__.lock:
+            # Set up a feature (light-curve) amd labels and with tracable values
+            # so the contents of each mags_bin matches its initial index with phase 0 at ix [0]
+            input_labels = { k: v for v, k in enumerate(deb_example.labels_and_scales) }
+            mags_bins = deb_example.default_mags_bins
+            input_lc_feature = { deb_example.default_mags_key: np.arange(mags_bins) }
+            deb = deb_example.serialize("t1", input_labels, input_lc_feature, {})
+
+            for wrap_phase, exp_phase_zero_ix in [(0.0, 0),
+                                                  (1.0, 0),
+                                                  (0.5, mags_bins * 0.5),
+                                                  (0.25, mags_bins * 0.75),
+                                                  (1.25, mags_bins * 0.75),
+                                                  (0.75, mags_bins * 0.25),
+                                                  (-0.25, mags_bins * 0.25)]:
+                # pylint: disable=cell-var-from-loop
+                # Execute a graph instance of the map_func, with wrap, to mimic a Dateset pipeline.
+                map_parse_fn = tf.function(deb_example.create_map_func(mags_wrap_phase=wrap_phase))
+                ((lc_feature, _), _) = map_parse_fn(deb)
+
+                # Asserting the phase zero (originally zeroth bin) is where we expect
+                lc_feature = lc_feature.numpy()[:, 0]
+                phase_zero_ix = np.where(lc_feature == 0)[0]
+                self.assertEqual(phase_zero_ix, exp_phase_zero_ix)
 
     def test_create_map_func_with_selected_ext_features(self):
         """ Test that the resulting map_func deserializes a deb_example with subset of ext_features """
