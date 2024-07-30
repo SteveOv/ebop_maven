@@ -52,6 +52,7 @@ np.random.seed(SEED)
 python_random.seed(SEED)
 tf.random.set_seed(SEED)
 
+# This schedule is effectively init_rate * 0.94^epoch (so is reduced by ~10 in 37 epochs)
 LR = optimizers.schedules.ExponentialDecay(1e-3, decay_steps=1000, decay_rate=0.94)
 OPTIMIZER = optimizers.Nadam(learning_rate=LR)
 LOSS = ["mae"]
