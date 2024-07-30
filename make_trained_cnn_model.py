@@ -45,14 +45,15 @@ TESTSET_DIR = Path(".") / "datasets" / "synthetic-mist-tess-dataset"
 TRAINING_EPOCHS = 250           # Set high if we're using early stopping
 BATCH_FRACTION = 0.001          # larger -> quicker training per epoch but more to converge
 MAX_BUFFER_SIZE = 20000000      # Size of Dataset shuffle buffer (in instances)
-EARLY_STOPPING_PATIENCE = 15    # Number of epochs w/o improvement before stopping
+EARLY_STOPPING_PATIENCE = 5     # Number of epochs w/o improvement before stopping
 ENFORCE_REPEATABILITY = True    # If true, avoid GPU/CUDA cores for repeatable results
 SEED = 42                       # Standard random seed ensures repeatable randomization
 np.random.seed(SEED)
 python_random.seed(SEED)
 tf.random.set_seed(SEED)
 
-OPTIMIZER = optimizers.Nadam(learning_rate=5e-4)
+LR = optimizers.schedules.ExponentialDecay(1e-3, decay_steps=1000, decay_rate=0.94)
+OPTIMIZER = optimizers.Nadam(learning_rate=LR)
 LOSS = ["mae"]
 METRICS = ["mse"] #+ [MeanAbsoluteErrorForLabel(CHOSEN_LABELS.index(l), l) for l in CHOSEN_LABELS]
 
@@ -203,8 +204,8 @@ if __name__ == "__main__":
             # $ tensorboard --port 6006 --logdir ./logs
             # Then start a browser and head to http://localhost:6006
             #callbacks.TensorBoard(log_dir="./logs", write_graph=True, write_images=True),
-            callbacks.EarlyStopping("val_loss", restore_best_weights=True,
-                                    patience=EARLY_STOPPING_PATIENCE, verbose=1),
+            callbacks.EarlyStopping("val_loss", restore_best_weights=True, min_delta=0.0001,
+                                start_from_epoch=5, patience=EARLY_STOPPING_PATIENCE, verbose=1),
             callbacks.CSVLogger(SAVE_DIR / "training-log.csv")
         ]
 
