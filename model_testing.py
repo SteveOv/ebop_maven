@@ -560,8 +560,6 @@ if __name__ == "__main__":
         # Set up the estimator and the reporting directory for this model
         the_estimator = Estimator(model_file)
         trainset_name = the_estimator.metadata["trainset_name"]
-        mags_key = deb_example.create_mags_key(the_estimator.mags_feature_bins,
-                                               the_estimator.mags_feature_wrap_phase)
         if model_file is None or model_file.parent.name == "estimator": # published with ebop_maven
             result_dir = Path("./drop/training/published/testing")
         else:
