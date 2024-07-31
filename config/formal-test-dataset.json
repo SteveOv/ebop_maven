@@ -665,8 +665,8 @@
     "V456 Cyg": {
         "source": "DEBCat and Van Reeth et al. (2022) Table 1. TESS sectors 14 and 15 fitted with JKTEBOP version 42. SpT and logLA from Bakis et al. (2014).",
         "reference": "VanReethSouthworth+22aa, BakisHensberge+14aj",
-        "exclude": true,
-        "why_exclude": "Components too large, at rA=0.27 and rB=0.26, for JKTEBOP simplified model.",
+        "exclude": false,
+        "why_exclude": "Components are large, at rA=0.27 and rB=0.26, for JKTEBOP's simplified model, however it was successfully used in the article providing the labels.",
         "aka": "TIC 15795549",
         "SpT": "A2hA7mA4V + F3V",
         "MA": 1.859,            "MA_err": 0.041,
@@ -1370,6 +1370,8 @@
     "V454 Aur": {
         "source": "Rediscussion XIX, Table II.  TESS sectors 20, 43, 44, 45, 60, 71, 72 and 73 SAP photometry analysed with JKTEBOP version 43.",
         "reference": "Southworth24obsR19",
+        "exclude": true,
+        "why_exclude": "Unable to get a robust control fit. Abandoned JKTEBOP task8 (MC simulations) fit as it was 'going nowhere' due to frequent Gaussj and 'failure to converge' warnings.",
         "aka": "TIC 138333980, HD 44192",
         "SpT": "F8 V + G1-2 V", 
         "MA": 1.034,            "MA_err": 0.006,
