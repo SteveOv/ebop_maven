@@ -213,8 +213,8 @@ def fit_against_formal_test_dataset(estimator: Union[Model, Estimator],
 
         params = {
             **base_jktebop_fit_params(3, period, pe, dat_fname.name, fit_stem, targ_config),
-            **{ n: get_nom(pred_vals[ix][n]) for n in pred_vals.dtype.names },  # predictions
-            **fit_overrides,                                                    # overrides
+            **{ n: pred_vals[ix][n] for n in pred_vals.dtype.names },   # predictions
+            **fit_overrides,                                            # overrides
         }
 
         # Add scale-factor poly fitting, chi^2 adjustment (to 1.0) and any light-ratio instructions
