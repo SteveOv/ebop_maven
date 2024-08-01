@@ -235,28 +235,28 @@ def make_dataset_file(trainset_file: Path,
         try:
             # model_data's shape is (2, rows) with phase in [0, :] and mags in [1, :]
             model_data = jktebop.generate_model_light_curve("trainset_", **params)
-            if np.isnan(np.min(model_data[1])):
+            if np.isnan(np.min(model_data["delta_mag"])):
                 # Checking for a Heisenbug where a model is somehow assigned NaN for at least 1 mag
                 # value, subsequently causing training to fail. Adding mitigation/error reporting
                 # seems to stop it happening despite the same source params, args and seed being
                 # used. I'll leave this in place to report if it ever happens again. I think the
                 # issue was caused by passing "bad" params to JKTEBOP which is why it's not repeated
                 print(f"{label}[{params['id']}]: Replacing NaN/Inf in processed LC.")
-                np.nan_to_num(x=model_data[1], copy=False)
+                np.nan_to_num(x=model_data["delta_mag"], copy=False)
 
             # Optionally, add Gaussian flux noise based on the instance's SNR
             snr = params.get("snr", None)
             if snr:
                 # We apply the noise to fluxes, so revert delta mags to normalized flux
                 # and base the noise sigma on the instance's SNR and mean flux
-                fluxes = np.power(10, np.divide(model_data[1], -2.5))
+                fluxes = np.power(10, np.divide(model_data["delta_mag"], -2.5))
                 noise_sigma = np.divide(np.mean(fluxes), np.power(10, np.divide(snr, 10)))
                 if noise_sigma:
                     noise = noise_generator.normal(0., scale=noise_sigma, size=len(fluxes))
-                    model_data[1] = np.multiply(-2.5, np.log10(fluxes + noise))
+                    model_data["delta_mag"] = np.multiply(-2.5, np.log10(fluxes + noise))
 
             # We store mags_features for various supported bins values
-            interpolator = interp1d(model_data[0], model_data[1], kind=interp_kind)
+            interpolator = interp1d(model_data["phase"], model_data["delta_mag"], kind=interp_kind)
             mags_features = {}
             for mag_name, mags_bins in deb_example.stored_mags_features.items():
                 # Ensure we don't waste a bin repeating the value for phase 0.0 & 1.0

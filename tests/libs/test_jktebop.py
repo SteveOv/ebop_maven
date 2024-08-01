@@ -157,13 +157,20 @@ class Testjktebop(unittest.TestCase):
         self.assertRaises(FileNotFoundError, generate_model_light_curve, self._prefix, **params)
         jktebop._jktebop_directory = Path(os.environ.get("JKTEBOP_DIR", "~/jktebop")).expanduser().absolute()
 
+    def test_generate_model_light_curve_data_dtype(self):
+        """ Test generate_model_light_curve(all necessary params) generates model data """
+        params = self._task2_params.copy()
+        model = generate_model_light_curve(self._prefix, **params)
+        self.assertIn("phase", model.dtype.names)
+        self.assertIn("delta_mag", model.dtype.names)
+
     def test_generate_model_light_curve_valid_params_only(self):
         """ Test generate_model_light_curve(all necessary params) generates model """
         params = self._task2_params.copy()
         model = generate_model_light_curve(self._prefix, **params)
         self.assertIsNotNone(model)
-        self.assertEqual(model.shape[0], 2) # columns
-        self.assertTrue(model.shape[1] > 0) # rows
+        self.assertTrue(model.shape[0] > 0)                 # rows
+        self.assertEqual(len(list(model.dtype.names)), 2)   # columns
 
     def test_generate_model_light_curve_valid_params_plus_extras(self):
         """ Test generate_model_light_curve(all necessary params + others) ignores others """
@@ -171,7 +178,7 @@ class Testjktebop(unittest.TestCase):
         params["another_param_to_be_ignores"] = "anything or nothing"
         model = generate_model_light_curve(self._prefix, **params)
         self.assertIsNotNone(model)
-        self.assertEqual(model.shape[0], 2) # columns
+        self.assertTrue(model.shape[0] > 0)                 # rows
 
 
     #
@@ -315,7 +322,7 @@ class Testjktebop(unittest.TestCase):
         data = np.loadtxt(file_name, comments="#", delimiter=" ", unpack=True)
         self.assertEqual(data.shape[0], 3)
         self.assertEqual(data.shape[1], len(lc))
-        self.assertAlmostEqual(data[0][750], float(lc.iloc[750]["time"].jd)-2.4e6, 6)
+        self.assertAlmostEqual(data[0][750], float(lc.iloc[750]["time"].value), 6)
         self.assertAlmostEqual(data[1][1000], float(lc.iloc[1000]["delta_mag"].value), 6)
 
     def test_write_light_curve_to_dat_file_explicit_columns(self):

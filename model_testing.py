@@ -223,8 +223,7 @@ def fit_against_formal_test_dataset(estimator: Union[Model, Estimator],
         append_lines += ["", "chif", ""] + [ f"lrat {l}" for l in lrats ]
 
         jktebop.write_in_file(in_fname, append_lines=append_lines, **params)
-        jktebop.write_light_curve_to_dat_file(
-                    lc, dat_fname, column_formats=[lambda t: f"{t.value:.6f}", "%.6f", "%.6f"])
+        jktebop.write_light_curve_to_dat_file(lc, dat_fname)
 
         # Don't consume the output files so they're available if we need any diagnostics.
         # Read superset of fit and label values as these data are needed for reports.

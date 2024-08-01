@@ -1,6 +1,6 @@
 """ Module for interacting with the JKTEBOP dEB light-curve fitting tool. """
 # pylint: disable=invalid-name
-from typing import Union, Dict, List, Tuple, Callable, Generator, Iterable
+from typing import Union, Dict, List, Tuple, Callable, Iterable
 import os
 import threading
 import subprocess
@@ -57,6 +57,9 @@ _param_file_line_beginswith = {
     "bS":               "Impact paramtr (secondary eclipse):",
     "phiS":             "Phase of secondary eclipse:"
 }
+
+# Defines the "columns" of the structured array returned by generate_model_light_curve()
+_task2_model_dtype = np.dtype([("phase", np.double), ("delta_mag", np.double)])
 
 def get_jktebop_dir() -> Path:
     """
@@ -146,13 +149,13 @@ def run_jktebop_task(in_filename: Path,
 def generate_model_light_curve(file_prefix: str, **params) -> np.ndarray:
     """
     Use JKTEBOP task 2 to generate a model light-curve for the passed
-    parameter set. The model data will be returned as an array of 
-    shape (2, rows) with column 0 the phase values and column 1 the magnitudes.
+    parameter set. The model data will be returned as a structured ndarray of 
+    shape (#rows, ) with 'columns' named phase and delta_mag.
 
     :file_prefix: the prefix to give temp files written jktebop
     :params: a **kwargs dictionary of the system params and values to model.
     See data/jktebop/task2.in.template for the params/tokens used.
-    :returns: model data as a shape(2, rows) ndarray
+    :returns: model data as a numpy structured ndarray of shape(rows, ["phase", "delta_mag"])
     """
     # Pre-process the params/tokens to be applied to the .in file.
     in_params = _prepare_params_for_task(2, params, calc_refl_coeffs=True)
@@ -170,10 +173,10 @@ def generate_model_light_curve(file_prefix: str, **params) -> np.ndarray:
         in_params["out_filename"] = f"{out_filename.name}"
         write_in_file(in_filename, **in_params)
 
-    # Call out to jktebop to process the in file & generate the corresponding .out file
-    # with the modelled LC data, which we parse and return as shape [2, #rows]
+    # Call out to jktebop to process the in file & generate the corresponding .out file with the
+    # modelled LC data, returning a Generator[str] for us to parse into our structured array.
     return np.loadtxt(run_jktebop_task(in_filename, out_filename, f"{in_filename.stem}.*"),
-                      usecols=(0, 1), comments="#", dtype=np.double, unpack=True)
+                      usecols=(0, 1), comments="#", dtype=_task2_model_dtype, unpack=False)
 
 
 def write_in_file(file_name: Path,
@@ -251,7 +254,7 @@ def write_light_curve_to_dat_file(lc: LightCurve,
     :file_name: the target file which will be overwritten if it already exists
     :column_names: the lc columns to read from [time, delta_mag, delta_mag_err]
     :column_formats: the formats to use for each column on writing them out to
-    the file [lambda t: f'{t.jd-2.4e6:.6f}', '%.6f', '%.6f']
+    the file [lambda t: f"{t.value:.6f}", "%.6f", "%.6f"]
     """
     if lc is None:
         raise TypeError("lc is None")
@@ -261,7 +264,7 @@ def write_light_curve_to_dat_file(lc: LightCurve,
     if column_names is None:
         column_names = ["time", "delta_mag", "delta_mag_err"]
     if column_formats is None:
-        column_formats = [lambda t: f"{t.jd-2.4e6:.6f}", "%.6f", "%.6f"]
+        column_formats = [lambda t: f"{t.value:.6f}", "%.6f", "%.6f"]
 
     # Check and set up the formats.
     if len(column_names) != len(column_formats):
@@ -281,7 +284,7 @@ def write_light_curve_to_dat_file(lc: LightCurve,
 
 
 def read_fitted_params_from_par_file(par_filename: Path,
-                                     params: List[str]) -> Dict[str, Tuple[float, float]]:
+                                     params: List[str]) -> Dict[str, UFloat]:
     """
     Will retrieve the final values of the requested parameters from the
     indicated JKTEBOP Task 3 parameter output file (.par).
@@ -305,8 +308,7 @@ def read_fitted_params_from_par_file(par_filename: Path,
 
 def read_fitted_params_from_par_lines(par_lines: Iterable[str],
                                       params: List[str],
-                                      as_ufloat: bool=False) \
-                                    -> Union[Dict[str, Tuple[float, float]], Dict[str, UFloat]]:
+                                      as_ufloat: bool=False) -> Dict[str, UFloat]:
     """
     Will retrieve the final values of the requested parameters from the
     passed on contents of a JKTEBOP Task 3 parameter output file (par)
