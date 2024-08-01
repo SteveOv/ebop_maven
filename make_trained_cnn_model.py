@@ -6,6 +6,7 @@ from pathlib import Path
 import os
 import random as python_random
 import json
+from inspect import getsource
 from datetime import datetime, timezone
 from contextlib import redirect_stdout
 
@@ -45,7 +46,8 @@ TESTSET_DIR = Path(".") / "datasets" / "synthetic-mist-tess-dataset"
 TRAINING_EPOCHS = 250           # Set high if we're using early stopping
 BATCH_FRACTION = 0.001          # larger -> quicker training per epoch but more to converge
 MAX_BUFFER_SIZE = 20000000      # Size of Dataset shuffle buffer (in instances)
-EARLY_STOPPING_PATIENCE = 5     # Number of epochs w/o improvement before stopping
+ES_PATIENCE = 5                 # Number of epochs w/o val_loss improvement before stopping
+ES_MIN_DELTA = 0.0001           # Minimum val_loss delta to be considered an improvment
 ENFORCE_REPEATABILITY = True    # If true, avoid GPU/CUDA cores for repeatable results
 SEED = 42                       # Standard random seed ensures repeatable randomization
 np.random.seed(SEED)
@@ -74,6 +76,13 @@ DNN_NUM_UNITS = 256
 DNN_NUM_FULL_LAYERS = 2
 DNN_DROPOUT_RATE = 0.5
 DNN_NUM_TAPER_UNITS = 64
+
+# These control augmentations
+# pylint: disable=unnecessary-lambda-assignment
+ROLL_MAX = int(4 * (MAGS_BINS/1024))
+roll_func = lambda: tf.random.uniform([], -ROLL_MAX, ROLL_MAX+1, tf.int32)
+noise_func = lambda: tf.random.uniform([], 0.001, 0.010, tf.float32)
+
 
 def make_best_model(chosen_features: list[str]=CHOSEN_FEATURES,
                     mags_bins: int=MAGS_BINS,
@@ -152,18 +161,17 @@ if __name__ == "__main__":
         # -----------------------------------------------------------
         # Set up the training and validation dataset pipelines
         # -----------------------------------------------------------
-        print("Picking up training and validation datasets.")
+        print("Creating training and validation dataset pipelines.")
+        print(f"Augmentation for roll: {getsource(roll_func)} where ROLL_MAX = {ROLL_MAX}")
+        print(f"Agumentation for noise: {getsource(noise_func)}")
         datasets = [tf.data.TFRecordDataset] * 2
         counts = [int] * 2
-        ROLL_MAX = int(4 * (MAGS_BINS/1024))
         map_func = deb_example.create_map_func(mags_bins=MAGS_BINS,
-                                            mags_wrap_phase=MAGS_WRAP_PHASE,
-                                            ext_features=CHOSEN_FEATURES,
-                                            labels=CHOSEN_LABELS,
-                                            noise_stddev=lambda: tf.random.uniform(
-                                                            [], 0.001, 0.010, tf.float32),
-                                            roll_steps=lambda: tf.random.uniform(
-                                                            [], -ROLL_MAX, ROLL_MAX+1, tf.int32))
+                                               mags_wrap_phase=MAGS_WRAP_PHASE,
+                                               ext_features=CHOSEN_FEATURES,
+                                               labels=CHOSEN_LABELS,
+                                               noise_stddev=noise_func,
+                                               roll_steps=roll_func)
         for ds_ix, (label, set_dir) in enumerate([("training", TRAINSET_DIR),
                                                 ("valiation", VALIDSET_DIR)]):
             files = list(set_dir.glob(TRAINSET_GLOB_TERM))
@@ -185,6 +193,11 @@ if __name__ == "__main__":
         model = make_best_model(verbose=True)
         model.compile(loss=LOSS, optimizer=OPTIMIZER, metrics=METRICS)
         model.summary()
+        print("\nTraining:",
+              f"epochs={TRAINING_EPOCHS}, patience={ES_PATIENCE}, min_delta={ES_MIN_DELTA}")
+        print(f"Optimizer: {OPTIMIZER.name} where LR is",
+              LR if isinstance(LR, (int, float)) else f"{LR.name}({vars(LR)})")
+        print(f"Loss function {LOSS} and metrics are {METRICS}")
 
         try:
             # Can only get this working specific pydot (1.4) & graphviz (8.0) conda packages.
@@ -206,8 +219,8 @@ if __name__ == "__main__":
             # $ tensorboard --port 6006 --logdir ./logs
             # Then start a browser and head to http://localhost:6006
             #callbacks.TensorBoard(log_dir="./logs", write_graph=True, write_images=True),
-            callbacks.EarlyStopping("val_loss", restore_best_weights=True, min_delta=0.0001,
-                                start_from_epoch=25, patience=EARLY_STOPPING_PATIENCE, verbose=1),
+            callbacks.EarlyStopping("val_loss", restore_best_weights=True, min_delta=ES_MIN_DELTA,
+                                    start_from_epoch=25, patience=ES_PATIENCE, verbose=1),
             callbacks.CSVLogger(SAVE_DIR / "training-log.csv")
         ]
 
