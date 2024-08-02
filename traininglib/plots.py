@@ -54,42 +54,41 @@ all_histogram_params = {
 }
 
 
-def plot_trainset_histograms(trainset_dir: Path,
-                             plot_file: Path=None,
-                             params: List[str]=None,
-                             cols: int=3,
-                             yscale: str="log",
-                             verbose: bool=True):
+def plot_dataset_histograms(csv_files: Iterable[Path],
+                            params: List[str]=None,
+                            cols: int=3,
+                            yscale: str="log",
+                            verbose: bool=True):
     """
-    Saves histogram plots to a single figure on a grid of axes. The params will
-    be plotted in the order they are listed, scanning from left to right and down.
+    Saves histogram plots to a single figure on a grid of axes. The params will be plotted
+    in the order they are listed, scanning from left to right and down. These are generated
+    from the dataset's CSV files as they may plot params not written to the dataset tfrecords.
 
-    :trainset_dir: the directory containing the trainset csv files
-    :plot_file: the directory to save the plots. If none, they're saved with the trainset
-    :parameters: the list of parameters to plot, or the full list if None.
+    :csv_files: a list of the dataset's csv files
+    :parames: the list of parameters to plot, or the full list if None.
     See the histogram_parameters attribute for the full list
     :cols: the width of the axes grid (the rows automatically adjust)
     :yscale: set to "linear" or "log" to control the y-axis scale
     :verbose: whether to print verbose progress/diagnostic messages
     """
     # pylint: disable=too-many-arguments
-    csvs = sorted(trainset_dir.glob("trainset*.csv"))
-
+    csv_files = sorted(csv_files)   # Happy for this to error if there's a problem
     if not params:
-        params = get_field_names_from_csvs(csvs)
+        params = get_field_names_from_csvs(csv_files)
     param_specs = { p: all_histogram_params[p] for p in params if p in all_histogram_params }
 
-    if param_specs and csvs:
+    fig = None
+    if param_specs and csv_files:
         rows = math.ceil(len(param_specs) / cols)
-        _, axes = plt.subplots(rows, cols, sharey="all",
-                               figsize=(cols*3, rows*2.5), constrained_layout=True)
+        fig, axes = plt.subplots(rows, cols, sharey="all",
+                                 figsize=(cols*3, rows*2.5), constrained_layout=True)
         if verbose:
             print(f"Plotting histograms in a {cols}x{rows} grid for:", ", ".join(param_specs))
 
         for (ax, field) in zip_longest(axes.flatten(), param_specs):
             if field:
                 bins, label = param_specs[field]
-                data = [row.get(field, None) for row in read_param_sets_from_csvs(csvs)]
+                data = [row.get(field, None) for row in read_param_sets_from_csvs(csv_files)]
                 if verbose:
                     print(f"Plotting histogram for {len(data):,} {field} values.")
                 ax.hist(data, bins=bins)
@@ -99,12 +98,7 @@ def plot_trainset_histograms(trainset_dir: Path,
                 ax.set_yscale(yscale)
             else:
                 ax.axis("off") # remove the unused ax
-
-        if verbose:
-            print("Saving histogram plot to", plot_file)
-        plot_file.parent.mkdir(parents=True, exist_ok=True)
-        plt.savefig(plot_file, dpi=100) # dpi is ignored for vector formats
-        plt.close()
+    return fig
 
 
 def plot_formal_test_dataset_hr_diagram(targets_cfg: Dict[str, any],

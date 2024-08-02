@@ -22,6 +22,7 @@ from ebop_maven.libs import orbital
 from ebop_maven.libs.tee import Tee
 
 DATASET_SIZE = 250000
+FILE_PREFIX = "trainset"
 dataset_dir = Path(f"./datasets/formal-training-dataset-{DATASET_SIZE // 1000}k/")
 dataset_dir.mkdir(parents=True, exist_ok=True)
 
@@ -129,7 +130,7 @@ if __name__ == "__main__":
                               file_count=DATASET_SIZE // 10000,
                               output_dir=dataset_dir,
                               generator_func=generate_instances_from_distributions,
-                              file_prefix="trainset",
+                              file_prefix=FILE_PREFIX,
                               valid_ratio=0.2,
                               test_ratio=0,
                               max_workers=5,
@@ -137,6 +138,8 @@ if __name__ == "__main__":
                               verbose=True,
                               simulate=False)
 
-        plots.plot_trainset_histograms(dataset_dir, dataset_dir/"train-histogram-full.png", cols=3)
-        plots.plot_trainset_histograms(dataset_dir, dataset_dir/"train-histogram-main.eps", cols=2,
-                                    params=["rA_plus_rB", "k", "J", "inc", "ecosw", "esinw"])
+        # Histograms are generated from the CSV files as they cover params not saved to tfrecord
+        csvs = sorted(dataset_dir.glob(f"**/{FILE_PREFIX}*.csv"))
+        plots.plot_dataset_histograms(csvs, cols=3).savefig(dataset_dir/"train-histogram-full.png")
+        plots.plot_dataset_histograms(csvs, ["rA_plus_rB", "k", "J", "inc", "ecosw", "esinw"],
+                                      cols=2).savefig(dataset_dir/"train-histogram-main.eps")

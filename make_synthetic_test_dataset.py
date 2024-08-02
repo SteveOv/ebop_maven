@@ -25,7 +25,7 @@ from ebop_maven.libs.mission import Mission
 from ebop_maven.libs.tee import Tee
 
 DATASET_SIZE = 20000
-RESUME = False
+FILE_PREFIX = "trainset"
 dataset_dir = Path("./datasets/synthetic-mist-tess-dataset/")
 dataset_dir.mkdir(parents=True, exist_ok=True)
 
@@ -216,13 +216,12 @@ def generate_instances_from_mist_models(label: str, verbose: bool=False):
 # which generates random plausible dEB systems based on MIST stellar models.
 # ------------------------------------------------------------------------------
 if __name__ == "__main__":
-
     with redirect_stdout(Tee(open(dataset_dir/"dataset.log", "w", encoding="utf8"))):
         datasets.make_dataset(instance_count=DATASET_SIZE,
                               file_count=10,
                               output_dir=dataset_dir,
                               generator_func=generate_instances_from_mist_models,
-                              file_prefix="trainset",
+                              file_prefix=FILE_PREFIX,
                               valid_ratio=0.,
                               test_ratio=1.,
                               max_workers=5,
@@ -230,14 +229,14 @@ if __name__ == "__main__":
                               verbose=True,
                               simulate=False)
 
-        # TODO: Update plot_trainset_histograms so that we can change name of the csv/dataset files
-        # Histograms are generated from the CSV files (as they cover params not in the dataset)
-        plots.plot_trainset_histograms(dataset_dir, dataset_dir/"synth-histogram-full.png", cols=4)
-        plots.plot_trainset_histograms(dataset_dir, dataset_dir/"synth-histogram-main.eps", cols=2,
-                                    params=["rA_plus_rB", "k", "J", "inc", "ecosw", "esinw"])
+        # Histograms are generated from the CSV files as they cover params not saved to tfrecord
+        csvs = sorted(dataset_dir.glob(f"**/{FILE_PREFIX}*.csv"))
+        plots.plot_dataset_histograms(csvs, cols=4).savefig(dataset_dir/"synth-histogram-full.png")
+        plots.plot_dataset_histograms(csvs, ["rA_plus_rB", "k", "J", "inc", "ecosw", "esinw"],
+                                      cols=2).savefig(dataset_dir/"synth-histogram-main.eps")
 
         # Simple diagnostic plot of the mags feature of a small sample of the instances.
-        dataset_files = sorted(dataset_dir.glob("**/*.tfrecord"))
+        dataset_files = sorted(dataset_dir.glob(f"**/{FILE_PREFIX}*.tfrecord"))
         ids, _, _, _ = deb_example.read_dataset(dataset_files)
         fig = plots.plot_dataset_instance_mags_features(dataset_files, ids[:30])
         fig.savefig(dataset_dir / "sample.pdf")
