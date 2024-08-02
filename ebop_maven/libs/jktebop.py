@@ -365,6 +365,10 @@ def _prepare_params_for_task(task: int,
     # Apply any defaults for params rarely set explicitly
     params.setdefault("task", task)
     params.setdefault("ring", 5)
+    params.setdefault("gravA", 0.)
+    params.setdefault("gravB", 0.)
+    params.setdefault("reflA", 0.)
+    params.setdefault("reflB", 0.)
 
     if fit_rA_and_rB:
         # indicate to JKTEBOP to fit/generate for rA and rB, rather than
