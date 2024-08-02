@@ -21,21 +21,8 @@ from traininglib import datasets, plots
 from ebop_maven.libs import orbital
 from ebop_maven.libs.tee import Tee
 
-# Creating a dataset is a two step process;
-#   1. create a set of csv files
-#   2. from these build a corresponding set of tensorflow (tfrecord) dataset files
-#
-# The reason for the split are;
-#   - it allows for the mulitple datasets to be created from a consistent set of
-#     instances (the csvs). This is useful during training/hyperparameter tuning
-#     by allow what's in a dataset to be varied (e.g. phase shift of the lightcurves)
-#   - tfrecord files are not easily readable so the csv files are useful for
-#     access to the original parameters of an instance. You could consider the
-#     dataset as the compiled output with the csvs being the source
-#   - it's a convenient break in the process
-
 DATASET_SIZE = 250000
-dataset_dir = Path(f"./datasets/formal-training-dataset-{DATASET_SIZE // 1000}k/")
+dataset_dir = Path(f"./datasets/formal-training-dataset-{DATASET_SIZE // 1000}k-test3/")
 dataset_dir.mkdir(parents=True, exist_ok=True)
 
 
