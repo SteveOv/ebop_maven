@@ -253,7 +253,7 @@ if __name__ == "__main__":
                                     simulate=False)
 
     # Simple diagnostic plot of the mags feature of randomly sampled instances.
-    dataset_files = list(dataset_dir.glob("**/*.tfrecord"))
+    dataset_files = sorted(dataset_dir.glob("**/*.tfrecord"))
     ids, _, _, _ = deb_example.read_dataset(dataset_files)
     fig = plots.plot_dataset_instance_mags_features(dataset_files, np.random.choice(ids, 30))
     fig.savefig(dataset_dir / "sample.pdf")
