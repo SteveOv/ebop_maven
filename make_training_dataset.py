@@ -22,7 +22,7 @@ from ebop_maven.libs import orbital
 from ebop_maven.libs.tee import Tee
 
 DATASET_SIZE = 250000
-dataset_dir = Path(f"./datasets/formal-training-dataset-{DATASET_SIZE // 1000}k-test3/")
+dataset_dir = Path(f"./datasets/formal-training-dataset-{DATASET_SIZE // 1000}k/")
 dataset_dir.mkdir(parents=True, exist_ok=True)
 
 

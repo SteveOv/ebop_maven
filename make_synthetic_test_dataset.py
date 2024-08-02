@@ -26,7 +26,7 @@ from ebop_maven.libs.tee import Tee
 
 DATASET_SIZE = 20000
 RESUME = False
-dataset_dir = Path("./datasets/synthetic-mist-tess-dataset-test/")
+dataset_dir = Path("./datasets/synthetic-mist-tess-dataset/")
 dataset_dir.mkdir(parents=True, exist_ok=True)
 
 # TODO: better way to share inst over multiple calls to generate_instances_from_mist_models()
