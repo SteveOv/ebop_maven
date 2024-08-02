@@ -39,14 +39,14 @@ dataset_dir = Path(f"./datasets/formal-training-dataset-{DATASET_SIZE // 1000}k/
 dataset_dir.mkdir(parents=True, exist_ok=True)
 
 
-def generate_instances_from_distributions(instance_count: int, label: str, verbose: bool=False):
+def generate_instances_from_distributions(label: str, verbose: bool=False):
     """
-    Generates the requested number of instances by picking from random distributions
-    over the JKTEBOP parameter range.
+    Generates system instances by picking from random distributions over the
+    JKTEBOP parameter range.
 
-    :instance_count: the number of systems to generate
+    :label: a useful label to use within messages
     :verbose: whether to print out verbose progress/diagnostics information
-    :returns: a generator over the dictionaries, one per system
+    :returns: a generator over instance parameter dictionaries, one per system
     """
     # pylint: disable=too-many-locals, invalid-name
     generated_counter = 0
@@ -57,7 +57,7 @@ def generate_instances_from_distributions(instance_count: int, label: str, verbo
     seed = int.from_bytes(hashlib.shake_128(label.encode("utf8")).digest(8))
     rng = np.random.default_rng(seed)
 
-    while usable_counter < instance_count:
+    while True: # infinite loop; we will continue to yield new instances until closed
         while True: # imitate "loop and a half" / "repeat ... until" logic
             # These are the "label" params for which we have defined distributions
             rA_plus_rB  = rng.uniform(low=0.001, high=0.45001)

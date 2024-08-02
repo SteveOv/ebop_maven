@@ -45,20 +45,19 @@ dataset_dir.mkdir(parents=True, exist_ok=True)
 # TODO: better way to share inst over multiple calls to generate_instances_from_mist_models()
 _mist_isochones = MistIsochrones()
 
-def generate_instances_from_mist_models(instance_count: int, label: str, verbose: bool=False):
+def generate_instances_from_mist_models(label: str, verbose: bool=False):
     """
-    Generates the requested number of system instances with a combination of random selecion
-    and lookups of MIST stellar models. The following steps are carried out for each candidate
-    instance;
+    Generates system instances with a combination of random selecion and lookups of MIST stellar
+    models. The following steps are carried out for each candidate instance;
     - random selection of Z, initial masses and age from suitable values available in MIST data
     - lookup of current mass, radius, T_effs, log(g) and luminosity values for each component
     - random selection of P, ecc, omega and inc from continuous distributions
     - calculation of rA+rB, k, J, ecosw, esinw, bP and LD params from above
     subject to checks that the system is plausible, will eclipse and is suitable for JKTEBOP
 
-    :instance_count: the number of systems to generate
+    :label: a useful label to use within messages
     :verbose: whether to print out verbose progress/diagnostics information
-    :returns: a generator over the dictionaries, one per system
+    :returns: a generator over instance parameter dictionaries, one per system
     """
     # pylint: disable=too-many-locals, too-many-statements, invalid-name
     generated_counter = 0
@@ -76,7 +75,7 @@ def generate_instances_from_mist_models(instance_count: int, label: str, verbose
     min_mass_value, max_mass_value = 0.4, 20.0
     cols = ["star_mass", "log_R", "log_Teff", "log_L", "log_g"]
 
-    while usable_counter < instance_count:
+    while True: # infinite loop; we will continue to yield new instances until closed
         while True: # imitate "loop and a half" / do ... until logic
             # Get a list of initial masses at a random metallicity & age to choose our stars from
             feh = rng.choice(feh_values)

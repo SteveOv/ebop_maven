@@ -57,7 +57,7 @@ histogram_params = {
 def make_dataset(instance_count: int,
                  file_count: int,
                  output_dir: Path,
-                 generator_func: Callable[[int, str, bool], Generator[dict[str, any], any, any]],
+                 generator_func: Callable[[str, bool], Generator[dict[str, any], any, any]],
                  valid_ratio: float=0.,
                  test_ratio: float=0,
                  file_prefix: str="dataset",
@@ -72,8 +72,8 @@ def make_dataset(instance_count: int,
     :instance_count: the number of training instances to create
     :file_count: the number of files to spread them over
     :output_dir: the directory to write the files to
-    :generator_func: the function to call to generate the required number of systems which must have
-    arguments (instance_count: int, file_stem: str, verbose: bool) and return a Generator[dict[str]]
+    :generator_func: the function to call to infinitely generate systems, until closed,
+    which must have arguments (file_stem: str, verbose: bool) and return a Generator[dict[str]]
     :valid_ratio: proportion of rows to be written to the validation files
     :test_ratio: proportion of rows to be written to the testing files
     :file_prefix: naming prefix for each of the dataset files
@@ -131,20 +131,20 @@ File names will be prefixed with:       {file_prefix}\n""")
 
 
 def make_dataset_file(inst_count: int,
-                    file_ix: int,
-                    output_dir: Path,
-                    generator_func: Callable[[int, str, bool], Generator[dict[str, any], any, any]],
-                    valid_ratio: float=0.,
-                    test_ratio: float=0,
-                    file_prefix: str="dataset",
-                    save_param_csvs: bool=True,
-                    verbose: bool=False,
-                    simulate: bool=False):
+                      file_ix: int,
+                      output_dir: Path,
+                      generator_func: Callable[[str, bool], Generator[dict[str, any], any, any]],
+                      valid_ratio: float=0.,
+                      test_ratio: float=0,
+                      file_prefix: str="dataset",
+                      save_param_csvs: bool=True,
+                      verbose: bool=False,
+                      simulate: bool=False):
     """
     Will make a TensorFlow dataset (tfrecord) file and, optionally, an accompanying parameter csv
     file. The dataset file is actually split into up to three subfiles, one each in training,
-    validation and testing subdirectories, with the ratios of instances in each dictated by the
-    valid_ratio and test_ratio arguments (with train_ratio implied).
+    validation and testing subdirectories, with the ratios of instances sent to each dictated by
+    the valid_ratio and test_ratio arguments (with train_ratio implied).
 
     TODO: Optionally, handles switching the LC and params if it's found that the eclipse at phase
     zero is not the deeper (deferred to make_dataset_file2).
@@ -154,8 +154,8 @@ def make_dataset_file(inst_count: int,
     :inst_count: the number of training instances to create
     :file_ix: the index number of this file. Is appended to file_prefix to make the file stem.
     :output_dir: the directory to write the files to
-    :generator_func: the function to call to generate the required number of systems which must have
-    arguments (instance_count: int, file_stem: str, verbose: bool) and return a Generator[dict[str]]
+    :generator_func: the function to call to infinitely generate systems, until closed,
+    which must have arguments (file_stem: str, verbose: bool) and return a Generator[dict[str]]
     :valid_ratio: proportion of rows to be written to the validation files
     :test_ratio: proportion of rows to be written to the testing files
     :file_prefix: naming prefix for each of the dataset files
@@ -178,31 +178,36 @@ def make_dataset_file(inst_count: int,
     else:
         csv_file = None
 
+    generator = generator_func(file_stem, verbose)
     ds_writers = [None] * 3
     ds_subsets = ["training", "validation", "testing"]
     try:
         # Set up the dataset files (deleting existing) and decide the distribution of instances
-        inst_file_ixs = [1] * round(valid_ratio*inst_count) + [2] * round(test_ratio*inst_count)
-        inst_file_ixs = [0] * (inst_count-len(inst_file_ixs)) + inst_file_ixs
+        inst_file_ixs = [1]*round(valid_ratio*inst_count) + [2]*round(test_ratio*inst_count)
+        inst_file_ixs = [0]*(inst_count-len(inst_file_ixs)) + inst_file_ixs
         for subset_ix, ds_subset in enumerate(ds_subsets):
             if not simulate:
-                writer = output_dir / ds_subset / ds_filename
+                ds_subset_file = output_dir / ds_subset / ds_filename
                 if subset_ix in inst_file_ixs:
-                    writer.parent.mkdir(exist_ok=True)
-                    ds_writers[subset_ix] = tf.io.TFRecordWriter(f"{writer}",
+                    ds_subset_file.parent.mkdir(parents=True, exist_ok=True)
+                    ds_writers[subset_ix] = tf.io.TFRecordWriter(f"{ds_subset_file}",
                                                                  deb_example.ds_options)
                 else:
-                    writer.unlink(missing_ok=True)
+                    ds_subset_file.unlink(missing_ok=True)
         rng.shuffle(inst_file_ixs)
 
-        for inst_ix, params in enumerate(generator_func(inst_count, file_stem, verbose)):
-
+        # This will continue to generate new instances until we have enough (==inst_count)
+        inst_ix = 0
+        while inst_ix < inst_count:
+            inst_id = inst_ix
             try:
-                # model_data's shape is (2, rows) with phase in [0, :] and mags in [1, :]
-                model_data = jktebop.generate_model_light_curve("trainset_", **params)
+                params = next(generator)
+                inst_id = params.get("id", inst_id)
+
+                model_data = jktebop.generate_model_light_curve(file_prefix, **params)
                 if np.isnan(np.min(model_data["delta_mag"])):
                     if verbose:
-                        print(f"{file_stem}[{params['id']}]: Replacing NaN/Inf in processed LC.")
+                        print(f"{file_stem}[{inst_id}]: Replacing NaN/Inf in processed LC.")
                     np.nan_to_num(x=model_data["delta_mag"], copy=False)
 
                 # Optionally, add Gaussian flux noise based on the instance's SNR
@@ -231,22 +236,23 @@ def make_dataset_file(inst_count: int,
                     "dS_over_dP": orbital.ratio_of_eclipse_duration(params["esinw"]),
                 }
 
-                # Write to the appropriate dataset file, based on the inst/file indices
-                row = deb_example.serialize(params["id"], params, mags_features, extra_features)
+                # Write to the appropriate dataset train/val/test file, based on inst/file indices
+                row = deb_example.serialize(inst_id, params, mags_features, extra_features)
                 ds_writers[inst_file_ixs[inst_ix]].write(row)
 
                 if csv_file:
                     write_param_sets_to_csv(csv_file, [params], append=True)
+                inst_ix += 1
 
             except Exception as exc: # pylint: disable=broad-exception-caught
                 traceback.print_exc(exc)
-                inst_file_ixs[inst_ix] = None
-                print(f"{file_stem}: Skipping instance {inst_ix} which caused exc: {params}")
+                print(f"{file_stem}[{inst_id}]: Skipping instance which caused exception:", params)
 
     finally:
-        for writer in ds_writers:
-            if writer and isinstance(writer, tf.io.TFRecordWriter):
-                writer.close()
+        for ds_subset_file in ds_writers:
+            if ds_subset_file and isinstance(ds_subset_file, tf.io.TFRecordWriter):
+                ds_subset_file.close()
+        generator.close()
 
     if verbose:
         for subset_ix, subset in enumerate(ds_subsets):
