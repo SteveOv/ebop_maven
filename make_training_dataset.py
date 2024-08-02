@@ -2,6 +2,7 @@
 import os
 from pathlib import Path
 from contextlib import redirect_stdout
+import hashlib
 
 import numpy as np
 
@@ -34,7 +35,6 @@ from ebop_maven.libs.tee import Tee
 #   - it's a convenient break in the process
 
 DATASET_SIZE = 250000
-RESUME = False
 dataset_dir = Path(f"./datasets/formal-training-dataset-{DATASET_SIZE // 1000}k/")
 dataset_dir.mkdir(parents=True, exist_ok=True)
 
@@ -51,19 +51,23 @@ def generate_instances_from_distributions(instance_count: int, label: str, verbo
     # pylint: disable=too-many-locals, invalid-name
     generated_counter = 0
     usable_counter = 0
-    set_id = label.replace("trainset", "")
+    set_id = ''.join(filter(str.isdigit, label))
+
+    # Don't use the built-in hash() function; it's not consistent across processes!!!
+    seed = int.from_bytes(hashlib.shake_128(label.encode("utf8")).digest(8))
+    rng = np.random.default_rng(seed)
 
     while usable_counter < instance_count:
         while True: # imitate "loop and a half" / "repeat ... until" logic
             # These are the "label" params for which we have defined distributions
-            rA_plus_rB  = np.random.uniform(low=0.001, high=0.45001)
-            k           = np.random.normal(loc=0.8, scale=0.4)
-            inc         = np.random.uniform(low=50., high=90.00001) * u.deg
-            J           = np.random.normal(loc=0.8, scale=0.4)
+            rA_plus_rB  = rng.uniform(low=0.001, high=0.45001)
+            k           = rng.normal(loc=0.8, scale=0.4)
+            inc         = rng.uniform(low=50., high=90.00001) * u.deg
+            J           = rng.normal(loc=0.8, scale=0.4)
 
             # We need a version of JKTEBOP which supports negative L3 input values
             # (not so for version 43) in order to train a model to predict L3.
-            L3          = np.random.normal(0., 0.1)
+            L3          = rng.normal(0., 0.1)
             L3          = 0 # continue to override until revised JKTEBOP released
 
             # The qphot mass ratio value (MB/MA) affects the lightcurve via the ellipsoidal effect
@@ -71,12 +75,12 @@ def generate_instances_from_distributions(instance_count: int, label: str, verbo
             # a value from other params. We're using the k-q relations of Demircan & Kahraman (1991)
             # Both <1.66 M_sun (k=q^0.935), both >1.66 M_sun (k=q^0.542), MB-low/MA-high (k=q^0.724)
             # and approx' single rule is k = q^0.715 which we use here (tests find this works best).
-            qphot       = np.random.normal(loc=k**1.4, scale=0.3) if k > 0 else 0
+            qphot       = rng.normal(loc=k**1.4, scale=0.3) if k > 0 else 0
 
             # We generate ecc and omega (argument of periastron) from appropriate distributions.
             # They're not used directly as labels, but they make up ecosw and esinw which are.
-            ecc         = np.abs(np.random.normal(loc=0.0, scale=0.2))
-            omega       = np.random.uniform(low=0., high=360.) * u.deg
+            ecc         = np.abs(rng.normal(loc=0.0, scale=0.2))
+            omega       = rng.uniform(low=0., high=360.) * u.deg
 
             # Now we can calculate the derived values, sufficient to check we've a usable system
             inc_rad     = inc.to(u.rad).value
@@ -132,29 +136,20 @@ def generate_instances_from_distributions(instance_count: int, label: str, verbo
 # samples parameter distributions over JKTEBOP's usable range.
 # ------------------------------------------------------------------------------
 if __name__ == "__main__":
-    with redirect_stdout(Tee(open(dataset_dir / "trainset.log",
-                                  "w",
-                                  encoding="utf8"))):
-        datasets.generate_dataset_csvs(instance_count=DATASET_SIZE,
-                                       file_count=DATASET_SIZE // 10000,
-                                       output_dir=dataset_dir,
-                                       generator_func=generate_instances_from_distributions,
-                                       file_pattern="trainset{0:03d}.csv",
-                                       verbose=True,
-                                       simulate=False)
 
-    plots.plot_trainset_histograms(dataset_dir, dataset_dir / "train-histogram-full.png", cols=3)
-    plots.plot_trainset_histograms(dataset_dir, dataset_dir / "train-histogram-main.eps", cols=2,
-                                   params=["rA_plus_rB", "k", "J", "inc", "ecosw", "esinw"])
+    with redirect_stdout(Tee(open(dataset_dir/"dataset.log", "w", encoding="utf8"))):
+        datasets.make_dataset(instance_count=DATASET_SIZE,
+                              file_count=DATASET_SIZE // 10000,
+                              output_dir=dataset_dir,
+                              generator_func=generate_instances_from_distributions,
+                              file_prefix="trainset",
+                              valid_ratio=0.2,
+                              test_ratio=0,
+                              max_workers=5,
+                              save_param_csvs=True,
+                              verbose=True,
+                              simulate=False)
 
-    with redirect_stdout(Tee(open(dataset_dir / "dataset.log",
-                                  "a" if RESUME else "w",
-                                  encoding="utf8"))):
-        datasets.make_dataset_files(trainset_files=sorted(dataset_dir.glob("trainset*.csv")),
-                                    output_dir=dataset_dir,
-                                    valid_ratio=0.2,
-                                    test_ratio=0,
-                                    resume=RESUME,
-                                    max_workers=5,
-                                    verbose=True,
-                                    simulate=False)
+        plots.plot_trainset_histograms(dataset_dir, dataset_dir/"train-histogram-full.png", cols=3)
+        plots.plot_trainset_histograms(dataset_dir, dataset_dir/"train-histogram-main.eps", cols=2,
+                                    params=["rA_plus_rB", "k", "J", "inc", "ecosw", "esinw"])
