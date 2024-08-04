@@ -245,7 +245,7 @@ def make_dataset_file(inst_count: int,
                 inst_ix += 1
 
             except Exception as exc: # pylint: disable=broad-exception-caught
-                traceback.print_exc(exc)
+                traceback.print_exception(exc)
                 print(f"{file_stem}[{inst_id}]: Skipping instance which caused exception:", params)
 
     finally:
