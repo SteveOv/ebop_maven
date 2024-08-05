@@ -27,65 +27,58 @@ dataset_dir = Path(f"./datasets/formal-training-dataset-{DATASET_SIZE // 1000}k/
 dataset_dir.mkdir(parents=True, exist_ok=True)
 
 
-def generate_instances_from_distributions(label: str, verbose: bool=False):
+def generate_instances_from_distributions(label: str):
     """
     Generates system instances by picking from random distributions over the
     JKTEBOP parameter range.
 
     :label: a useful label to use within messages
-    :verbose: whether to print out verbose progress/diagnostics information
     :returns: a generator over instance parameter dictionaries, one per system
     """
     # pylint: disable=too-many-locals, invalid-name
     generated_counter = 0
-    usable_counter = 0
     set_id = ''.join(filter(str.isdigit, label))
 
     # Don't use the built-in hash() function; it's not consistent across processes!!!
     seed = int.from_bytes(hashlib.shake_128(label.encode("utf8")).digest(8))
     rng = np.random.default_rng(seed)
 
-    while True: # infinite loop; we will continue to yield new instances until closed
-        while True: # imitate "loop and a half" / "repeat ... until" logic
-            # These are the "label" params for which we have defined distributions
-            rA_plus_rB  = rng.uniform(low=0.001, high=0.45001)
-            k           = rng.normal(loc=0.8, scale=0.4)
-            inc         = rng.uniform(low=50., high=90.00001) * u.deg
-            J           = rng.normal(loc=0.8, scale=0.4)
+    while True: # infinite loop; we will continue to yield new instances until generator is closed
+        # These are the "label" params for which we have defined distributions
+        rA_plus_rB  = rng.uniform(low=0.001, high=0.45001)
+        k           = rng.normal(loc=0.8, scale=0.4)
+        inc         = rng.uniform(low=50., high=90.00001) * u.deg
+        J           = rng.normal(loc=0.8, scale=0.4)
 
-            # We need a version of JKTEBOP which supports negative L3 input values
-            # (not so for version 43) in order to train a model to predict L3.
-            L3          = rng.normal(0., 0.1)
-            L3          = 0 # continue to override until revised JKTEBOP released
+        # We need a version of JKTEBOP which supports negative L3 input values
+        # (not so for version 43) in order to train a model to predict L3.
+        L3          = rng.normal(0., 0.1)
+        L3          = 0 # continue to override until revised JKTEBOP released
 
-            # The qphot mass ratio value (MB/MA) affects the lightcurve via the ellipsoidal effect
-            # due to distortion of the stars' shape. Set to -100 to force spherical stars or derive
-            # a value from other params. We're using the k-q relations of Demircan & Kahraman (1991)
-            # Both <1.66 M_sun (k=q^0.935), both >1.66 M_sun (k=q^0.542), MB-low/MA-high (k=q^0.724)
-            # and approx' single rule is k = q^0.715 which we use here (tests find this works best).
-            qphot       = rng.normal(loc=k**1.4, scale=0.3) if k > 0 else 0
+        # The qphot mass ratio value (MB/MA) affects the lightcurve via the ellipsoidal effect
+        # due to distortion of the stars' shape. Set to -100 to force spherical stars or derive
+        # a value from other params. We're using the k-q relations of Demircan & Kahraman (1991)
+        # Both <1.66 M_sun (k=q^0.935), both >1.66 M_sun (k=q^0.542), MB-low/MA-high (k=q^0.724)
+        # and approx' single rule is k = q^0.715 which we use here (tests find this works best).
+        qphot       = rng.normal(loc=k**1.4, scale=0.3) if k > 0 else 0
 
-            # We generate ecc and omega (argument of periastron) from appropriate distributions.
-            # They're not used directly as labels, but they make up ecosw and esinw which are.
-            ecc         = np.abs(rng.normal(loc=0.0, scale=0.2))
-            omega       = rng.uniform(low=0., high=360.) * u.deg
+        # We generate ecc and omega (argument of periastron) from appropriate distributions.
+        # They're not used directly as labels, but they make up ecosw and esinw which are.
+        ecc         = np.abs(rng.normal(loc=0.0, scale=0.2))
+        omega       = rng.uniform(low=0., high=360.) * u.deg
 
-            # Now we can calculate the derived values, sufficient to check we've a usable system
-            inc_rad     = inc.to(u.rad).value
-            omega_rad   = omega.to(u.rad).value
-            esinw       = ecc * np.sin(omega_rad)
-            ecosw       = ecc * np.cos(omega_rad)
-            rA          = rA_plus_rB / (1 + k)
-            rB          = rA_plus_rB - rA
-            imp_prm     = orbital.impact_parameter(rA, inc, ecc, None, esinw,
-                                                   orbital.EclipseType.BOTH)
-
-            generated_counter += 1
-            inst_id = f"{set_id}/{generated_counter:06d}"
-            if datasets.is_usable_system(rA, rB, J, qphot, ecc, inc, imp_prm, r_limit=0.23):
-                break
+        # Now we can calculate the derived values, sufficient to check we've a usable system
+        inc_rad     = inc.to(u.rad).value
+        omega_rad   = omega.to(u.rad).value
+        esinw       = ecc * np.sin(omega_rad)
+        ecosw       = ecc * np.cos(omega_rad)
+        rA          = rA_plus_rB / (1 + k)
+        rB          = rA_plus_rB - rA
+        imp_prm     = orbital.impact_parameter(rA, inc, ecc, None, esinw, orbital.EclipseType.BOTH)
 
         # Create the pset dictionary.
+        generated_counter += 1
+        inst_id = f"{set_id}/{generated_counter:06d}"
         yield {
             "id":           inst_id,
 
@@ -113,10 +106,37 @@ def generate_instances_from_distributions(label: str, verbose: bool=False):
             "bS":           imp_prm[1],                      
         }
 
-        usable_counter += 1
-        if verbose and usable_counter % 100 == 0:
-            print(f"{label}: Generated {usable_counter:,} usable",
-                    f"instances from {generated_counter:,} distinct configurations.")
+
+def is_usable_instance(k: float=0, J: float=0, qphot: float=0, ecc: float=0,
+                       bP: float= None, bS: float=None,
+                       rA: float=1., rB: float=1., inc: float=0,
+                       **_ # Used to ignore any unexpected **params
+                       ) -> bool:
+    """
+    Checks various parameter values to decide whether this represents a usable instance.
+    Checks on;
+    - is system physically plausible
+    - will it generate eclipses
+    - is it suitable for modelling with JKTEBOP
+    """
+    # pylint: disable=invalid-name, too-many-arguments, unused-argument
+    usable = False
+
+    # Use invalid values as defaults so that if any are missing we fail
+    # Physically plausible (qphot of -100 is a magic number to force spherical)
+    usable = k > 0 and J > 0 and (qphot > 0 or qphot == -100) and ecc < 1
+
+    # Will eclipse
+    if usable:
+        usable = all(b is not None and b <= 1 + k for b in [bP, bS])
+
+    # Compatible with JKTEBOP restrictions
+    # Soft restriction of rA & rB both <= r_limit as its model is not suited to higher
+    # Hard restrictions of rA+rB<0.8 (covered by above), inc > 50
+    # TODO: will need to extend this for L3 if we start to use non-Zero L3 values
+    if usable:
+        usable = rA <= 0.23 and rB <= 0.23 and inc > 50
+    return usable
 
 
 # ------------------------------------------------------------------------------
@@ -130,6 +150,7 @@ if __name__ == "__main__":
                               file_count=DATASET_SIZE // 10000,
                               output_dir=dataset_dir,
                               generator_func=generate_instances_from_distributions,
+                              check_func=is_usable_instance,
                               file_prefix=FILE_PREFIX,
                               valid_ratio=0.2,
                               test_ratio=0,

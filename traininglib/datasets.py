@@ -15,7 +15,6 @@ import hashlib
 
 import numpy as np
 from scipy.interpolate import interp1d
-import astropy.units as u
 import tensorflow as tf
 
 # Hack so that this module can see the ebop_maven package and below
@@ -57,7 +56,8 @@ histogram_params = {
 def make_dataset(instance_count: int,
                  file_count: int,
                  output_dir: Path,
-                 generator_func: Callable[[str, bool], Generator[dict[str, any], any, any]],
+                 generator_func: Callable[[str], Generator[dict[str, any], any, any]],
+                 check_func: Callable[[dict[str, any]], bool],
                  valid_ratio: float=0.,
                  test_ratio: float=0,
                  file_prefix: str="dataset",
@@ -73,7 +73,9 @@ def make_dataset(instance_count: int,
     :file_count: the number of files to spread them over
     :output_dir: the directory to write the files to
     :generator_func: the function to call to infinitely generate systems, until closed,
-    which must have arguments (file_stem: str, verbose: bool) and return a Generator[dict[str]]
+    which must have arguments (file_stem: str) and return a Generator[dict[str, any]]
+    :check_func: the boolean function to call to confirm an instance's params are usable.
+    Will be called with the instance's **params dictionary (as kwargs)
     :valid_ratio: proportion of rows to be written to the validation files
     :test_ratio: proportion of rows to be written to the testing files
     :file_prefix: naming prefix for each of the dataset files
@@ -112,7 +114,7 @@ File names will be prefixed with:       {file_prefix}\n""")
     file_inst_counts = list(_calculate_file_splits(instance_count, file_count))
     iter_params = (
         # pylint: disable=line-too-long
-        (inst_count, file_ix, output_dir, generator_func, valid_ratio, test_ratio, file_prefix, save_param_csvs, verbose, simulate)
+        (inst_count, file_ix, output_dir, generator_func, check_func, valid_ratio, test_ratio, file_prefix, save_param_csvs, verbose, simulate)
             for (file_ix, inst_count) in enumerate(file_inst_counts)
     )
 
@@ -133,7 +135,8 @@ File names will be prefixed with:       {file_prefix}\n""")
 def make_dataset_file(inst_count: int,
                       file_ix: int,
                       output_dir: Path,
-                      generator_func: Callable[[str, bool], Generator[dict[str, any], any, any]],
+                      generator_func: Callable[[str], Generator[dict[str, any], any, any]],
+                      check_func: Callable[[dict[str, any]], bool],
                       valid_ratio: float=0.,
                       test_ratio: float=0,
                       file_prefix: str="dataset",
@@ -155,7 +158,9 @@ def make_dataset_file(inst_count: int,
     :file_ix: the index number of this file. Is appended to file_prefix to make the file stem.
     :output_dir: the directory to write the files to
     :generator_func: the function to call to infinitely generate systems, until closed,
-    which must have arguments (file_stem: str, verbose: bool) and return a Generator[dict[str]]
+    which must have arguments (file_stem: str) and return a Generator[dict[str, any]]
+    :check_func: the boolean function to call to confirm an instance's params are usable.
+    Will be called with the instance's **params dictionary (as kwargs)
     :valid_ratio: proportion of rows to be written to the validation files
     :test_ratio: proportion of rows to be written to the testing files
     :file_prefix: naming prefix for each of the dataset files
@@ -178,7 +183,7 @@ def make_dataset_file(inst_count: int,
     else:
         csv_file = None
 
-    generator = generator_func(file_stem, verbose)
+    generator = generator_func(file_stem)
     ds_writers = [None] * 3
     ds_subsets = ["training", "validation", "testing"]
     try:
@@ -198,52 +203,58 @@ def make_dataset_file(inst_count: int,
 
         # This will continue to generate new instances until we have enough (==inst_count)
         inst_ix = 0
+        generated_counter = 0
         while inst_ix < inst_count:
             inst_id = inst_ix
             try:
                 params = next(generator)
-                inst_id = params.get("id", inst_id)
+                generated_counter += 1
 
-                model_data = jktebop.generate_model_light_curve(file_prefix, **params)
-                if np.isnan(np.min(model_data["delta_mag"])):
-                    if verbose:
-                        print(f"{file_stem}[{inst_id}]: Replacing NaN/Inf in processed LC.")
-                    np.nan_to_num(x=model_data["delta_mag"], copy=False)
+                if check_func(**params):
+                    inst_id = params.get("id", inst_id)
 
-                # Optionally, add Gaussian flux noise based on the instance's SNR
-                snr = params.get("snr", None)
-                if snr:
-                    # We apply the noise to fluxes, so revert delta mags to normalized flux
-                    # and base the noise sigma on the instance's SNR and mean flux
-                    fluxes = np.power(10, np.divide(model_data["delta_mag"], -2.5))
-                    noise_sigma = np.divide(np.mean(fluxes), np.power(10, np.divide(snr, 10)))
-                    if noise_sigma:
-                        noise = rng.normal(0., scale=noise_sigma, size=len(fluxes))
-                        model_data["delta_mag"] = np.multiply(-2.5, np.log10(fluxes + noise))
+                    model_data = jktebop.generate_model_light_curve(file_prefix, **params)
+                    if np.isnan(np.min(model_data["delta_mag"])):
+                        if verbose:
+                            print(f"{file_stem}[{inst_id}]: Replacing NaN/Inf in processed LC.")
+                        np.nan_to_num(x=model_data["delta_mag"], copy=False)
 
-                # We store mags_features for various supported bins values
-                mags_features = {}
-                interp = interp1d(model_data["phase"], model_data["delta_mag"], kind=interp_kind)
-                for mag_name, mags_bins in deb_example.stored_mags_features.items():
-                    # Ensure we don't waste a bin repeating the value for phase 0.0 & 1.0
-                    new_phases = np.linspace(0., 1., mags_bins + 1)[:-1]
-                    bin_model_data = np.array([new_phases, interp(new_phases)], dtype=np.double)
-                    mags_features[mag_name] = bin_model_data[1]
+                    # Optionally, add Gaussian flux noise based on the instance's SNR
+                    snr = params.get("snr", None)
+                    if snr:
+                        # We apply the noise to fluxes, so revert delta mags to normalized flux
+                        # and base the noise sigma on the instance's SNR and mean flux
+                        fluxes = np.power(10, np.divide(model_data["delta_mag"], -2.5))
+                        noise_sigma = np.divide(np.mean(fluxes), np.power(10, np.divide(snr, 10)))
+                        if noise_sigma:
+                            noise = rng.normal(0., scale=noise_sigma, size=len(fluxes))
+                            model_data["delta_mag"] = np.multiply(-2.5, np.log10(fluxes + noise))
 
-                # These are the extra features which may be used for predictions alongside the LC.
-                extra_features = {
-                    "phiS": orbital.secondary_eclipse_phase(params["ecosw"], params["ecc"]),
-                    "dS_over_dP": orbital.ratio_of_eclipse_duration(params["esinw"]),
-                }
+                    # We store mags_features for various supported bins values
+                    mags_features = {}
+                    interp = interp1d(model_data["phase"], model_data["delta_mag"], interp_kind)
+                    for mag_name, mags_bins in deb_example.stored_mags_features.items():
+                        # Ensure we don't waste a bin repeating the value for phase 0.0 & 1.0
+                        new_phases = np.linspace(0., 1., mags_bins + 1)[:-1]
+                        bin_model_data = np.array([new_phases, interp(new_phases)], dtype=np.double)
+                        mags_features[mag_name] = bin_model_data[1]
 
-                # Write to the appropriate dataset train/val/test file, based on inst/file indices
-                row = deb_example.serialize(inst_id, params, mags_features, extra_features)
-                ds_writers[inst_file_ixs[inst_ix]].write(row)
+                    # Any extra features which may be used for predictions alongside the LC.
+                    extra_features = {
+                        "phiS": orbital.secondary_eclipse_phase(params["ecosw"], params["ecc"]),
+                        "dS_over_dP": orbital.ratio_of_eclipse_duration(params["esinw"]),
+                    }
 
-                if csv_file:
-                    write_param_sets_to_csv(csv_file, [params], append=True)
-                inst_ix += 1
+                    # Write the appropriate dataset train/val/test file, based on inst/file indices
+                    row = deb_example.serialize(inst_id, params, mags_features, extra_features)
+                    ds_writers[inst_file_ixs[inst_ix]].write(row)
 
+                    if csv_file:
+                        write_param_sets_to_csv(csv_file, [params], append=True)
+
+                    inst_ix += 1
+                    if verbose and inst_ix % 100 == 0:
+                        print(f"{file_stem}: Generated {inst_ix:n} usable instances.")
             except Exception as exc: # pylint: disable=broad-exception-caught
                 traceback.print_exception(exc)
                 print(f"{file_stem}[{inst_id}]: Skipping instance which caused exception:", params)
@@ -258,8 +269,8 @@ def make_dataset_file(inst_count: int,
         for subset_ix, subset in enumerate(ds_subsets):
             saved_count = inst_file_ixs.count(subset_ix)
             if saved_count:
-                print("Simulated saving" if simulate else "Saved",
-                      f"{saved_count} {subset} instance(s) to",
+                print(f"{file_stem}:", "Simulated saving" if simulate else "Saved",
+                      f"{saved_count:n} {subset} instance(s) to",
                       f"{output_dir.name}/{subset}/{ds_filename}")
 
 
@@ -336,38 +347,6 @@ def get_field_names_from_csvs(file_names: list[Path]) -> list[str]:
         # Modify names so that it hold the names common to both
         names = [n for n in names if n in this_names] if names is not None else this_names
     return names
-
-
-def is_usable_system(rA: float, rB: float, J: float, qphot: float,
-                    ecc: float, inc: float, imp_params: tuple[float],
-                    eclipse_baseline: float=1.0, r_limit=0.2) -> bool:
-    """
-    Checks various  values to decide whether this represents a usable system.
-    Checks on;
-    - is system physically plausible
-    - will it generate eclipses
-    - is it suitable for modelling with JKTEBOP
-    """
-    usable = False
-
-    k = rB / rA
-
-    # Physically plausible (qphot of -100 is a magic number to force spherical)
-    usable = k > 0 and J > 0 and (qphot > 0 or qphot == -100) and ecc < 1
-
-    # Will eclipse
-    if usable:
-        usable = all(b <= eclipse_baseline + k for b in imp_params)
-
-    # Compatible with JKTEBOP restrictions
-    # Soft restriction of rA & rB both <= r_limit as its model is not suited to higher
-    # Hard restrictions of rA+rB<0.8 (covered by above), inc > 50
-    # TODO: will need to extend this for L3 if we start to use non-Zero L3 values
-    if usable:
-        if isinstance(inc, u.Quantity):
-            inc = inc.to(u.deg).value
-        usable = rA <= r_limit and rB <= r_limit and inc > 50
-    return usable
 
 
 def _calculate_file_splits(instance_count: int, file_count: int) -> list[int]:
