@@ -96,6 +96,7 @@ Generate & write dEB system dataset for required number of instances
 The number of instances to generate:    {instance_count:,} across {file_count} file(s)
 The dataset files to be written within: {output_dir}
 The instance generator function is:     {generator_func.__name__}
+The instance check function is:         {check_func.__name__}
 Training : Validation : Test ratio is:  {train_ratio:.2f} : {valid_ratio:.2f} : {test_ratio:.2f}
 The maximum concurrent workers:         {max_workers}
 File names will be prefixed with:       {file_prefix}\n""")
