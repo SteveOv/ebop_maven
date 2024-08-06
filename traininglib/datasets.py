@@ -62,6 +62,7 @@ def make_dataset(instance_count: int,
                  test_ratio: float=0,
                  file_prefix: str="dataset",
                  max_workers: int=1,
+                 swap_on_deeper_secondary: bool=False,
                  save_param_csvs: bool=True,
                  verbose: bool=False,
                  simulate: bool=False) -> None:
@@ -80,6 +81,7 @@ def make_dataset(instance_count: int,
     :test_ratio: proportion of rows to be written to the testing files
     :file_prefix: naming prefix for each of the dataset files
     :max_workers: maximum number of files to process concurrently
+    :swap_on_deeper_secondary: whether the components are swapped if the secondary eclipse is deeper
     :save_param_csvs: whether to save csv files with full params in addition to the dataset files.
     :verbose: whether to print verbose progress/diagnostic messages
     :simulate: whether to simulate the process, skipping only file/directory actions
@@ -98,8 +100,10 @@ The dataset files to be written within: {output_dir}
 The instance generator function is:     {generator_func.__name__}
 The instance check function is:         {check_func.__name__}
 Training : Validation : Test ratio is:  {train_ratio:.2f} : {valid_ratio:.2f} : {test_ratio:.2f}
-The maximum concurrent workers:         {max_workers}
-File names will be prefixed with:       {file_prefix}\n""")
+File names will be prefixed with:       {file_prefix}
+The maximum concurrent workers:         {max_workers}\n""")
+        if swap_on_deeper_secondary:
+            print("Instances' stars will be swapped where the secondary eclipse is the deeper")
         if simulate:
             print("Simulate requested so no files will be written.\n")
         elif save_param_csvs:
@@ -114,8 +118,8 @@ File names will be prefixed with:       {file_prefix}\n""")
     # args for each make_dataset_file call as required by process_pool starmap
     file_inst_counts = list(_calculate_file_splits(instance_count, file_count))
     iter_params = (
-        # pylint: disable=line-too-long
-        (inst_count, file_ix, output_dir, generator_func, check_func, valid_ratio, test_ratio, file_prefix, save_param_csvs, verbose, simulate)
+        (inst_count, file_ix, output_dir, generator_func, check_func, valid_ratio, test_ratio,
+         file_prefix, swap_on_deeper_secondary, save_param_csvs, verbose, simulate)
             for (file_ix, inst_count) in enumerate(file_inst_counts)
     )
 
@@ -141,6 +145,7 @@ def make_dataset_file(inst_count: int,
                       valid_ratio: float=0.,
                       test_ratio: float=0,
                       file_prefix: str="dataset",
+                      swap_on_deeper_secondary: bool=False,
                       save_param_csvs: bool=True,
                       verbose: bool=False,
                       simulate: bool=False):
@@ -165,6 +170,7 @@ def make_dataset_file(inst_count: int,
     :valid_ratio: proportion of rows to be written to the validation files
     :test_ratio: proportion of rows to be written to the testing files
     :file_prefix: naming prefix for each of the dataset files
+    :swap_on_deeper_secondary: whether the components are swapped if the secondary eclipse is deeper
     :save_param_csvs: whether to save csv files with full params in addition to the dataset files.
     :verbose: whether to print verbose progress/diagnostic messages
     :simulate: whether to simulate the process, skipping only file/directory actions
@@ -204,17 +210,31 @@ def make_dataset_file(inst_count: int,
 
         # This will continue to generate new instances until we have enough (==inst_count)
         inst_ix = 0
-        generated_counter = 0
+        generated_count, swap_count = 0, 0
         while inst_ix < inst_count:
             inst_id = inst_ix
             try:
                 params = next(generator)
-                generated_counter += 1
+                generated_count += 1
+                inst_id = params.get("id", inst_id)
 
-                if check_func(**params):
-                    inst_id = params.get("id", inst_id)
-
+                is_usable = check_func(**params)
+                if is_usable:
                     model_data = jktebop.generate_model_light_curve(file_prefix, **params)
+
+                    if swap_on_deeper_secondary:
+                        # Check the primary eclipse is the deeper. If not, we can swap the
+                        # components and roll the mags to move the secondary eclipse to phase zero.
+                        max_ix = np.argmax(model_data["delta_mag"])
+                        if 99 < max_ix < len(model_data) -99:
+                            _swap_instance_components(params)
+                            is_usable = check_func(**params)
+                            if is_usable:
+                                model_data["delta_mag"] = np.roll(model_data["delta_mag"], -max_ix)
+                                swap_count += 1
+
+                if is_usable:
+                    # Occasionally, JKTEBOP outputs NaN for a mag. Handle this by setting it to zero
                     if np.isnan(np.min(model_data["delta_mag"])):
                         if verbose:
                             print(f"{file_stem}[{inst_id}]: Replacing NaN/Inf in processed LC.")
@@ -267,6 +287,9 @@ def make_dataset_file(inst_count: int,
         generator.close()
 
     if verbose:
+        if swap_count > 0:
+            print(f"{file_stem}: Swapped the components of {swap_count} instance(s)",
+                  "where the secondary eclipse was deeper.")
         for subset_ix, subset in enumerate(ds_subsets):
             saved_count = inst_file_ixs.count(subset_ix)
             if saved_count:
@@ -363,3 +386,37 @@ def _calculate_file_splits(instance_count: int, file_count: int) -> list[int]:
     file_instance_counts = [int(np.ceil(instance_count / file_count))] * (file_count-1)
     file_instance_counts += [instance_count - sum(file_instance_counts)]
     return file_instance_counts
+
+
+def _swap_instance_components(params: dict[str, any]):
+    """
+    Handle swapping the A and B stars, and its effect on the various instance parameters.
+
+    :params: the params dict (passed byref) which is updated in place
+    """
+    # The "system as a whole" params such as rA_plus_rB, e and L3 are unchanged.
+    # However, we need to flip the ratios as the A and B stars are swapped.
+    params["k"] = np.reciprocal(params["k"])
+    params["J"] = np.reciprocal(params["J"])
+    params["qphot"] = np.reciprocal(params["qphot"])
+    if "LB_over_LA" in params:
+        params["LB_over_LA"] = np.reciprocal(params["LB_over_LA"])
+
+    # Swap over the impact params; what was the primary eclipse will now be the secondary
+    params["bP"], params["bS"] = params["bS"], params["bP"]
+
+    # We update omega to omega+pi; the ascending node is unchanged, but moving origin to star B
+    # changes the argument of periastron from ω to ω+pi. Using the relations sin(ω+pi)=-sin(ω)
+    # & cos(ω+pi)=-cos(ω) and with e unchanged, we just need to negate the Poincare elements.
+    params["ecosw"] *= -1
+    params["esinw"] *= -1
+    if "omega" in params:
+        omega = params["omega"]
+        params["omega"] = omega+180 if omega < 180 else omega-180
+
+    # Swap over the limb darkening parameters and any (optional) star specific informational params
+    for pattern in ["LD{0}", "LD{0}1", "LD{0}2", "r{0}", "R{0}", "M{0}", "L{0}", "Teff{0}"]:
+        keyA = pattern.format("A")
+        keyB = pattern.format("B")
+        if keyA in params and keyB in params:
+            params[keyA], params[keyB] = params[keyB], params[keyA]
