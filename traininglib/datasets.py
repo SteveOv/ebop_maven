@@ -7,7 +7,7 @@ Functions for generating binary system instances and writing their parameters to
 from typing import Callable, Generator
 from pathlib import Path
 from timeit import default_timer
-from datetime import timedelta
+from datetime import timedelta, datetime
 import traceback
 from multiprocessing import Pool
 import csv
@@ -110,6 +110,7 @@ The maximum concurrent workers:         {max_workers}\n""")
             print("Parameter CSV files will be saved to accompany dataset files.\n")
 
     if verbose:
+        print(f"Starting process at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}\n")
         start_time = default_timer()
 
     if not simulate:
