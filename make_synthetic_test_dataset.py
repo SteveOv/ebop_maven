@@ -74,7 +74,7 @@ def generate_instances_from_mist_models(label: str):
 
         # First choose the primary mass based on an IMF and multiplicity probability function
         # Choose our stars and then get the basic physical params from the isochrones
-        probs = np.power(init_masses, -2.35)        # Salpeter IMF
+        probs = salpeter_imf(init_masses)
         probs *= np.tanh(0.31 * init_masses + .18)  # Wells & Prsa Primary multiplicity frac
         probs = np.divide(probs, np.sum(probs))     # Scaled to get a pmf() == 1
         init_MA = rng.choice(init_masses, p=probs) * u.solMass
@@ -198,6 +198,10 @@ def generate_instances_from_mist_models(label: str):
                 "MB":           MB.to(u.solMass).value
             }
 
+def salpeter_imf(masses):
+    """ Salpeter IMF as a simple power law. """
+    # We'll assume the initial density is 1
+    return np.power(masses, -2.35)
 
 def is_usable_instance(k: float=0.0, J: float=0.0, qphot: float=0.0, ecc: float=-1.0,
                        bP: float=None, bS: float=None,
