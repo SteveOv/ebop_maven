@@ -45,8 +45,12 @@ def generate_instances_from_distributions(label: str):
 
     while True: # infinite loop; we will continue to yield new instances until generator is closed
         # These are the "label" params for which we have defined distributions
+        # Extending range of rA_plus_rB further makes negligible difference to predictions
         rA_plus_rB  = rng.uniform(low=0.001, high=0.45001)
         k           = rng.normal(loc=0.8, scale=0.4)
+        rA          = rA_plus_rB / (1 + k)              # Not used directly as labels, but useful
+        rB          = rA_plus_rB - rA
+
         inc         = rng.uniform(low=50., high=90.00001) * u.deg
         J           = rng.normal(loc=0.8, scale=0.4)
 
@@ -75,8 +79,6 @@ def generate_instances_from_distributions(label: str):
         omega_rad   = omega.to(u.rad).value
         esinw       = ecc * np.sin(omega_rad)
         ecosw       = ecc * np.cos(omega_rad)
-        rA          = rA_plus_rB / (1 + k)
-        rB          = rA_plus_rB - rA
         imp_prm     = orbital.impact_parameter(rA, inc, ecc, None, esinw, orbital.EclipseType.BOTH)
 
         # Create the pset dictionary.
@@ -134,7 +136,7 @@ def is_usable_instance(k: float=0, J: float=0, qphot: float=0, ecc: float=0,
         usable = all(b is not None and b <= 1 + k for b in [bP, bS])
 
     # Compatible with JKTEBOP restrictions
-    # Soft restriction of rA & rB both <= 0.23 as its model is not suited to higher
+    # Soft restriction of rA & rB both <= 0.23 as its model is not suited to r >~ 0.2
     # Hard restrictions of rA+rB<0.8 (covered by above), inc > 50
     if usable:
         usable = rA <= 0.23 and rB <= 0.23 and inc > 50
