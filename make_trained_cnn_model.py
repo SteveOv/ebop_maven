@@ -28,6 +28,7 @@ CHOSEN_FEATURES = []
 MAGS_BINS = 4096
 MAGS_WRAP_PHASE = 0.75
 CHOSEN_LABELS = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "bP"]
+OUTPUT_ACTIVATIONS = ["softplus"]*3 + ["linear"]*3
 TRAINSET_SUFFIX = "250k"
 
 MODEL_NAME = f"CNN-New-Ext{len(CHOSEN_FEATURES)}-{'-'.join(CHOSEN_LABELS[5:])}-" \
@@ -135,8 +136,7 @@ def make_best_model(chosen_features: list[str]=CHOSEN_FEATURES,
             modelling.hidden_layers(1, int(dnn_num_taper_units), dnn_initializer, dnn_activation,
                                     0, ("Taper-",), verbose) if dnn_num_taper_units else None
         ],
-        output=modelling.output_layer(metadata, dnn_initializer,
-                                      ["softplus"]*3 + ["linear"]*3, "Output", verbose),
+        output=modelling.output_layer(metadata, dnn_initializer, OUTPUT_ACTIVATIONS, verbose),
         post_build_step=None,
         name=model_name,
         verbose=verbose
