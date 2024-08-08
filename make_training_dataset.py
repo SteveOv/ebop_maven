@@ -64,7 +64,10 @@ def generate_instances_from_distributions(label: str):
 
         # We generate ecc and omega (argument of periastron) from appropriate distributions.
         # They're not used directly as labels, but they make up ecosw and esinw which are.
-        ecc         = np.abs(rng.normal(loc=0.0, scale=0.2))
+        # Eccentricity is uniform selection, restricted with eqn 5 of Wells & Prsa (2024) which
+        # reduces the max eccentricity with the separation plus 10% are fixed at 0 to ensure
+        # sufficient examples. This trains better than simple uniform or normal distributions tried.
+        ecc         = rng.choice([0, rng.uniform(low=0., high=1-(1.5*rA_plus_rB))], p=[0.1, 0.9])
         omega       = rng.uniform(low=0., high=360.) * u.deg
 
         # Now we can calculate the derived values, sufficient to check we've a usable system
