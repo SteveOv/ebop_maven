@@ -149,6 +149,8 @@ def make_best_model(chosen_features: list[str]=CHOSEN_FEATURES,
 if __name__ == "__main__":
     SAVE_DIR.mkdir(parents=True, exist_ok=True)
     with redirect_stdout(Tee(open(SAVE_DIR / "make_trained_cnn_model.log", "w", encoding="utf8"))):
+        print(f"Started at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}\n")
+        
         print("\n".join(f"{lib.__name__} v{lib.__version__}" for lib in [tf, tensorboard, keras]))
         if ENFORCE_REPEATABILITY:
             # Extreme, but it stops TensorFlow/Keras from using (even seeing) the GPU.
@@ -269,3 +271,5 @@ if __name__ == "__main__":
         model_testing.evaluate_model_against_dataset(model_file, 1, usable_targs, scaled=True)
         print("\n *** Running tests against formal-test-dataset with 1000 MC-Dropout iterations\n")
         model_testing.evaluate_model_against_dataset(model_file, 1000, usable_targs, scaled=True)
+
+        print(f"Completed at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}\n")
