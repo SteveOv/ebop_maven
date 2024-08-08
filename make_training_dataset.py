@@ -134,9 +134,8 @@ def is_usable_instance(k: float=0, J: float=0, qphot: float=0, ecc: float=0,
         usable = all(b is not None and b <= 1 + k for b in [bP, bS])
 
     # Compatible with JKTEBOP restrictions
-    # Soft restriction of rA & rB both <= r_limit as its model is not suited to higher
+    # Soft restriction of rA & rB both <= 0.23 as its model is not suited to higher
     # Hard restrictions of rA+rB<0.8 (covered by above), inc > 50
-    # TODO: will need to extend this for L3 if we start to use non-Zero L3 values
     if usable:
         usable = rA <= 0.23 and rB <= 0.23 and inc > 50
     return usable
