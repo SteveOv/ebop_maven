@@ -33,6 +33,7 @@ from traininglib import formal_testing, plots
 
 SYNTHETIC_MIST_TEST_DS_DIR = Path("./datasets/synthetic-mist-tess-dataset/")
 FORMAL_TEST_DATASET_DIR = Path("./datasets/formal-test-dataset/")
+TEST_RESULTS_SUBDIR = "testing"
 
 def evaluate_model_against_dataset(estimator: Union[Model, Estimator],
                                    mc_iterations: int=1,
@@ -560,9 +561,9 @@ if __name__ == "__main__":
         the_estimator = Estimator(model_file)
         trainset_name = the_estimator.metadata["trainset_name"]
         if model_file is None or model_file.parent.name == "estimator": # published with ebop_maven
-            result_dir = Path("./drop/training/published/testing")
+            result_dir = Path(f"./drop/training/published/{TEST_RESULTS_SUBDIR}")
         else:
-            result_dir = model_file.parent / "testing"
+            result_dir = model_file.parent / TEST_RESULTS_SUBDIR
         result_dir.mkdir(parents=True, exist_ok=True)
 
         labs, all_preds = None, {}
