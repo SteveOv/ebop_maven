@@ -44,13 +44,15 @@ def generate_instances_from_distributions(label: str):
     rng = np.random.default_rng(seed)
 
     while True: # infinite loop; we will continue to yield new instances until generator is closed
-        # These are the "label" params for which we have defined distributions
-        # Extending range of rA_plus_rB further makes negligible difference to predictions
+        # The "label" params are rA_plus_rB, k, J, ecosw, esinw and bP (or inc, depending on model)
+
+        # Extending range of rA_plus_rB and k further makes negligible difference to predictions
         rA_plus_rB  = rng.uniform(low=0.001, high=0.45001)
         k           = rng.normal(loc=0.8, scale=0.4)
         rA          = rA_plus_rB / (1 + k)              # Not used directly as labels, but useful
         rB          = rA_plus_rB - rA
 
+        # Simple uniform dist for inc (JKTEBOP bottoms out at 50 deg)
         inc         = rng.uniform(low=50., high=90.00001) * u.deg
         J           = rng.normal(loc=0.8, scale=0.4)
 
