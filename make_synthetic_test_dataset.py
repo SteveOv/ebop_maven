@@ -200,8 +200,26 @@ def generate_instances_from_mist_models(label: str):
 
 def salpeter_imf(masses):
     """ Salpeter IMF as a simple power law. """
-    # We'll assume the initial density is 1
-    return np.power(masses, -2.35)
+    # Ignore the normalization constant as this will be normalized later
+    imf = np.power(masses, -2.35)
+    return imf
+
+def chabrier_imf(masses):
+    """ Chabrier (2003PASP..115..763C) two part IMF (Table I) """
+    imf = np.zeros_like(masses, dtype=float)
+
+    # p(M) = 0.158 M^-2.3 for M >= 1.0 MSun
+    mask = masses >= 1.0
+    norm =  0.0443
+    imf[mask] = np.multiply(norm, np.power(masses[mask], -2.3))
+
+    # p(M) = 0.158/(M*ln(10)) * exp[-0.5*(log(M)-log(0.079)/0.69)^2] for M < 1.0 MSun
+    mask = ~mask
+    norm = np.divide(0.158, np.multiply(masses[mask], np.log(10)))
+    exponent = np.square(np.divide(np.subtract(np.log10(masses[mask]), np.log10(0.079)), 0.69))
+    imf[mask] = np.multiply(norm, np.exp(np.multiply(-0.5, exponent)))
+    return imf
+
 
 def is_usable_instance(k: float=0.0, J: float=0.0, qphot: float=0.0, ecc: float=-1.0,
                        bP: float=None, bS: float=None,
