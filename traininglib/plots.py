@@ -26,6 +26,8 @@ all_param_captions = {
     "esinw":        r"$e\,\sin{\omega}$",
     "L3":           r"$L_{3}$",
     "bP":           r"$b_{P}$",
+    "ecc":          r"$e$",
+    "e":            r"$e$",
 }
 
 # The full set of parameters available for histograms, their #bins and plot labels
