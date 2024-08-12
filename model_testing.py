@@ -107,9 +107,8 @@ def evaluate_model_against_dataset(estimator: Union[Model, Estimator],
                                                     ylabel="Residual")
                 fig.savefig(report_dir / f"predictions-{mc_type}-box-{ds_name}{sub_suffix}.pdf")
 
-                rep_flags = tflags if len(subset) == 0 else tflags[tmask]
                 fig = plots.plot_predictions_vs_labels(pred_vals[tmask], lbl_vals[tmask],
-                                                       rep_flags, pnames, show_errorbars=False)
+                                                       tflags[tmask], pnames, show_errorbars=False)
                 fig.savefig(report_dir/f"predictions-{mc_type}-vs-labels-{ds_name}{sub_suffix}.pdf")
 
             if report_dir and "formal" not in ds_name:

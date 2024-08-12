@@ -210,9 +210,9 @@ def plot_dataset_instance_mags_features(dataset_files: Iterable[Path],
     return fig
 
 
-def plot_predictions_vs_labels(predictions: np.rec.recarray[UFloat],
-                               labels: np.rec.recarray[UFloat],
-                               transit_flags: List[bool],
+def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
+                               labels: np.ndarray[UFloat],
+                               transit_flags: np.ndarray[bool],
                                selected_params: List[str]=None,
                                show_errorbars: bool=None,
                                xlabel_prefix: str="label",
@@ -248,7 +248,7 @@ def plot_predictions_vs_labels(predictions: np.rec.recarray[UFloat],
     axes = axes.flatten()
 
     if transit_flags is None:
-        transit_flags = [False] * len(labels)
+        transit_flags = np.zeros((labels.shape[0]), dtype=bool)
 
     print(f"Plotting scatter plot {rows}x{cols} grid for: {', '.join(params.keys())}")
     for ax_ix, (param_name, param_caption) in enumerate(params.items()):
