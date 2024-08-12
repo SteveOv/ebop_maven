@@ -218,6 +218,7 @@ def make_dataset_file(inst_count: int,
                 params = next(generator)
                 generated_count += 1
                 inst_id = params.get("id", inst_id)
+                params.setdefault("swapped", 0)
 
                 is_usable = check_func(**params)
                 if is_usable:
@@ -233,6 +234,7 @@ def make_dataset_file(inst_count: int,
                             if is_usable:
                                 model_data["delta_mag"] = np.roll(model_data["delta_mag"], -max_ix)
                                 swap_count += 1
+                                params["swapped"] = 1
 
                 if is_usable:
                     # Occasionally, JKTEBOP outputs NaN for a mag. Handle this by setting it to zero
