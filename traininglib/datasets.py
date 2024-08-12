@@ -62,7 +62,7 @@ def make_dataset(instance_count: int,
                  test_ratio: float=0,
                  file_prefix: str="dataset",
                  max_workers: int=1,
-                 swap_on_deeper_secondary: bool=False,
+                 swap_if_deeper_secondary: bool=False,
                  save_param_csvs: bool=True,
                  verbose: bool=False,
                  simulate: bool=False) -> None:
@@ -81,7 +81,7 @@ def make_dataset(instance_count: int,
     :test_ratio: proportion of rows to be written to the testing files
     :file_prefix: naming prefix for each of the dataset files
     :max_workers: maximum number of files to process concurrently
-    :swap_on_deeper_secondary: whether the components are swapped if the secondary eclipse is deeper
+    :swap_if_deeper_secondary: whether the components are swapped if the secondary eclipse is deeper
     :save_param_csvs: whether to save csv files with full params in addition to the dataset files.
     :verbose: whether to print verbose progress/diagnostic messages
     :simulate: whether to simulate the process, skipping only file/directory actions
@@ -102,7 +102,7 @@ The instance check function is:         {check_func.__name__}
 Training : Validation : Test ratio is:  {train_ratio:.2f} : {valid_ratio:.2f} : {test_ratio:.2f}
 File names will be prefixed with:       {file_prefix}
 The maximum concurrent workers:         {max_workers}\n""")
-        if swap_on_deeper_secondary:
+        if swap_if_deeper_secondary:
             print("Instances' stars will be swapped where the secondary eclipse is the deeper")
         if simulate:
             print("Simulate requested so no files will be written.\n")
@@ -120,7 +120,7 @@ The maximum concurrent workers:         {max_workers}\n""")
     file_inst_counts = list(_calculate_file_splits(instance_count, file_count))
     iter_params = (
         (inst_count, file_ix, output_dir, generator_func, check_func, valid_ratio, test_ratio,
-         file_prefix, swap_on_deeper_secondary, save_param_csvs, verbose, simulate)
+         file_prefix, swap_if_deeper_secondary, save_param_csvs, verbose, simulate)
             for (file_ix, inst_count) in enumerate(file_inst_counts)
     )
 
@@ -146,7 +146,7 @@ def make_dataset_file(inst_count: int,
                       valid_ratio: float=0.,
                       test_ratio: float=0,
                       file_prefix: str="dataset",
-                      swap_on_deeper_secondary: bool=False,
+                      swap_if_deeper_secondary: bool=False,
                       save_param_csvs: bool=True,
                       verbose: bool=False,
                       simulate: bool=False):
@@ -171,7 +171,7 @@ def make_dataset_file(inst_count: int,
     :valid_ratio: proportion of rows to be written to the validation files
     :test_ratio: proportion of rows to be written to the testing files
     :file_prefix: naming prefix for each of the dataset files
-    :swap_on_deeper_secondary: whether the components are swapped if the secondary eclipse is deeper
+    :swap_if_deeper_secondary: whether the components are swapped if the secondary eclipse is deeper
     :save_param_csvs: whether to save csv files with full params in addition to the dataset files.
     :verbose: whether to print verbose progress/diagnostic messages
     :simulate: whether to simulate the process, skipping only file/directory actions
@@ -223,7 +223,7 @@ def make_dataset_file(inst_count: int,
                 if is_usable:
                     model_data = jktebop.generate_model_light_curve(file_prefix, **params)
 
-                    if swap_on_deeper_secondary:
+                    if swap_if_deeper_secondary:
                         # Check the primary eclipse is the deeper. If not, we can swap the
                         # components and roll the mags to move the secondary eclipse to phase zero.
                         max_ix = np.argmax(model_data["delta_mag"])
