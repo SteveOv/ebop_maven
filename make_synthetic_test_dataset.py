@@ -277,7 +277,7 @@ if __name__ == "__main__":
                                       cols=2).savefig(dataset_dir/"synth-histogram-main.eps")
 
         # Simple diagnostic plot of the mags feature of a small sample of the instances.
-        dataset_files = sorted(dataset_dir.glob(f"**/{FILE_PREFIX}*.tfrecord"))
+        dataset_files = sorted(dataset_dir.glob(f"**/{FILE_PREFIX}000.tfrecord"))
         ids, _, _, _ = deb_example.read_dataset(dataset_files)
-        fig = plots.plot_dataset_instance_mags_features(dataset_files, ids[:30])
-        fig.savefig(dataset_dir / "sample.pdf")
+        fig = plots.plot_dataset_instance_mags_features(dataset_files, ids[:50], cols=5)
+        fig.savefig(dataset_dir / "sample.png", dpi=150)
