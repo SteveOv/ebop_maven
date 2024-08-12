@@ -15,6 +15,7 @@ import hashlib
 
 import numpy as np
 from scipy.interpolate import interp1d
+import astropy.units as u
 import tensorflow as tf
 
 # Hack so that this module can see the ebop_maven package and below
@@ -405,9 +406,6 @@ def _swap_instance_components(params: dict[str, any]):
     if "LB_over_LA" in params:
         params["LB_over_LA"] = np.reciprocal(params["LB_over_LA"])
 
-    # Swap over the impact params; what was the primary eclipse will now be the secondary
-    params["bP"], params["bS"] = params["bS"], params["bP"]
-
     # We update omega to omega+pi; the ascending node is unchanged, but moving origin to star B
     # changes the argument of periastron from ω to ω+pi. Using the relations sin(ω+pi)=-sin(ω)
     # & cos(ω+pi)=-cos(ω) and with e unchanged, we just need to negate the Poincare elements.
@@ -423,3 +421,10 @@ def _swap_instance_components(params: dict[str, any]):
         keyB = pattern.format("B")
         if keyA in params and keyB in params:
             params[keyA], params[keyB] = params[keyB], params[keyA]
+
+    # Recalculate the impact parameters as we have changed the primary star. It's not just a case of
+    # swapping the values, as both impact params are related to the primary's fractional radius.
+    params["bP"], params["bS"] = orbital.impact_parameter(params["rA"], params["inc"] * u.deg,
+                                                          e=params.get("ecc", 0),
+                                                          esinw=params["esinw"],
+                                                          eclipse=orbital.EclipseType.BOTH)
