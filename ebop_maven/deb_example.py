@@ -3,6 +3,8 @@ Functions for reading and writing to deb_example encoded TensorFlow datasets
 """
 from typing import Dict, List, Tuple, Callable, Iterable, Union
 from pathlib import Path
+import os
+import errno
 
 import numpy as np
 import tensorflow as tf
@@ -204,6 +206,13 @@ def create_dataset_pipeline(dataset_files: Iterable[str],
     rows without any optional filtering applied.
     """
     # pylint: disable=too-many-arguments
+    # Explicitly check the dataset_files otherwise we may get a cryptic errors further down.
+    if dataset_files is None or len(dataset_files) == 0:
+        raise ValueError("No dataset_files specified")
+    for file in dataset_files:
+        if not Path(file).exists():
+            raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), file)
+
     # Read through once to get the total number of records
     ds = tf.data.TFRecordDataset(list(dataset_files), num_parallel_reads=100,
                                  compression_type=ds_options.compression_type)
