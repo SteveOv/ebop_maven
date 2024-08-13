@@ -181,8 +181,7 @@ if __name__ == "__main__":
                 (datasets[ds_ix], counts[ds_ix]) = \
                     deb_example.create_dataset_pipeline(files, BATCH_FRACTION, map_func,
                                                         shuffle=True, reshuffle_each_iteration=True,
-                                                        max_buffer_size=MAX_BUFFER_SIZE,
-                                                        prefetch=1, seed=SEED)
+                                                        max_buffer_size=MAX_BUFFER_SIZE, seed=SEED)
             else:
                 (datasets[ds_ix], counts[ds_ix]) = \
                     deb_example.create_dataset_pipeline(files, BATCH_FRACTION, map_func)

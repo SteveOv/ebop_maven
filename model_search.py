@@ -347,7 +347,7 @@ def train_and_test_model(trial_kwargs):
     for ix, (dn, dd) in enumerate(zip(["training", "validation"],[TRAINSET_DIR, VALIDSET_DIR])):
         files = list(dd.glob(TRAINSET_GLOB_TERM))
         (train_ds[ix], train_ct[ix]) = deb_example.create_dataset_pipeline(
-                    files, BATCH_FRACTION, tr_map_func, None, True, True, MAX_BUFFER_SIZE, 1, SEED)
+                    files, BATCH_FRACTION, tr_map_func, None, True, True, MAX_BUFFER_SIZE,seed=SEED)
         print(f"Found {train_ct[ix]:,} {dn} instances over {len(files)}",
               f"tfrecord file(s) matching glob '{TRAINSET_GLOB_TERM}' within", dd)
 

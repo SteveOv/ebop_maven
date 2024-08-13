@@ -187,7 +187,7 @@ def create_dataset_pipeline(dataset_files: Iterable[str],
                             shuffle: bool=False,
                             reshuffle_each_iteration: bool=False,
                             max_buffer_size: int=1000000,
-                            prefetch: int=0,
+                            prefetch: int=tf.data.AUTOTUNE,
                             seed: int=42) -> Tuple[tf.data.TFRecordDataset, int]:
     """
     Creates the requested TFRecordDataset pipeline.
@@ -200,7 +200,7 @@ def create_dataset_pipeline(dataset_files: Iterable[str],
     :shuffle: whether to include a shuffle step in the pipeline
     :reshuffle_each_iteration: whether the shuffle step suffles on each epoch
     :max_buffer_size: the maximum size of the shuffle buffer
-    :prefetch: the number of prefetch operations to perform
+    :prefetch: the number of prefetch operations to perform, or leave to autotune
     :seed: seed for any random behaviour
     :returns: a tuple of (dataset pipeline, row count). The row count is the total
     rows without any optional filtering applied.
