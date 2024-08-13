@@ -249,9 +249,10 @@ class Test_deb_example(unittest.TestCase):
             self.assertFalse(all(bin == first_bins[0] for bin in first_bins), f"{first_bins}")
 
     #
-    #   TEST iterate_dataset(dataset_files: List[str], mags_bins: int, mags_wrap_phse: float,
+    #   TEST iterate_dataset(dataset_files: Iterable[str], mags_bins: int, mags_wrap_phase: float,
     #                        ext_features: List[str], labels: List[str],
-    #                        identifiers: List[str], scale_labels: bool)
+    #                        identifiers: List[str], scale_labels: bool,
+    #                        noise_stddev: float, roll_max: int, max_instances: int)
     #                           -> Generator(ids, mags, features, labels)
     #
     #   iterate_dataset() wraps create_dataset_pipeline() so that gets a workout too
@@ -286,6 +287,35 @@ class Test_deb_example(unittest.TestCase):
         # Only the two rows, yielded in the order they appear in the dataset
         self.assertEqual(["CW Eri", "CM Dra"], id_vals)
 
+    def test_iterate_dataset_identifers_filtering_and_max_instances(self):
+        """ Tests iterate_dataset(with id filter and max_instances) -> yields up to max_instances """
+        files = list((Path.cwd() / "datasets/formal-test-dataset/").glob("**/*.tfrecord"))
+        exp_inst_count = 2
+        identifiers = ["CM Dra", "CW Eri", "GW Eri", "RR Lyn"]
+        id_vals = []
+        for (id_val, _, _, _) in deb_example.iterate_dataset(files, identifiers=identifiers,
+                                                             max_instances=exp_inst_count):
+            id_vals += [id_val]
+        self.assertEqual(exp_inst_count, len(id_vals))
+
+    def test_iterate_dataset_max_instances_low(self):
+        """ Tests iterate_dataset(max_instances < ds rows) -> return requested number of rows """
+        files = list((Path.cwd() / "datasets/formal-test-dataset/").glob("**/*.tfrecord"))
+        exp_inst_count = 5
+        id_vals = []
+        for (id_val, _, _, _) in deb_example.iterate_dataset(files, max_instances=exp_inst_count):
+            id_vals += [id_val]
+        self.assertEqual(exp_inst_count, len(id_vals))
+
+    def test_iterate_dataset_max_instances_high(self):
+        """ Tests iterate_dataset(max_instances > ds rows) -> return all availabe rows; no error """
+        files = list((Path.cwd() / "datasets/formal-test-dataset/").glob("**/*.tfrecord"))
+        (_, exp_inst_count) = deb_example.create_dataset_pipeline(files)
+        id_vals = []
+        for (id_val, _, _, _) in deb_example.iterate_dataset(files, max_instances=100000):
+            id_vals += [id_val]
+        self.assertEqual(exp_inst_count, len(id_vals))
+
     def test_iterate_dataset_all_filters(self):
         """ Tests iterate_dataset(with id, features & labels filter and scaling) -> selected rows """
         files = list((Path.cwd() / "datasets/formal-test-dataset/").glob("**/*.tfrecord"))
@@ -301,9 +331,10 @@ class Test_deb_example(unittest.TestCase):
 
 
     #
-    #   TEST read_dataset(dataset_files: List[str], mags_bins: int, mags_wrap_phse: float,
+    #   TEST read_dataset(dataset_files: Iterable[str], mags_bins: int, mags_wrap_phse: float,
     #                     ext_features: List[str], labels: List[str],
-    #                     identifiers: List[str], scale_labels: bool)
+    #                     identifiers: List[str], scale_labels: bool,
+    #                     noise_stddev: float, roll_max: int, max_instances: int)
     #                       -> (ids, mags, features, labels)
     #
     def test_read_dataset_identifers_filtering(self):
@@ -313,7 +344,8 @@ class Test_deb_example(unittest.TestCase):
         identifiers = ["CM Dra", "CW Eri"] # Not in the order they appear in the dataset
         labels = ["L3", "inc"]
         (id_vals, _, _, lrows) = deb_example.read_dataset(files, identifiers=identifiers,
-                                                          labels=labels, scale_labels=False)
+                                                          labels=labels, scale_labels=False,
+                                                          max_instances=199)
 
         # Only the two rows, yielded in the order requested, not the order they're stored in
         self.assertEqual(2, len(id_vals))
@@ -367,6 +399,18 @@ class Test_deb_example(unittest.TestCase):
         self.assertEqual(id_vals.shape, (2, ))
         self.assertEqual(labs.shape, (2, ))
         self.assertEqual(len(labs.dtype.names), 0)
+
+    def test_read_dataset_identifers_max_instances(self):
+        """ Tests read_dataset(with an unknown label) -> no error but empty labs returned """
+        files = list((Path.cwd() / "datasets/formal-test-dataset/").glob("**/*.tfrecord"))
+        exp_inst_count = 5
+        (id_vals, mags, feats, labs) = deb_example.read_dataset(files, max_instances=exp_inst_count)
+
+        # Only the requested number of rows have been returned
+        self.assertEqual(id_vals.shape[0], exp_inst_count)
+        self.assertEqual(mags.shape[0], exp_inst_count)
+        self.assertEqual(feats.shape[0], exp_inst_count)
+        self.assertEqual(labs.shape[0], exp_inst_count)
 
     @unittest.skip("only run this interactively as it may take a long time")
     def test_read_dataset_scalability_test(self):

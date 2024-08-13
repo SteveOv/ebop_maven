@@ -240,7 +240,8 @@ def iterate_dataset(dataset_files: Iterable[str],
                     identifiers: List[str]=None,
                     scale_labels: bool=False,
                     noise_stddev: float = 0.,
-                    roll_max: int = 0):
+                    roll_max: int = 0,
+                    max_instances: int = np.inf):
     """
     Utility/diagnostics function which will parse a saved dataset yielding rows,
     and within the rows labels and features, which match the requested criteria.
@@ -263,6 +264,7 @@ def iterate_dataset(dataset_files: Iterable[str],
     :scale_values: if True values will be scaled
     :noise_stddev: the standard deviation of Gaussian Noise to add to the mags feature
     :roll_max: the maximum random roll to apply to the mags feature
+    :max_instances: the maximum number of instances to yield
     :returns: for each matching row yields a tuple of (id, mags vals, ext feature vals, label vals)
     """
     # pylint: disable=too-many-arguments, too-many-locals
@@ -277,6 +279,9 @@ def iterate_dataset(dataset_files: Iterable[str],
         chosen_labels = { l: labels_and_scales[l] for l in labels }
     else:
         chosen_labels = labels_and_scales
+
+    if identifiers is not None and len(identifiers) < max_instances:
+        max_instances = len(identifiers)
 
     def map_func(record_bytes):
         example = tf.io.parse_single_example(record_bytes, description)
@@ -306,12 +311,15 @@ def iterate_dataset(dataset_files: Iterable[str],
         return example["id"], mags_feature, ext_features, labels
 
     # Create a custom pipeline for this dataset, with the above map function
-    (ds, count) = create_dataset_pipeline(dataset_files, 0, map_func)
-    for id_val, mags_val, feat_vals, lab_vals in ds.take(count).as_numpy_iterator():
+    yield_count = 0
+    (ds, _) = create_dataset_pipeline(dataset_files, 0, map_func)
+    for id_val, mags_val, feat_vals, lab_vals in ds.as_numpy_iterator():
         id_val = id_val.decode(encoding="utf8")
         if identifiers is None or id_val in identifiers:
             yield id_val, mags_val, feat_vals, lab_vals
-
+            yield_count += 1
+            if yield_count >= max_instances:
+                break
 
 def read_dataset(dataset_files: Iterable[str],
                  mags_bins: int = default_mags_bins,
@@ -321,7 +329,8 @@ def read_dataset(dataset_files: Iterable[str],
                  identifiers: List[str]=None,
                  scale_labels: bool=False,
                  noise_stddev: float = 0.,
-                 roll_max: int = 0) \
+                 roll_max: int = 0,
+                 max_instances: int = np.inf) \
             -> Tuple[np.ndarray, np.ndarray[float], np.ndarray[float], np.ndarray[float]]:
     """
     Wrapper around iterate_dataset() which handles the iteration and returns separate
@@ -343,6 +352,7 @@ def read_dataset(dataset_files: Iterable[str],
     :scale_values: if True values will be scaled
     :noise_stddev: the standard deviation of Gaussian Noise to add to the mags feature
     :roll_max: the maximum random roll to apply to the mags feature
+    :max_instances: the maximum number of instances to return
     :returns: a Tuple[NDArray[#insts, 1], NDArray[#insts, #bins], NDArray[#insts, #feats],
     NDArray[#insts, #labels]], with the labels being a structured NDArray supporting named columns
     """
@@ -355,7 +365,7 @@ def read_dataset(dataset_files: Iterable[str],
     ids, mags_vals, feature_vals, label_vals = [], [], [], []
     for row in iterate_dataset(dataset_files, mags_bins, mags_wrap_phase,
                                ext_features, labels, identifiers, scale_labels,
-                               noise_stddev, roll_max):
+                               noise_stddev, roll_max, max_instances):
         ids += [row[0]]
         mags_vals += [row[1]]
         feature_vals += [row[2]]
