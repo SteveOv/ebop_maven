@@ -170,3 +170,9 @@ if __name__ == "__main__":
         plots.plot_dataset_histograms(csvs, cols=3).savefig(dataset_dir/"train-histogram-full.png")
         plots.plot_dataset_histograms(csvs, ["rA_plus_rB", "k", "J", "inc", "ecosw", "esinw"],
                                       cols=2).savefig(dataset_dir/"train-histogram-main.eps")
+
+        # Simple diagnostic plot of the mags feature of a small sample of the instances.
+        print("Plotting a sample of the set's mags features")
+        dataset_files = sorted(dataset_dir.glob(f"**/training/{FILE_PREFIX}000.tfrecord"))
+        fig = plots.plot_dataset_instance_mags_features(dataset_files, cols=5, max_instances=50)
+        fig.savefig(dataset_dir / "sample.png", dpi=150)

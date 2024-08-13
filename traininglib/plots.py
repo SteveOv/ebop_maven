@@ -148,22 +148,23 @@ def plot_dataset_instance_mags_features(dataset_files: Iterable[Path],
                                         mags_bins: int=4096,
                                         mags_wrap_phase: float=0.75,
                                         cols: int=3,
+                                        max_instances: int=np.inf,
                                         **format_kwargs) -> Figure:
     """
     Utility function to produce a plot of the requested dataset instance's mags feature
 
     :dataset_files: the set of dataset files to parse
-    :identifier: the identifier of the instance
-    :output: where to send the plot. Either a Path to save to or an existing axes
+    :chosen_targets: a list of ids to find and plot, or all as yielded (up to max_instances) if None
     :mags_bins: the width of the mags to publish
     :mags_wrap_phase: the wrap phase of the mags to publish
+    :max_instances: the maximum number of instances to plot
     :format_kwargs: kwargs to be passed on to format_axes()
     :returns: the figure
     """
     # pylint: disable=too-many-locals
     # Get the instances for each matching target
     instances = [*deb_example.iterate_dataset(dataset_files, mags_bins, mags_wrap_phase,
-                                              identifiers=chosen_targets)]
+                                        identifiers=chosen_targets, max_instances=max_instances)]
 
     rows = math.ceil(len(instances) / cols)
     fig, axes = plt.subplots(rows, cols, sharex="all", sharey="all",
