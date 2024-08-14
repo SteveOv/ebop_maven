@@ -30,13 +30,14 @@ class Estimator(ABC):
             raise ValueError("iterations must be a positive integer")
         self._iterations = iterations
 
+        file_timestamp = datetime.now()
         if isinstance(model, Path):
             if not model.exists():
                 raise ValueError(f"Model file '{model}' not found.")
-            print(f"{self.__class__.__name__} loading model file '{model}'...")
+            print(f"{self.__class__.__name__} loading model file '{model}'...", end="")
             self._model = modelling.load_model(model)
-            modified = datetime.fromtimestamp(model.stat().st_mtime).isoformat()
-            print(f"Loaded model '{self._model.name}' last modified at {modified}.")
+            print(f"loaded model '{self._model.name}'.")
+            file_timestamp = datetime.fromtimestamp(model.stat().st_mtime).isoformat()
         elif isinstance(model, Model):
             self._model = model
             print(f"Assigned model '{self._model.name}'")
@@ -50,6 +51,7 @@ class Estimator(ABC):
             self._metadata = output_layer.metadata
         else:
             self._metadata = {}
+        self._metadata.setdefault("created_timestamp", file_timestamp)
 
         # Not published
         self._extra_features_and_defaults = self._metadata.pop("extra_features_and_defaults",
@@ -60,6 +62,7 @@ class Estimator(ABC):
         self._scale_values = list(self._labels_and_scales.values())
         self._scaling_applied = any(s != 1 for s in self._scale_values)
 
+        print(f"The model {self.name} was created at {self._metadata['created_timestamp']}")
         print("The prediction inputs are:\n",
               f"\tmags_feature - numpy NDarray[float] shape (#instances, {self.mags_feature_bins})",
               f"with the phases after {self.mags_feature_wrap_phase} wrapped by -1")
