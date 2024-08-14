@@ -82,7 +82,7 @@ DNN_NUM_TAPER_UNITS = 64
 # pylint: disable=unnecessary-lambda-assignment
 ROLL_MAX = int(4 * (MAGS_BINS/1024))
 roll_func = lambda: tf.random.uniform([], -ROLL_MAX, ROLL_MAX+1, tf.int32)
-noise_func = lambda: tf.random.uniform([], 0.001, 0.010, tf.float32)
+noise_func = lambda: tf.random.uniform([], 0.001, 0.030, tf.float32)
 
 
 def make_best_model(chosen_features: list[str]=CHOSEN_FEATURES,
