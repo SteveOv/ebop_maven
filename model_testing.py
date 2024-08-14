@@ -31,9 +31,12 @@ from ebop_maven import deb_example, pipeline
 from traininglib import formal_testing, plots
 
 
-SYNTHETIC_MIST_TEST_DS_DIR = Path("./datasets/synthetic-mist-tess-dataset/")
+# These are used if you run this module directly
+TEST_SET_SUFFIX = ""
+TEST_RESULTS_SUBDIR = f"testing{TEST_SET_SUFFIX}"
+SYNTHETIC_MIST_TEST_DS_DIR = Path(f"./datasets/synthetic-mist-tess-dataset{TEST_SET_SUFFIX}/")
+
 FORMAL_TEST_DATASET_DIR = Path("./datasets/formal-test-dataset/")
-TEST_RESULTS_SUBDIR = "testing"
 
 def evaluate_model_against_dataset(estimator: Union[Model, Estimator],
                                    mc_iterations: int=1,
