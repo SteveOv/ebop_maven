@@ -19,7 +19,6 @@ if not "JKTEBOP_DIR" in os.environ:
 from traininglib import datasets, plots
 from traininglib.mistisochrones import MistIsochrones
 
-from ebop_maven import deb_example
 from ebop_maven.libs import orbital, limb_darkening
 from ebop_maven.libs.mission import Mission
 from ebop_maven.libs.tee import Tee
