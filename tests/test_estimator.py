@@ -66,7 +66,7 @@ class TestEstimator(unittest.TestCase):
     #
     def test_init_model_argument_errors(self):
         """ Tests __init__(invalid model values) -> correct error raised """
-        self.assertRaises(ValueError, Estimator, self._this_dir / "what.h5", 1)
+        self.assertRaises(FileNotFoundError, Estimator, self._this_dir / "what.h5", 1)
         self.assertRaises(TypeError, Estimator, "I'm not a Path or Model", 1)
 
         valid_file = self._this_dir / "cnn_ext_model.h5"
