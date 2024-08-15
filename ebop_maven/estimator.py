@@ -4,6 +4,8 @@ from datetime import datetime
 from pathlib import Path
 from abc import ABC
 from inspect import getsourcefile
+import os
+import errno
 
 import numpy as np
 from uncertainties import UFloat, unumpy
@@ -33,14 +35,14 @@ class Estimator(ABC):
         file_timestamp = datetime.now()
         if isinstance(model, Path):
             if not model.exists():
-                raise ValueError(f"Model file '{model}' not found.")
-            print(f"{self.__class__.__name__} loading model file '{model}'...", end="")
+                raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), model)
+            print(f"{self.__class__.__name__} loading '{model}'...", end="")
             self._model = modelling.load_model(model)
-            print(f"loaded model '{self._model.name}'.")
+            print(f"loaded '{self._model.name}'.")
             file_timestamp = datetime.fromtimestamp(model.stat().st_mtime).isoformat()
         elif isinstance(model, Model):
             self._model = model
-            print(f"Assigned model '{self._model.name}'")
+            print(f"{self.__class__.__name__} assigned model '{self._model.name}'")
         else:
             raise TypeError("Expected model to be a Path or a tf.keras.models.Model.")
 
@@ -63,21 +65,20 @@ class Estimator(ABC):
         self._scaling_applied = any(s != 1 for s in self._scale_values)
 
         print(f"The model {self.name} was created at {self._metadata['created_timestamp']}")
-        print("The prediction inputs are:\n",
-              f"\tmags_feature - numpy NDarray[float] shape (#instances, {self.mags_feature_bins})",
-              f"with the phases after {self.mags_feature_wrap_phase} wrapped by -1")
+        print("The input features are:")
+        print(f"  mags_feature as a NDarray[float] of shape (#instances, {self.mags_feature_bins})",
+              f"with the phases beyond {self.mags_feature_wrap_phase} wrapped by -1")
         if len(self.extra_feature_names):
-            print( "\textra_features - numpy NDarray[float] shape (#instances, ",
-                  f"{len(self.extra_feature_names)}) for the features;",
-                   ", ".join(self.extra_feature_names))
+            print("  extra_features as a NDarray[float] of shape (#instances,",
+                  f"{len(self.extra_feature_names)}) for [{', '.join(self.extra_feature_names)}])")
         else:
-            print("\textra_features - numpy NDarray shape (#instances, 0) or None",
-                  "as extra_features are not used for predictions")           
-        print("The prediction results are:\n",
-               "\tpredicted values as an numpy structured NDarray[UFloat] of shape",
-              f"(#instances, [{', '.join(self.label_names)}])\n",
-               "\toptionally raw predictions as a numpy NDArray[float] of shape",
-              f"(#instances, {len(self.label_names)}, #iterations), if include_raw==True")
+            print( "  extra_features as a NDarray of shape (#instances, 0) or None,",
+                  "as no extra_features are used for predictions")
+        print("The prediction results are:")
+        print( "  predicted values as a structured NDarray[UFloat] of shape",
+              f"(#instances, [{', '.join(self.label_names)}])")
+        print("  optionally, if include_raw is True, all MC predictions as a NDArray[float]",
+              f"of shape (#instances, {len(self.label_names)}, #iterations)")
 
     @property
     def name(self) -> str:
