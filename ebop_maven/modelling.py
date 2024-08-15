@@ -384,8 +384,6 @@ def save_model(file_name: Path,
     """
     Save the Model, overwriting existing, to the indicated file
 
-    TODO: try to regain the functionality of saving arbitrary metadata with the model
-
     :file_name: the file name of the file to save to - will be overwritten
     :model: the model to save
     """
@@ -396,8 +394,6 @@ def save_model(file_name: Path,
 def load_model(file_name: Path) -> models.Model:
     """
     Loads the Model and while handling the need to register the custom objects.
-
-    TODO: try to regain the functionality of loading saved metadata from the model
 
     :file_name: the saved model file to load
     """
