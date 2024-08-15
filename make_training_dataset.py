@@ -46,15 +46,18 @@ def generate_instances_from_distributions(label: str):
     while True: # infinite loop; we will continue to yield new instances until generator is closed
         # The "label" params are rA_plus_rB, k, J, ecosw, esinw and bP (or inc, depending on model)
 
-        # Extending range of rA_plus_rB and k further makes negligible difference to predictions
+        # Extending range of rA_plus_rB beyond 0.2+0.2 we need to be able to predict systems where
+        # JKTEBOP may not be suitable (we may not know this unless the predictions are reliable).
+        # The distributions for k and J are chosen through testing, being those which yield a
+        # model capable of making good predictions over the various testing datasets.
         rA_plus_rB  = rng.uniform(low=0.001, high=0.45001)
-        k           = rng.normal(loc=0.8, scale=0.4)
+        k           = rng.normal(loc=0.5, scale=0.8)
         rA          = rA_plus_rB / (1 + k)              # Not used directly as labels, but useful
         rB          = rA_plus_rB - rA
 
         # Simple uniform dist for inc (JKTEBOP bottoms out at 50 deg)
         inc         = rng.uniform(low=50., high=90.00001) * u.deg
-        J           = rng.normal(loc=0.8, scale=0.4)
+        J           = rng.normal(loc=0.5, scale=0.8)
 
         # We need a version of JKTEBOP which supports negative L3 input values
         # (not so for version 43) in order to train a model to predict L3.
@@ -138,7 +141,7 @@ def is_usable_instance(k: float=0, J: float=0, qphot: float=0, ecc: float=0,
         usable = all(b is not None and b <= 1 + k for b in [bP, bS])
 
     # Compatible with JKTEBOP restrictions
-    # Soft restriction of rA & rB both <= 0.23 as its model is not suited to r >~ 0.2
+    # Soft restriction of rA & rB both <= 0.23 as its model is not well suited to r >~ 0.2
     # Hard restrictions of rA+rB<0.8 (covered by above), inc > 50
     if usable:
         usable = rA <= 0.23 and rB <= 0.23 and inc > 50
