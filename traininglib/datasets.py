@@ -417,6 +417,12 @@ def _swap_instance_components(params: dict[str, any]):
         omega = params["omega"]
         params["omega"] = omega+180 if omega < 180 else omega-180
 
+    # These are related to the Poincare elements.
+    if "phiS" in params:
+        params["phiS"] = orbital.secondary_eclipse_phase(params["ecosw"], None, params["esinw"])
+    if "dS_over_dP" in params:
+        params["dS_over_dP"] = np.reciprocal(params["dS_over_dP"])
+
     # Swap over the limb darkening parameters and any (optional) star specific informational params
     for pattern in ["LD{0}", "LD{0}1", "LD{0}2", "r{0}", "R{0}", "M{0}", "L{0}", "Teff{0}"]:
         keyA = pattern.format("A")
