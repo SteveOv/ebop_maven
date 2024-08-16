@@ -414,8 +414,7 @@ def _swap_instance_components(params: dict[str, any]):
     params["ecosw"] *= -1
     params["esinw"] *= -1
     if "omega" in params:
-        omega = params["omega"]
-        params["omega"] = omega+180 if omega < 180 else omega-180
+        params["omega"] = (params["omega"] + 180) % 360
 
     # These are related to the Poincare elements.
     if "phiS" in params:
