@@ -113,7 +113,9 @@ def generate_instances_from_distributions(label: str):
             "ecc":          ecc,
             "omega":        omega.to(u.deg).value,
             "bP":           imp_prm[0],
-            "bS":           imp_prm[1],                      
+            "bS":           imp_prm[1],
+            "phiS":         orbital.secondary_eclipse_phase(ecosw, ecc),
+            "dS_over_dP":   orbital.ratio_of_eclipse_duration(esinw),
         }
 
 
@@ -170,7 +172,7 @@ if __name__ == "__main__":
 
         # Histograms are generated from the CSV files as they cover params not saved to tfrecord
         csvs = sorted(dataset_dir.glob(f"**/{FILE_PREFIX}*.csv"))
-        plots.plot_dataset_histograms(csvs, cols=3).savefig(dataset_dir/"train-histogram-full.png")
+        plots.plot_dataset_histograms(csvs, cols=5).savefig(dataset_dir/"train-histogram-full.png")
         plots.plot_dataset_histograms(csvs, ["rA_plus_rB", "k", "J", "inc", "ecosw", "esinw"],
                                       cols=2).savefig(dataset_dir/"train-histogram-main.eps")
 
@@ -179,3 +181,4 @@ if __name__ == "__main__":
         dataset_files = sorted(dataset_dir.glob(f"**/training/{FILE_PREFIX}000.tfrecord"))
         fig = plots.plot_dataset_instance_mags_features(dataset_files, cols=5, max_instances=50)
         fig.savefig(dataset_dir / "sample.png", dpi=150)
+        fig.clf()

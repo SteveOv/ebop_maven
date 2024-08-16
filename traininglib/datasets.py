@@ -266,8 +266,10 @@ def make_dataset_file(inst_count: int,
 
                     # Any extra features which may be used for predictions alongside the LC.
                     extra_features = {
-                        "phiS": orbital.secondary_eclipse_phase(params["ecosw"], params["ecc"]),
-                        "dS_over_dP": orbital.ratio_of_eclipse_duration(params["esinw"]),
+                        "phiS": params.get("phiS", None) \
+                                or orbital.secondary_eclipse_phase(params["ecosw"], params["ecc"]),
+                        "dS_over_dP": params.get("dS_over_dP", None) \
+                                or orbital.ratio_of_eclipse_duration(params["esinw"]),
                     }
 
                     # Write the appropriate dataset train/val/test file, based on inst/file indices

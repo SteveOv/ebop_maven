@@ -35,19 +35,19 @@ all_histogram_params = {
     "rA_plus_rB":   (100, r"$r_{A}+r_{B}$"),
     "k":            (100, r"$k$"),
     "inc":          (100, r"$i~(^{\circ})$"),
-    "sini":         (100, r"$\sin{i}$"),
-    "cosi":         (100, r"$\cos{i}$"),
-    "qphot":        (100, r"$q_{phot}$"),
-    #"L3":           (100, r"$L_3$"), # currently always zero
-    "ecc":          (100, r"$e$"),
-    "omega":        (100, r"$\omega~(^{\circ})$"),
     "J":            (100, r"$J$"),
+    "qphot":        (100, r"$q_{phot}$"),
     "ecosw":        (100, r"$e\,\cos{\omega}$"),
     "esinw":        (100, r"$e\,\sin{\omega}$"),
+    #"L3":           (100, r"$L_3$"), # currently always zero
+    "bP":           (100, r"$b_{pri}$"),
+    "bS":           (100, r"$b_{sec}$"),
+    "ecc":          (100, r"$e$"),
+    "omega":        (100, r"$\omega~(^{\circ})$"),
     "rA":           (100, r"$r_A$"),
     "rB":           (100, r"$r_B$"),
-    "bP":           (100, r"$b_{prim}$"),
-    "bS":           (100, r"$b_{sec}$"),
+    "phiS":         (100, r"$\phi_{sec}$"),
+    "dS_over_dP":   (100, r"$d_{sec}/d_{pri}$"),
     "RA":           (100, r"$R_{A}~(\text{R}_{\odot})$"),
     "RB":           (100, r"$R_{B}~(\text{R}_{\odot})$"),
     "MA":           (100, r"$M_{A}~(\text{M}_{\odot})$"),
@@ -67,17 +67,20 @@ def plot_dataset_histograms(csv_files: Iterable[Path],
     from the dataset's CSV files as they may plot params not written to the dataset tfrecords.
 
     :csv_files: a list of the dataset's csv files
-    :parames: the list of parameters to plot, or the full list if None.
-    See the histogram_parameters attribute for the full list
+    :params: the list of parameters to plot (in this order), or those in all_histogram_params
+    if None. In either case params will only be plotted if they are present in the csv files.
     :cols: the width of the axes grid (the rows automatically adjust)
     :yscale: set to "linear" or "log" to control the y-axis scale
     :verbose: whether to print verbose progress/diagnostic messages
     """
-    # pylint: disable=too-many-arguments
+    # pylint: disable=too-many-arguments, too-many-locals
     csv_files = sorted(csv_files)   # Happy for this to error if there's a problem
-    if not params:
-        params = get_field_names_from_csvs(csv_files)
-    param_specs = { p: all_histogram_params[p] for p in params if p in all_histogram_params }
+    csv_params = get_field_names_from_csvs(csv_files)
+    if params:
+        plot_params = [p for p in params if p in all_histogram_params]
+    else:
+        plot_params = list(all_histogram_params.keys())
+    param_specs = { p: all_histogram_params[p] for p in plot_params if p in csv_params }
 
     fig = None
     if param_specs and csv_files:
