@@ -189,6 +189,8 @@ def make_dataset_file(inst_count: int,
     else:
         csv_file = None
 
+    inst_ix = 0
+    generated_count, swap_count = 0, 0
     generator = generator_func(file_stem)
     ds_writers = [None] * 3
     ds_subsets = ["training", "validation", "testing"]
@@ -208,8 +210,6 @@ def make_dataset_file(inst_count: int,
         rng.shuffle(inst_file_ixs)
 
         # This will continue to generate new instances until we have enough (==inst_count)
-        inst_ix = 0
-        generated_count, swap_count = 0, 0
         while inst_ix < inst_count:
             inst_id = inst_ix
             try:
@@ -279,9 +279,11 @@ def make_dataset_file(inst_count: int,
                     inst_ix += 1
                     if verbose and inst_ix % 100 == 0:
                         print(f"{file_stem}: Generated {inst_ix:n} usable instances.")
+            except StopIteration:
+                break
             except Exception as exc: # pylint: disable=broad-exception-caught
                 traceback.print_exception(exc)
-                print(f"{file_stem}[{inst_id}]: Skipping instance which caused exception:", params)
+                print(f"{file_stem}: instance {inst_ix} caused a {type(exc).__name__}: {exc}")
 
     finally:
         for ds_subset_file in ds_writers:
@@ -290,16 +292,19 @@ def make_dataset_file(inst_count: int,
         generator.close()
 
     if verbose:
+        if generated_count >= inst_count:
+            for subset_ix, subset in enumerate(ds_subsets):
+                saved_count = inst_file_ixs.count(subset_ix)
+                if saved_count:
+                    print(f"{file_stem}:", "Simulated saving" if simulate else "Saved",
+                        f"{saved_count:n} {subset} instance(s) to",
+                        f"{output_dir.name}/{subset}/{ds_filename}")
+        else:
+            print(f"{file_stem}: \033[93m\033[1m!!!Failed after generating",
+                  f"{generated_count-1} of {inst_count} instances!!!\033[0m")
         if swap_count > 0:
             print(f"{file_stem}: Swapped the components of {swap_count} instance(s)",
                   "where the secondary eclipse was deeper.")
-        for subset_ix, subset in enumerate(ds_subsets):
-            saved_count = inst_file_ixs.count(subset_ix)
-            if saved_count:
-                print(f"{file_stem}:", "Simulated saving" if simulate else "Saved",
-                      f"{saved_count:n} {subset} instance(s) to",
-                      f"{output_dir.name}/{subset}/{ds_filename}")
-
 
 def write_param_sets_to_csv(file_name: Path,
                             param_sets: list[dict],
