@@ -74,7 +74,7 @@ def generate_instances_from_mist_models(label: str):
         # First choose the primary mass based on an IMF and multiplicity probability function
         # Choose our stars and then get the basic physical params from the isochrones
         probs = salpeter_imf(init_masses)
-        probs *= np.tanh(0.31 * init_masses + .18)  # Wells & Prsa Primary multiplicity frac
+        probs *= wells_prsa_multiplicity_function(init_masses)
         probs = np.divide(probs, np.sum(probs))     # Scaled to get a pmf() == 1
         init_MA = rng.choice(init_masses, p=probs) * u.solMass
 
@@ -221,6 +221,9 @@ def chabrier_imf(masses):
     imf[mask] = np.multiply(norm, np.exp(np.multiply(-0.5, exponent)))
     return imf
 
+def wells_prsa_multiplicity_function(masses):
+    """ Wells & Prsa (2021ApJS..253...32W) eqn. 2 with coeffs given in following paragraph """
+    return np.tanh(np.add(np.multiply(0.31, masses), 0.18))
 
 def is_usable_instance(k: float=0.0, J: float=0.0, qphot: float=0.0, ecc: float=-1.0,
                        bP: float=None, bS: float=None,
