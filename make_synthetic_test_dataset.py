@@ -206,19 +206,22 @@ def salpeter_imf(masses):
     return imf
 
 def chabrier_imf(masses):
-    """ Chabrier (2003PASP..115..763C) two part IMF (Table I) """
+    """ 
+    Chabrier (2003PASP..115..763C) two part IMF (Table I)
+    as summarized by Maschberger (2013MNRAS.429.1725M)
+    """
     imf = np.zeros_like(masses, dtype=float)
 
-    # p(M) = 0.158 M^-2.3 for M >= 1.0 MSun
+    # p(M) = 0.0443 * M^-2.3 for M >= 1.0 MSun
     mask = masses >= 1.0
-    norm =  0.0443
-    imf[mask] = np.multiply(norm, np.power(masses[mask], -2.3))
+    coeffs =  0.0443
+    imf[mask] = np.multiply(coeffs, np.power(masses[mask], -2.3))
 
-    # p(M) = 0.158/(M*ln(10)) * exp[-0.5*(log(M)-log(0.079)/0.69)^2] for M < 1.0 MSun
+    # p(M) = 0.158/M * exp[-0.5*(log(M)-log(0.079)/0.69)^2] for M < 1.0 MSun
     mask = ~mask
-    norm = np.divide(0.158, np.multiply(masses[mask], np.log(10)))
+    coeffs = np.divide(0.158, masses[mask])
     exponent = np.square(np.divide(np.subtract(np.log10(masses[mask]), np.log10(0.079)), 0.69))
-    imf[mask] = np.multiply(norm, np.exp(np.multiply(-0.5, exponent)))
+    imf[mask] = np.multiply(coeffs, np.exp(np.multiply(-0.5, exponent)))
     return imf
 
 def wells_prsa_multiplicity_function(masses):
