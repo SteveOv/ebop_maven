@@ -55,8 +55,8 @@ def generate_instances_from_mist_models(label: str):
     mission = Mission.get_instance("TESS")
 
     feh_values = _mist_isochones.list_metallicities()
-    min_phase, max_phase = 0.0, 2.0 # M-S to RGB
-    min_mass_value, max_mass_value = 0.4, 20.0
+    min_phase, max_phase = 0.0, 2.0     # M-S to RGB
+    min_mass_value = 0.07               # Adopted from Wells & Prša (although MIST bottoms at 0.1)
     cols = ["star_mass", "log_R", "log_Teff", "log_L", "log_g"]
 
     while True: # infinite loop; we will continue to yield new instances until closed
@@ -66,19 +66,18 @@ def generate_instances_from_mist_models(label: str):
         while True:
             age = rng.choice(ages) * u.dex(u.yr)
             init_masses = _mist_isochones.list_initial_masses(feh, age.value,
-                                                              min_phase, max_phase,
-                                                              min_mass_value, max_mass_value)
+                                                              min_phase, max_phase, min_mass_value)
             if len(init_masses):
                 break
 
         # First choose the primary mass based on an IMF and multiplicity probability function
         # Choose our stars and then get the basic physical params from the isochrones
-        probs = salpeter_imf(init_masses)
+        probs = chabrier_imf(init_masses)
         probs *= wells_prsa_multiplicity_function(init_masses)
         probs = np.divide(probs, np.sum(probs))     # Scaled to get a pmf() == 1
         init_MA = rng.choice(init_masses, p=probs) * u.solMass
 
-        init_MB_mask = (init_masses >= min_mass_value) & (init_masses < init_MA.value)
+        init_MB_mask = (init_masses >= min_mass_value) & (init_masses <= init_MA.value)
         if any(init_MB_mask):
             init_MB = rng.choice(init_masses[init_MB_mask]) * u.solMass
         else:
@@ -99,7 +98,7 @@ def generate_instances_from_mist_models(label: str):
         loggB       = results["log_g"] * u.dex(u.cm / u.s**2)
 
         # Now find the minimum separation, to give the min period, which will be the greater of:
-        # . 3(RA+RB) / 2(1-e) (Wells & Prsa) (assuming e==0 for now)
+        # . 3(RA+RB) / 2(1-e) (Wells & Prša) (assuming e==0 for now)
         # . max(5*RA, 5*RB) (based on JKTEBOP recommendation for rA <= 0.2, rB <= 0.2)
         a_min = max(3/2*(RA+RB), 5*RA, 5*RB)
         per_min = orbital.orbital_period(MA, MB, a_min).to(u.d).value
@@ -225,7 +224,7 @@ def chabrier_imf(masses):
     return imf
 
 def wells_prsa_multiplicity_function(masses):
-    """ Wells & Prsa (2021ApJS..253...32W) eqn. 2 with coeffs given in following paragraph """
+    """ Wells & Prša (2021ApJS..253...32W) eqn. 2 with coeffs given in following paragraph """
     return np.tanh(np.add(np.multiply(0.31, masses), 0.18))
 
 def is_usable_instance(k: float=0.0, J: float=0.0, qphot: float=0.0, ecc: float=-1.0,
