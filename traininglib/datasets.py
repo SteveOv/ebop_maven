@@ -157,9 +157,6 @@ def make_dataset_file(inst_count: int,
     validation and testing subdirectories, with the ratios of instances sent to each dictated by
     the valid_ratio and test_ratio arguments (with train_ratio implied).
 
-    TODO: Optionally, handles switching the LC and params if it's found that the eclipse at phase
-    zero is not the deeper (deferred to make_dataset_file2).
-
     Adds Gaussian noise to the LC/mags feature if a "snr" param is specified.
     
     :inst_count: the number of training instances to create
