@@ -139,10 +139,10 @@ def generate_instances_from_mist_models(label: str):
             # Central surface brightness ratio (i.e. in absence of LD) within the mission's bandpass
             J = mission.expected_brightness_ratio(T_eff_A, T_eff_B)
 
-            # Lookup the LD coeffs. Minimum supported T_eff for pow2 coeffs is 3500 K
+            # Lookup the nearest matching LD coeffs
             LD_ALGO = "pow2"
-            ld_coeffs_A = limb_darkening.lookup_tess_pow2_ld_coeffs(loggA, max(T_eff_A, 3500 * u.K))
-            ld_coeffs_B = limb_darkening.lookup_tess_pow2_ld_coeffs(loggB, max(T_eff_B, 3500 * u.K))
+            ld_coeffs_A = limb_darkening.lookup_tess_pow2_ld_coeffs(loggA, T_eff_A)
+            ld_coeffs_B = limb_darkening.lookup_tess_pow2_ld_coeffs(loggB, T_eff_B)
 
             # Now we have to decide an appropriate Gaussian noise SNR to apply.
             # Randomly choose an apparent mag in the TESS photometric range then derive
