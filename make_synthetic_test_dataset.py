@@ -122,10 +122,8 @@ def generate_instances_from_mist_models(label: str):
             e_max = max(min(1-(per.value/2)**(-2/3), 1-(1.5*(RA+RB)/a).value), 0)
             ecc = rng.uniform(low=0, high=e_max)
 
-        # We're once more predicting L3 as JKTEBOP is being updated to support
-        # negative L3 input values (so it's now fully trainable)
-        L3          = rng.normal(0., 0.1)
-        L3          = 0 # continue to override this as L3 doesn't train well
+        # Continue to fix this as JKTEBOP doesn't support negative L3 values so we cannot train it
+        L3          = 0
 
         # Now we can calculate other params which we need to decide whether to use this
         q = (MB / MA).value
