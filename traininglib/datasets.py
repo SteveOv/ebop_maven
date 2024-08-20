@@ -5,6 +5,7 @@ Functions for generating binary system instances and writing their parameters to
 # pylint: disable=invalid-name, no-member, too-many-arguments, too-many-locals
 
 from typing import Callable, Generator
+from sys import gettrace
 from pathlib import Path
 from timeit import default_timer
 from datetime import timedelta, datetime
@@ -126,6 +127,10 @@ The maximum concurrent workers:         {max_workers}\n""")
     )
 
     max_workers = min(file_count, max_workers or 1)
+    if max_workers > 1 and gettrace is not None and gettrace() is not None:
+        print("Detected a debugger so I'm overriding the max_workers arg, setting it to 1")
+        max_workers = 1
+
     if max_workers <= 1:
         # We could use a pool of 1, but it's useful to keep execution on the interactive proc
         for params in iter_params:
