@@ -251,9 +251,9 @@ def is_usable_instance(k: float=0.0, J: float=0.0, qphot: float=0.0, ecc: float=
 
     # Compatible with JKTEBOP restrictions
     # Soft restriction of rA & rB both <= 0.2 as its model is not suited to higher
-    # Hard restrictions of rA+rB<0.8 (covered by above), inc > 50
+    # Hard restrictions of rA+rB < 0.8 (covered by above), inc > 50, k <= 100
     if usable:
-        usable = rA <= 0.2 and rB <= 0.2 and inc > 50
+        usable = rA <= 0.2 and rB <= 0.2 and inc > 50 and k <= 100
     return usable
 
 
