@@ -13,6 +13,7 @@ from contextlib import redirect_stdout
 from textwrap import fill
 import copy
 import argparse
+from datetime import datetime
 
 import matplotlib.pylab as plt
 
@@ -570,6 +571,8 @@ if __name__ == "__main__":
 
         labs, all_preds = None, {}
         with redirect_stdout(Tee(open(result_dir / "model_testing.log", "w", encoding="utf8"))):
+            print(f"\nStarting tests of {the_estimator} at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
+
             # Report on the performance of the model/Estimator predictions vs labels
             for pred_type, iters, dataset_dir, targs in [
                     ("nonmc",   1,      FORMAL_TEST_DATASET_DIR,    formal_targs),
