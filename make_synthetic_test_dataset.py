@@ -35,10 +35,15 @@ def generate_instances_from_mist_models(label: str):
     """
     Generates system instances with a combination of random selecion and lookups of MIST stellar
     models. The following steps are carried out for each candidate instance;
-    - random selection of Z, initial masses and age from suitable values available in MIST data
+    - random selection of Z and age from values available in the MIST data
+    - random selection of MA from values compatible with above, subject to probabilities derived
+      from an initial mass function and a multiplicity function
+    - random selection of MB for masses up to and including MA
     - lookup of current mass, radius, T_effs, log(g) and luminosity values for each component
-    - random selection of P, ecc, omega and inc from continuous distributions
-    - calculation of rA+rB, k, J, ecosw, esinw, bP and LD params from above
+    - random selection of P, ecc, omega and inc from distributions (subject to restrictions)
+    - calculation of rA+rB, k, J, ecosw, esinw and bP label values
+    - lookup of pow2 LD params based on stars' logg and Teff values
+    - random selection of an apparent snr from within plausible range for TESS observations
     subject to checks that the system is plausible, will eclipse and is suitable for JKTEBOP
 
     :label: a useful label to use within messages
