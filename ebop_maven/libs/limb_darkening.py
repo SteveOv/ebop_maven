@@ -1,14 +1,13 @@
 """ Module publishing methods for lookup up Limb Darkening coefficients. """
 from inspect import getsourcefile
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, Iterable
 from functools import lru_cache
-import numpy as np
+
 import pandas as pd
 from pandas import DataFrame
 import astropy.units as u
 from astropy.units import Quantity, quantity_input
-from numba import jit
 
 _this_dir = Path(getsourcefile(lambda:0)).parent
 
@@ -25,24 +24,13 @@ def lookup_tess_quad_ld_coeffs(logg: Quantity, t_eff: Quantity) \
     :returns: tuple (a, b) where a is the linear and b the quadratic coefficient
     or will raise a KeyError if no match made
     """
-    # Find the nearest match to requested log(g) and T_eff values
-    logg = __round_to_nearest(logg.value, 0.5)
-    t_eff = t_eff.to(u.K).value
-    if t_eff < 2300:
-        t_eff = 2300
-    elif 4900 < t_eff < 5100:
-        # Special case; the data is missing values for t_eff == 5000 K
-        # We need to force the requested value to 4900 or 5100 K as appropriate
-        t_eff = 4900. if t_eff < 5000 else 5100.
-    elif t_eff < 7000:
-        t_eff = __round_to_nearest(t_eff, 100)
-    elif t_eff < 12000:
-        t_eff = __round_to_nearest(t_eff, 200)
-    else:
-        t_eff = 12000
-
     try:
-        row = __tess_quad_ld_coeffs_table().loc[(logg, t_eff)]
+        # Traverse the indices finding the nearest match
+        # Unfortunately, get_indexer([(a, b)], method="nearest") not supported on multiindex
+        index_values = __find_nearest_index_values(__tess_power2_coeffs_table(),
+                                                   (logg.value, t_eff.to(u.K).value))
+
+        row = __tess_quad_ld_coeffs_table().loc[index_values]
     except KeyError as exc:
         raise KeyError(f"No quad coeffs for logg={logg} and t_eff={t_eff} K") from exc
 
@@ -61,24 +49,13 @@ def lookup_tess_pow2_ld_coeffs(logg: Quantity, t_eff: Quantity) \
     :returns: tuple with the (g, h) power-2 LD coefficients
     or will raise a KeyError if no match made
     """
-    # Find the nearest match to requested log(g) and T_eff values
-    logg = __round_to_nearest(logg.value, 0.5)
-    t_eff = t_eff.to(u.K).value
-    if t_eff < 2300:
-        t_eff = 2300
-    elif 4900 < t_eff < 5100:
-        # Special case; the data is missing values for t_eff == 5000 K
-        # We need to force the requested value to 4900 or 5100 K as appropriate
-        t_eff = 4900. if t_eff < 5000 else 5100.
-    elif t_eff < 7000:
-        t_eff = __round_to_nearest(t_eff, 100)
-    elif t_eff < 12000:
-        t_eff = __round_to_nearest(t_eff, 200)
-    else:
-        t_eff = 12000
-
     try:
-        row = __tess_power2_coeffs_table().loc[(logg, t_eff)]
+        # Traverse the indices finding the nearest match
+        # Unfortunately, get_indexer([(a, b)], method="nearest") not supported on multiindex
+        index_values = __find_nearest_index_values(__tess_power2_coeffs_table(),
+                                                   (logg.value, t_eff.to(u.K).value))
+
+        row = __tess_power2_coeffs_table().loc[index_values]
     except KeyError as exc:
         raise KeyError(f"No pow2 coeffs for logg={logg} and t_eff={t_eff} K") from exc
     return row["g"], row["h"]
@@ -109,22 +86,20 @@ def __tess_power2_coeffs_table() -> DataFrame:
                     names=["logg", "Teff", "Z", "g", "h"],
                     index_col=["logg", "Teff"])
 
-@jit(nopython=True)
-def __round_to_nearest(value, nearest=1.):
+def __find_nearest_index_values(df: DataFrame, suggested_values: Iterable[float]) -> Tuple[float]:
     """
-    Will round the passed value to the nearest value to the passed
-    nearest argument. 
-    For example round_to_nearest(23.74, 0.5) will return 23.5
-    wheras round_to_nearewst(23.75, 0.5) will return 24.
-
-    :value: the value to round
-    :nearest: the target to round "to the nearest". Defaults to 1.
+    Takes the suggested index values and finds the nearest matches within the dataframe's
+    multiindex returning them as a tuple which can be used directly in a call to loc[]
     """
-    if nearest == 1.:
-        result = np.round(value)
-    else:
-        mod = np.mod(value, nearest)
-        result = np.subtract(value, mod)
-        if np.add(mod, mod) >= nearest:
-            result = np.add(result, nearest)
-    return result
+    loc_values = list(suggested_values)
+    for value_ix, suggested_value in enumerate(suggested_values):
+        # pylint: disable=cell-var-from-loop
+        if value_ix == 0:
+            index_values = df.index.levels[0].values
+        elif value_ix == 1:
+            # We get a warning if loc is a single item tuple of form (value, ) from tuple(value)
+            index_values = df.loc[(loc_values[0])].index.values
+        else:
+            index_values = df.loc[tuple(loc_values[:value_ix])].index.values
+        loc_values[value_ix] = min(index_values, key=lambda v: abs(v - suggested_value))
+    return tuple(loc_values)
