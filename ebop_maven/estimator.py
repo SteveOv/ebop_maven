@@ -80,6 +80,10 @@ class Estimator(ABC):
         print("  optionally, if include_raw is True, all MC predictions as a NDArray[float]",
               f"of shape (#instances, {len(self.label_names)}, #iterations)")
 
+    def __str__(self):
+        """ Uses the model name as a string representation of the class. """
+        return self._model.name
+
     @property
     def name(self) -> str:
         """ Gets the name of the underlying model. """
