@@ -360,11 +360,11 @@ def append_calculated_inc_predictions(preds: np.ndarray[UFloat]) -> np.ndarray[U
             # From primary impact param:  i = arccos(bP * r1 * (1+esinw)/(1-e^2))
             r = preds["rA_plus_rB"] / (1+preds["k"])
             csi = preds["bP"] * r * (1+preds["esinw"]) / (1-(preds["ecosw"]**2 + preds["esinw"]**2))
-            inc = np.array([degrees(acos(i)) for i in csi], dtype=UFloat)
+            inc = np.array([degrees(acos(i)) for i in csi], dtype=np.dtype(UFloat.dtype))
         elif "cosi" in names:
-            inc = np.array([degrees(acos(val)) for val in preds["cosi"]], dtype=UFloat)
+            inc = np.array([degrees(acos(i)) for i in preds["cosi"]], dtype=np.dtype(UFloat.dtype))
         elif "sini" in names:
-            inc = np.array([degrees(asin(val)) for val in preds["sini"]], dtype=UFloat)
+            inc = np.array([degrees(asin(i)) for i in preds["sini"]], dtype=np.dtype(UFloat.dtype))
         else:
             raise KeyError("Missing bP, cosi or sini in predictions required to calc inc.")
 
