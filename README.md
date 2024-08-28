@@ -59,7 +59,7 @@ dead neurons).
 Training is based on the formal-training-dataset which is made up of 250,000 fully synthetic
 instances split 80:20 between training and validation datasets. During training the dataset
 pipeline includes augmentations which randomly add Gaussian noise and a shift to each
-instances mags feature. The augmentations supplement the Dropout layers in mitigating overfitting
+instance's mags feature. The augmentations supplement the Dropout layers in mitigating overfitting
 and expose the model to less than perfect data during training, improving its performance
 with real data.
 
@@ -95,11 +95,12 @@ a numpy structured array of shape (#instances, #parameters) where values can be 
 parameter/label name (as listed in the Estimator's `label_names` attribute).
 
 ```python
-# Make a prediction on a single instance using the MC Dropout algorithm over 1000 iterations.
-# The include_raw_preds argument gives access to the values for each of the iterations in raw_preds.
-predictions, raw_preds = estimator.predict(np.array([mags]), iterations=1000, include_raw_preds=True)
+# Make a prediction on a single instance using the MC Dropout with 1000 iterations.
+# include_raw_preds=True makes predict return a tuple including values for each iteration.
+inputs = np.array([mags])
+predictions, raw_preds = estimator.predict(inputs, iterations=1000, include_raw_preds=True)
 
-# predictions is a structured array[UFloat] so can be accessed with label names. The dtype is
+# predictions is a structured array[UFloat] & can be accessed with label names. The dtype is
 # UFloat from the uncertainties package which publishes nominal_value and std_dev attributes.
 # The following gets the nominal value of k for the first instance.
 k_value = predictions[0]["k"].nominal_value
@@ -109,9 +110,9 @@ predictions with uncertainties. Simply set the `predict(iterations)` argument to
 Estimator will make the requested number of predictions on each instance, with the model's Dropout
 layers enabled. In this configuration predictions are made for each iteration with a random subset
 of the neural network's neurons disabled, with the final predictions returned being the mean and
-standard deviation over every iteration for each instance. With dropout enabled, the prediction
-for each iteration is effectively made with a weak predictor but with sufficient iterations the
-resulting probability distribution represents a strong prediction through "the wisdom of crowds".
+standard deviation over every iteration for each instance. With dropout enabled the prediction
+for each iteration is effectively made with a weak predictor, however given sufficient iterations
+the resulting probability distribution represents a strong prediction through the wisdom of crowds.
 
 | ![ZZ Boo violin plot](https://github.com/user-attachments/assets/cc4ef9c7-9221-4881-abda-77aa514ad7d1) |
 | :-: |
@@ -120,15 +121,15 @@ resulting probability distribution represents a strong prediction through "the w
 The final set of prediction nominal values and the label values used for testing are shown below.
 The model does not predict $inc$ directly so it has to be calculated from the other predicted values:
 ```text
----------------------------------------------------------------------------------------------------------------
-ZZ Boo     | rA_plus_rB          k          J      ecosw      esinw         bP        inc        MAE        MSE
----------------------------------------------------------------------------------------------------------------
-Label      |   0.236690   1.069100   0.980030   0.000000   0.000000   0.208100  88.636100
-Prediction |   0.236385   1.067168   1.006427   0.000909   0.007463   0.272921  88.198103
-O-C        |   0.000305   0.001932  -0.026397  -0.000909  -0.007463  -0.064821   0.437997   0.077118   0.028114
-===============================================================================================================
-MAE        |   0.000305   0.001932   0.026397   0.000909   0.007463   0.064821   0.437997   0.077118
-MSE        |   0.000000   0.000004   0.000697   0.000001   0.000056   0.004202   0.191842              0.028114
+---------------------------------------------------------------------------------------------------
+ZZ Boo | rA_plus_rB         k         J     ecosw     esinw        bP       inc       MAE       MSE
+---------------------------------------------------------------------------------------------------
+Label  |   0.236690  1.069100  0.980030  0.000000  0.000000  0.208100 88.636100
+Pred   |   0.236385  1.067168  1.006427  0.000909  0.007463  0.272921 88.198103
+O-C    |   0.000305  0.001932 -0.026397 -0.000909 -0.007463 -0.064821  0.437997  0.077118  0.028114
+===================================================================================================
+MAE    |   0.000305  0.001932  0.026397  0.000909  0.007463  0.064821  0.437997  0.077118
+MSE    |   0.000000  0.000004  0.000697  0.000001  0.000056  0.004202  0.191842            0.028114
 ```
  
 The predicted values for $r_A+r_B$, $k$, $J$, $e\cos{\omega}$ and $e\sin{\omega}$ and the derived
@@ -139,15 +140,15 @@ which we can parse to get the values of the parameters of interest.  Shown below
 of fitting the parameters previously predicted and how they compare to the labels derived from
 the reference analysis:
 ```
----------------------------------------------------------------------------------------------------------------
-ZZ Boo     | rA_plus_rB          k          J      ecosw      esinw         bP        inc        MAE        MSE
----------------------------------------------------------------------------------------------------------------
-Label      |   0.236690   1.069100   0.980030   0.000000   0.000000   0.208100  88.636100
-Fitted     |   0.236666   1.069237   0.978183  -0.000003   0.000061   0.207551  88.639682
-O-C        |   0.000024  -0.000137   0.001847   0.000003  -0.000061   0.000549  -0.003582   0.000886   0.000002
-===============================================================================================================
-MAE        |   0.000024   0.000137   0.001847   0.000003   0.000061   0.000549   0.003582   0.000886
-MSE        |   0.000000   0.000000   0.000003   0.000000   0.000000   0.000000   0.000013              0.000002
+---------------------------------------------------------------------------------------------------
+ZZ Boo | rA_plus_rB         k         J     ecosw     esinw        bP       inc       MAE       MSE
+---------------------------------------------------------------------------------------------------
+Label  |   0.236690  1.069100  0.980030  0.000000  0.000000  0.208100 88.636100
+Fitted |   0.236666  1.069237  0.978183 -0.000003  0.000061  0.207551 88.639682
+O-C    |   0.000024 -0.000137  0.001847  0.000003 -0.000061  0.000549 -0.003582  0.000886  0.000002
+===================================================================================================
+MAE    |   0.000024  0.000137  0.001847  0.000003  0.000061  0.000549  0.003582  0.000886
+MSE    |   0.000000  0.000000  0.000003  0.000000  0.000000  0.000000  0.000013            0.000002
 ```
 
 The result of the task 3 analysis can be plotted by parsing the .out file written, which contains
