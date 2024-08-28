@@ -28,7 +28,7 @@ or galaxies (Chaini et al. 2023), however here we are using one to address a reg
 
 | ![cnn-ext-model](https://github.com/user-attachments/assets/210e53f2-901b-4a9b-b4c3-366c7dc57a40) |
 | :-: |
-| _Figure 1. The EBOP MAVEN CNN model._  |
+| _Figure 1. The EBOP MAVEN CNN model. Network visualized using a fork of PlotNeuralNet (Iqbal 2018)._  |
 
 A CNN model consists of one or more convolutional layers which during training "learn" convolution
 kernels to isolate important features in the input data, followed by a neural network which learns
@@ -161,6 +161,8 @@ columns with the phase, fitted model and residual values (Fig. 4).
 
 ## References
 Chaini S., Bagul A., Deshpande A., Gondkar R., Sharma K., Vivek M., Kembhavi A., 2023, [MNRAS](https://ui.adsabs.harvard.edu/abs/2023MNRAS.518.3123C), 518, 3123
+
+Iqbal H., 2018, HarisIqbal88/PlotNeuralNetv1.0.0 (v1.0.0), [Zenodo](https://doi.org/10.5281/zenodo.2526396)
 
 Southworth J., 2023, [The Observatory](https://ui.adsabs.harvard.edu/abs/2023Obs...143...19S), 143, 19
 
