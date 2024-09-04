@@ -49,7 +49,6 @@ BATCH_FRACTION = 0.001          # larger -> quicker training per epoch but more 
 MAX_BUFFER_SIZE = 20000000      # Size of Dataset shuffle buffer (in instances)
 ES_PATIENCE = 5                 # Number of epochs w/o val_loss improvement before stopping
 ES_MIN_DELTA = 0.0001           # Minimum val_loss delta to be considered an improvment
-ENFORCE_REPEATABILITY = True    # If true, avoid GPU/CUDA cores for repeatable results
 SEED = 42                       # Standard random seed ensures repeatable randomization
 np.random.seed(SEED)
 python_random.seed(SEED)
@@ -149,21 +148,20 @@ def make_best_model(chosen_features: list[str]=CHOSEN_FEATURES,
 if __name__ == "__main__":
     SAVE_DIR.mkdir(parents=True, exist_ok=True)
     with redirect_stdout(Tee(open(SAVE_DIR / "make_trained_cnn_model.log", "w", encoding="utf8"))):
-        print(f"Started at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}\n")
-        
+        print(f"\nStarted at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}\n")
+
+        # CUDA_VISIBLE_DEVICES is set for the conda env. A value of "-1" suppresses GPUs which is
+        # useful for repeatable results (Keras advises that out of order processing within GPU/CUDA
+        # can lead to varying results) and also avoiding memory constraints on smaller GPUs (mine!).
         print("\n".join(f"{lib.__name__} v{lib.__version__}" for lib in [tf, tensorboard, keras]))
-        if ENFORCE_REPEATABILITY:
-            # Extreme, but it stops TensorFlow/Keras from using (even seeing) the GPU.
-            # Slows training down massively (by 3-4 times) but should avoid GPU memory
-            # constraints! Necessary if repeatable results are required (Keras advises
-            # that out of order processing within GPU/CUDA can lead to varying results).
-            os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-        print(f"Found {len(tf.config.list_physical_devices('GPU'))} GPU(s)\n")
+        print(f"Found {len(tf.config.list_physical_devices('GPU'))} GPU(s)")
+        cuda_visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES", "")
+        print(f"The environment variable CUDA_VISIBLE_DEVICES set to '{cuda_visible_devices}'")
 
         # -----------------------------------------------------------
         # Set up the training and validation dataset pipelines
         # -----------------------------------------------------------
-        print("Creating training and validation dataset pipelines.")
+        print("\nCreating training and validation dataset pipelines.")
         print(f"Augmentation for roll: {getsource(roll_func)} where ROLL_MAX = {ROLL_MAX}")
         print(f"Agumentation for noise: {getsource(noise_func)}")
         datasets = [tf.data.TFRecordDataset] * 2

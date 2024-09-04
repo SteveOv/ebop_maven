@@ -50,7 +50,6 @@ MAX_BUFFER_SIZE = 20000000          # Size of Dataset shuffle buffer (in instanc
 TRAIN_PATIENCE = 7                  # Number of epochs w/o improvement before training is stopped
 TRAIN_TIMEOUT = timedelta(hours=1)  # Timeout training if not completed within this time
 
-ENFORCE_REPEATABILITY = True    # If true, avoid GPU/CUDA cores for repeatable results
 SEED = 42                       # Standard random seed ensures repeatable randomization
 np.random.seed(SEED)
 python_random.seed(SEED)
@@ -59,14 +58,13 @@ tf.random.set_seed(SEED)
 results_dir = Path(".") / "drop" / "model_search"
 results_dir.mkdir(parents=True, exist_ok=True)
 
+# CUDA_VISIBLE_DEVICES is set for the conda env. A value of "-1" suppresses GPUs which is
+# useful for repeatable results (Keras advises that out of order processing within GPU/CUDA
+# can lead to varying results) and also avoiding memory constraints on smaller GPUs (mine!).
 print("\n".join(f"{lib.__name__} v{lib.__version__}" for lib in [tf, keras]))
-if ENFORCE_REPEATABILITY:
-    # Extreme, but it stops TensorFlow/Keras from using (even seeing) the GPU.
-    # Slows training down massively (by 3-4 times) but should avoid GPU memory
-    # constraints! Necessary if repeatable results are required (Keras advises
-    # that out of order processing within GPU/CUDA can lead to varying results).
-    os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-print(f"Found {len(tf.config.list_physical_devices('GPU'))} GPU(s)\n")
+print(f"Found {len(tf.config.list_physical_devices('GPU'))} GPU(s)")
+cuda_visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES", "")
+print(f"The environment variable CUDA_VISIBLE_DEVICES set to '{cuda_visible_devices}'\n")
 
 
 # -----------------------------------------------------------
