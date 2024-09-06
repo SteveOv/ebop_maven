@@ -5,6 +5,8 @@ formal analysis with [JKTEBOP](https://www.astro.keele.ac.uk/jkt/codes/jktebop.h
 Detailed instructions on setting up the runtime environment, training & testing datasets,
 and training a model can be found [here in the wiki](https://github.com/SteveOv/ebop_maven/wiki/setup-instructions)
 
+[Release v0.1 for KOPAL2024](https://github.com/SteveOv/ebop_maven/releases/tag/v0.1)
+
 An article on the development of EBOP MAVEN is being prepared for publication.
 
 ## Overview
@@ -69,7 +71,7 @@ function for making predictions and numerous attributes to describe the model an
 ```python
 from ebop_maven.estimator import Estimator
 
-# Loads the default model
+# Loads the default model which is included in this repo
 estimator = Estimator()
 
 # Get the expected size and wrap to apply to model's input "mags" feature
