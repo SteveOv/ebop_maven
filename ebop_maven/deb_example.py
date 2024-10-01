@@ -135,10 +135,12 @@ def create_map_func(mags_bins: int = default_mags_bins,
     # pylint: disable=too-many-arguments
     mags_key = create_mags_key(mags_bins)
     mags_wrap_phase = mags_wrap_phase % 1 # Treat the wrap a cyclic & force it into the range [0, 1)
+
     if ext_features is not None:
         chosen_ext_feat_and_defs = { ef: extra_features_and_defaults[ef] for ef in ext_features}
     else:
         chosen_ext_feat_and_defs = extra_features_and_defaults
+
     if labels is not None:
         chosen_lab_and_scl = { l: labels_and_scales[l] for l in labels }
     else:
@@ -148,8 +150,8 @@ def create_map_func(mags_bins: int = default_mags_bins,
     def map_func(record_bytes):
         example = tf.io.parse_single_example(record_bytes, description)
 
-        # Need to adjust the model mags slightly to get it into a shape for the model
-        # so basically a change from (#bins,) to (#bins, 1)
+        # Get mags feature and reshape to match ML model's requirements; from (#bins,) to (#bins, 1)
+        # Assume mags will have been stored with phase implied by index and primary eclipse at zero
         mags_feature = tf.reshape(example[mags_key], shape=(mags_bins, 1))
 
         # Apply any noise augmentations to the model mags
@@ -279,11 +281,13 @@ def iterate_dataset(dataset_files: Iterable[str],
     # pylint: disable=too-many-arguments, too-many-locals
     mags_key = create_mags_key(mags_bins)
     mags_wrap_phase = mags_wrap_phase % 1 # Treat the wrap a cyclic & force it into the range [0, 1)
+
     if ext_features is not None:
         chosen_ext_feats = {
             f: extra_features_and_defaults[f] for f in ext_features if f != "mags" }
     else:
         chosen_ext_feats = extra_features_and_defaults
+
     if labels is not None:
         chosen_labels = { l: labels_and_scales[l] for l in labels }
     else:
@@ -293,6 +297,7 @@ def iterate_dataset(dataset_files: Iterable[str],
         max_instances = len(identifiers)
 
     def map_func(record_bytes):
+        # Assume mags will have been stored with phase implied by index and primary eclipse at zero
         example = tf.io.parse_single_example(record_bytes, description)
         mags_feature = example[mags_key]
 
