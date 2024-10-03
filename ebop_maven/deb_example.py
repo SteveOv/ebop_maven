@@ -111,35 +111,40 @@ def create_map_func(mags_bins: int = default_mags_bins,
                     scale_labels: bool=True,
                     include_id: bool=False) -> Callable:
     """
-    Configures and returns a dataset map function for deb_examples. The map function
-    is used by TFRecordDataset().map() to deserialize each raw tfrecord row into the
-    corresponding features and labels required for model training or testing.
+    Configures and returns a dataset map function for deb_examples. The map function is used by
+    TFRecordDataset().map() to deserialize each raw tfrecord row into the corresponding features
+    and labels required for model training or testing.
     
-    In addition to deserializing the rows, the map function supports the option of
-    augmenting the output magnitudes feature by adding Gaussian noise and/or rolling
-    the bins left or right. These options are configured by supplying functions which
-    set their stddev or roll values respectively (otherwise they do nothing). Note,
-    these will be running within the context of a graph so you should use tf.functions
-    if you want to do anything beyond setting a fixed value. For example:
-
-    roll_steps = lambda: tf.random.uniform([], -3, 4, tf.int32)
+    The mags_wrap_phase argument controls at which point the cyclic, phase normalized mags data is
+    wrapped when read. This can be in the range [0, 1] or None (in which case the mags data is
+    adaptively wrapped to centre on the mid-point between the primary and secondary eclipses).
+    
+    In addition to deserializing the rows, the map function supports the option of augmenting the
+    output magnitudes feature by adding Gaussian noise and/or rolling the bins left or right after
+    the mags_wrap_phase is applied. These options are configured by supplying functions which set
+    their stddev or roll values respectively (otherwise they do nothing). Note, these will be
+    running within the context of a tf graph so you should use tf.functions if you want to do
+    anything more complex than supplying a fixed value. For example, to return a random value:
+    ```Python
+        roll_steps = lambda: tf.random.uniform([], -3, 4, tf.int32)
+    ```
 
     :mags_bins: the width of the mags to publish
-    :mags_wrap_phase: the wrap phase of the mags to publish
-    :ext_features: a chosen subset of the available ext_features,
-    in the requested order, or all if None
-    :labels: a chosen subset of the available labels, in requested order, or all if None
+    :mags_wrap_phase: the wrap phase of the mags to publish, or None to use adaptive wrap
+    :ext_features: chosen subset of available ext_features, in the requested order, or all if None
+    :labels: chosen subset of available labels, in requested order, or all if None
     :noise_stddev: a function which returns the stddev of the Gaussian noise to add
     :roll_steps: a function which returns the number of steps to roll the mag data,
     negative values roll to the left and positive values to the right
     :scale_labels: whether to apply scaling to the map function's returned labels
-    :include_id: whether to include the id in the map function's returned tuple. If true, it returns
+    :include_id: whether to include the id in the function's returned tuple. If true, it returns
     (id, (mags_feature, ext_features), labels) per inst else ((mags_feature, ext_features), labels)
-    :returns: the configured map function
+    :returns: the newly generated map function
     """
     # pylint: disable=too-many-arguments
     mags_key = create_mags_key(mags_bins)
-    mags_wrap_phase = mags_wrap_phase % 1 # Treat the wrap a cyclic & force it into the range [0, 1)
+    if mags_wrap_phase is not None:
+        mags_wrap_phase %= 1 # Treat the wrap as cyclic & force it into the range [0, 1)
 
     if ext_features is not None:
         chosen_ext_feat_and_defs = { ef: extra_features_and_defaults[ef] for ef in ext_features}
@@ -165,17 +170,23 @@ def create_map_func(mags_bins: int = default_mags_bins,
             if stddev != 0.:
                 mags_feature += tf.random.normal(mags_feature.shape, stddev=stddev)
 
-        # Now roll the mags to match the requested wrap phase. For example, if the wrap phase
+        if mags_wrap_phase is not None:
+            roll_phase = mags_wrap_phase
+        else:
+            # Adaptive; chosen to centre mags on the midpoint between primary & secondary eclipses
+            roll_phase = (example.get("phiS", 0.5) + 0.25) % 1
+
+        # Now roll the mags to match the requested wrap phase. For example, if the roll phase
         # is 0.75 then the mags will be rolled right by 0.25 phase so that those mags originally
-        # beyond phase 0.75 are rolled round to lie before phase 0 (as phases -0.25 to 0).
+        # beyond phase 0.75 are rolled round to lie before phase 0 (effectively phases -0.25 to 0).
         # Combine with any roll augmentation so we only incur the overhead of rolling once
-        roll_bins = 0 if mags_wrap_phase == 0 else int(mags_bins * (1.0 - mags_wrap_phase))
+        roll_shift = 0 if roll_phase == 0 else int(mags_bins * (1.0 - roll_phase))
         if roll_steps:
-            roll_bins += roll_steps()
-        if roll_bins != 0:
-            if roll_bins > mags_bins // 2:
-                roll_bins -= mags_bins
-            mags_feature = tf.roll(mags_feature, [roll_bins], axis=[0])
+            roll_shift += roll_steps()
+        if roll_shift != 0:
+            if roll_shift > mags_bins // 2:
+                roll_shift -= mags_bins
+            mags_feature = tf.roll(mags_feature, [roll_shift], axis=[0])
 
         # The Extra features: ignore unknown fields and use default if not found
         ext_features = [example.get(k, d) for (k, d) in chosen_ext_feat_and_defs.items()]
