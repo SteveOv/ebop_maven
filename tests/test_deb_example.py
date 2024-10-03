@@ -93,6 +93,39 @@ class Test_deb_example(unittest.TestCase):
                 phase_zero_ix = np.where(lc_feature == 0)[0]
                 self.assertEqual(phase_zero_ix, exp_phase_zero_ix)
 
+    def test_create_map_func_adaptive_wrap_phase(self):
+        """ Tests the created map_func's adaptive wrap_phase functionality """
+        with self.__class__.lock:
+            input_labels = { k: v for v, k in enumerate(deb_example.labels_and_scales) }
+
+            # We test that the map_func uses phiS, which is the phase of the secondary based on the
+            # primary being at phase 0, to work out the phase of the midpoint between the eclipses.
+            # It should then roll the mags to centre them on this midpoint.
+            for mags_bins in [1024, 4096]:
+                # A graph instance of the map_func, with wrap==None to enforce adaptive wrap.
+                map_fn = tf.function(deb_example.create_map_func(mags_bins, mags_wrap_phase=None))
+
+                # Set up a mags feature with each bin's value equal to its index with the primary
+                # eclipse at phase/index of zero. This allows us to see any wrap that's been applied
+                input_mags = np.arange(mags_bins)
+                mags_feature = { deb_example.create_mags_key(mags_bins): input_mags }
+
+                # Serialize checks for the presence of the "default" mags even when not being tested
+                mags_feature.setdefault(deb_example.default_mags_key, np.arange(deb_example.default_mags_bins))
+
+                for phiS in [0.5, 0.2, 0.33, 0.66, 0.8]:
+                    deb = deb_example.serialize("t1", input_labels, mags_feature, { "phiS": phiS })
+                    ((lc_feature, _), _) = map_fn(deb)
+
+                    # Work out where we expect the parsed mags to be centred; the midpoint between
+                    # the primary (at phase 0) and secondary (at phase phiS).
+                    eclipse_midpoint_phase = phiS / 2
+                    eclipse_midpoint_value = input_mags[int(mags_bins * eclipse_midpoint_phase)]
+
+                    # We expect the mags to now be centred on the midpoint between eclipses.
+                    centre_bin_value = lc_feature.numpy()[mags_bins // 2, 0]
+                    self.assertTrue(abs(eclipse_midpoint_value - centre_bin_value) <= 1)
+
     def test_create_map_func_with_selected_ext_features(self):
         """ Test that the resulting map_func deserializes a deb_example with subset of ext_features """
         with self.__class__.lock:

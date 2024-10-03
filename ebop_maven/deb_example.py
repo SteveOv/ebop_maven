@@ -174,7 +174,8 @@ def create_map_func(mags_bins: int = default_mags_bins,
             roll_phase = mags_wrap_phase
         else:
             # Adaptive; chosen to centre mags on the midpoint between primary & secondary eclipses
-            roll_phase = (example.get("phiS", 0.5) + 0.25) % 1
+            # With the primary initially at phase 0, the midpoint is half the secondary phase
+            roll_phase = 0.5 + example.get("phiS", 0.5) / 2
 
         # Now roll the mags to match the requested wrap phase. For example, if the roll phase
         # is 0.75 then the mags will be rolled right by 0.25 phase so that those mags originally
