@@ -65,15 +65,21 @@ class Estimator(ABC):
         self._scaling_applied = any(s != 1 for s in self._scale_values)
 
         print(f"The model {self.name} was created at {self._metadata['created_timestamp']}")
+
         print("The input features are:")
         print(f"  mags_feature as a NDarray[float] of shape (#instances, {self.mags_feature_bins})",
-              f"with the phases beyond {self.mags_feature_wrap_phase} wrapped by -1")
+              "containing a phase folded light curve ", end="")
+        if self.mags_feature_wrap_phase is None:
+            print("centred on the mid-point between the primary and secondary eclipse")
+        elif self.mags_feature_wrap_phase:
+            print(f"with the phases above {self.mags_feature_wrap_phase} wrapped by -1")
         if len(self.extra_feature_names):
             print("  extra_features as a NDarray[float] of shape (#instances,",
                   f"{len(self.extra_feature_names)}) for [{', '.join(self.extra_feature_names)}])")
         else:
             print( "  extra_features as a NDarray of shape (#instances, 0) or None,",
                   "as no extra_features are used for predictions")
+
         print("The prediction results are:")
         print( "  predicted values as a structured NDarray[UFloat] of shape",
               f"(#instances, [{', '.join(self.label_names)}])")
