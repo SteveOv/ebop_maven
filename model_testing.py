@@ -18,7 +18,7 @@ from datetime import datetime
 import matplotlib.pylab as plt
 
 from uncertainties import ufloat, UFloat, unumpy
-from uncertainties.umath import acos, asin, degrees # pylint: disable=no-name-in-module
+from uncertainties.umath import acos, asin, cos, degrees, radians # pylint: disable=no-name-in-module
 
 import astropy.units as u
 import numpy as np
@@ -374,6 +374,32 @@ def append_calculated_inc_predictions(preds: np.ndarray[UFloat]) -> np.ndarray[U
         new[names] = preds[names]
         new["inc"] = inc
         return new
+
+
+def primary_impact_param(rA_plus_rB: Union[np.ndarray[float], np.ndarray[UFloat], float, UFloat],
+                         k: Union[np.ndarray[float], np.ndarray[UFloat], float, UFloat],
+                         inc: Union[np.ndarray[float], np.ndarray[UFloat], float, UFloat],
+                         ecosw: Union[np.ndarray[float], np.ndarray[UFloat], float, UFloat],
+                         esinw: Union[np.ndarray[float], np.ndarray[UFloat], float, UFloat]) \
+                            -> Union[np.ndarray[float], np.ndarray[UFloat], float, UFloat]:
+    """
+    Calculate the primary impact parameter for the passed label values.
+
+    :rA_plus_rB: the systems' sum of the radii
+    :k: the systems' ratio of the radii
+    :inc: the orbital inclinations in degrees
+    :ecosw: the e*cos(omega) Poincare elements
+    :esinw: the e*sin(omega) Poincare elements
+    :returns: the calculated primary impact parameter(s)
+    """
+    # bp = (1/rA) * cos(inc) * (1-e^2 / 1+esinw) where rA = rA_plus_rB/(1+k)
+    one_over_rA = (1 + k) / rA_plus_rB
+    e = (ecosw**2 + esinw**2)**0.5
+    if isinstance(inc, np.ndarray):
+        cosi = np.array([cos(radians(i)) for i in inc])
+    else:
+        cosi = cos(radians(inc))
+    return one_over_rA * cosi * (1 - e**2) / (1 + esinw)
 
 
 def will_transit(rA_plus_rB: Union[np.ndarray[float], np.ndarray[UFloat]],
