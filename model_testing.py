@@ -92,39 +92,37 @@ def evaluate_model_against_dataset(estimator: Union[Model, Estimator],
     argvs = [lbl_vals[p] / (deb_example.labels_and_scales[p] if scaled else 1) for p in pnames]
     tflags = will_transit(*argvs)
 
-    # Now report on the quality of the predictions, for which we will need the residuals
-    resids = calculate_residuals(pred_vals, lbl_vals, estimator.label_names)
+    # Now report on the quality of the predictions, for which we will need the errors
+    errors = calculate_prediction_errors(pred_vals, lbl_vals, estimator.label_names)
     pnames = [n for n in pred_vals.dtype.names if n not in ["ecosw", "esinw"]] + ["ecosw", "esinw"]
     for (subset, tmask) in [("",                 [True]*lbl_vals.shape[0]),
                             (" transiting",      tflags),
                             (" non-transiting",  ~tflags)]:
-        sub_suffix = subset.replace(' ','-')
+        suffix = subset.replace(' ','-')
         if any(tmask):
             print(f"\nMetrics for {sum(tmask)}{subset} system(s).")
-            predictions_vs_labels_to_table(pred_vals[tmask], lbl_vals[tmask], summary_only=True,
+            m_preds, m_lbls, m_errs = pred_vals[tmask], lbl_vals[tmask], errors[tmask]
+            predictions_vs_labels_to_table(m_preds, m_lbls, summary_only=True,
                                            selected_param_names=estimator.label_names)
 
             # These plot to pdf, which looks better than eps, as it supports transparency/alpha.
             if report_dir and (not subset or "formal" not in ds_name):
                 # For formal-test-dataset plot only the whole set as the size is too low to split.
-                fig = plots.plot_prediction_boxplot(resids[tmask], show_fliers="formal" in ds_name,
-                                                    ylabel="Residual")
-                fig.savefig(report_dir / f"predictions-{mc_type}-box-{ds_name}{sub_suffix}.pdf")
-
-                fig = plots.plot_predictions_vs_labels(pred_vals[tmask], lbl_vals[tmask],
-                                                       tflags[tmask], pnames, show_errorbars=False)
-                fig.savefig(report_dir/f"predictions-{mc_type}-vs-labels-{ds_name}{sub_suffix}.pdf")
+                show_fliers = "formal" in ds_name
+                fig = plots.plot_prediction_boxplot(m_errs, show_fliers=show_fliers, ylabel="Error")
+                fig.savefig(report_dir / f"predictions-{mc_type}-box-{ds_name}{suffix}.pdf")
+                fig = plots.plot_predictions_vs_labels(m_preds, m_lbls, tflags[tmask],
+                                                       pnames, show_errorbars=False)
+                fig.savefig(report_dir / f"predictions-{mc_type}-vs-labels-{ds_name}{suffix}.pdf")
 
             if report_dir and "formal" not in ds_name:
                 # Break down the predictions into bins then plot the MAE against mean label to give
                 # an indication of how the accuracy of the predictions vary over the label ranges.
-                fig = plots.plot_binned_mae_vs_labels(resids[tmask], lbl_vals[tmask],
-                                                      ["esinw", "ecosw"], xlim=(-.75, .75))
-                fig.savefig(report_dir / f"binned-mae-poincare-{mc_type}-{ds_name}{sub_suffix}.pdf")
-
-                fig = plots.plot_binned_mae_vs_labels(resids[tmask], lbl_vals[tmask],
-                                                      ["k", "J", "bP"])
-                fig.savefig(report_dir / f"binned-mae-kjbp-{mc_type}-{ds_name}{sub_suffix}.pdf")
+                fig = plots.plot_binned_mae_vs_labels(m_errs, m_lbls, ["esinw","ecosw"],
+                                                      xlim=(-.75,.75))
+                fig.savefig(report_dir / f"binned-mae-poincare-{mc_type}-{ds_name}{suffix}.pdf")
+                fig = plots.plot_binned_mae_vs_labels(m_errs, m_lbls, ["k", "J", "bP"])
+                fig.savefig(report_dir / f"binned-mae-kjbp-{mc_type}-{ds_name}{suffix}.pdf")
             plt.close()
 
 
@@ -188,8 +186,7 @@ def fit_against_formal_test_dataset(estimator: Union[Model, Estimator],
             pred_vals = append_calculated_inc_predictions(pred_vals)
 
     # Pre-allocate a structured array to hold the params which are output from each JKTEBOP fitting
-    fitted_vals = np.empty(shape=(len(targs), ),
-                           dtype=[(name, np.dtype(UFloat.dtype)) for name in super_names])
+    fit_vals = np.empty((len(targs), ), dtype=[(sn, np.dtype(UFloat.dtype)) for sn in super_names])
 
     # Finally, we have everything in place to fit our targets and report on the results
     for ix, targ in enumerate(targs):
@@ -235,10 +232,10 @@ def fit_against_formal_test_dataset(estimator: Union[Model, Estimator],
         par_fname = fit_dir / f"{fit_stem}.par"
         par_contents = list(jktebop.run_jktebop_task(in_fname, par_fname, stdout_to=sys.stdout))
         fit_params_dict = jktebop.read_fitted_params_from_par_lines(par_contents, super_names)
-        fitted_vals[ix] = tuple(ufloat(value[0], value[1]) for _, value in fit_params_dict.items())
+        fit_vals[ix] = tuple(ufloat(value[0], value[1]) for _, value in fit_params_dict.items())
 
         print(f"\nHave fitted {targ} resulting in the following fitted params")
-        predictions_vs_labels_to_table(fitted_vals[ix], lbl_vals[ix], [targ], fit_names,
+        predictions_vs_labels_to_table(fit_vals[ix], lbl_vals[ix], [targ], fit_names,
                                        prediction_head="Fitted")
 
     # Save reports on how the predictions and fitting has gone over all of the selected targets
@@ -274,7 +271,7 @@ def fit_against_formal_test_dataset(estimator: Union[Model, Estimator],
             # Summarize this set of fitted params as plots pred-vs-label|control and in text tables
             results_stem = f"fitted-params-from-{prediction_type}-vs-{comp_type}"
             names = [n for n in fit_names if n not in ["ecosw", "esinw"]] + ["ecosw", "esinw"]
-            fig = plots.plot_predictions_vs_labels(fitted_vals, comp_vals, trans_flags, names,
+            fig = plots.plot_predictions_vs_labels(fit_vals, comp_vals, trans_flags, names,
                                                    xlabel_prefix=comp_head, ylabel_prefix="fitted")
             fig.savefig(report_dir / f"{results_stem}.eps")
             plt.close()
@@ -282,11 +279,10 @@ def fit_against_formal_test_dataset(estimator: Union[Model, Estimator],
             with open(report_dir / f"{results_stem}.txt", "w", encoding="utf8") as txtf:
                 for (sub_head, mask, rep_names) in sub_reports:
                     if any(mask):
-                        predictions_vs_labels_to_table(fitted_vals[mask], comp_vals[mask],
-                                                       targs[mask], rep_names, title=sub_head,
-                                                       comparison_head=comp_head.capitalize(),
-                                                       prediction_head="Fitted", to=txtf)
-    return fitted_vals
+                        predictions_vs_labels_to_table(fit_vals[mask], comp_vals[mask], targs[mask],
+                                                rep_names, title=sub_head, prediction_head="Fitted",
+                                                label_head=comp_head.capitalize(), to=txtf)
+    return fit_vals
 
 
 def base_jktebop_fit_params(task: int,
@@ -447,22 +443,22 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
                                    block_headings: np.ndarray[str]=None,
                                    selected_param_names: np.ndarray[str]=None,
                                    reverse_scaling: bool=False,
-                                   comparison_head: str="Label",
                                    prediction_head: str="Prediction",
+                                   label_head: str="Label",
                                    title: str=None,
                                    summary_only: bool=False,
                                    to: TextIOBase=None):
     """
     Will write a text table of the predicted nominal values vs the label values
-    with O-C, MAE and MSE metrics, to the requested output.
+    with individual error, MAE and MSE metrics, to the requested output.
 
     :predictions: the predictions
-    :labels: the labels
+    :labels: the labels or other comparison values
     :block_headings: the heading for each block of preds-vs-labels
     :selected_param_names: a subset of the full list of labels/prediction names to render
     :reverse_scaling: whether to reverse the scaling of the values to represent the model output
-    :comparison_head: the text of the comparison row headings (10 chars or less)
     :prediction_head: the text of the prediction row headings (10 chars or less)
+    :label_head: the text of the label/comparison row headings (10 chars or less)
     :title: optional title text to write above the table
     :summary_only: omit the body and just report the summary
     :to: the output to write the table to. Defaults to printing.
@@ -476,9 +472,14 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
     else:
         keys = selected_param_names
 
-    resids = calculate_residuals(predictions, labels, keys, reverse_scaling)
-    maes = unumpy.nominal_values([np.mean(np.abs(resids[k])) for k in keys])
-    mses = unumpy.nominal_values([np.mean(np.square(resids[k])) for k in keys])
+    errors = calculate_prediction_errors(predictions, labels, keys, reverse_scaling)
+    maes = unumpy.nominal_values([np.mean(np.abs(errors[k])) for k in keys])
+    mses = unumpy.nominal_values([np.mean(np.square(errors[k])) for k in keys])
+
+    # Make sure these are iterable; not always the case if we're given a single row
+    labels = np.expand_dims(labels, 0) if labels.shape == () else labels
+    predictions = np.expand_dims(predictions, 0) if predictions.shape == () else predictions
+    errors = np.expand_dims(errors, 0) if errors.shape == () else errors
 
     print_it = not to
     if print_it:
@@ -503,30 +504,30 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
         elif isinstance(block_headings, str):
             block_headings = [block_headings]
 
-        # Make sure these are iterable; not always the case if we're given a single row
-        labels = np.expand_dims(labels, 0) if labels.shape == () else labels
-        predictions = np.expand_dims(predictions, 0) if predictions.shape == () else predictions
-        resids = np.expand_dims(resids, 0) if resids.shape == () else resids
-
-        for block_head, b_comp, b_preds, b_ocs in zip(block_headings, labels, predictions, resids):
-            # A sub table for each block/instance with 3 rows; labels|controls, predictions and ocs
+        # A sub table for each block/instance with heads & 3 rows; labels|controls, preds and errs
+        for block_head, b_lbls, b_preds, b_errs \
+                in zip(block_headings, labels, predictions, errors, strict=True):
             header_block(block_head)
             horizontal_line("-")
-            for row_head, row_vals in zip([comparison_head, prediction_head, "O-C"],
-                                          [b_comp, b_preds, b_ocs]):
+            for row_head, row_vals in zip([label_head, prediction_head, "Error"],
+                                          [b_lbls, b_preds, b_errs]):
                 to.write(f"{row_head:<10s} | " +
                          " ".join(f"{get_nom(row_vals[k]):10.6f}" for k in keys))
-                if row_head == "O-C":
+                if row_head == "Error":
                     to.write(f" {get_nom(np.mean(np.abs(row_vals[keys].tolist()))):10.6f}")
                     to.write(f" {get_nom(np.mean(np.square(row_vals[keys].tolist()))):10.6f}")
                 to.write("\n")
 
-    # Summary rows for aggregate stats over all of the rows
-    horizontal_line("=")
-    to.write(f"{'MAE':<10s} | " + " ".join(f"{get_nom(v):10.6f}" for v in maes) +
-             f" {get_nom(np.mean(np.abs(resids.tolist()))):10.6f}\n")
-    to.write(f"{'MSE':<10s} | " + " ".join(f"{get_nom(v):10.6f}" for v in mses) +
-             " "*11 + f" {get_nom(np.mean(np.square(resids.tolist()))):10.6f}\n")
+    if summary_only or len(predictions) > 1:
+        # Summary rows for aggregate stats over all of the rows
+        horizontal_line("=")
+        to.write(f"{'MAE':<10s} | " + " ".join(f"{get_nom(v):10.6f}" for v in maes) +
+                f" {get_nom(np.mean(np.abs(errors.tolist()))):10.6f}\n")
+        to.write(f"{'MSE':<10s} | " + " ".join(f"{get_nom(v):10.6f}" for v in mses) +
+                " "*11 + f" {get_nom(np.mean(np.square(errors.tolist()))):10.6f}\n")
+    else:
+        horizontal_line("-")
+
     if print_it:
         print(to.getvalue())
 
@@ -534,12 +535,12 @@ def get_nom(value):
     """ Get the nominal value if the passed value is a UFloat other return as is """
     return value.nominal_value if isinstance(value, UFloat) else value
 
-def calculate_residuals(predictions: np.ndarray[UFloat],
-                        labels: np.ndarray[Union[UFloat, float]],
-                        selected_param_names: np.ndarray[str]=None,
-                        reverse_scaling: bool=False) -> np.ndarray[UFloat]:
+def calculate_prediction_errors(predictions: np.ndarray[UFloat],
+                                labels: np.ndarray[Union[UFloat, float]],
+                                selected_param_names: np.ndarray[str]=None,
+                                reverse_scaling: bool=False) -> np.ndarray[UFloat]:
     """
-    Calculates the residual by subtracted the predictions from the labels.
+    Calculates the prediction errors by subtracting the predictions from the label values.
 
     :predictions: the predictions
     :labels: the labels
@@ -559,16 +560,16 @@ def calculate_residuals(predictions: np.ndarray[UFloat],
     # (no subtract in unumpy). We do it a (common) column/param at a time, which has the added
     # benefit of being untroubled by the two arrays having different sets of cols (widths).
     row_count = predictions.shape[0] if predictions.shape else 1
-    resids = np.empty(shape=(row_count, ), dtype=dtype)
+    errors = np.empty(shape=(row_count, ), dtype=dtype)
 
     # We may have to reverse the scaling
     if reverse_scaling:
         for n in selected_param_names:
-            resids[n] = (labels[n] - predictions[n]) * deb_example.labels_and_scales[n]
+            errors[n] = (labels[n] - predictions[n]) * deb_example.labels_and_scales[n]
     else:
         for n in selected_param_names:
-            resids[n] = labels[n] - predictions[n]
-    return resids
+            errors[n] = labels[n] - predictions[n]
+    return errors
 
 
 if __name__ == "__main__":
@@ -611,8 +612,9 @@ if __name__ == "__main__":
                       f"on {dataset_dir.name}\n" + "="*80)
                 evaluate_model_against_dataset(the_estimator, iters, targs, dataset_dir, result_dir)
 
-            # Report on fitting the formal-test-dataset based on estimator predictions. First run
-            # through actually uses labels as the fit inputs to give us a set of control fit results
+            # Report on fitting the formal-test-dataset based on estimator predictions. First loop
+            # uses labels as the "predictions" yielding a set of control fit results for subsequent
+            # use as the baseline for the fitted values resulting from subsequent predictions
             ctrl_fit_vals = None # To be set on the first, control fit run
             for (pred_type, is_ctrl_fit, iterations) in [
                 ("control",     True,       0),
@@ -620,13 +622,13 @@ if __name__ == "__main__":
                 ("mc",          False,      1000),
             ]:
                 print(f"\nTesting JKTEBOP fitting of {pred_type} input values\n" + "="*80)
-                fit_vals = fit_against_formal_test_dataset(the_estimator,
-                                                           formal_targs_cfg,
-                                                           formal_targs,
-                                                           iterations,
-                                                           True,
-                                                           is_ctrl_fit,
-                                                           None if is_ctrl_fit else ctrl_fit_vals,
-                                                           result_dir)
+                fitted_vals = fit_against_formal_test_dataset(the_estimator,
+                                                            formal_targs_cfg,
+                                                            formal_targs,
+                                                            iterations,
+                                                            True,
+                                                            is_ctrl_fit,
+                                                            None if is_ctrl_fit else ctrl_fit_vals,
+                                                            result_dir)
                 if is_ctrl_fit:
-                    ctrl_fit_vals = fit_vals
+                    ctrl_fit_vals = fitted_vals
