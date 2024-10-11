@@ -61,6 +61,10 @@ _param_file_line_beginswith = {
 # Defines the "columns" of the structured array returned by generate_model_light_curve()
 _task2_model_dtype = np.dtype([("phase", np.double), ("delta_mag", np.double)])
 
+class JktebopWarning(UserWarning):
+    """ A Warning specific to JKTEBOP task processing. """
+
+
 def get_jktebop_dir() -> Path:
     """
     Publishes the path of the directory holding the JKTEBOP executable
@@ -123,6 +127,8 @@ def run_jktebop_task(in_filename: Path,
                     if not line:
                         break
                     stdout_to.write(line)
+                    if "warning" in line.casefold():
+                        warnings.warn(message=line, category=JktebopWarning)
             stdout_thread = threading.Thread(target=redirect_process_stdout)
             stdout_thread.start()
         return_code = proc.wait() # Seem to have to do this get the return_code
