@@ -1450,11 +1450,11 @@
         "logLB": -1.154,        "logLB_err": 0.053,
         "rA": 0.0596,           "rA_err": 0.0008,
         "rB": 0.0357,           "rB_err": 0.0004,
-        "desc": "A G+M pair in an eccentric 6.1 d orbit showing partial primary eclipses of ~0.5 mag and shallow secondary transits of ~0.06 mag. Some variability detected; probably from star spots on the primary component.",
+        "desc": "A G+M pair in an eccentric 6.1 d orbit showing partial primary eclipses of ~0.5 mag and shallow secondary transits of ~0.06 mag. Some variability detected, potentially from star spots.",
         "transits": true,
         "eclipses_similar": false,
         "components_similar": false,
-        "notes": "J in TESS bandpass calculated from T_effs; bP derived from rA, inc, e & esinw; control fit on TESS S33, with flattening to dampen variability, yields MAE 0.0090;",
+        "notes": "J in TESS bandpass calculated from T_effs; bP derived from rA, inc, e & esinw; control fit on TESS S33, with flattening to dampen variability, yields MAE 0.0083;",
         "primary_epoch": 2210.491034996,
         "period": 6.110760760,
         "ecc": 0.0862,              "ecc_err": 0.0010,
@@ -1472,7 +1472,7 @@
         },
         "sectors": {
             "33": {
-                "quality_bitmask": "hard",
+                "quality_bitmask": "hardest",
                 "flatten": { "mask_time_ranges": [[2210.37, 2210.62], [2213.19, 2213.46]] },
                 "detrend_gap_threshold": 0.5,
                 "detrend_order": 1
