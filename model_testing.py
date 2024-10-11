@@ -109,21 +109,13 @@ def evaluate_model_against_dataset(estimator: Union[Model, Estimator],
             if report_dir and (not subset or "formal" not in ds_name):
                 # For formal-test-dataset plot only the whole set as the size is too low to split.
                 show_fliers = "formal" in ds_name
-                fig = plots.plot_prediction_boxplot(m_errs, show_fliers=show_fliers, ylabel="Error")
-                fig.savefig(report_dir / f"predictions-{mc_type}-box-{ds_name}{suffix}.pdf")
-                fig = plots.plot_predictions_vs_labels(m_preds, m_lbls, tflags[tmask],
-                                                       pnames, show_errorbars=False)
-                fig.savefig(report_dir / f"predictions-{mc_type}-vs-labels-{ds_name}{suffix}.pdf")
-
-            if report_dir and "formal" not in ds_name:
-                # Break down the predictions into bins then plot the MAE against mean label to give
-                # an indication of how the accuracy of the predictions vary over the label ranges.
-                fig = plots.plot_binned_mae_vs_labels(m_errs, m_lbls, ["esinw","ecosw"],
-                                                      xlim=(-.75,.75))
-                fig.savefig(report_dir / f"binned-mae-poincare-{mc_type}-{ds_name}{suffix}.pdf")
-                fig = plots.plot_binned_mae_vs_labels(m_errs, m_lbls, ["k", "J", "bP"])
-                fig.savefig(report_dir / f"binned-mae-kjbp-{mc_type}-{ds_name}{suffix}.pdf")
-            plt.close()
+                plots.plot_prediction_boxplot(m_errs, show_fliers=show_fliers, ylabel="Error") \
+                    .savefig(report_dir / f"predictions-{mc_type}-box-{ds_name}{suffix}.pdf")
+                plt.close()
+                plots.plot_predictions_vs_labels(m_preds, m_lbls, tflags[tmask],
+                                                       pnames, show_errorbars=False) \
+                    .savefig(report_dir / f"predictions-{mc_type}-vs-labels-{ds_name}{suffix}.pdf")
+                plt.close()
 
 
 def fit_against_formal_test_dataset(estimator: Union[Model, Estimator],
