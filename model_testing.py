@@ -20,6 +20,7 @@ import matplotlib.pylab as plt
 from uncertainties import ufloat, UFloat, unumpy
 from uncertainties.umath import acos, asin, cos, degrees, radians # pylint: disable=no-name-in-module
 
+from lightkurve import LightCurve
 import astropy.units as u
 import numpy as np
 from keras import Model
@@ -141,7 +142,6 @@ def fit_against_formal_test_dataset(estimator: Union[Model, Estimator],
     :returns: a recarray[UFloat] containing the resulting fitted parameters for each target
     """
     # pylint: disable=too-many-statements, too-many-branches
-    fit_dir = jktebop.get_jktebop_dir()
     if isinstance(estimator, (Model, Path)):
         estimator = Estimator(estimator)
 
@@ -187,44 +187,16 @@ def fit_against_formal_test_dataset(estimator: Union[Model, Estimator],
         print(fill(targ_config.get("desc", "")) + "\n")
 
         # The basic lightcurve data read, rectified & extended with delta_mag and delta_mag_err cols
-        (lc, sector_count) = formal_testing.prepare_lightcurve_for_target(targ, targ_config, True)
-        pe = pipeline.to_lc_time(targ_config["primary_epoch"], lc).value
-        period = targ_config["period"]
-
-        fit_stem = "model-testing-" + re.sub(r"[^\w\d-]", "-", targ.lower())
-        for file in fit_dir.glob(f"{fit_stem}.*"):
-            file.unlink()
-        in_fname = fit_dir / f"{fit_stem}.in"
-        dat_fname = fit_dir / f"{fit_stem}.dat"
+        (lc, _) = formal_testing.prepare_lightcurve_for_target(targ, targ_config, True)
 
         print(f"\nWill fit {targ} with these input params from {prediction_type} predictions")
         predictions_vs_labels_to_table(pred_vals[ix], lbl_vals[ix], [targ], fit_names)
 
-        # published fitting params that may be needed for reliable fit
-        fit_overrides = targ_config.get("fit_overrides", {}) if apply_fit_overrides else {}
-        lrats = fit_overrides.get("lrat", [])
-
-        params = {
-            **base_jktebop_fit_params(3, period, pe, dat_fname.name, fit_stem, targ_config),
-            **{ n: pred_vals[ix][n] for n in pred_vals.dtype.names },   # predictions
-            **fit_overrides,                                            # overrides
-        }
-
-        # Add scale-factor poly fitting, chi^2 adjustment (to 1.0) and any light-ratio instructions
-        segments = pipeline.find_lightcurve_segments(lc, 0.5, return_times=True)
-        append_lines = jktebop.build_poly_instructions(segments, "sf", 1)
-        append_lines += ["", "chif", ""] + [ f"lrat {l}" for l in lrats ]
-
-        jktebop.write_in_file(in_fname, append_lines=append_lines, **params)
-        jktebop.write_light_curve_to_dat_file(lc, dat_fname)
-
-        # Don't consume the output files so they're available if we need any diagnostics.
-        # Read superset of fit and label values as these data are needed for reports.
-        print(f"\nFitting {targ} (with {sector_count} sector(s) of data) using JKTEBOP task 3...")
-        par_fname = fit_dir / f"{fit_stem}.par"
-        par_contents = list(jktebop.run_jktebop_task(in_fname, par_fname, stdout_to=sys.stdout))
-        fit_params_dict = jktebop.read_fitted_params_from_par_lines(par_contents, super_names)
-        fit_vals[ix] = tuple(ufloat(value[0], value[1]) for _, value in fit_params_dict.items())
+        # Perform the task3 fit taking the preds or control as input params and supplementing
+        # them with parameter values and fitting instructions from the target's config.
+        fit_stem = "model-testing-" + re.sub(r"[^\w\d-]", "-", targ.lower())
+        fit_vals[ix] = fit_target(lc, targ, pred_vals[ix], targ_config, super_names, fit_stem,
+                                  task=3, apply_fit_overrides=apply_fit_overrides)
 
         print(f"\nHave fitted {targ} resulting in the following fitted params")
         predictions_vs_labels_to_table(fit_vals[ix], lbl_vals[ix], [targ], fit_names,
@@ -277,61 +249,117 @@ def fit_against_formal_test_dataset(estimator: Union[Model, Estimator],
     return fit_vals
 
 
-def base_jktebop_fit_params(task: int,
-                            period: float,
-                            primary_epoch: float,
-                            dat_file_name: str,
-                            file_name_stem: str,
-                            sector_cfg: Dict[str, any],
-                            simulations: int=100) -> Dict[str, any]:
+def fit_target(lc: LightCurve,
+               target: str,
+               input_params: np.ndarray[UFloat],
+               target_cfg: dict[str, any],
+               return_keys: List[str],
+               file_stem: str = "model-testing-",
+               task: int=3,
+               simulations: int=100,
+               apply_fit_overrides: bool=True) -> np.ndarray[UFloat]:
     """
-    Get the basic testing set of JKTEBOP task 3, 8 or 9 in file parameters.
-    This sets up mainly fixed values for qphot, grav darkening etc.
-    but includes setting up suitable simulation iterations
+    Perform a JKTEBOP fitting on the passed light-curve based on the input_params and target config
+    passed in. This covers the following tasks;
+    - lookup quad limb darkening coeffs based on the M(A|B), R(A|B) and Teff(A|B) config values
+    - write the JKTEBOP in file with the
+      - task, default parameter values, period & p. e. from config and above limb darkening params
+      - overridden with the input_params
+      - optionally overriden with the fit_overrides from the config, including lrat instructions
+      - sf (scale factor) 1st order poly instructions for each contiguous stretch of LC on 1 day gap
+      - chif instruction to adjust error bars to give chi^2 of 1.0, after fitting
+    - write the JKTEBOP dat file from the light-curve's time, delta_mag and delta_mag_err fields
+    - invoke JKTEBOP to process the in and dat file
+    - parse the resulting par file to read & return the requested return_keys' values
 
-    L3 defaults to zero and fitted
-
-    qphot defaults to zero and not fitted
-
-    However, quad limb darkening algo and coeffs are found by lookup based
-    on the stars' masses and radii (for logg) and effective temps, as held in sector_cfg.
+    :lc: the light-curve data to fit
+    :target: the name of the target system
+    :input_params: the initial values for the fitted params to override the default values
+    :target_cfg: the target config dictionary containing labels, characteristics and overrides
+    :return_keys: keys for the fitted parameters to populate the return array
+    :file_stem: the file name stem for each JKTEBOP file written
+    :task: the JKTEBOP task to execute; 3, 8 or 9
+    :simulations: the number of simulations to run when task 8 or 9 (ignored for task 3)
+    :apply_fit_overrides: whether to apply any fit_overrides from the target config
+    :returns: a structured NDArray[UFloat] of those return_keys found in the fitted par file
     """
+    fit_dir = jktebop.get_jktebop_dir()
+    in_fname = fit_dir / f"{file_stem}.in"
+    dat_fname = fit_dir / f"{file_stem}.dat"
+    par_fname = fit_dir / f"{file_stem}.par"
+
+    # JKTEBOP will fail if it finds files from a previous fitting
+    for file in fit_dir.glob(f"{file_stem}.*"):
+        file.unlink()
+
+    jktebop.write_light_curve_to_dat_file(lc, dat_fname)
+
     # Calculate star specific LD params
     ld_params = {}
     for star in ["A", "B"]:
-        logg = stellar.log_g(sector_cfg[f"M{star}"] * u.solMass, sector_cfg[f"R{star}"] * u.solRad)
-        coeffs = limb_darkening.lookup_tess_quad_ld_coeffs(logg, sector_cfg[f"Teff{star}"] * u.K)
+        logg = stellar.log_g(target_cfg[f"M{star}"] * u.solMass, target_cfg[f"R{star}"] * u.solRad)
+        coeffs = limb_darkening.lookup_tess_quad_ld_coeffs(logg, target_cfg[f"Teff{star}"] * u.K)
         ld_params[f"LD{star}"] = "quad"
         ld_params[f"LD{star}1"] = coeffs[0]
         ld_params[f"LD{star}2"] = coeffs[1]
 
-    if task == 3:
-        simulations = "" # The only valid option for task 3
+    # published fitting params that may be needed for reliable fit
+    fit_overrides = target_cfg.get("fit_overrides", {}) if apply_fit_overrides else {}
 
-    return {
+    if input_params.shape == (1,):
+        input_params = input_params[0]
+
+    all_in_params = {
         "task": task,
         "qphot": 0.,
-        "gravA": 0.,        "gravB": 0.,
+        "gravA": 0.,
+        "gravB": 0.,
         "L3": 0.,
 
-        **ld_params,
+        "reflA": 0.,
+        "reflB": 0.,
+        "period": target_cfg["period"],
+        "primary_epoch": pipeline.to_lc_time(target_cfg["primary_epoch"], lc).value,
 
-        "reflA": 0.,        "reflB": 0.,
-        "period": period,
-        "primary_epoch": primary_epoch,
-
-        "simulations": simulations,
+        "simulations": simulations if task in [8, 9] else "",
 
         "qphot_fit": 0,
-        "ecosw_fit": 1,     "esinw_fit": 1,
+        "ecosw_fit": 1,
+        "esinw_fit": 1,
         "L3_fit": 1,
-        "LDA1_fit": 1,      "LDB1_fit": 1,
-        "LDA2_fit": 0,      "LDB2_fit": 0,
+        "LDA1_fit": 1,
+        "LDB1_fit": 1,
+        "LDA2_fit": 0,
+        "LDB2_fit": 0,
         "period_fit": 1,
         "primary_epoch_fit": 1,
-        "data_file_name": dat_file_name,
-        "file_name_stem": file_name_stem,
+
+        "data_file_name": dat_fname.name,
+        "file_name_stem": file_stem,
+
+        **ld_params,
+        **{ n: input_params[n] for n in input_params.dtype.names },
+        **fit_overrides,
     }
+
+    # Add scale-factor poly fitting, chi^2 adjustment (to 1.0) and any light-ratio instructions
+    segments = pipeline.find_lightcurve_segments(lc, 0.5, return_times=True)
+    append_lines = jktebop.build_poly_instructions(segments, "sf", 1)
+
+    # The lrats are spectroscopic light ratios which may be specified to constrain fitting and
+    # the chif instruction tells JKTEBOP to adjust the fit's error bars until the chi^2 == 1.
+    lrats = fit_overrides.get("lrat", []) if fit_overrides else []
+    append_lines += ["", "chif", ""] + [ f"lrat {l}" for l in lrats ]
+    jktebop.write_in_file(in_fname, append_lines=append_lines, **all_in_params)
+
+    sector_count = sum(1 for s in target_cfg["sectors"] if s.isdigit())
+    print(f"\nFitting {target} (with {sector_count} sector(s) of data) with JKTEBOP task {task}...")
+    par_lines_gen = jktebop.run_jktebop_task(in_fname, par_fname, stdout_to=sys.stdout)
+
+    # Parse the par file contents to pull out the requested parameters & return structured NDArray
+    fitted_params = jktebop.read_fitted_params_from_par_lines(par_lines_gen, return_keys)
+    return np.array(tuple(ufloat(val[0], val[1]) for _, val in fitted_params.items()),
+                    dtype=[(k, np.dtype(UFloat.dtype)) for k in fitted_params])
 
 
 def append_calculated_inc_predictions(preds: np.ndarray[UFloat]) -> np.ndarray[UFloat]:
