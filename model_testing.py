@@ -14,6 +14,7 @@ from textwrap import fill
 import copy
 import argparse
 from datetime import datetime
+from warnings import catch_warnings
 
 import matplotlib.pylab as plt
 
@@ -39,6 +40,11 @@ TEST_RESULTS_SUBDIR = f"testing{TEST_SET_SUFFIX}"
 SYNTHETIC_MIST_TEST_DS_DIR = Path(f"./datasets/synthetic-mist-tess-dataset{TEST_SET_SUFFIX}/")
 
 FORMAL_TEST_DATASET_DIR = Path("./datasets/formal-test-dataset/")
+
+# Superset of all of the potentially fitted parameters
+all_fitted_params = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "inc",
+                     "L3", "pe", "period", "bP", "bS", "ecc", "omega",
+                     "phiS", "rA", "rB", "LDA1", "LDB1", "LDA2", "LDB2"]
 
 def evaluate_model_against_dataset(estimator: Union[Model, Estimator],
                                    mc_iterations: int=1,
@@ -253,11 +259,12 @@ def fit_target(lc: LightCurve,
                target: str,
                input_params: np.ndarray[UFloat],
                target_cfg: dict[str, any],
-               return_keys: List[str],
+               return_keys: List[str] = None,
                file_stem: str = "model-testing-",
                task: int=3,
                simulations: int=100,
-               apply_fit_overrides: bool=True) -> np.ndarray[UFloat]:
+               apply_fit_overrides: bool=True,
+               retry_on_failure_to_converge: bool=True) -> np.ndarray[UFloat]:
     """
     Perform a JKTEBOP fitting on the passed light-curve based on the input_params and target config
     passed in. This covers the following tasks;
@@ -270,29 +277,32 @@ def fit_target(lc: LightCurve,
       - chif instruction to adjust error bars to give chi^2 of 1.0, after fitting
     - write the JKTEBOP dat file from the light-curve's time, delta_mag and delta_mag_err fields
     - invoke JKTEBOP to process the in and dat file
+      - retry the fit, from where the initial fit stopped, if a warning indicating a "good fit not
+      found after ### iterations" is raised and retry_on_failure_to_converge is True
     - parse the resulting par file to read & return the requested return_keys' values
 
     :lc: the light-curve data to fit
     :target: the name of the target system
     :input_params: the initial values for the fitted params to override the default values
     :target_cfg: the target config dictionary containing labels, characteristics and overrides
-    :return_keys: keys for the fitted parameters to populate the return array
+    :return_keys: keys for the fitted parameters to populate the return array, or all if None
     :file_stem: the file name stem for each JKTEBOP file written
     :task: the JKTEBOP task to execute; 3, 8 or 9
     :simulations: the number of simulations to run when task 8 or 9 (ignored for task 3)
     :apply_fit_overrides: whether to apply any fit_overrides from the target config
+    :retry_on_failure_to_converge: enable a second attempt if first fails to converge on a good fit
     :returns: a structured NDArray[UFloat] of those return_keys found in the fitted par file
     """
+    if return_keys is None:
+        return_keys = all_fitted_params
+
+    sector_count = sum(1 for s in target_cfg["sectors"] if s.isdigit())
+    print(f"\nFitting {target} (with {sector_count} sector(s) of data) with JKTEBOP task {task}...")
+
     fit_dir = jktebop.get_jktebop_dir()
     in_fname = fit_dir / f"{file_stem}.in"
     dat_fname = fit_dir / f"{file_stem}.dat"
     par_fname = fit_dir / f"{file_stem}.par"
-
-    # JKTEBOP will fail if it finds files from a previous fitting
-    for file in fit_dir.glob(f"{file_stem}.*"):
-        file.unlink()
-
-    jktebop.write_light_curve_to_dat_file(lc, dat_fname)
 
     # Calculate star specific LD params
     ld_params = {}
@@ -306,60 +316,83 @@ def fit_target(lc: LightCurve,
     # published fitting params that may be needed for reliable fit
     fit_overrides = target_cfg.get("fit_overrides", {}) if apply_fit_overrides else {}
 
-    if input_params.shape == (1,):
-        input_params = input_params[0]
+    max_attempts = 2 if retry_on_failure_to_converge else 1
+    fitted_params = np.empty(shape=(max_attempts, ),
+                             dtype=[(k, np.dtype(UFloat.dtype)) for k in all_fitted_params])
+    for attempt in range(max_attempts):
+        if input_params.shape == (1,):
+            input_params = input_params[0]
 
-    all_in_params = {
-        "task": task,
-        "qphot": 0.,
-        "gravA": 0.,
-        "gravB": 0.,
-        "L3": 0.,
+        all_in_params = {
+            "task": task,
+            "qphot": 0.,
+            "gravA": 0.,                "gravB": 0.,
+            "L3": 0.,
 
-        "reflA": 0.,
-        "reflB": 0.,
-        "period": target_cfg["period"],
-        "primary_epoch": pipeline.to_lc_time(target_cfg["primary_epoch"], lc).value,
+            "reflA": 0.,                "reflB": 0.,
+            "period": target_cfg["period"],
+            "primary_epoch": pipeline.to_lc_time(target_cfg["primary_epoch"], lc).value,
 
-        "simulations": simulations if task in [8, 9] else "",
+            "simulations": simulations if task in [8, 9] else "",
 
-        "qphot_fit": 0,
-        "ecosw_fit": 1,
-        "esinw_fit": 1,
-        "L3_fit": 1,
-        "LDA1_fit": 1,
-        "LDB1_fit": 1,
-        "LDA2_fit": 0,
-        "LDB2_fit": 0,
-        "period_fit": 1,
-        "primary_epoch_fit": 1,
+            "qphot_fit": 0,
+            "ecosw_fit": 1,             "esinw_fit": 1,
+            "L3_fit": 1,
+            "LDA1_fit": 1,              "LDB1_fit": 1,
+            "LDA2_fit": 0,              "LDB2_fit": 0,
+            "period_fit": 1,
+            "primary_epoch_fit": 1,
 
-        "data_file_name": dat_fname.name,
-        "file_name_stem": file_stem,
+            "data_file_name": dat_fname.name,
+            "file_name_stem": file_stem,
 
-        **ld_params,
-        **{ n: input_params[n] for n in input_params.dtype.names },
-        **fit_overrides,
-    }
+            **ld_params,
+            **{ n: input_params[n] for n in input_params.dtype.names },
+            **fit_overrides,
+        }
 
-    # Add scale-factor poly fitting, chi^2 adjustment (to 1.0) and any light-ratio instructions
-    segments = pipeline.find_lightcurve_segments(lc, 0.5, return_times=True)
-    append_lines = jktebop.build_poly_instructions(segments, "sf", 1)
+        # Add scale-factor poly fitting, chi^2 adjustment (to 1.0) and any light-ratio instructions
+        # The lrats are spectroscopic light ratios which may be specified to constrain fitting and
+        # the chif instruction tells JKTEBOP to adjust the fit's error bars until the chi^2 == 1.
+        segments = pipeline.find_lightcurve_segments(lc, 0.5, return_times=True)
+        append_lines = jktebop.build_poly_instructions(segments, "sf", 1)
+        lrats = fit_overrides.get("lrat", []) if fit_overrides else []
+        append_lines += ["", "chif", ""] + [ f"lrat {l}" for l in lrats ]
 
-    # The lrats are spectroscopic light ratios which may be specified to constrain fitting and
-    # the chif instruction tells JKTEBOP to adjust the fit's error bars until the chi^2 == 1.
-    lrats = fit_overrides.get("lrat", []) if fit_overrides else []
-    append_lines += ["", "chif", ""] + [ f"lrat {l}" for l in lrats ]
-    jktebop.write_in_file(in_fname, append_lines=append_lines, **all_in_params)
+        # JKTEBOP will fail if it finds files from a previous fitting
+        for file in fit_dir.glob(f"{file_stem}.*"):
+            file.unlink()
+        jktebop.write_in_file(in_fname, append_lines=append_lines, **all_in_params)
+        jktebop.write_light_curve_to_dat_file(lc, dat_fname)
 
-    sector_count = sum(1 for s in target_cfg["sectors"] if s.isdigit())
-    print(f"\nFitting {target} (with {sector_count} sector(s) of data) with JKTEBOP task {task}...")
-    par_lines_gen = jktebop.run_jktebop_task(in_fname, par_fname, stdout_to=sys.stdout)
+        # Warnings are a mess! I haven't found a way to capture a specific type of warning with
+        # specified text and leave everything else to behave normally. This is the nearest I can
+        # get but it seems to suppress reporting all warnings, which is "sort of" OK as it's a
+        # small block of code and I don't expect anythine except JktebopWarnings to be raised here.
+        with catch_warnings(record=True, category=jktebop.JktebopWarning) as warn_list:
+            # Context manager will list any JktebopWarnings raised in this context
 
-    # Parse the par file contents to pull out the requested parameters & return structured NDArray
-    fitted_params = jktebop.read_fitted_params_from_par_lines(par_lines_gen, return_keys)
-    return np.array(tuple(ufloat(val[0], val[1]) for _, val in fitted_params.items()),
-                    dtype=[(k, np.dtype(UFloat.dtype)) for k in fitted_params])
+            # Blocks on the JKTEBOP task until we can parse the newly written par file contents
+            # to read out the revised values for the superset of potentially fitted parameters.
+            pgen = jktebop.run_jktebop_task(in_fname, par_fname, stdout_to=sys.stdout)
+            for k, v in jktebop.read_fitted_params_from_par_lines(pgen, all_fitted_params).items():
+                fitted_params[attempt][k] = ufloat(v[0], v[1])
+
+            if retry_on_failure_to_converge \
+                    and sum(1 for w in warn_list if "good fit was not found" in str(w.message)):
+                if attempt == 0:
+                    print("Initial attempt failed to fully converge on a good fit. Retry is",
+                          "enabled so attempting a second fit based on the outputs from the first.")
+                    input_params = fitted_params[attempt]
+                else:
+                    print("Subsequent attempt failed to fully converge on a good fit.",
+                          "Reverting to the results from the initial attempt.")
+                    attempt = 0
+                    break
+            else: # Successful fit or retries are off
+                break
+
+    return fitted_params[attempt][return_keys]
 
 
 def append_calculated_inc_predictions(preds: np.ndarray[UFloat]) -> np.ndarray[UFloat]:
