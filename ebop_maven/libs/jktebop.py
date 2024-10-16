@@ -66,10 +66,13 @@ _param_file_line_beginswith = {
 _task2_model_dtype = np.dtype([("phase", np.double), ("delta_mag", np.double)])
 
 class JktebopWarning(UserWarning):
-    """ A Warning specific to JKTEBOP task processing. """
+    """ A Base Warning specific to JKTEBOP. """
 
 class JktebopParameterWarning(JktebopWarning):
     """ A warning arising from JKTEBOP input parameter """
+
+class JktebopTaskWarning(JktebopWarning):
+    """ A warning arising from JKTEBOP task processing """
 
 def get_jktebop_dir() -> Path:
     """
@@ -134,7 +137,7 @@ def run_jktebop_task(in_filename: Path,
                         break
                     stdout_to.write(line)
                     if "warning" in line.casefold():
-                        warnings.warn(message=line, category=JktebopWarning)
+                        warnings.warn(message=line, category=JktebopTaskWarning)
             stdout_thread = threading.Thread(target=redirect_process_stdout)
             stdout_thread.start()
         return_code = proc.wait() # Seem to have to do this get the return_code
