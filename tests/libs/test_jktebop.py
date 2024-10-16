@@ -16,6 +16,7 @@ from ebop_maven.libs.jktebop import _prepare_params_for_task
 from ebop_maven.libs.jktebop import get_jktebop_dir
 from ebop_maven.libs.jktebop import run_jktebop_task, generate_model_light_curve
 from ebop_maven.libs.jktebop import write_in_file, write_light_curve_to_dat_file
+from ebop_maven.libs.jktebop import JktebopParameterWarning
 
 # pylint: disable=invalid-name, too-many-public-methods, line-too-long, protected-access
 class Testjktebop(unittest.TestCase):
@@ -200,15 +201,36 @@ class Testjktebop(unittest.TestCase):
         file_name = th.TEST_DATA_DIR / "any_old_file_will_do.dat"
         self.assertRaises(KeyError, write_in_file, file_name, task=3, k=0.5)
 
-    def test_write_in_file_validation_warnings(self):
-        """ Testwrite_in_file(some invalid param values) raises Warning """
+    def test_write_in_file_rA_plus_rB_validation_warnings(self):
+        """ Testwrite_in_file(some out of range param values) raises Warning """
         file_name = th.TEST_DATA_DIR / "any_old_file_will_do.dat"
         for param, value, expected_value in [("rA_plus_rB", 0.9, 0.8)]:
             params = self._task3_params.copy()
             params[param] = value
             match = f"{param}={expected_value}"
-            with self.assertWarnsRegex(UserWarning, match, msg="Expected a warning to be raised"):
+            with self.assertWarnsRegex(JktebopParameterWarning, match,
+                                       msg=f"Expected a {JktebopParameterWarning} to be raised"):
                 write_in_file(file_name, 3, None, **params)
+
+    def test_write_in_file_ld_validation_warnings(self):
+        """ Testwrite_in_file(some out of range LD param values) raises Warning """
+        file_name = th.TEST_DATA_DIR / "any_old_file_will_do.dat"
+
+        for star in ["A", "B"]:
+            for algo, test_values in {
+                "quad": [(-1.1, -1), (2.1, 2)],
+                "pow2": [(-1.1, -1), (2.1, 2)],
+                "4par": [(-9.1, -9), (9.1, 9)]
+            }.items():
+                for value, exp_value in test_values:
+                    for coeff_ix in range(1, 5 if algo == "4par" else 3):
+                        params = self._task3_params.copy()
+                        params[f"LD{star}"] = algo
+                        params[f"LD{star}{coeff_ix}"] = value
+                        match = f"LD{star}{coeff_ix}={exp_value}"
+                        with self.assertWarnsRegex(JktebopParameterWarning, match,
+                                            msg=f"Expected {JktebopParameterWarning} to be raised"):
+                            write_in_file(file_name, 3, None, **params)
 
     def test_write_in_file_L3_configurable_validation_rules(self):
         """ Testwrite_in_file(some invalid param values) raises ValueError """

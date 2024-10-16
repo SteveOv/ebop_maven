@@ -68,6 +68,8 @@ _task2_model_dtype = np.dtype([("phase", np.double), ("delta_mag", np.double)])
 class JktebopWarning(UserWarning):
     """ A Warning specific to JKTEBOP task processing. """
 
+class JktebopParameterWarning(JktebopWarning):
+    """ A warning arising from JKTEBOP input parameter """
 
 def get_jktebop_dir() -> Path:
     """
@@ -209,11 +211,36 @@ def write_in_file(file_name: Path,
     in_params = _prepare_params_for_task(task, params)
 
     if "L3" in in_params and in_params["L3"] < 0. and not _jktebop_support_negative_l3:
-        warnings.warn("Minimum supported L3 input value is 0.0. Setting L3=0.0")
+        warnings.warn("Minimum supported L3 input value is 0.0. Setting L3=0.0",
+                      JktebopParameterWarning)
         in_params["L3"] = 0.
     if "rA_plus_rB" in in_params and in_params["rA_plus_rB"] > 0.8:
-        warnings.warn("Maximum supported rA_plus_rB input value is 0.8. Setting rA_plus_rB=0.8")
+        warnings.warn("Maximum supported rA_plus_rB input value is 0.8. Setting rA_plus_rB=0.8",
+                      JktebopParameterWarning)
         in_params["rA_plus_rB"] = 0.8
+
+    # Limb Darkening: basically coeffs within (-1, 2) for all algos except "4par" where it's (-9, 9)
+    # There are other validation rules around LD params, such as number of coeffs or matching algos,
+    # but it's unneccessary to replicate them all here. All we need is to ensure that coeffs that
+    # may have been generated programmatically are within a suitable range to prevent errors.
+    for star in ["A", "B"]:
+        algo = in_params.get(f"LD{star}", None)
+        if star == "B" and algo == "same":
+            break # B values ignored by JKTEBOP with A values used for both
+        (ld_min, ld_max) = (-9, 9) if algo == "4par" else (-1, 2)
+        for coeff_ix in range(1, 5):
+            key = f"LD{star}{coeff_ix}"
+            coeff = in_params.get(key, 0)
+            if coeff < ld_min:
+                warnings.warn(
+                    f"Min supported {algo} {key} input value is {ld_min}. Setting {key}={ld_min}",
+                    JktebopParameterWarning)
+                in_params[key] = ld_min
+            elif coeff > ld_max:
+                warnings.warn(
+                    f"Max supported {algo} {key} input value is {ld_max}. Setting {key}={ld_max}",
+                    JktebopParameterWarning)
+                in_params[key] = ld_max
 
     if "file_name_stem" not in in_params:
         in_params["file_name_stem"] = file_name.stem
