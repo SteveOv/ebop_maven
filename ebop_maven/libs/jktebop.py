@@ -201,6 +201,7 @@ def write_in_file(file_name: Path,
     """
     Writes a JKTEBOP .in file based on applying the passed params/token
     values to the template file corresponding to the selected task.
+    Selected params may be coerced to valid values if they are outside the expected range.
 
     :file_name: the name and path of the file to write.
     :task: the task being undertaken. Currently only 2 and 3 are supported.
@@ -213,37 +214,43 @@ def write_in_file(file_name: Path,
     # Pre-process the params/tokens to be applied to the .in file.
     in_params = _prepare_params_for_task(task, params)
 
-    if "L3" in in_params and in_params["L3"] < 0. and not _jktebop_support_negative_l3:
-        warnings.warn("Minimum supported L3 input value is 0.0. Setting L3=0.0",
-                      JktebopParameterWarning)
-        in_params["L3"] = 0.
-    if "rA_plus_rB" in in_params and in_params["rA_plus_rB"] > 0.8:
-        warnings.warn("Maximum supported rA_plus_rB input value is 0.8. Setting rA_plus_rB=0.8",
-                      JktebopParameterWarning)
-        in_params["rA_plus_rB"] = 0.8
+    def coerce_in_param(key: str, min_val: float=None, max_val: float=None,
+                        warn_if_outside_range: bool=True, warn_if_missing: bool=False):
+        """
+        Ensures that the passed in param is within defined range.
+        Raises a JktebopParameterWarning if it is not and warn_if_outside_range is True
+        or if it is missing and warn_if_missing is True
+        """
+        if key in in_params:
+            msg = None
+            value = in_params[key]
+            if min_val is not None and value < min_val:
+                msg = f"{key}={value} and less than the min value {min_val} so set to {min_val}"
+                in_params[key] = min_val
+            elif max_val is not None and value > max_val:
+                msg = f"{key}={value} and greater than the max value {max_val} so set to {max_val}"
+                in_params[key] = max_val
+            if warn_if_outside_range and msg:
+                warnings.warn(msg, JktebopParameterWarning)
+        elif warn_if_missing:
+            # Unlikely to need this as what's required is set by the template more than JKTEBOP
+            warnings.warn(f"The expected parameter {key} is not found.", JktebopParameterWarning)
+
+    if not _jktebop_support_negative_l3:
+        coerce_in_param("L3", min_val=0.)
+    coerce_in_param("rA_plus_rB", max_val=0.8)
 
     # Limb Darkening: basically coeffs within (-1, 2) for all algos except "4par" where it's (-9, 9)
     # There are other validation rules around LD params, such as number of coeffs or matching algos,
     # but it's unneccessary to replicate them all here. All we need is to ensure that coeffs that
     # may have been generated programmatically are within a suitable range to prevent errors.
     for star in ["A", "B"]:
-        algo = in_params.get(f"LD{star}", None)
+        algo = in_params.get(f"LD{star}", "")
         if star == "B" and algo == "same":
             break # B values ignored by JKTEBOP with A values used for both
-        (ld_min, ld_max) = (-9, 9) if algo == "4par" else (-1, 2)
-        for coeff_ix in range(1, 5):
-            key = f"LD{star}{coeff_ix}"
-            coeff = in_params.get(key, 0)
-            if coeff < ld_min:
-                warnings.warn(
-                    f"Min supported {algo} {key} input value is {ld_min}. Setting {key}={ld_min}",
-                    JktebopParameterWarning)
-                in_params[key] = ld_min
-            elif coeff > ld_max:
-                warnings.warn(
-                    f"Max supported {algo} {key} input value is {ld_max}. Setting {key}={ld_max}",
-                    JktebopParameterWarning)
-                in_params[key] = ld_max
+        (ld_min, ld_max, exp_num_coeffs) = (-9.0, 9.0, 4) if algo == "4par" else (-1.0, 2.0, 2)
+        for coeff_key in (f"LD{star}{i}" for i in range(1, exp_num_coeffs+1)):
+            coerce_in_param(coeff_key, min_val=ld_min, max_val=ld_max)
 
     if "file_name_stem" not in in_params:
         in_params["file_name_stem"] = file_name.stem

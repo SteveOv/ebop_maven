@@ -207,7 +207,7 @@ class Testjktebop(unittest.TestCase):
         for param, value, expected_value in [("rA_plus_rB", 0.9, 0.8)]:
             params = self._task3_params.copy()
             params[param] = value
-            match = f"{param}={expected_value}"
+            match = f"set to {expected_value}"
             with self.assertWarnsRegex(JktebopParameterWarning, match,
                                        msg=f"Expected a {JktebopParameterWarning} to be raised"):
                 write_in_file(file_name, 3, None, **params)
@@ -218,16 +218,16 @@ class Testjktebop(unittest.TestCase):
 
         for star in ["A", "B"]:
             for algo, test_values in {
-                "quad": [(-1.1, -1), (2.1, 2)],
-                "pow2": [(-1.1, -1), (2.1, 2)],
-                "4par": [(-9.1, -9), (9.1, 9)]
+                "quad": [(-1.1, -1.0), (2.1, 2.0)],
+                "pow2": [(-1.1, -1.0), (2.1, 2.0)],
+                "4par": [(-9.1, -9.0), (9.1, 9.0)]
             }.items():
                 for value, exp_value in test_values:
                     for coeff_ix in range(1, 5 if algo == "4par" else 3):
                         params = self._task3_params.copy()
                         params[f"LD{star}"] = algo
                         params[f"LD{star}{coeff_ix}"] = value
-                        match = f"LD{star}{coeff_ix}={exp_value}"
+                        match = f"set to {exp_value}"
                         with self.assertWarnsRegex(JktebopParameterWarning, match,
                                             msg=f"Expected {JktebopParameterWarning} to be raised"):
                             write_in_file(file_name, 3, None, **params)
@@ -240,7 +240,8 @@ class Testjktebop(unittest.TestCase):
 
         # Off - we expect an warning as negative not supported
         jktebop._jktebop_support_negative_l3 = False
-        with self.assertWarnsRegex(UserWarning, "L3=0.0", msg="Expected a warning to be raised"):
+        with self.assertWarnsRegex(JktebopParameterWarning, "set to 0.0",
+                                   msg="Expected a warning to be raised"):
             write_in_file(file_name, 3, None, **params)
 
         # On - no warning
