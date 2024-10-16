@@ -14,7 +14,7 @@ from textwrap import fill
 import copy
 import argparse
 from datetime import datetime
-from warnings import catch_warnings
+import warnings
 
 import matplotlib.pylab as plt
 
@@ -369,8 +369,8 @@ def fit_target(lc: LightCurve,
         # specified text and leave everything else to behave normally. This is the nearest I can
         # get but it seems to suppress reporting all warnings, which is "sort of" OK as it's a
         # small block of code and I don't expect anythine except JktebopWarnings to be raised here.
-        with catch_warnings(record=True, category=jktebop.JktebopWarning) as warn_list:
-            # Context manager will list any JktebopWarnings raised in this context
+        with warnings.catch_warnings(record=True, category=jktebop.JktebopTaskWarning) as warn_list:
+            # Context manager will list any JktebopTaskWarning raised in this context
 
             # Blocks on the JKTEBOP task until we can parse the newly written par file contents
             # to read out the revised values for the superset of potentially fitted parameters.
@@ -648,6 +648,11 @@ if __name__ == "__main__":
         else:
             result_dir = model_file.parent / TEST_RESULTS_SUBDIR
         result_dir.mkdir(parents=True, exist_ok=True)
+
+        def warnings_to_stdout(message, category, filename, lineno, file=None, line=None):
+            """ Will redirect any warning output to stdout where it can be picked up by Tee """
+            sys.stdout.write(warnings.formatwarning(message, category, filename, lineno, line))
+        warnings.showwarning = warnings_to_stdout
 
         labs, all_preds = None, {}
         with redirect_stdout(Tee(open(result_dir / "model_testing.log", "w", encoding="utf8"))):
