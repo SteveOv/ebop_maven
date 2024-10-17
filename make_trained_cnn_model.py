@@ -26,7 +26,7 @@ import model_testing
 # Configure the inputs and outputs of the model
 CHOSEN_FEATURES = []
 MAGS_BINS = 4096
-MAGS_WRAP_PHASE = 0.75
+MAGS_WRAP_PHASE = None # None indicates wrap to centre on midpoint between eclipses
 CHOSEN_LABELS = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "bP"]
 OUTPUT_ACTIVATIONS = ["softplus"]*3 + ["linear"]*3
 TRAINSET_SUFFIX = "250k"
@@ -79,7 +79,7 @@ DNN_NUM_TAPER_UNITS = 64
 
 # These control augmentations
 # pylint: disable=unnecessary-lambda-assignment
-ROLL_MAX = int(4 * (MAGS_BINS/1024))
+ROLL_MAX = int(128 * (MAGS_BINS/1024))
 roll_func = lambda: tf.random.uniform([], -ROLL_MAX, ROLL_MAX+1, tf.int32)
 noise_func = lambda: tf.random.uniform([], 0.001, 0.030, tf.float32)
 
@@ -162,6 +162,10 @@ if __name__ == "__main__":
         # Set up the training and validation dataset pipelines
         # -----------------------------------------------------------
         print("\nCreating training and validation dataset pipelines.")
+        if MAGS_WRAP_PHASE is None:
+            print("The mags features will be centred on the midpoint between eclipses.")
+        else:
+            print(f"The mags features will be wrapped beyond phase {MAGS_WRAP_PHASE}.")
         print(f"Augmentation for roll: {getsource(roll_func)} where ROLL_MAX = {ROLL_MAX}")
         print(f"Agumentation for noise: {getsource(noise_func)}")
         datasets = [tf.data.TFRecordDataset] * 2
