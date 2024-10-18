@@ -102,10 +102,11 @@ def generate_instances_from_mist_models(label: str):
         LB          = np.power(10, results["log_L"]) * u.solLum
         loggB       = results["log_g"] * u.dex(u.cm / u.s**2)
 
-        # Now find the minimum separation, to give the min period, which will be the greater of:
+        # The minimum period from Kepler's 3rd law & the minimum separation, which is the greater of
         # . 3(RA+RB) / 2(1-e) (Wells & Prša) (assuming e==0 for now)
         # . max(5*RA, 5*RB) (based on JKTEBOP recommendation for rA <= 0.2, rB <= 0.2)
-        a_min = max(3/2*(RA+RB), 5*RA, 5*RB)
+        # However, the Wells & Prša expression is never > both 5RA and 5RB for all RA and RB, so
+        a_min = max(5*RA, 5*RB)
         per_min = orbital.orbital_period(MA, MB, a_min).to(u.d).value
 
         # We generate period, inc, and omega (argument of periastron) from uniform distributions
@@ -114,7 +115,7 @@ def generate_instances_from_mist_models(label: str):
         omega       = rng.uniform(low=0., high=360.) * u.deg
 
         # Eccentricity from uniform distribution, subject to a maximum value which depends on
-        # orbital period/seperation (again, based on Wells & Prsa; Moe & Di Stefano)
+        # orbital period/seperation (again, based on Wells & Prsa (eqn 6); Moe & Di Stefano)
         a = orbital.semi_major_axis(MA, MB, per)
         if per <= 2 * u.d:
             ecc = 0
