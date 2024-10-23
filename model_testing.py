@@ -309,15 +309,30 @@ def fit_target(lc: LightCurve,
     # published fitting params that may be needed for reliable fit
     fit_overrides = target_cfg.get("fit_overrides", {}) if apply_fit_overrides else {}
 
-    # Calculate star specific LD params if we haven't been given the algo & coeffs in the overrides
-    ld_params = {}
+    # Set up star specific LD params on the overrides if we haven't been given both algo & coeffs
     for star in ["A", "B"]:
-        if f"LD{star}" not in fit_overrides:
+        algo = fit_overrides.get(f"LD{star}", "quad") # Only quad, pow2 or h1h2 supported
+        if f"LD{star}" not in fit_overrides \
+                or f"LD{star}1" not in fit_overrides or f"LD{star}2" not in fit_overrides:
+            # If we've not been given overrides for both the algo and coeffs we can look them up
+            # provided we have the stellar mass (M*), radius (R*) & effective temp (Teff*) in config
             logg = stellar.log_g(target_cfg[f"M{star}"]*u.solMass, target_cfg[f"R{star}"]*u.solRad)
-            coeffs = limb_darkening.lookup_tess_quad_ld_coeffs(logg, target_cfg[f"Teff{star}"]*u.K)
-            ld_params[f"LD{star}"] = "quad"
-            ld_params[f"LD{star}1"] = coeffs[0]
-            ld_params[f"LD{star}2"] = coeffs[1]
+            teff = target_cfg[f"Teff{star}"] * u.K
+            if algo == "quad":
+                c, alpha = limb_darkening.lookup_tess_quad_ld_coeffs(logg, teff)
+            else:
+                c, alpha = limb_darkening.lookup_tess_pow2_ld_coeffs(logg, teff)
+
+            # Add any missing algo/coeffs tags to the overrides
+            fit_overrides.setdefault(f"LD{star}", algo)
+            if algo != "h1h2":
+                fit_overrides.setdefault(f"LD{star}1", c)
+                fit_overrides.setdefault(f"LD{star}2", alpha)
+            else:
+                # The h1h2 reparameterisation of the pow2 law addreeses correlation between the
+                # coeffs; see Maxted (2018A&A...616A..39M) and Southworth (2023Obs...143...71S)
+                fit_overrides.setdefault(f"LD{star}1", 1 - c*(1 - 2**(-alpha)))
+                fit_overrides.setdefault(f"LD{star}2", c * 2**(-alpha))
 
     attempts = 1 + max(0, retries)
     fitted_params = np.empty(shape=(attempts, ),
