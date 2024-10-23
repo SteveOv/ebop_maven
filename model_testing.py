@@ -318,14 +318,16 @@ def fit_target(lc: LightCurve,
             # provided we have the stellar mass (M*), radius (R*) & effective temp (Teff*) in config
             logg = stellar.log_g(target_cfg[f"M{star}"]*u.solMass, target_cfg[f"R{star}"]*u.solRad)
             teff = target_cfg[f"Teff{star}"] * u.K
-            if algo == "quad":
+            if algo == "same":
+                c, alpha = 0, 0 # JKTEBOP uses the A star params for both
+            elif algo == "quad":
                 c, alpha = limb_darkening.lookup_tess_quad_ld_coeffs(logg, teff)
             else:
                 c, alpha = limb_darkening.lookup_tess_pow2_ld_coeffs(logg, teff)
 
             # Add any missing algo/coeffs tags to the overrides
             fit_overrides.setdefault(f"LD{star}", algo)
-            if algo != "h1h2":
+            if algo != "h1h2" or algo == "same":
                 fit_overrides.setdefault(f"LD{star}1", c)
                 fit_overrides.setdefault(f"LD{star}2", alpha)
             else:
