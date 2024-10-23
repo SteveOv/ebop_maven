@@ -264,7 +264,7 @@ def fit_target(lc: LightCurve,
                task: int=3,
                simulations: int=100,
                apply_fit_overrides: bool=True,
-               retry_on_failure_to_converge: bool=True) -> np.ndarray[UFloat]:
+               retries: int=1) -> np.ndarray[UFloat]:
     """
     Perform a JKTEBOP fitting on the passed light-curve based on the input_params and target config
     passed in. This covers the following tasks;
@@ -277,8 +277,10 @@ def fit_target(lc: LightCurve,
       - chif instruction to adjust error bars to give chi^2 of 1.0, after fitting
     - write the JKTEBOP dat file from the light-curve's time, delta_mag and delta_mag_err fields
     - invoke JKTEBOP to process the in and dat file
-      - retry the fit, from where the initial fit stopped, if a warning indicating a "good fit not
-      found after ### iterations" is raised and retry_on_failure_to_converge is True
+      - retry the fit, from where the current fit stopped, if a warning indicating a "good fit not
+      found after ### iterations" is raised and available retries > 0
+      - if we've run out of retries and we're still getting the warning, select the fitted values
+      from the first attempt for parsing as the result
     - parse the resulting par file to read & return the requested return_keys' values
 
     :lc: the light-curve data to fit
@@ -290,7 +292,7 @@ def fit_target(lc: LightCurve,
     :task: the JKTEBOP task to execute; 3, 8 or 9
     :simulations: the number of simulations to run when task 8 or 9 (ignored for task 3)
     :apply_fit_overrides: whether to apply any fit_overrides from the target config
-    :retry_on_failure_to_converge: enable a second attempt if first fails to converge on a good fit
+    :retries: number of times to retry on failure to converge on a good fit
     :returns: a structured NDArray[UFloat] of those return_keys found in the fitted par file
     """
     if return_keys is None:
@@ -316,10 +318,10 @@ def fit_target(lc: LightCurve,
     # published fitting params that may be needed for reliable fit
     fit_overrides = target_cfg.get("fit_overrides", {}) if apply_fit_overrides else {}
 
-    max_attempts = 2 if retry_on_failure_to_converge else 1
-    fitted_params = np.empty(shape=(max_attempts, ),
+    attempts = 1 + max(0, retries)
+    fitted_params = np.empty(shape=(attempts, ),
                              dtype=[(k, np.dtype(UFloat.dtype)) for k in all_fitted_params])
-    for attempt in range(max_attempts):
+    for attempt in range(attempts):
         if input_params.shape == (1,):
             input_params = input_params[0]
 
@@ -378,14 +380,14 @@ def fit_target(lc: LightCurve,
             for k, v in jktebop.read_fitted_params_from_par_lines(pgen, all_fitted_params).items():
                 fitted_params[attempt][k] = ufloat(v[0], v[1])
 
-            if retry_on_failure_to_converge \
+            if attempts > 1 \
                     and sum(1 for w in warn_list if "good fit was not found" in str(w.message)):
-                if attempt == 0:
-                    print("Initial attempt failed to fully converge on a good fit. Retry is",
-                          "enabled so attempting a second fit based on the outputs from the first.")
+                if attempt+1 < attempts: # Further attempts available
+                    print(f"Attempt {attempt+1} didn't fully converge on a good fit. {attempts}",
+                        "attempt(s) allowed so will retry from the final position of this attempt.")
                     input_params = fitted_params[attempt]
                 else:
-                    print("Subsequent attempt failed to fully converge on a good fit.",
+                    print(f"Failed to fully converge on a good fit after {attempt+1} attempts.",
                           "Reverting to the results from the initial attempt.")
                     attempt = 0
                     break
