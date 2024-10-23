@@ -366,7 +366,6 @@ def fit_target(lc: LightCurve,
             "data_file_name": dat_fname.name,
             "file_name_stem": file_stem,
 
-            **ld_params,
             **{ n: input_params[n] for n in input_params.dtype.names },
             **fit_overrides,
         }
