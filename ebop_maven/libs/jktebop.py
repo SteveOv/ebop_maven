@@ -236,9 +236,11 @@ def write_in_file(file_name: Path,
             # Unlikely to need this as what's required is set by the template more than JKTEBOP
             warnings.warn(f"The expected parameter {key} is not found.", JktebopParameterWarning)
 
+    coerce_in_param("k", min_val=0.0, max_val=100.0)
+    coerce_in_param("J", min_val=0.0, max_val=1000.0)
+    coerce_in_param("rA_plus_rB", min_val=-0.8, max_val=0.8)
     if not _jktebop_support_negative_l3:
         coerce_in_param("L3", min_val=0.)
-    coerce_in_param("rA_plus_rB", max_val=0.8)
 
     # Limb Darkening: basically coeffs within (-1, 2) for all algos except "4par" where it's (-9, 9)
     # There are other validation rules around LD params, such as number of coeffs or matching algos,
