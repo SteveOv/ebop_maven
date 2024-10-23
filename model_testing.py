@@ -306,17 +306,18 @@ def fit_target(lc: LightCurve,
     dat_fname = fit_dir / f"{file_stem}.dat"
     par_fname = fit_dir / f"{file_stem}.par"
 
-    # Calculate star specific LD params
-    ld_params = {}
-    for star in ["A", "B"]:
-        logg = stellar.log_g(target_cfg[f"M{star}"] * u.solMass, target_cfg[f"R{star}"] * u.solRad)
-        coeffs = limb_darkening.lookup_tess_quad_ld_coeffs(logg, target_cfg[f"Teff{star}"] * u.K)
-        ld_params[f"LD{star}"] = "quad"
-        ld_params[f"LD{star}1"] = coeffs[0]
-        ld_params[f"LD{star}2"] = coeffs[1]
-
     # published fitting params that may be needed for reliable fit
     fit_overrides = target_cfg.get("fit_overrides", {}) if apply_fit_overrides else {}
+
+    # Calculate star specific LD params if we haven't been given the algo & coeffs in the overrides
+    ld_params = {}
+    for star in ["A", "B"]:
+        if f"LD{star}" not in fit_overrides:
+            logg = stellar.log_g(target_cfg[f"M{star}"]*u.solMass, target_cfg[f"R{star}"]*u.solRad)
+            coeffs = limb_darkening.lookup_tess_quad_ld_coeffs(logg, target_cfg[f"Teff{star}"]*u.K)
+            ld_params[f"LD{star}"] = "quad"
+            ld_params[f"LD{star}1"] = coeffs[0]
+            ld_params[f"LD{star}2"] = coeffs[1]
 
     attempts = 1 + max(0, retries)
     fitted_params = np.empty(shape=(attempts, ),
