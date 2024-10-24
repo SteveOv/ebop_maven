@@ -43,7 +43,7 @@ FORMAL_TEST_DATASET_DIR = Path("./datasets/formal-test-dataset/")
 
 # Superset of all of the potentially fitted parameters
 all_fitted_params = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "inc",
-                     "L3", "pe", "period", "bP", "bS", "ecc", "omega",
+                     "L3", "pe", "period", "bP", "bS", "ecc", "omega", "qphot",
                      "phiS", "rA", "rB", "LDA1", "LDB1", "LDA2", "LDB2"]
 
 def evaluate_model_against_dataset(estimator: Union[Model, Estimator],
