@@ -44,13 +44,13 @@
         "fit_overrides": {
             "period_fit": 0,
             "LDA": "quad",
-            "LDB": "quad",
-            "LDA1_fit": 0,
-            "LDB1_fit": 0,
             "LDA1": 0.046,
-            "LDB1": 0.046,
             "LDA2": 0.22,
-            "LDB2": 0.22
+            "LDA1_fit": 0,
+            "LDB": "quad",
+            "LDB1": 0.046,
+            "LDB2": 0.22,
+            "LDB1_fit": 0
         }
     },
     "V539 Ara": {
@@ -72,7 +72,7 @@
         "transits": false,
         "eclipses_similar": false,
         "components_similar": false,
-        "notes": "bP label derived from rA, inc, e & esinw; qphot label from published masses; control fit of sector 13 SAP data yields MAE~0.01 (S39 worse);",
+        "notes": "bP label derived from rA, inc, e & esinw; qphot label from published masses; control fit of sector 13 SAP data with pow2 LD yields MAE~0.0035 (S39 worse);",
         "primary_epoch": 1671.167003858,
         "period": 3.169080048,
         "ecc": 0.0555,              "ecc_err": 0.0011,
@@ -96,6 +96,8 @@
             }
         },
         "fit_overrides": {
+            "LDA": "pow2",
+            "LDB": "pow2"
         }
     },
     "MU Cas": {
@@ -146,12 +148,12 @@
         },
         "fit_overrides": {
             "LDA": "pow2",
-            "LDB": "pow2",
             "LDA1": 0.519,
-            "LDB1": 0.519,
             "LDA2": 0.3811,
-            "LDB2": 0.3811,
             "LDA1_fit": 0,
+            "LDB": "pow2",
+            "LDB1": 0.519,
+            "LDB2": 0.3811,
             "LDB1_fit": 0
         }
     },
@@ -208,7 +210,9 @@
             "gravA": 0.55,
             "gravB": 0.88,
             "reflA": 0.0012,
-            "reflB": 0.0125
+            "reflB": 0.0125,
+            "LDA": "pow2",
+            "LDB": "pow2"
         }
     },
     "psi Cen": {
@@ -269,7 +273,9 @@
             "qphot_fit": 0,
             "L3_fit": 0,
             "gravA": 1.0,
-            "gravB": 1.0
+            "gravB": 1.0,
+            "LDA": "pow2",
+            "LDB": "pow2"
         }
     },
     "V402 Lac": {
@@ -293,7 +299,7 @@
         "transits": false,
         "eclipses_similar": false,
         "components_similar": true,
-        "notes": "e=0.376 (fixed); rA_plus_rB & k & ecosw & esinw derived from table 11; J approximated from Teff; bP derived from rA, inc, e & esinw; bbest control fit (fixed at published qphot and L3) gives MAE~0.38 which is not usable (likely components too distorted for JKTEBOP simplified model); without fixing L3 fits are even worse with a large negative L3;",
+        "notes": "e=0.376 (fixed); rA_plus_rB & k & ecosw & esinw derived from table 11; J approximated from Teff; bP derived from rA, inc, e & esinw; best control fit (fixed at published qphot, L3 and LD) gives MAE~0.38 which is not usable (likely components too distorted for JKTEBOP simplified model); without fixing L3 fits are even worse with a large negative L3;",
         "primary_epoch": 1754.155893449,
         "period": 3.782090049,
         "ecc": 0.376,           "ecc_err": null,
@@ -320,7 +326,9 @@
             "qphot": 0.99,
             "qphot_fit": 0,
             "L3": 0.15,
-            "L3_fit": 0
+            "L3_fit": 0,
+            "LDA": "quad",
+            "LDB": "quad"
         }
     },
     "V1229 Tau": {
@@ -365,12 +373,12 @@
         },
         "fit_overrides": {
             "LDA": "pow2",
-            "LDB": "pow2",
             "LDA1": 0.52,
-            "LDB1": 0.63,
             "LDA2": 0.45,
-            "LDB2": 0.42,
             "LDA1_fit": 0,
+            "LDB": "pow2",
+            "LDB1": 0.63,
+            "LDB2": 0.42,
             "LDB1_fit": 0,
             "lrat": ["2464.20 0.328 0.011", "2465.80 0.328 0.011"]
         }
@@ -394,7 +402,7 @@
         "transits": false,
         "eclipses_similar": false,
         "components_similar": true,
-        "notes": "ecosw & esinw derived from table 9; bP derived from rA, inc, e & esinw; best control fit with sector 54 SAP flux, fixed published period & lrat yields MAE~0.005;",
+        "notes": "ecosw & esinw derived from table 9; bP derived from rA, inc, e & esinw; best control fit with sector 54 SAP flux, fixed published period, lrat & LD yields MAE~0.004;",
         "primary_epoch": 2772.124954368,
         "period": 11.120757,
         "ecc": 0.3750,          "ecc_err": 0.0013,
@@ -421,6 +429,10 @@
         "author": "TESS-SPOC",
         "exptime": 600,
         "fit_overrides": {
+            "LDA": "quad",
+            "LDA1": 0.177,
+            "LDA2": 0.239,
+            "LDB": "same",
             "period_fit": 0,
             "lrat": ["2774.10 0.98 0.06"]
         }
@@ -444,7 +456,7 @@
         "transits": false,
         "eclipses_similar": false,
         "components_similar": true,
-        "notes": "e=0.0 & ω=0.0 & L3=0 (fixed); bP derived from rA, inc, e & esinw; best control fit is sector 20 only SAP flux which yields MAE~0.031 (allowing L3 to fit);",
+        "notes": "e=0.0 & ω=0.0 & L3=0 (fixed); bP derived from rA, inc, e & esinw; best control fit is sector 20 only SAP flux which yields MAE~0.031 (allowing L3 to fit and using published LD algo/coeffs);",
         "primary_epoch": 1862.339276176,
         "period": 2.525018489,
         "labels": {
@@ -470,7 +482,13 @@
             "qphot_fit": 0,
             "L3_fit": 1,
             "gravA": 1.0,
-            "gravB": 1.0
+            "gravB": 1.0,
+            "LDA": "lin",
+            "LDA1": 0.416,
+            "LDA2": 0.418,
+            "LDB": "lin",
+            "LDB1": 0.416,
+            "LDB2": 0.418
         }
     },
     "V788 Cen": {
@@ -492,7 +510,7 @@
         "transits": false,
         "eclipses_similar": false,
         "components_similar": false,
-        "notes": "e=0.0 & ω=0.0 fixed; J from trial JKTEBOP fit; bP derived from rA, inc, e & esinw; control fit on SAP flux of 2nd half of S37 with L3 fixed at published value yields MAE~0.021",
+        "notes": "e=0.0 & ω=0.0 fixed; J from trial JKTEBOP fit; bP derived from rA, inc, e & esinw; control fit on SAP flux of 2nd half of S37 with L3 fixed at published value & quad LD (log & sqrt used) yields MAE~0.021",
         "primary_epoch": 2323.949317858,
         "period": 4.966388646,
         "labels": { 
@@ -514,7 +532,9 @@
         },
         "fit_overrides": {
             "L3": 0.021,
-            "L3_fit": 0
+            "L3_fit": 0,
+            "LDA": "quad",
+            "LDB": "quad"
         }
     },
     "RR Lyn": {
@@ -561,10 +581,10 @@
         },
         "fit_overrides":{
             "LDA": "quad",
-            "LDB": "quad",
             "LDA1": 0.177,
-            "LDB1": 0.230,
             "LDA2": 0.25,
+            "LDB": "quad",
+            "LDB1": 0.230,
             "LDB2": 0.22
         }
     },
@@ -587,7 +607,7 @@
         "transits": true,
         "eclipses_similar": false,
         "components_similar": false,
-        "notes": "J from trial JKTEBOP fit; rA_plus_rB & k derived from rA & rB in table 8; bP derived from rA, inc, e & esinw; control fit of 2nd half of S13 SAP fluxes with L3 fixed at 0 and qphot fixed at spectroscopic value yields MAE~0.024 (however unable to replicate esinw - always get positive value unless fixed);",
+        "notes": "J from trial JKTEBOP fit; rA_plus_rB & k derived from rA & rB in table 8; bP derived from rA, inc, e & esinw; control fit of 2nd half of S13 SAP fluxes with L3 fixed at 0, qphot fixed at spectroscopic value and quad LD yields MAE~0.024 (however unable to replicate esinw - always get positive value unless fixed);",
         "primary_epoch": 1675.389224513,
         "period": 2.748420962,
         "ecc": 0.0014,          "ecc_err": 0.0004,
@@ -612,7 +632,9 @@
         },
         "fit_overrides": {
             "qphot": 0.45,
-            "L3_fit": 0
+            "L3_fit": 0,
+            "LDA": "quad",
+            "LDB": "quad"
         }
     },
     "HO Tel": {
@@ -636,7 +658,7 @@
         "transits": true,
         "eclipses_similar": false,
         "components_similar": false,
-        "notes": "rA_plus_rB & k calculated from rA and rB; ecc, omega and Poincare elements set to zero as published; bP calculated from rA and inc (with ecc == zero); J approximated from Teff values; best control fit of sector 67 yields MAE~0.069 but is unreliable (e.g. O-C for J is -0.14)",
+        "notes": "rA_plus_rB & k calculated from rA and rB; ecc, omega and Poincare elements set to zero as published; bP calculated from rA and inc (with ecc == zero); J approximated from Teff values; best control fit of sector 67 with pow2 LD yields MAE~0.062 but is unreliable (e.g. O-C for J is -0.14)",
         "primary_epoch": 3135.755972,
         "period": 1.61310394,
         "labels": { 
@@ -659,6 +681,8 @@
             }
         },
         "fit_overrides": {
+            "LDA": "pow2",
+            "LDB": "pow2"
         },
         "mission": "TESS",
         "author": "TESS-SPOC",
@@ -685,7 +709,7 @@
         "transits": false,
         "eclipses_similar": false,
         "components_similar": true,
-        "notes": "e=0 & ω=0 (fixed); bP derived from rA, inc, e & esinw; logLB=0.78(5) from from Bakis+ logLA and Van Reeth+ Light Ratio; control fit of sectors 14 and 15 yields MAE~0.012;",
+        "notes": "e=0 & ω=0 (fixed); bP derived from rA, inc, e & esinw; logLB=0.78(5) from from Bakis+ logLA and Van Reeth+ Light Ratio; control fit of sectors 14 and 15 with published LD params yields MAE~0.012;",
         "primary_epoch": 1712.409315791,
         "period": 0.891193163,
         "labels": { 
@@ -712,6 +736,12 @@
             }
         },
         "fit_overrides": {
+            "LDA": "quad",
+            "LDA1": 0.248,
+            "LDA2": 0.232,
+            "LDB": "quad",
+            "LDB1": 0.285,
+            "LDB2": 0.229
         }
     },
     "GW Eri": {
@@ -733,7 +763,7 @@
         "transits": false,
         "eclipses_similar": true,
         "components_similar": true,
-        "notes": "e=0 & ω=0 (fixed); rA_plus_rB & k derived from rA & rB in table 8; J from trial JKTEBOP fit; bP derived from rA, inc, e & esinw; control fit on sector 31 yields MAE~0.0046;",
+        "notes": "e=0 & ω=0 (fixed); rA_plus_rB & k derived from rA & rB in table 8; J from trial JKTEBOP fit; bP derived from rA, inc, e & esinw; control fit on sector 31 with quad LD algo yields MAE~0.0046;",
         "primary_epoch": 2164.129416978,
         "period": 3.658664004,
         "labels": { 
@@ -753,6 +783,10 @@
                 "detrend_gap_threshold": 0.5,
                 "detrend_order": 1
             }
+        },
+        "fit_overrides":{
+            "LDA": "quad",
+            "LDB": "quad"
         }
     },
     "OO Peg": {
@@ -803,10 +837,10 @@
             "L3": 0,
             "L3_fit": 0,
             "LDA": "pow2",
-            "LDB": "pow2",
             "LDA1": 0.709,
-            "LDB1": 0.709,
             "LDA2": 0.431,
+            "LDB": "pow2",
+            "LDB1": 0.709,
             "LDB2": 0.431
         }
     },
@@ -829,7 +863,7 @@
         "transits": false,
         "eclipses_similar": false,
         "components_similar": false,
-        "notes": "bP derived from rA, inc, e & esinw; control fit on sectors 31 with fixed qphot (as used in source paper) gives MAE~0.005",
+        "notes": "bP derived from rA, inc, e & esinw; control fit on sectors 31 with fixed qphot and LD params (as used in source paper) gives MAE~0.005",
         "primary_epoch": 2163.056459177,
         "period": 2.728370923,
         "ecc": 0.01310,         "ecc_err": 0.00067,
@@ -854,7 +888,13 @@
         },
         "fit_overrides":{
             "qphot": 0.836,
-            "qphot_fit": 0
+            "qphot_fit": 0,
+            "LDA": "pow2",
+            "LDA1": 0.6437,
+            "LDA2": 0.4676,
+            "LDB": "pow2",
+            "LDB1": 0.6445,
+            "LDB2": 0.4967
         }
     },
     "ZZ Boo": {
@@ -900,10 +940,10 @@
         },
         "fit_overrides": {
             "LDA": "quad",
-            "LDB": "quad",
             "LDA1": 0.246,
-            "LDB1": 0.246,
             "LDA2": 0.22,
+            "LDB": "quad",
+            "LDB1": 0.246,
             "LDB2": 0.22
         }
     },
@@ -952,10 +992,10 @@
             "L3": 0,
             "L3_fit": 0,
             "LDA": "pow2",
-            "LDB": "pow2",
             "LDA1": 0.548,
-            "LDB1": 0.516,
             "LDA2": 0.498,
+            "LDB": "pow2",
+            "LDB1": 0.516,
             "LDB2": 0.467,
             "lrat": ["1809.42 0.703 0.057"]
         }
@@ -979,7 +1019,7 @@
         "transits": true,
         "eclipses_similar": false,
         "components_similar": false,
-        "notes": "L3=0 (fixed); bP derived from rA, inc, e & esinw; source article based sectors 19, 25 & 26 FFIs - we use sectors 52 & 53 @ 600 s cadence to get full coverage of the orbit giving MAE~0.015;",
+        "notes": "L3=0 (fixed); bP derived from rA, inc, e & esinw; source article based sectors 19, 25 & 26 FFIs - we use sectors 52 & 53 @ 600 s cadence to get full coverage of the orbit & published LD params to give MAE~0.015;",
         "primary_epoch": 2726.954043296,
         "period": 20.999146855,
         "ecc": 0.4676,          "ecc_err": 0.0002,
@@ -1014,10 +1054,10 @@
             "L3": 0,
             "L3_fit": 0,
             "LDA": "quad",
-            "LDB": "quad",
             "LDA1": 0.190,
-            "LDB1": 0.190,
             "LDA2": 0.22,
+            "LDB": "quad",
+            "LDB1": 0.190,
             "LDB2": 0.22
         }
     },
@@ -1066,10 +1106,10 @@
         },
         "fit_overrides": {
             "LDA": "pow2",
-            "LDB": "pow2",
             "LDA1": 0.540,
-            "LDB1": 0.540,
             "LDA2": 0.50,
+            "LDB": "pow2",
+            "LDB1": 0.540,
             "LDB2": 0.50
         }
     },
@@ -1117,10 +1157,10 @@
         },
         "fit_overrides": {
             "LDA": "quad",
-            "LDB": "quad",
             "LDA1": 0.221,
-            "LDB1": 0.221,
             "LDA2": 0.22,
+            "LDB": "quad",
+            "LDB1": 0.221,
             "LDB2": 0.22
         }
     },
@@ -1168,10 +1208,10 @@
             "L3": 0,
             "L3_fit": 0,
             "LDA": "quad",
-            "LDB": "quad",
             "LDA1": 0.261,
-            "LDB1": 0.261,
             "LDA2": 0.23,
+            "LDB": "quad",
+            "LDB1": 0.261,
             "LDB2": 0.23
         }
     },
@@ -1194,7 +1234,7 @@
         "transits": true,
         "eclipses_similar": false,
         "components_similar": false,
-        "notes": "J calculated from T_effs and corroborated with JKTEBOP fit with fixed params from run K; bP derived from rA, inc, e & esinw; control fit using SAP flux and fixed period (as in Maxted paper) yields MAE~0.0063; need good predictions for a statisfactory fit - there's a 2nd set of params nearby with J~0.85 which is very attractive;",
+        "notes": "J calculated from T_effs and corroborated with JKTEBOP fit with fixed params from run K; bP derived from rA, inc, e & esinw; control fit using SAP flux, quad LD and fixed period (as in Maxted+ paper) yields MAE~0.0063; need good predictions for a statisfactory fit - there's a 2nd set of params nearby with J~0.85 which is very attractive;",
         "primary_epoch": 1362.828326117,
         "period": 24.59240,
         "ecc": 0.1881,          "ecc_err": 0.0008,
@@ -1218,7 +1258,9 @@
             }
         },
         "fit_overrides":{
-            "period_fit": 0
+            "period_fit": 0,
+            "LDA": "quad",
+            "LDB": "quad"
         },
         "flux_column": "sap_flux"
     },
@@ -1266,10 +1308,10 @@
             "L3": 0,
             "L3_fit": 0,
             "LDA": "quad",
-            "LDB": "quad",
             "LDA1": 0.328,
-            "LDB1": -0.031,
             "LDA2": 0.30,
+            "LDB": "quad",
+            "LDB1": -0.031,
             "LDB2": 0.23,
             "LDA1_fit": 0,
             "LDB1_fit": 0
@@ -1321,7 +1363,9 @@
         "flux_column": "pdcsap_flux",
         "fit_overrides": {
             "L3": 0,
-            "L3_fit": 0
+            "L3_fit": 0,
+            "LDA": "quad",
+            "LDB": "quad"
         }
     },
     "V963 Cen": {
@@ -1367,6 +1411,10 @@
                 "flatten": { "mask_time_ranges": [[3073.8, 3074.2], [3078.2, 3078.65]] },
                 "detrend_order": 1
             }
+        },
+        "fit_overrides":{
+            "LDA": "quad",
+            "LDB": "quad"
         }
     },
     "V454 Aur": {
@@ -1427,10 +1475,10 @@
             "L3": 0,
             "L3_fit": 0,
             "LDA": "pow2",
-            "LDB": "pow2",
             "LDA1": 0.623,
-            "LDB1": 0.623,
             "LDA2": 0.545,
+            "LDB": "pow2",
+            "LDB1": 0.623,
             "LDB2": 0.545
         }
     },
@@ -1454,7 +1502,7 @@
         "transits": true,
         "eclipses_similar": false,
         "components_similar": false,
-        "notes": "J in TESS bandpass calculated from T_effs; bP derived from rA, inc, e & esinw; control fit on TESS S33, with flattening to dampen variability, yields MAE 0.0083;",
+        "notes": "J in TESS bandpass calculated from T_effs; bP derived from rA, inc, e & esinw; control fit on TESS S33, with flattening to dampen variability & using published LD params (NFO V) but LDB1 free to fit, yields MAE 0.009;",
         "primary_epoch": 2210.491034996,
         "period": 6.110760760,
         "ecc": 0.0862,              "ecc_err": 0.0010,
@@ -1481,7 +1529,13 @@
         "fit_overrides": {
             "qphot": 0.5932,
             "L3": 0,
-            "L3_fit": 0
+            "L3_fit": 0,
+            "LDA": "lin",
+            "LDA1": 0.54,
+            "LDA2": 0,
+            "LDB": "lin",
+            "LDB1": 0.71,
+            "LDB2": 0
         }
     },  
     "CM Dra": {
@@ -1503,7 +1557,7 @@
         "transits": false,
         "eclipses_similar": true,
         "components_similar": true,
-        "notes": "Martin values; L3=0 (fixed); just a single sector needed for a good fit, as the period is so short, yielding MAE~0.0086;",
+        "notes": "Martin values; L3=0 (fixed); just a single sector needed for a good fit, as the period is so short, and the quad LD algo (similar to published work, albeit different model & source of coeffs) yielding MAE~0.0086;",
         "primary_epoch": 2872.601497313,
         "period": 1.268388816,
         "ecc": 0.00527,         "ecc_err": 0.00021,
@@ -1531,7 +1585,9 @@
         "exptime": 200,
         "fit_overrides": {
             "L3": 0,
-            "L3_fit": 0
+            "L3_fit": 0,
+            "LDA": "quad",
+            "LDB": "quad"
         }
     }
 }
