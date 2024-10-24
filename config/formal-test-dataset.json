@@ -1502,7 +1502,7 @@
         "transits": true,
         "eclipses_similar": false,
         "components_similar": false,
-        "notes": "J in TESS bandpass calculated from T_effs; bP derived from rA, inc, e & esinw; control fit on TESS S33, with flattening to dampen variability & using published LD params (NFO V) but LDB1 free to fit, yields MAE 0.009;",
+        "notes": "J in TESS bandpass calculated from T_effs; bP derived from rA, inc, e & esinw; control fit on TESS S33, with flattening to dampen variability & using the fixed mass ratio and linear LD params (NFO V) from the published source, yields MAE 0.019;",
         "primary_epoch": 2210.491034996,
         "period": 6.110760760,
         "ecc": 0.0862,              "ecc_err": 0.0010,
@@ -1528,6 +1528,7 @@
         },
         "fit_overrides": {
             "qphot": 0.5932,
+            "qphot_fit": 0,
             "L3": 0,
             "L3_fit": 0,
             "LDA": "lin",
@@ -1535,7 +1536,8 @@
             "LDA2": 0,
             "LDB": "lin",
             "LDB1": 0.71,
-            "LDB2": 0
+            "LDB2": 0,
+            "LDB1_fit": 0
         }
     },  
     "CM Dra": {
