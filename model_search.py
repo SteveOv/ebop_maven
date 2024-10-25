@@ -526,7 +526,7 @@ if __name__ == "__main__":
         #   - fits a Gaussian Mixture Model (GMM) - l(x) - to the set of hyperparam values with
         #     the smallest loss values ("good" dist)
         #   - fits a GMM - g(x) - to the remaining hyperparam values ("bad" dist)
-        #   - chooses the hyperparam value x which minimizes l(x)/g(x)
+        #   - chooses the hyperparam value x which maximizes l(x)/g(x)
         best = fmin(fn = train_and_test_model,
                     space = trials_pspace,
                     trials = None, # Have fmin create new or deserialize the saved trials
