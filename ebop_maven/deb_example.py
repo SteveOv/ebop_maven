@@ -11,11 +11,11 @@ import tensorflow as tf
 
 # We can store multiple configuration of the mags feature but we can publish only one.
 stored_mags_features = {
-    "mags_1024": 1024,
+    # "mags_1024": 1024,
     # "mags_2048": 2048,
     "mags_4096": 4096,
 }
-default_mags_key = "mags_1024"                                  # pylint: disable=invalid-name
+default_mags_key = "mags_4096"                                  # pylint: disable=invalid-name
 default_mags_bins = stored_mags_features[default_mags_key]      # pylint: disable=invalid-name
 default_mags_wrap_phase = 1.0                                   # pylint: disable=invalid-name
 
