@@ -490,6 +490,43 @@ if __name__ == "__main__":
         else:
             print("\nStarting a new Hyperopt trials\n")
 
+        # The Tree-structured Parzen Estimator (TPE) Hyperparameter Optimization algorithm (HOA)
+        # see
+        # https://proceedings.neurips.cc/paper_files/paper/2011/hash/86e8f7ab32cfd12577bc2619bc635690-Abstract.html
+        # https://proceedings.mlr.press/v28/bergstra13.html
+        #
+        # Tree-structured refers to the configuration space, whereby some parameters are only
+        # well-defined when other parameters have particular values (e.g. #units in DNN layer 3
+        # is only well defined with #layers >= 3). In this case #units is a leaf & #layers a node.
+        #
+        # 1 initial trial steps are a stochastic search over the parameter space
+        #   - models are evaluated against the desired objective/loss function
+        #	- this initializes the trials history (parameter sets & objective value)
+        #   - leads to an approximation of regions of the param space which lead to good/bad models
+        # 2 split the parameter space based on some quantile threshold \gamma
+        #   - (e.g. \gamma=0.2 will split it 20%/80%)
+        #   - l(x) (aka "good" distribution) will be the ##% of the sets which evaluate the best
+        #   - g(x) (aka "bad" distribution) are the remaining sets which evaluate less well
+        #   - Parzen Estimation (aka Kernel Density Estimation [KDE])
+        #     - density estimation; an example is a histogram - a means of measuring the density
+        #       (# measurements) for each "bin" within a range to estimate their distribution
+        #     - estimators based on gaussian KDEs
+        #     - fit a KDE over each of the good and bad distributions
+        # 3 determine the next potentialy "best" parameter set to test
+        #	- draw random parameter set samples from within l(x) (good dist)
+        #   - evaluate each sample wrt l(x)/g(x) and select the set which maximizes this
+        # 4 derive model from selected set
+        #	- evaluate model against desired objective/loss function
+        #	- result added to trials history
+        # 5 repeat steps 2 to 4 until total number of trials reached or params exhausted
+        # 6 select parameter set associated with the "best" objective measurement
+        #
+        # In the hyperopt paper (Bergstra+2013hyperopt) this is summarized as
+        # - on each iteration, for each hyperparameter
+        #   - fits a Gaussian Mixture Model (GMM) - l(x) - to the set of hyperparam values with
+        #     the smallest loss values ("good" dist)
+        #   - fits a GMM - g(x) - to the remaining hyperparam values ("bad" dist)
+        #   - chooses the hyperparam value x which minimizes l(x)/g(x)
         best = fmin(fn = train_and_test_model,
                     space = trials_pspace,
                     trials = None, # Have fmin create new or deserialize the saved trials
