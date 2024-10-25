@@ -505,16 +505,17 @@ if __name__ == "__main__":
         #   - leads to an approximation of regions of the param space which lead to good/bad models
         # 2 split the parameter space based on some quantile threshold \gamma
         #   - (e.g. \gamma=0.2 will split it 20%/80%)
-        #   - l(x) (aka "good" distribution) will be the ##% of the sets which evaluate the best
-        #   - g(x) (aka "bad" distribution) are the remaining sets which evaluate less well
         #   - Parzen Estimation (aka Kernel Density Estimation [KDE])
         #     - density estimation; an example is a histogram - a means of measuring the density
         #       (# measurements) for each "bin" within a range to estimate their distribution
         #     - estimators based on gaussian KDEs
-        #     - fit a KDE over each of the good and bad distributions
+        #     - fit a Gaussian KDE over each of the good and bad distributions
+        #   - l(x) (aka "good" distribution) the ##% of each param values which evaluate the best
+        #   - g(x) (aka "bad" distribution) the remaining param values which evaluate less well
         # 3 determine the next potentialy "best" parameter set to test
-        #	- draw random parameter set samples from within l(x) (good dist)
-        #   - evaluate each sample wrt l(x)/g(x) and select the set which maximizes this
+        #   - for each param x;
+        #	  - draw random samples from l(x) (good dist)
+        #     - evaluate each sample wrt l(x)/g(x) and select value which maximizes this
         # 4 derive model from selected set
         #	- evaluate model against desired objective/loss function
         #	- result added to trials history
