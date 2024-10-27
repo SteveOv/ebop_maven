@@ -9,6 +9,7 @@ import json
 from inspect import getsource
 from datetime import datetime, timezone
 from contextlib import redirect_stdout
+from warnings import filterwarnings
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -238,10 +239,12 @@ if __name__ == "__main__":
             callbacks.CSVLogger(SAVE_DIR / "training-log.csv")
         ]
 
+        # This appears to be a known false alarm raised from tf 2.16 which can safely be ignored
+        # See https://github.com/tensorflow/tensorflow/issues/62963
+        filterwarnings("ignore", "Your input ran out of data; interrupting training", UserWarning)
+
         print(f"\nTraining the model on {counts[0]} training and {counts[1]} validation instances.")
         try:
-            # You may see the following warning while training, which can safely be ignored;
-            #   UserWarning: Your input ran out of data; interrupting training
             history = model.fit(x = datasets[0],    # pylint: disable=invalid-name
                                 epochs = TRAINING_EPOCHS,
                                 callbacks = CALLBACKS,
