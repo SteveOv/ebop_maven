@@ -1,7 +1,7 @@
 """
 Functions for reading and writing to deb_example encoded TensorFlow datasets
 """
-from typing import Dict, List, Tuple, Callable, Iterable, Union
+from typing import Dict, List, Tuple, Callable, Iterable
 from pathlib import Path
 import os
 import errno
@@ -106,36 +106,33 @@ def create_map_func(mags_bins: int = default_mags_bins,
                     mags_wrap_phase: float = default_mags_wrap_phase,
                     ext_features: List[str] = None,
                     labels: List[str] = None,
-                    noise_stddev: Callable[[], float] = None,
-                    roll_steps: Callable[[], int] = None,
+                    augmentation_callback: Callable[[tf.Tensor], tf.Tensor] = None,
                     scale_labels: bool=True,
                     include_id: bool=False) -> Callable:
     """
     Configures and returns a dataset map function for deb_examples. The map function is used by
     TFRecordDataset().map() to deserialize each raw tfrecord row into the corresponding features
     and labels required for model training or testing.
-    
+        
+    In addition to deserializing the rows, the map function supports the option of augmenting the
+    mags_feature data by supplying a reference to an augmentation_callback function. This callback
+    will be called from a graphed function so must be compatible with tf.function.
+    A simple example to augment the mags_feature with additive Gaussian noise:
+    ```Python
+    @tf.function
+    def sample_aug_callback(mags_feature: tf.Tensor) -> tf.Tensor:
+        return mags_feature + tf.random.normal(mags_feature.shape, stddev=0.005)
+    ```
+
     The mags_wrap_phase argument controls at which point the cyclic, phase normalized mags data is
     wrapped when read. This can be in the range [0, 1] or None (in which case the mags data is
     adaptively wrapped to centre on the mid-point between the primary and secondary eclipses).
-    
-    In addition to deserializing the rows, the map function supports the option of augmenting the
-    output magnitudes feature by adding Gaussian noise and/or rolling the bins left or right after
-    the mags_wrap_phase is applied. These options are configured by supplying functions which set
-    their stddev or roll values respectively (otherwise they do nothing). Note, these will be
-    running within the context of a tf graph so you should use tf.functions if you want to do
-    anything more complex than supplying a fixed value. For example, to return a random value:
-    ```Python
-        roll_steps = lambda: tf.random.uniform([], -3, 4, tf.int32)
-    ```
 
     :mags_bins: the width of the mags to publish
     :mags_wrap_phase: the wrap phase of the mags to publish, or None to use adaptive wrap
     :ext_features: chosen subset of available ext_features, in the requested order, or all if None
     :labels: chosen subset of available labels, in requested order, or all if None
-    :noise_stddev: a function which returns the stddev of the Gaussian noise to add
-    :roll_steps: a function which returns the number of steps to roll the mag data,
-    negative values roll to the left and positive values to the right
+    :augmentation_callback: optional function with which client code can augment mags_feature data.
     :scale_labels: whether to apply scaling to the map function's returned labels
     :include_id: whether to include the id in the function's returned tuple. If true, it returns
     (id, (mags_feature, ext_features), labels) per inst else ((mags_feature, ext_features), labels)
@@ -164,11 +161,13 @@ def create_map_func(mags_bins: int = default_mags_bins,
         # Assume mags will have been stored with phase implied by index and primary eclipse at zero
         mags_feature = tf.reshape(example[mags_key], shape=(mags_bins, 1))
 
-        # Apply any noise augmentations to the model mags
-        if noise_stddev:
-            stddev = noise_stddev()
-            if stddev != 0.:
-                mags_feature += tf.random.normal(mags_feature.shape, stddev=stddev)
+        # Put this here for now, as this allowa us to apply noise & roll before the wrap_phase shift
+        # whichs effectively works as previously when we had separate noise & roll conditional code.
+        # If we set the seeds as before, we expect to replicate the previous training results.
+        # Not all potential augmentations support in-place updates (ie tf.Roll) so we have to absorb
+        # the overhead of send/return rather than using the "byref" behaviour of a mutable arg.
+        if augmentation_callback:
+            mags_feature = augmentation_callback(mags_feature)
 
         if mags_wrap_phase is not None:
             roll_phase = mags_wrap_phase
@@ -182,8 +181,6 @@ def create_map_func(mags_bins: int = default_mags_bins,
         # beyond phase 0.75 are rolled round to lie before phase 0 (effectively phases -0.25 to 0).
         # Combine with any roll augmentation so we only incur the overhead of rolling once
         roll_shift = 0 if roll_phase == 0 else int(mags_bins * (1.0 - roll_phase))
-        if roll_steps:
-            roll_shift += roll_steps()
         if roll_shift != 0:
             if roll_shift > mags_bins // 2:
                 roll_shift -= mags_bins
@@ -273,8 +270,7 @@ def iterate_dataset(dataset_files: Iterable[str],
                     labels: List[str]=None,
                     identifiers: List[str]=None,
                     scale_labels: bool=False,
-                    noise_stddev: Callable[[], float] = None,
-                    roll_steps: Callable[[], int] = None,
+                    augmentation_callback: Callable[[tf.Tensor], tf.Tensor] = None,
                     max_instances: int = np.inf):
     """
     Utility/diagnostics function which will parse a saved dataset yielding rows,
@@ -295,9 +291,7 @@ def iterate_dataset(dataset_files: Iterable[str],
     :ext_features: a chosen subset of the available features, in this order, or all if None
     :labels: a chosen subset of the available labels, in this order, or all if None
     :identifiers: optional list of ids to yield, or all ids if None
-    :noise_stddev: a function which returns the stddev of the Gaussian noise to add
-    :roll_steps: a function which returns the number of steps to roll the mag data,
-    negative values roll to the left and positive values to the right
+    :augmentation_callback: optional function with which client code can augment mags_feature data.
     :max_instances: the maximum number of instances to yield
     :returns: for each matching row yields a tuple of (id, mags vals, ext feature vals, label vals)
     """
@@ -306,7 +300,7 @@ def iterate_dataset(dataset_files: Iterable[str],
         max_instances = len(identifiers)
 
     map_func = create_map_func(mags_bins, mags_wrap_phase, ext_features, labels,
-                               noise_stddev, roll_steps, scale_labels, include_id=True)
+                               augmentation_callback, scale_labels, include_id=True)
     (ds, _) = create_dataset_pipeline(dataset_files, 0, map_func)
 
     yield_count = 0
@@ -328,8 +322,7 @@ def read_dataset(dataset_files: Iterable[str],
                  labels: List[str]=None,
                  identifiers: List[str]=None,
                  scale_labels: bool=False,
-                 noise_stddev: Callable[[], float] = None,
-                 roll_steps: Callable[[], int] = None,
+                 augmentation_callback: Callable[[tf.Tensor], tf.Tensor] = None,
                  max_instances: int = np.inf) \
             -> Tuple[np.ndarray, np.ndarray[float], np.ndarray[float], np.ndarray[float]]:
     """
@@ -350,8 +343,7 @@ def read_dataset(dataset_files: Iterable[str],
     :labels: a chosen subset of the available labels, in this order, or all if None
     :identifiers: optional list of ids to yield, or all ids if None
     :scale_values: if True values will be scaled
-    :noise_stddev: the standard deviation of Gaussian Noise to add to the mags feature
-    :roll_max: the maximum random roll to apply to the mags feature
+    :augmentation_callback: optional function with which client code can augment mags_feature data.
     :max_instances: the maximum number of instances to return
     :returns: a Tuple[NDArray[#insts, 1], NDArray[#insts, #bins], NDArray[#insts, #feats],
     NDArray[#insts, #labels]], with the labels being a structured NDArray supporting named columns
@@ -365,7 +357,7 @@ def read_dataset(dataset_files: Iterable[str],
     ids, mags_vals, feature_vals, label_vals = [], [], [], []
     for row in iterate_dataset(dataset_files, mags_bins, mags_wrap_phase,
                                ext_features, labels, identifiers, scale_labels,
-                               noise_stddev, roll_steps, max_instances):
+                               augmentation_callback, max_instances):
         ids += [row[0]]
         mags_vals += [row[1]]
         feature_vals += [row[2]]

@@ -77,11 +77,22 @@ DNN_NUM_FULL_LAYERS = 2
 DNN_DROPOUT_RATE = 0.5
 DNN_NUM_TAPER_UNITS = 64
 
-# These control augmentations
-# pylint: disable=unnecessary-lambda-assignment
+# Control dataset pipeline augmentations
+NOISE_MAX = 0.030
 ROLL_MAX = int(128 * (MAGS_BINS/1024))
-roll_func = lambda: tf.random.uniform([], -ROLL_MAX, ROLL_MAX+1, tf.int32)
-noise_func = lambda: tf.random.uniform([], 0.001, 0.030, tf.float32)
+@tf.function
+def augmentation_callback(mags_feature: tf.Tensor) -> tf.Tensor:
+    """
+    Dataset pipeline augmentation function which is called from the map_func. Updates the
+    mags_feature with random amounts of additive Gaussian noise and a random roll left or right.
+    """
+    noise_stddev = tf.random.uniform([], 0.001, NOISE_MAX, tf.float32)
+    if noise_stddev != 0:
+        mags_feature += tf.random.normal(mags_feature.shape, stddev=noise_stddev)
+    roll_by = tf.random.uniform([], -ROLL_MAX, ROLL_MAX+1, tf.int32)
+    if roll_by != 0:
+        mags_feature = tf.roll(mags_feature, [roll_by], axis=[0])
+    return mags_feature
 
 
 def make_best_model(chosen_features: list[str]=CHOSEN_FEATURES,
@@ -166,16 +177,16 @@ if __name__ == "__main__":
             print("The mags features will be centred on the midpoint between eclipses.")
         else:
             print(f"The mags features will be wrapped beyond phase {MAGS_WRAP_PHASE}.")
-        print(f"Augmentation for roll: {getsource(roll_func)} where ROLL_MAX = {ROLL_MAX}")
-        print(f"Agumentation for noise: {getsource(noise_func)}")
+        print(f"Dataset pipeline augmentation with NOISE_MAX={NOISE_MAX} & ROLL_MAX={ROLL_MAX}:",
+              f"\n{getsource(augmentation_callback)}")
+
         datasets = [tf.data.TFRecordDataset] * 2
         counts = [int] * 2
         map_func = deb_example.create_map_func(mags_bins=MAGS_BINS,
                                                mags_wrap_phase=MAGS_WRAP_PHASE,
                                                ext_features=CHOSEN_FEATURES,
                                                labels=CHOSEN_LABELS,
-                                               noise_stddev=noise_func,
-                                               roll_steps=roll_func)
+                                               augmentation_callback=augmentation_callback)
         for ds_ix, (label, set_dir) in enumerate([("training", TRAINSET_DIR),
                                                 ("valiation", VALIDSET_DIR)]):
             files = list(set_dir.glob(TRAINSET_GLOB_TERM))

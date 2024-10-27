@@ -101,7 +101,7 @@ class Test_deb_example(unittest.TestCase):
             # We test that the map_func uses phiS, which is the phase of the secondary based on the
             # primary being at phase 0, to work out the phase of the midpoint between the eclipses.
             # It should then roll the mags to centre them on this midpoint.
-            for mags_bins in [1024, 4096]:
+            for mags_key, mags_bins in deb_example.stored_mags_features.items():
                 # A graph instance of the map_func, with wrap==None to enforce adaptive wrap.
                 map_fn = tf.function(deb_example.create_map_func(mags_bins, mags_wrap_phase=None))
 
@@ -182,28 +182,31 @@ class Test_deb_example(unittest.TestCase):
                 # Some loss of fidelity in encoding/decoding a tf.Tensor so can't do exact assert
                 self.assertAlmostEqual(label.numpy(), exp_value, 6)
 
-    def test_create_map_func_with_roll(self):
-        """ Tests the created map_func's roll functionality """
+    def test_create_map_func_with_roll_augmentation(self):
+        """ Tests the created map_func's augmentation functionality supports rolling the mags """
         with self.__class__.lock:
             # Set up a feature (light-curve) amd labels and with tracable values
             input_labels = { k: v for v, k in enumerate(deb_example.labels_and_scales) }
             input_lc_feature = { deb_example.default_mags_key: np.arange(deb_example.default_mags_bins) }
             deb = deb_example.serialize("t1", input_labels, input_lc_feature, {})
 
-            for roll_by in [-5, 0, 5]:
+            for roll_steps in [-5, 0, 5]:
+                def aug_callback(mags_feature):
+                    return tf.roll(mags_feature, [roll_steps], axis=[0])
+
                 # pylint: disable=cell-var-from-loop
                 # Execute a graph instance of the map_func (with roll) to mimic a Dateset pipeline.
-                map_parse_fn = tf.function(deb_example.create_map_func(roll_steps=lambda: roll_by))
+                map_parse_fn = tf.function(deb_example.create_map_func(augmentation_callback=aug_callback))
                 ((lc_feature, _), _) = map_parse_fn(deb)
 
                 # Assert that these bins match the input values where they should have been rolled from
                 lc_feature = lc_feature.numpy()[:, 0]
                 for lb_ix in np.arange(500, 600, 1):
-                    self.assertEqual(lc_feature[lb_ix + roll_by],
+                    self.assertEqual(lc_feature[lb_ix + roll_steps],
                                      input_lc_feature[deb_example.default_mags_key][lb_ix])
 
-    def test_create_map_func_with_mags_wrap_and_roll(self):
-        """ Tests the created map_func's mags_wrap and roll_steps combine as expected """
+    def test_create_map_func_with_mags_wrap_and_roll_augmentation(self):
+        """ Tests the created map_func's mags_wrap and roll augmentations combine as expected """
         with self.__class__.lock:
             # Set up a feature (light-curve) amd labels and with tracable values
             # so the contents of each mags_bin matches its initial index with phase 0 at ix [0]
@@ -227,10 +230,14 @@ class Test_deb_example(unittest.TestCase):
                                                               (-0.25, -10, (mags_bins*0.25)-10),
                                                               (0.5, 15, (mags_bins*0.5)+15),
                                                               (0.25, -25, (mags_bins*0.75)-25)]:
+
+                def aug_callback(mags_feature):
+                    return tf.roll(mags_feature, [roll_steps], axis=[0])
+
                 # pylint: disable=cell-var-from-loop
                 # Execute a graph instance of the map_func, with wrap, to mimic a Dateset pipeline.
                 map_parse_fn = tf.function(deb_example.create_map_func(mags_wrap_phase=wrap_phase,
-                                                                       roll_steps=lambda: roll_steps))
+                                                                       augmentation_callback=aug_callback))
                 ((lc_feature, _), _) = map_parse_fn(deb)
 
                 # Asserting the phase zero (originally zeroth bin) is rolled to where we expect
@@ -238,35 +245,40 @@ class Test_deb_example(unittest.TestCase):
                 phase_zero_ix = np.where(lc_feature == 0)[0]
                 self.assertEqual(phase_zero_ix, exp_phase_zero_ix)
 
-    def test_create_map_func_with_noise(self):
-        """ Tests the created map_func's roll functionality """
+    def test_create_map_func_with_noise_augmentation(self):
+        """ Tests the created map_func's augmentation functionality supports adding noise """
         with self.__class__.lock:
             # Set up a feature (light-curve) amd labels and with tracable values
             input_labels = { k: v for v, k in enumerate(deb_example.labels_and_scales) }
             input_lc_feature = { deb_example.default_mags_key: [1] * deb_example.default_mags_bins } # all the same, so stddev==0
             deb = deb_example.serialize("t1", input_labels, input_lc_feature, {})
 
-            # Execute a graph instance of the map_func (with roll) to mimic a Dateset pipeline.
             apply_stddev = 0.01
-            map_parse_fn = tf.function(deb_example.create_map_func(noise_stddev=lambda: apply_stddev))
+            def aug_callback(mags_feature):
+                return mags_feature + tf.random.normal(mags_feature.shape, stddev=apply_stddev)
+
+            # Execute a graph instance of the map_func (with roll) to mimic a Dateset pipeline.
+            map_parse_fn = tf.function(deb_example.create_map_func(augmentation_callback=aug_callback))
             ((lc_feature, _), _) = map_parse_fn(deb)
 
             # Assert that stddev of the output lc reflects the noise we applied
             lc_feature = lc_feature.numpy()[:, 0]
             self.assertAlmostEqual(lc_feature.std(), apply_stddev, 3)
 
-    def test_create_map_func_with_random_roll(self):
-        """ Tests implementing a random roll_steps func via create_map_func() """
+    def test_create_map_func_with_random_roll_augmentation(self):
+        """ Tests the created map_func's augmentation functionality supports random rolls """
         with self.__class__.lock:
             # Set up a feature (light-curve) amd labels and with tracable values
             input_labels = { k: v for v, k in enumerate(deb_example.labels_and_scales) }
             input_lc_feature = { deb_example.default_mags_key: np.arange(deb_example.default_mags_bins) }
             deb = deb_example.serialize("t1", input_labels, input_lc_feature, {})
 
-            def random_roll():
-                """ Create a random roll_steps value """
-                return tf.random.uniform([], -100, 101, tf.int32)
-            map_parse_fn = tf.function(deb_example.create_map_func(roll_steps=random_roll))
+            # Augmentation callback with random roll
+            def aug_callback(mags_feature):
+                roll_steps = tf.random.uniform([], -100, 101, tf.int32)
+                return tf.roll(mags_feature, [roll_steps], axis=[0])
+
+            map_parse_fn = tf.function(deb_example.create_map_func(augmentation_callback=aug_callback))
 
             # Execute map_func a number of times on the same input lc with the random roll.
             # Store the output lcs, which should have different rolls applied to them.
