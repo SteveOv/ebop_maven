@@ -21,7 +21,10 @@ from traininglib import datasets, plots
 from ebop_maven.libs import orbital
 from ebop_maven.libs.tee import Tee
 
+# By splitting the dataset over multiple files we have the option of using a subset of the dataset
+# using a wildcard match, for example "trainset00?.tfrecord" picks up the first 10 files only.
 DATASET_SIZE = 250000
+FILE_COUNT = DATASET_SIZE // 10000
 FILE_PREFIX = "trainset"
 dataset_dir = Path(f"./datasets/formal-training-dataset-{DATASET_SIZE // 1000}k/")
 dataset_dir.mkdir(parents=True, exist_ok=True)
@@ -158,7 +161,7 @@ if __name__ == "__main__":
 
     with redirect_stdout(Tee(open(dataset_dir/"dataset.log", "w", encoding="utf8"))):
         datasets.make_dataset(instance_count=DATASET_SIZE,
-                              file_count=DATASET_SIZE // 10000,
+                              file_count=FILE_COUNT,
                               output_dir=dataset_dir,
                               generator_func=generate_instances_from_distributions,
                               check_func=is_usable_instance,
