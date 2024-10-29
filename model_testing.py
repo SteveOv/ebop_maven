@@ -240,7 +240,8 @@ def fit_against_formal_test_dataset(estimator: Union[Model, Estimator],
                     for (sub_head, mask, rep_names) in sub_reports:
                         if any(mask):
                             predictions_vs_labels_to_table(pred_vals[mask], comp_vals[mask],
-                                                    targs[mask], rep_names, title=sub_head, to=txtf)
+                                                    targs[mask], rep_names, title=sub_head,
+                                                    error_bars=prediction_type == "mc", to=txtf)
 
             # Summarize this set of fitted params as plots pred-vs-label|control and in text tables
             results_stem = f"fitted-params-from-{prediction_type}-vs-{comp_type}"
@@ -254,8 +255,8 @@ def fit_against_formal_test_dataset(estimator: Union[Model, Estimator],
                 for (sub_head, mask, rep_names) in sub_reports:
                     if any(mask):
                         predictions_vs_labels_to_table(fit_vals[mask], comp_vals[mask], targs[mask],
-                                                rep_names, title=sub_head, prediction_head="Fitted",
-                                                label_head=comp_head.capitalize(), to=txtf)
+                                        rep_names, title=sub_head, prediction_head="Fitted",
+                                        label_head=comp_head.capitalize(), error_bars=True, to=txtf)
     return fit_vals
 
 
@@ -523,6 +524,7 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
                                    label_head: str="Label",
                                    title: str=None,
                                    summary_only: bool=False,
+                                   error_bars: bool=False,
                                    to: TextIOBase=None):
     """
     Will write a text table of the predicted nominal values vs the label values
@@ -537,6 +539,7 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
     :label_head: the text of the label/comparison row headings (10 chars or less)
     :title: optional title text to write above the table
     :summary_only: omit the body and just report the summary
+    :error_bars: include error bars in output
     :to: the output to write the table to. Defaults to printing.
     """
     # pylint: disable=too-many-arguments, too-many-locals, too-many-branches
@@ -549,8 +552,6 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
         keys = selected_param_names
 
     errors = calculate_prediction_errors(predictions, labels, keys, reverse_scaling)
-    maes = unumpy.nominal_values([np.mean(np.abs(errors[k])) for k in keys])
-    mses = unumpy.nominal_values([np.mean(np.square(errors[k])) for k in keys])
 
     # Make sure these are iterable; not always the case if we're given a single row
     labels = np.expand_dims(labels, 0) if labels.shape == () else labels
@@ -568,6 +569,15 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
     def header_block(header):
         horizontal_line("-")
         to.write(f"{header:<10s} | " + " ".join(f"{k:>10s}" for k in keys + ["MAE", "MSE"]) + "\n")
+
+    def row(row_head, values):
+        to.write(f"{row_head:<10s} | ")
+        to.write(" ".join((" "*10 if v is None else f"{get_nom(v):10.6f}") for v in values))
+        to.write("\n")
+        if error_bars:
+            to.write(f"{' +/- ':<10s} | ")
+            to.write(" ".join((" "*10 if v is None else f"{get_err(v):10.6f}") for v in values))
+            to.write("\n")
 
     if title:
         to.write(f"{title}\n")
@@ -587,20 +597,21 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
             horizontal_line("-")
             for row_head, row_vals in zip([label_head, prediction_head, "Error"],
                                           [b_lbls, b_preds, b_errs]):
-                to.write(f"{row_head:<10s} | " +
-                         " ".join(f"{get_nom(row_vals[k]):10.6f}" for k in keys))
+                vals = row_vals[keys].tolist()
                 if row_head == "Error":
-                    to.write(f" {get_nom(np.mean(np.abs(row_vals[keys].tolist()))):10.6f}")
-                    to.write(f" {get_nom(np.mean(np.square(row_vals[keys].tolist()))):10.6f}")
-                to.write("\n")
+                    vals = np.concatenate([vals, [np.mean(np.abs(vals)), np.mean(np.square(vals))]])
+                row(row_head, vals)
 
     if summary_only or len(predictions) > 1:
         # Summary rows for aggregate stats over all of the rows
         horizontal_line("=")
-        to.write(f"{'MAE':<10s} | " + " ".join(f"{get_nom(v):10.6f}" for v in maes) +
-                f" {get_nom(np.mean(np.abs(errors.tolist()))):10.6f}\n")
-        to.write(f"{'MSE':<10s} | " + " ".join(f"{get_nom(v):10.6f}" for v in mses) +
-                " "*11 + f" {get_nom(np.mean(np.square(errors.tolist()))):10.6f}\n")
+        key_maes = [np.mean(np.abs(errors[k])) for k in keys]
+        key_mses = [np.mean(np.square(errors[k])) for k in keys]
+        overall_mae = np.mean(np.abs(errors[keys].tolist()))
+        overall_mse = np.mean(np.square(errors[keys].tolist()))
+        row("MAE", np.concatenate([key_maes, [overall_mae]]))
+        row("MSE", np.concatenate([key_mses, [None, overall_mse]]))
+
     else:
         horizontal_line("-")
 
@@ -608,8 +619,12 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
         print(to.getvalue())
 
 def get_nom(value):
-    """ Get the nominal value if the passed value is a UFloat other return as is """
+    """ Get the nominal value if the passed value is a UFloat other return value as is """
     return value.nominal_value if isinstance(value, UFloat) else value
+
+def get_err(value):
+    """ Get the errorbar (stddev) value if the passed value is a UFloat otherwise err is zero """
+    return value.std_dev if isinstance(value, UFloat) else 0.
 
 def calculate_prediction_errors(predictions: np.ndarray[UFloat],
                                 labels: np.ndarray[Union[UFloat, float]],
