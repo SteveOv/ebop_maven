@@ -6,7 +6,7 @@ from inspect import getsourcefile
 import unittest
 
 import numpy as np
-from uncertainties import unumpy
+from uncertainties import unumpy, UFloat
 
 import tensorflow as tf
 from keras import layers
@@ -21,8 +21,8 @@ class TestEstimator(unittest.TestCase):
     """ Unit tests for the TensorFlowEstimator base class. """
     # Tests for tf.DataSet support are in test_tensorflow_estimator_dataset
     _this_dir = Path(getsourcefile(lambda:0)).parent
-    _default_model_file = _this_dir / "data/test_estimator/test_cnn_ext_model.keras"
-    _default_model_name = "Test-CNN-Ext-Model"
+    _test_model_file = _this_dir / "data/test_estimator/test_cnn_ext_model.keras"
+    _test_model_name = "Test-CNN-Ext-Model"
 
     @classmethod
     def setUpClass(cls):
@@ -30,7 +30,7 @@ class TestEstimator(unittest.TestCase):
 
         # To re-generate the test model file delete the existing file (under data) & run these tests
         # TODO: issue #64 raised to create training dataset specific to tests
-        model_file = cls._default_model_file
+        model_file = cls._test_model_file
         if not model_file.exists():
             with redirect_stdout(Tee(open(model_file.parent / f"{model_file.stem}.txt",
                                           "w",
@@ -43,16 +43,17 @@ class TestEstimator(unittest.TestCase):
                         layers.Conv1D(32, 16, 4, "same", activation="relu"),
                     ],
                     dnn_layers=[
+                        layers.Dropout(0.1),
                         layers.Dense(32, "leaky_relu")
                     ],
-                    name=cls._default_model_name
+                    name=cls._test_model_name
                 )
 
                 model.summary()
                 model.compile(loss=["mae"], optimizer="adam", metrics=["mse"])
 
-                # These are created by make_training_dataset.py
-                files = list(Path("./datasets/formal-training-dataset-250k/training").glob("**/*.tfrecord"))
+                # These are created by make_synthetic_test_dataset.py (smaller than full trainset)
+                files = list(Path("./datasets/synthetic-mist-tess-dataset").glob("**/*.tfrecord"))
                 train_ds = tf.data.TFRecordDataset(files, num_parallel_reads=100)
                 x = train_ds.shuffle(100000, 42).map(deb_example.create_map_func()).batch(100)
                 model.fit(x, epochs=10, verbose=2)
@@ -80,13 +81,13 @@ class TestEstimator(unittest.TestCase):
 
     def test_init_with_path(self):
         """ Tests __init__(valid model path) -> correct initialization """
-        estimator = Estimator(self._default_model_file)
+        estimator = Estimator(self._test_model_file)
         self.assertIn("Test", estimator.name)
 
     def test_init_with_model(self):
         """ Tests __init__(valid model path) -> correct initialization """
         # Not tf.keras.models.load_model as we're potentially using custom layers
-        my_model = modelling.load_model(self._default_model_file)
+        my_model = modelling.load_model(self._test_model_file)
         estimator = Estimator(my_model)
         self.assertIn("Test", estimator.name)
 
@@ -96,14 +97,14 @@ class TestEstimator(unittest.TestCase):
     #
     def test_predict_invalid_argument_types(self):
         """ Tests predict(various invalid arg types) gives TypeError """
-        estimator = Estimator(self._default_model_file)
+        estimator = Estimator(self._test_model_file)
         self.assertRaises(TypeError, estimator.predict, None, np.array([1.0, 0.5]))
         self.assertRaises(TypeError, estimator.predict, "Hello", np.array([1.0, 0.5]))
         self.assertRaises(TypeError, estimator.predict, np.array([[0.5]*estimator.mags_feature_bins]), 0.5)
 
     def test_predict_incorrect_sized_mags_feature(self):
         """ Tests predict(incorrect size mags_feature NDArray) gives ValueError """
-        estimator = Estimator(self._default_model_file)
+        estimator = Estimator(self._test_model_file)
         ext_features = np.array([[1.0] * len(estimator.extra_feature_names)]) # valid
 
         mags_feature = np.array([0.5] * (estimator.mags_feature_bins))      # (#bins) no inst dimension
@@ -113,7 +114,7 @@ class TestEstimator(unittest.TestCase):
 
     def test_predict_incorrect_sized_ext_features(self):
         """ Tests predict(incorrect extra_features NDArray) gives ValueError """
-        estimator = Estimator(self._default_model_file)
+        estimator = Estimator(self._test_model_file)
         mags_feature = np.array([[0.5] * (estimator.mags_feature_bins)])    # valid
 
         ext_features = np.array([1.0] * len(estimator.extra_feature_names)) # (#feats) no inst dimension
@@ -121,37 +122,47 @@ class TestEstimator(unittest.TestCase):
         ext_features = np.array([[1.0] * (len(estimator.extra_feature_names)+1)]) # too wide
         self.assertRaises(ValueError, estimator.predict, mags_feature, ext_features)
 
-    def test_predict_valid_single_inst_assert_scaling(self):
+    def test_predict_valid_assert_scaling(self):
         """ Tests predict() assert scaling correctly applied """
-        estimator = Estimator(self._default_model_file)
+        estimator = Estimator(self._test_model_file)
 
         mags_feature = np.array([[0.5] * (estimator.mags_feature_bins)])
         ext_features = np.array([[1.0, 0.5]])
-        expected_preds = estimator.predict(mags_feature, ext_features, iterations=1, unscale=True)
-        print(expected_preds)
 
-        # We're going to have the same number of instances and MC iterations as the
-        # number of labels. This will allow us to test the scaling is applied to the correct axis.
-        # The inc label is scaled by 0.01, so it should be easy to detect this applied incorrectly.
-        num_labels = len(estimator.label_names)
-        mags_feature = np.array([[0.5] * (estimator.mags_feature_bins)] * num_labels)
-        ext_features = np.array([[1.0, 0.5]] * num_labels)
+        # Fudge factors for approx_equal to overcome prediction variability
+        fudges = { k: max(0.1/v, 0.25) for k, v in estimator._labels_and_scales.items() }
 
-        preds = estimator.predict(mags_feature, ext_features, iterations=num_labels, unscale=True)
-        print(preds)
+        def approx_equal(a: UFloat, b: UFloat, fudge: float=1.0) -> bool:
+            return abs(a.nominal_value - b.nominal_value) < fudge
 
+        # Our control preds; made without scaling applied then manually scaled
+        expected_preds = estimator.predict(mags_feature, ext_features, iterations=1, unscale=False)
+        for name in expected_preds.dtype.names:
+            expected_preds[0][name] /= estimator._labels_and_scales[name]
+
+        # Test the predictions made Without MC Dropout
+        preds = estimator.predict(mags_feature, ext_features, iterations=1, unscale=True)
         for name in estimator.label_names:
-            for ix in range(num_labels):
-                # There will be slight differences due to the MC Dropout algo,
-                # but differences due to incorrectly applied scaling will be much larger.
-                exp_pred = expected_preds[0][name].nominal_value
-                pred = preds[0][name].nominal_value
-                self.assertAlmostEqual(exp_pred, pred, 3,
-                                       msg=f"Expected pred[{ix}][{name}]=={exp_pred} but is {pred}")
+            exp, pred, fudge = expected_preds[0][name], preds[0][name], fudges[name]
+            self.assertTrue(approx_equal(exp, pred, fudge),
+                            f"Expected pred[{name}]={pred} to be within {fudge} of {exp}")
+
+        # With MC Dropout. We're going to use the same number of instances and MC iterations as the
+        # number of labels. This will allow scaling to be applied to the wrong axis, and if it is we
+        # can detect it has happened as the inc label (scale 0.01) will apply where not expected.
+        num_labels = len(estimator.label_names)
+        mags_feature = np.array(mags_feature.tolist() * num_labels)
+        ext_features = np.array(ext_features.tolist() * num_labels)
+        preds = estimator.predict(mags_feature, ext_features, iterations=num_labels, unscale=True)
+        for inst in range(num_labels):
+            for name in estimator.label_names:
+                exp, pred, fudge = expected_preds[0][name], preds[inst][name], fudges[name]
+                self.assertTrue(approx_equal(exp, pred, fudge),
+                            f"Expected pred[{inst}][{name}]={pred} to be within {fudge} of {exp}")
 
     def test_predict_valid_single_inst_assert_structure(self):
         """ Tests predict((1, #bins), (1, #feats), iterations=1) returns correctly structured result """
-        estimator = Estimator(self._default_model_file)
+        estimator = Estimator(self._test_model_file)
 
         mags_feature = np.array([[0.5] * (estimator.mags_feature_bins)])
         ext_features = np.array([[1.0, 0.5]])
@@ -163,7 +174,7 @@ class TestEstimator(unittest.TestCase):
 
     def test_predict_valid_single_inst_include_raw_preds_assert_structure(self):
         """ Tests predict((1, #bins), (1, #feats), iterations=10, include_raw_preds=True) returns correctly structured result """
-        estimator = Estimator(self._default_model_file)
+        estimator = Estimator(self._test_model_file)
 
         mags_feature = np.array([[0.5] * (estimator.mags_feature_bins)])
         ext_features = np.array([[1.0, 0.5]])
@@ -176,7 +187,7 @@ class TestEstimator(unittest.TestCase):
 
     def test_predict_iterations_1_assert_zero_error_bars(self):
         """ Tests predict((1, #bins), (1, #feats), iterations=1) results have error bars of zero """
-        estimator = Estimator(self._default_model_file)
+        estimator = Estimator(self._test_model_file)
 
         mags_feature = np.array([[0.5] * (estimator.mags_feature_bins)])
         ext_features = np.array([[1.0, 0.5]])
@@ -187,7 +198,7 @@ class TestEstimator(unittest.TestCase):
 
     def test_predict_iterations_100_assert_nonzero_error_bars(self):
         """ Tests predict((1, #bins), (1, #feats), iterations=100) results have error bars """
-        estimator = Estimator(self._default_model_file)
+        estimator = Estimator(self._test_model_file)
 
         mags_feature = np.array([[0.5] * (estimator.mags_feature_bins)])
         ext_features = np.array([[1.0, 0.5]])
@@ -195,6 +206,38 @@ class TestEstimator(unittest.TestCase):
 
         error_bars = unumpy.std_devs(preds.tolist()).flatten()
         self.assertTrue(any(eb != 0 for eb in error_bars))
+
+    def test_predict_iterations_assert_force_repeatable_results(self):
+        """ 
+        Tests predict() with iterations and a reset dropout seed gives repeatable results.
+        A PoC that it's possible to force repeatability which may be needed for test predictions.
+        """
+        estimator = Estimator(self._test_model_file, iterations=100)
+        mags_feature = np.array([[0.5] * (estimator.mags_feature_bins)])
+        ext_features = np.array([[1.0, 0.5]])
+
+        self._force_reset_dropout_seed(estimator, 2112)
+        preds1 = estimator.predict(mags_feature, ext_features)[0]
+
+        self._force_reset_dropout_seed(estimator, 2112)
+        preds2 = estimator.predict(mags_feature, ext_features)[0]
+
+        for ix, (p1, p2) in enumerate(zip(preds1, preds2, strict=True)):
+            self.assertEqual(p1.nominal_value, p2.nominal_value, f"Index {ix} differs on nominals")
+            self.assertEqual(p1.std_dev, p2.std_dev, f"Index {ix} differs on std_dev")
+
+    @classmethod
+    def _force_reset_dropout_seed(cls, estimator: Estimator, seed_value: int):
+        """
+        Messes with the seed generator used by each dropout layer to force a new state on it.
+        Definitely not for "live" but may be useful for testing where repeatability is required. 
+        """
+        for layer in estimator._model.layers:
+            if isinstance(layer, layers.Dropout):
+                seed_gen = layer.seed_generator
+                new_seed = seed_gen.backend.convert_to_tensor(np.array([0, seed_value],
+                                                              dtype=seed_gen.state.dtype))
+                seed_gen.state.assign(new_seed)
 
 if __name__ == "__main__":
     unittest.main()

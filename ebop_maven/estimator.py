@@ -9,7 +9,6 @@ import errno
 
 import numpy as np
 from uncertainties import UFloat, unumpy
-import tensorflow as tf
 from keras import Model
 
 from . import modelling, deb_example
@@ -133,8 +132,7 @@ class Estimator(ABC):
                 extra_features: np.ndarray[float]=None,
                 iterations: int=None,
                 unscale: bool=True,
-                include_raw_preds: bool=False,
-                seed: int=42) \
+                include_raw_preds: bool=False) \
             -> Union[np.ndarray[UFloat], Tuple[np.ndarray[UFloat], np.ndarray[float]]]:
         """
         Make predictions on one or more instances' features. The instances are
@@ -164,7 +162,6 @@ class Estimator(ABC):
         :unscale: indicates whether to undo the scaling of the predicted values. For example,
         the model may predict inc*0.01 and unscale would undo this returning inc as prediction/0.01
         :include_raw_preds: if True the raw preds will also be returned as the 2nd item of a tuple
-        :seed: random seed for Tensorflow
         :returns: a structured NDarray[UFloat] with the predictions in the shape (#insts, #labels)
         and optionally an NDArray of the raw predictions in the shape (#insts, #labels, #iterations)
         """
@@ -204,7 +201,6 @@ class Estimator(ABC):
         # If dropout, we make multiple predictions for each inst with training switched on so that
         # each prediction is with a statistically unique subset of the model's net: the MC Dropout
         # algorithm. These raw predictions will be in the shape (#iterations, #insts, #labels)
-        tf.random.set_seed(seed)
         raw_preds = np.stack([
             self._model((mags_feature, extra_features), training=is_mc)
             for _ in range(iterations)

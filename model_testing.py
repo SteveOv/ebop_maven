@@ -24,7 +24,7 @@ from uncertainties.umath import acos, asin, cos, degrees, radians # pylint: disa
 from lightkurve import LightCurve
 import astropy.units as u
 import numpy as np
-from keras import Model
+from keras import Model, layers
 
 from ebop_maven.libs.tee import Tee
 from ebop_maven.libs import jktebop, stellar, limb_darkening
@@ -40,6 +40,8 @@ TEST_RESULTS_SUBDIR = f"testing{TEST_SET_SUFFIX}"
 SYNTHETIC_MIST_TEST_DS_DIR = Path(f"./datasets/synthetic-mist-tess-dataset{TEST_SET_SUFFIX}/")
 
 FORMAL_TEST_DATASET_DIR = Path("./datasets/formal-test-dataset/")
+
+DEFAULT_TESTING_SEED = 42
 
 # Superset of all of the potentially fitted parameters
 all_fitted_params = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "inc",
@@ -92,6 +94,7 @@ def evaluate_model_against_dataset(estimator: Union[Model, Estimator],
     # Make predictions, returned as a structured array of shape (#insts, #labels) and dtype=UFloat
     print(f"The Estimator is making predictions on the {len(ids)} test instances",
           f"with {mc_iterations} iteration(s) (iterations >1 triggers MC Dropout algorithm).")
+    force_seed_on_dropout_layers(estimator)
     pred_vals = estimator.predict(mags_vals, feat_vals, mc_iterations, unscale=not scaled)
 
     # Work out which are the transiting systems so we can break down the reporting
@@ -179,6 +182,7 @@ def fit_against_formal_test_dataset(estimator: Union[Model, Estimator],
     else:
         print(f"\nThe Estimator will make predictions on {len(targs)} formal test instance(s)",
               f"with {mc_iterations} iteration(s) (iterations >1 triggers MC Dropout algorithm).")
+        force_seed_on_dropout_layers(estimator)
         pred_vals = estimator.predict(mags_vals, feat_vals, mc_iterations)
         if "inc" not in pred_vals.dtype.names:
             pred_vals = append_calculated_inc_predictions(pred_vals)
@@ -642,6 +646,23 @@ def calculate_prediction_errors(predictions: np.ndarray[UFloat],
         for n in selected_param_names:
             errors[n] = labels[n] - predictions[n]
     return errors
+
+
+def force_seed_on_dropout_layers(estimator: Estimator, seed: int=DEFAULT_TESTING_SEED):
+    """
+    Forces a seed onto the dropout layers of the model wrapped by the passed Estimator.
+    Setting this is a way of making subsequent MC Dropout predictions repeatable.
+    Definitely not for "live" but may be useful for testing where repeatability is required.
+    
+    :estimator: the estimator to modify
+    :seed: the new seed value to assign
+    """
+    # pylint: disable=protected-access
+    dropout_layers = (l for l in estimator._model.layers if isinstance(l, layers.Dropout))
+    for ix, layer in enumerate(dropout_layers, start=1):
+        sg = layer.seed_generator
+        new_seed = sg.backend.convert_to_tensor(np.array([0, seed*ix], dtype=sg.state.dtype))
+        sg.state.assign(new_seed)
 
 
 if __name__ == "__main__":
