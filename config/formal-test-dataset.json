@@ -332,10 +332,10 @@
         }
     },
     "V1229 Tau": {
-        "source": "DEBCat and Southworth et al. (2023), Table I. TESS sectors 42-44 SAP flux analysed with JKTEBOP version 43.",
-        "reference": "SouthworthMurphy+23mnrasl",
+        "source": "DEBCat and Southworth et al. (2023), Table I. TESS sectors 42-44 SAP flux analysed with JKTEBOP version 43. SpT originally from Abt & Levator (1978)",
+        "reference": "SouthworthMurphy+23mnrasl;AbtLevato78pasp",
         "aka": "TIC 125754991, HD 23642",
-        "SpT": "F5",
+        "SpT": "A0 Vp(Si) + Am",
         "MA": 2.273,            "MA_err": 0.011,
         "MB": 1.595,            "MB_err": 0.008,
         "RA": 1.799,            "RA_err": 0.019,
