@@ -168,12 +168,16 @@ def fit_against_formal_test_dataset(estimator: Union[Model, Estimator],
 
     print(f"\nLooking for the test dataset in '{FORMAL_TEST_DATASET_DIR}'.")
     tfrecord_files = sorted(FORMAL_TEST_DATASET_DIR.glob("**/*.tfrecord"))
-    targs, mags_vals, feat_vals, lbl_vals = deb_example.read_dataset(tfrecord_files,
-                                                                estimator.mags_feature_bins,
-                                                                estimator.mags_feature_wrap_phase,
-                                                                estimator.extra_feature_names,
-                                                                super_names,
-                                                                include_ids)
+    targs, mags_vals, feat_vals, _ = deb_example.read_dataset(tfrecord_files,
+                                                              estimator.mags_feature_bins,
+                                                              estimator.mags_feature_wrap_phase,
+                                                              estimator.extra_feature_names,
+                                                              [],
+                                                              include_ids)
+
+    # For this "deep dive" test we report on labels with uncertainties, so we ignore the label
+    # values in the dataset (nominals only) and go to the source config to get the full values.
+    lbl_vals = formal_testing.get_labels_for_targets(targets_config, super_names, targs)
 
     # Make predictions, returned as a structured array of shape (#insts, #labels) and dtype=UFloat
     if do_control_fit:

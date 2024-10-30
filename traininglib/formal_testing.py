@@ -4,7 +4,7 @@ Functions in this module know about the format of the formal test dataset config
 """
 # Use ucase variable names where they match the equivalent symbol and pylint can't find units alias
 # pylint: disable=invalid-name, no-member, too-many-arguments, too-many-locals
-from typing import Dict, List, Tuple, Generator
+from typing import Dict, List, Tuple, Generator, Union
 from pathlib import Path
 import json
 import re
@@ -12,28 +12,63 @@ import re
 import numpy as np
 import astropy.units as u
 from lightkurve import LightCurve, LightCurveCollection
+from uncertainties import ufloat, UFloat
 
 from ebop_maven import pipeline
 
 
-def iterate_target_configs(target_config_file: Path,
+def iterate_target_configs(target_configs: Union[Path, dict[str, any]],
                            chosen_targets: List[str]=None,
                            include_excluded: bool=False) \
                                 -> Generator[Tuple[str, Dict[str, any]], any, None]:
     """
     Sets up a Generator over the target configs within the passed config file.
 
-    :target_config_file: the source json configuration file
-    :chosen_targets: which targets to find, or all of None
+    :target_configs: the source configuration, either a dict or a Path to a json file
+    :chosen_targets: which targets and the expected order, or all in the order held if None
     :include_excluded: whether to include those targets marked as excluded
     :returns: Generator over the chosen targets yielding (str, dict) of the target name and config
     """
-    with open(target_config_file, mode="r", encoding="utf8") as f:
-        configs = json.load(f)
-    for k, v in configs.items():
-        if chosen_targets is None or k in chosen_targets:
-            if include_excluded or not v.get("exclude", False):
-                yield k, v
+    if isinstance(target_configs, dict):
+        configs = target_configs
+    else:
+        with open(target_configs, mode="r", encoding="utf8") as f:
+            configs = json.load(f)
+
+    # Only targets we know and order of supplied list (if given) overrides order in config file
+    if chosen_targets is None or len(chosen_targets) == 0:
+        chosen_targets = list(configs.keys())
+    else:
+        chosen_targets = [k for k in chosen_targets if k in configs]
+
+    for k in chosen_targets:
+        v = configs[k]
+        if include_excluded or not v.get("exclude", False):
+            yield k, v
+
+
+def get_labels_for_targets(target_config: Union[Path, dict[str, any]],
+                           chosen_labels: list[str],
+                           chosen_targets: List[str]=None,
+                           include_excluded: bool=False) -> np.ndarray[UFloat]:
+    """
+    Gets the label values and uncertainties for the chosen set of targets and labels.
+
+    :target_configs: the source configuration, either a dict or a Path to a json file
+    :chosen_labels: the labels to get, in the order required
+    :chosen_targets: which targets and the expected order, or all in the order held if None
+    :include_excluded: whether to include those targets marked as excluded
+    :returns: a structured NDArray[UFloat] with columns for the chosen labels and rows
+    in the order of the specified targets
+    """
+    dtype = [(l, np.dtype(UFloat.dtype)) for l in chosen_labels]
+    rows = []
+    for _, config in iterate_target_configs(target_config, chosen_targets, include_excluded):
+        lbl_cfg = config.get("labels", { })
+        rows += [tuple(
+            ufloat(lbl_cfg.get(l, 0), lbl_cfg.get(f"{l}_err", None) or 0) for l in chosen_labels
+        )]
+    return np.array(rows, dtype=dtype)
 
 
 def list_sectors_in_target_config(target_cfg: Dict[str, any]) -> List[int]:
