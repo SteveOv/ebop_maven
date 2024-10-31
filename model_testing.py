@@ -717,26 +717,27 @@ if __name__ == "__main__":
         with redirect_stdout(Tee(open(result_dir / "model_testing.log", "w", encoding="utf8"))):
             print(f"\nStarting tests of {the_estimator} at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
 
-            # Report on the performance of the model/Estimator predictions vs labels
+            # Report on the basic performance of the model/Estimator predictions vs labels
             for pred_type, iters, dataset_dir, targs in [
+                    ("nonmc",   1,      SYNTHETIC_MIST_TEST_DS_DIR, None),
+                    # Resource hog & non-essential; takes ~0.5 h on i7 CPU and may not fit in GPU
+                    #("mc",      1000,   SYNTHETIC_MIST_TEST_DS_DIR, None),
+
                     ("nonmc",   1,      FORMAL_TEST_DATASET_DIR,    formal_targs),
                     ("mc",      1000,   FORMAL_TEST_DATASET_DIR,    formal_targs),
-                    ("nonmc",   1,      SYNTHETIC_MIST_TEST_DS_DIR, None),
-                    # TODO: probably need a batched dataset for this as it's a memory hog
-                    # ("mc",      1000,   SYNTHETIC_MIST_TEST_DS_DIR, None),
             ]:
                 print(f"\nEvaluating the model's {pred_type} estimates (iters={iters})",
                       f"on {dataset_dir.name}\n" + "="*80)
                 evaluate_model_against_dataset(the_estimator, iters, targs, dataset_dir, result_dir)
 
-            # Report on fitting the formal-test-dataset based on estimator predictions. First loop
-            # uses labels as the "predictions" yielding a set of control fit results for subsequent
-            # use as the baseline for the fitted values resulting from subsequent predictions
+            # In depth report on fitting the formal-test-dataset based on estimator predictions.
+            # First loop uses labels as the "predictions" to yield a set of control fit results for
+            # use as the comparison baseline of the subsequent fitted values from model predictions.
             ctrl_fit_vals = None # To be set on the first, control fit run
             for (pred_type, is_ctrl_fit, iterations) in [
-                ("control",     True,       0),
-                ("nonmc",       False,      1),
-                ("mc",          False,      1000),
+                    ("control",     True,       0),
+                    ("nonmc",       False,      1),
+                    ("mc",          False,      1000),
             ]:
                 print(f"\nTesting JKTEBOP fitting of {pred_type} input values\n" + "="*80)
                 fitted_vals = fit_against_formal_test_dataset(the_estimator,
@@ -749,3 +750,5 @@ if __name__ == "__main__":
                                                             result_dir)
                 if is_ctrl_fit:
                     ctrl_fit_vals = fitted_vals
+
+            print(f"\nCompleted tests at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
