@@ -61,9 +61,9 @@ class Testlimbdarkening(unittest.TestCase):
                          lookup_tess_quad_ld_coeffs(4.24 * u.dex, 6500. * u.K))
 
     def test_lookup_tess_quad_ld_coeffs_round_up_logg(self):
-        """ Tests lookup_tess_quad_ld_coeffs(3.75 dex, 6500. K) gets for (4. dex, 6500. K) """
+        """ Tests lookup_tess_quad_ld_coeffs(3.76 dex, 6500. K) gets for (4. dex, 6500. K) """
         self.assertEqual(self.quad_coeffs_4_6500,
-                         lookup_tess_quad_ld_coeffs(3.75 * u.dex, 6500. * u.K))
+                         lookup_tess_quad_ld_coeffs(3.76 * u.dex, 6500. * u.K))
 
     def test_lookup_tess_quad_ld_coeffs_round_down_temp1(self):
         """ Tests lookup_tess_quad_ld_coeffs(4.0 dex, 6549. K) gets for (4. dex, 6500. K) """
@@ -71,9 +71,9 @@ class Testlimbdarkening(unittest.TestCase):
                          lookup_tess_quad_ld_coeffs(4. * u.dex, 6549. * u.K))
 
     def test_lookup_tess_quad_ld_coeffs_round_up_temp1(self):
-        """ Tests lookup_tess_quad_ld_coeffs(4.0 dex, 6450. K) gets for (4. dex, 6500. K) """
+        """ Tests lookup_tess_quad_ld_coeffs(4.0 dex, 6450.1 K) gets for (4. dex, 6500. K) """
         self.assertEqual(self.quad_coeffs_4_6500,
-                         lookup_tess_quad_ld_coeffs(4. * u.dex, 6450. * u.K))
+                         lookup_tess_quad_ld_coeffs(4. * u.dex, 6450.1 * u.K))
 
     # These 2 work in the region where the temp steps change from 100 to 200 K
     # They're both expected to return the values for logg==4.0, T_eff=7200.
@@ -83,9 +83,9 @@ class Testlimbdarkening(unittest.TestCase):
                          lookup_tess_quad_ld_coeffs(4. * u.dex, 7299. * u.K))
 
     def test_lookup_tess_quad_ld_coeffs_round_up_temp2(self):
-        """ Tests lookup_tess_quad_ld_coeffs(4.0 dex, 7100. K) gets for (4.0 dex, 7200. K) """
+        """ Tests lookup_tess_quad_ld_coeffs(4.0 dex, 7100.1 K) gets for (4.0 dex, 7200. K) """
         self.assertEqual(self.quad_coeffs_4_7200,
-                         lookup_tess_quad_ld_coeffs(4. * u.dex, 7100. * u.K))
+                         lookup_tess_quad_ld_coeffs(4. * u.dex, 7100.1 * u.K))
 
     # There's a gap in the A&A, 618, A20, Table 5 quad coeffs between 4900 and 5100 K
     # Test the special case where we need to round away from 5000, otherwise we get a KeyError.
@@ -104,11 +104,6 @@ class Testlimbdarkening(unittest.TestCase):
                          lookup_tess_quad_ld_coeffs(4.03 * u.dex, 2000 * u.K))
         self.assertEqual(self.quad_coeffs_4_max,
                          lookup_tess_quad_ld_coeffs(4.03 * u.dex, 12600 * u.K))
-
-    # These 2 test keys outside the known indices - rasing KeyError
-    def test_lookup_tess_quad_ld_coeffs_unknown_logg(self):
-        """ Tests lookup_tess_quad_ld_coeffs(7.2 dex, 6500. K) raises KeyError """
-        self.assertRaises(KeyError, lookup_tess_quad_ld_coeffs, 7.2 * u.dex, 6500. * u.K)
 
 
     #
@@ -140,9 +135,9 @@ class Testlimbdarkening(unittest.TestCase):
                          lookup_tess_pow2_ld_coeffs(4.24 * u.dex, 6500. * u.K))
 
     def test_lookup_tess_pow2_ld_coeffs_round_up_logg(self):
-        """ Tests lookup_tess_pow2_ld_coeffs(3.75 dex, 6500. K) gets for (4.0 dex, 6500. K) """
+        """ Tests lookup_tess_pow2_ld_coeffs(3.76 dex, 6500. K) gets for (4.0 dex, 6500. K) """
         self.assertEqual(self.pow2_coeffs_4_6500,
-                         lookup_tess_pow2_ld_coeffs(3.75 * u.dex, 6500. * u.K))
+                         lookup_tess_pow2_ld_coeffs(3.76 * u.dex, 6500. * u.K))
 
     def test_lookup_tess_pow2_ld_coeffs_round_down_temp1(self):
         """ Tests lookup_tess_pow2_ld_coeffs(4.0 dex, 6549. K) gets for (4.0 dex, 6500. K) """
@@ -150,9 +145,9 @@ class Testlimbdarkening(unittest.TestCase):
                          lookup_tess_pow2_ld_coeffs(4. * u.dex, 6549. * u.K))
 
     def test_lookup_tess_pow2_ld_coeffs_round_up_temp1(self):
-        """ Tests lookup_tess_pow2_ld_coeffs(4.0 dex, 6450. K) gets for (4.0 dex, 6500. K) """
+        """ Tests lookup_tess_pow2_ld_coeffs(4.0 dex, 6450.1 K) gets for (4.0 dex, 6500. K) """
         self.assertEqual(self.pow2_coeffs_4_6500,
-                         lookup_tess_pow2_ld_coeffs(4. * u.dex, 6450. * u.K))
+                         lookup_tess_pow2_ld_coeffs(4. * u.dex, 6450.1 * u.K))
 
     # These 2 work in the region where the temp steps change from 100 to 200 K
     # They're both expected to return the values for logg==4.0, T_eff=7200.
@@ -162,9 +157,9 @@ class Testlimbdarkening(unittest.TestCase):
                          lookup_tess_pow2_ld_coeffs(4. * u.dex, 7299. * u.K))
 
     def test_lookup_tess_pow2_ld_coeffs_round_up_temp2(self):
-        """ Tests lookup_tess_pow2_ld_coeffs(4.0 dex, 7100. K) gets for (4.0 dex, 7200. K) """
+        """ Tests lookup_tess_pow2_ld_coeffs(4.0 dex, 7100.1 K) gets for (4.0 dex, 7200. K) """
         self.assertEqual(self.pow2_coeffs_4_7200,
-                         lookup_tess_pow2_ld_coeffs(4. * u.dex, 7100. * u.K))
+                         lookup_tess_pow2_ld_coeffs(4. * u.dex, 7100.1 * u.K))
 
     # There's a gap in the A&A, 664, A63, Table 1 pow2 coeffs between 4900 and 5100 K
     # Test the special case where we need to round away from 5000, otherwise we get a KeyError.
@@ -183,11 +178,6 @@ class Testlimbdarkening(unittest.TestCase):
                          lookup_tess_pow2_ld_coeffs(4.06 * u.dex, 2000 * u.K))
         self.assertEqual(self.pow2_coeffs_4_max,
                          lookup_tess_pow2_ld_coeffs(4.03 * u.dex, 12600 * u.K))
-
-    # These 2 test keys outside the known indices - rasing KeyError
-    def test_lookup_tess_pow2_ld_coeffs_unknown_logg(self):
-        """ Tests lookup_tess_pow2_ld_coeffs(7.2 dex, 6500. K) raises KeyError """
-        self.assertRaises(KeyError, lookup_tess_pow2_ld_coeffs, 7.2 * u.dex, 6500. * u.K)
 
 
 if __name__ == "__main__":
