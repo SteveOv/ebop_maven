@@ -10,6 +10,7 @@ import json
 from io import StringIO
 from datetime import timedelta
 import traceback
+from warnings import filterwarnings
 
 import numpy as np
 import tensorflow as tf
@@ -29,8 +30,8 @@ import make_trained_cnn_model
 
 # Configure the inputs and outputs of the model
 CHOSEN_FEATURES = []
-MAGS_BINS = 4096
-MAGS_WRAP_PHASE = 0.75
+MAGS_BINS = deb_example.default_mags_bins
+MAGS_WRAP_PHASE = None # None indicates wrap to centre on midpoint between eclipses
 CHOSEN_LABELS = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "bP"]
 
 TRAINSET_NAME = "formal-training-dataset-250k"
@@ -50,7 +51,7 @@ MAX_BUFFER_SIZE = 20000000          # Size of Dataset shuffle buffer (in instanc
 TRAIN_PATIENCE = 7                  # Number of epochs w/o improvement before training is stopped
 TRAIN_TIMEOUT = timedelta(hours=1)  # Timeout training if not completed within this time
 
-SEED = 42                       # Standard random seed ensures repeatable randomization
+SEED = 42                           # Standard random seed ensures repeatable randomization
 np.random.seed(SEED)
 python_random.seed(SEED)
 tf.random.set_seed(SEED)
@@ -124,21 +125,7 @@ metadata = {
 }
 
 trials_pspace = hp.pchoice("train_and_test_model", [
-    (0.01, {
-        "description": "Control: current best model structure & best known set of hyperparams",
-        "model": { 
-            "func": make_trained_cnn_model.make_best_model,
-            "chosen_features": CHOSEN_FEATURES,
-            "mags_bins": MAGS_BINS,
-            "mags_wrap_phase": MAGS_WRAP_PHASE,
-            "chosen_labels": CHOSEN_LABELS,
-            "trainset_name": TRAINSET_NAME,
-            "verbose": True
-        },
-        "optimizer": optimizers.Nadam(learning_rate=5e-4),
-        "loss_function": make_trained_cnn_model.LOSS,
-    }),
-    (0.74, {
+    (0.50, {
         "description": "Best: current best model structure with varied dnn, hyperparams and training",
         "model": { 
             "func": make_trained_cnn_model.make_best_model,
@@ -218,7 +205,7 @@ trials_pspace = hp.pchoice("train_and_test_model", [
         ]),
         "loss_function":                hp.choice("best_loss", loss_function_choices),
     }),
-    (0.25, {
+    (0.50, {
         "description": "Free: explore model structure and hyperparams",
         "model": {
             "func": modelling.build_mags_ext_model,
@@ -335,12 +322,9 @@ def train_and_test_model(trial_kwargs):
 
     # Set up the training and validation dataset pipelines
     # Redo this every trial so we can potentially include these pipeline params in the search
-    noise_lambda = 0.005
-    roll_max = int(9 * (MAGS_BINS/1024))
     tr_map_func = deb_example.create_map_func(mags_bins=MAGS_BINS, mags_wrap_phase=MAGS_WRAP_PHASE,
-                                              ext_features=CHOSEN_FEATURES, labels=CHOSEN_LABELS,
-                                              noise_stddev=lambda: noise_lambda,
-                          roll_steps=lambda: tf.random.uniform([], -roll_max, roll_max+1, tf.int32))
+                                ext_features=CHOSEN_FEATURES, labels=CHOSEN_LABELS,
+                                augmentation_callback=make_trained_cnn_model.augmentation_callback)
     train_ds, train_ct = [tf.data.TFRecordDataset] * 2, [int] * 2
     for ix, (dn, dd) in enumerate(zip(["training", "validation"],[TRAINSET_DIR, VALIDSET_DIR])):
         files = list(dd.glob(TRAINSET_GLOB_TERM))
@@ -489,6 +473,10 @@ if __name__ == "__main__":
             print("\nResuming the previous Hyperopt trials...\n")
         else:
             print("\nStarting a new Hyperopt trials\n")
+
+        # This appears to be a known false alarm raised from tf 2.16 which can safely be ignored
+        # See https://github.com/tensorflow/tensorflow/issues/62963
+        filterwarnings("ignore", "Your input ran out of data; interrupting training", UserWarning)
 
         # The Tree-structured Parzen Estimator (TPE) Hyperparameter Optimization algorithm (HOA)
         # see
