@@ -529,6 +529,7 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
                                    title: str=None,
                                    summary_only: bool=False,
                                    error_bars: bool=False,
+                                   format_dp: int=6,
                                    to: TextIOBase=None):
     """
     Will write a text table of the predicted nominal values vs the label values
@@ -544,6 +545,7 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
     :title: optional title text to write above the table
     :summary_only: omit the body and just report the summary
     :error_bars: include error bars in output
+    :format_dp: the number of decimal places in numeric output. Set <= 6 to maintain column widths
     :to: the output to write the table to. Defaults to printing.
     """
     # pylint: disable=too-many-arguments, too-many-locals, too-many-branches
@@ -574,13 +576,14 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
         horizontal_line("-")
         to.write(f"{header:<10s} | " + " ".join(f"{k:>10s}" for k in keys + ["MAE", "MSE"]) + "\n")
 
+    num_fmt = f"{{:10.{format_dp:d}f}}"
     def row(row_head, values):
         to.write(f"{row_head:<10s} | ")
-        to.write(" ".join((" "*10 if v is None else f"{get_nom(v):10.6f}") for v in values))
+        to.write(" ".join(" "*10 if v is None else num_fmt.format(get_nom(v)) for v in values))
         to.write("\n")
         if error_bars:
             to.write(f"{' +/- ':<10s} | ")
-            to.write(" ".join((" "*10 if v is None else f"{get_err(v):10.6f}") for v in values))
+            to.write(" ".join(" "*10 if v is None else num_fmt.format(get_err(v)) for v in values))
             to.write("\n")
 
     if title:
