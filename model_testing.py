@@ -7,6 +7,7 @@ from typing import Union, List, Dict
 from io import TextIOBase, StringIO
 import inspect
 import sys
+import os
 from pathlib import Path
 import re
 from contextlib import redirect_stdout
@@ -24,6 +25,9 @@ from uncertainties.umath import acos, asin, cos, degrees, radians # pylint: disa
 from lightkurve import LightCurve
 import astropy.units as u
 import numpy as np
+
+import tensorflow as tf
+import keras
 from keras import Model, layers
 
 from ebop_maven.libs.tee import Tee
@@ -719,6 +723,13 @@ if __name__ == "__main__":
         labs, all_preds = None, {}
         with redirect_stdout(Tee(open(result_dir / "model_testing.log", "w", encoding="utf8"))):
             print(f"\nStarting tests of {the_estimator} at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
+
+            # CUDA_VISIBLE_DEVICES is set for the ebop_maven conda env. A value of "-1" suppresses
+            # GPUs, useful for repeatable results (Keras advises that out of order processing within
+            # GPU/CUDA can lead to varying results) & also avoids memory constraints on smaller GPUs
+            print("\nRuntime environment:", sys.prefix.replace("'", ""))
+            print(*(f"{lib.__name__} v{lib.__version__}" for lib in [tf, keras]), sep="\n")
+            print(f"tensorflow sees {len(tf.config.list_physical_devices('GPU'))} physical GPU(s)")
 
             # Report on the basic performance of the model/Estimator predictions vs labels
             for pred_type, iters, dataset_dir, targs in [

@@ -4,6 +4,7 @@ Trains a regression CNN to estimate fitting parameters from folded dEB light cur
 #pylint: disable=line-too-long
 from pathlib import Path
 import os
+import sys
 import random as python_random
 import json
 from inspect import getsource
@@ -162,13 +163,12 @@ if __name__ == "__main__":
     with redirect_stdout(Tee(open(SAVE_DIR / "make_trained_cnn_model.log", "w", encoding="utf8"))):
         print(f"\nStarted at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}\n")
 
-        # CUDA_VISIBLE_DEVICES is set for the conda env. A value of "-1" suppresses GPUs which is
+        # CUDA_VISIBLE_DEVICES is set for the ebop_maven conda env. A value of "-1" suppresses GPUs,
         # useful for repeatable results (Keras advises that out of order processing within GPU/CUDA
         # can lead to varying results) and also avoiding memory constraints on smaller GPUs (mine!).
+        print("Runtime environment:", sys.prefix.replace("'", ""))
         print("\n".join(f"{lib.__name__} v{lib.__version__}" for lib in [tf, tensorboard, keras]))
-        print(f"Found {len(tf.config.list_physical_devices('GPU'))} GPU(s)")
-        cuda_visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES", "")
-        print(f"The environment variable CUDA_VISIBLE_DEVICES set to '{cuda_visible_devices}'")
+        print(f"tensorflow can see {len(tf.config.list_physical_devices('GPU'))} physical GPU(s)")
 
         # -----------------------------------------------------------
         # Set up the training and validation dataset pipelines

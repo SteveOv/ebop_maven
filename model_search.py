@@ -60,17 +60,6 @@ tf.random.set_seed(SEED)
 results_dir = Path(".") / "drop" / "model_search"
 results_dir.mkdir(parents=True, exist_ok=True)
 
-# CUDA_VISIBLE_DEVICES is set for the conda env. A value of "-1" suppresses GPUs which is
-# useful for repeatable results (Keras advises that out of order processing within GPU/CUDA
-# can lead to varying results) and also avoiding memory constraints on smaller GPUs (mine!).
-print("Runtime environment:", sys.prefix.replace("'", ""))
-print("\n".join(f"{lib.__name__} v{lib.__version__}" for lib in [tf, keras]))
-
-cuda_visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES", "")
-print(f"The environment variable CUDA_VISIBLE_DEVICES set to '{cuda_visible_devices}'")
-print(f"Found {len(tf.config.list_physical_devices('GPU'))} GPU(s)\n")
-
-
 # -----------------------------------------------------------
 # Set up the test datasets - we don't need to recreate per trial
 # -----------------------------------------------------------
@@ -477,6 +466,13 @@ if __name__ == "__main__":
             print("\nResuming the previous Hyperopt trials...\n")
         else:
             print("\nStarting a new Hyperopt trials\n")
+
+        # CUDA_VISIBLE_DEVICES is set for the ebop_maven conda env. A value of "-1" suppresses GPUs,
+        # useful for repeatable results (Keras advises that out of order processing within GPU/CUDA
+        # can lead to varying results) and also avoiding memory constraints on smaller GPUs (mine!).
+        print("Runtime environment:", sys.prefix.replace("'", ""))
+        print("\n".join(f"{lib.__name__} v{lib.__version__}" for lib in [tf, keras]))
+        print(f"tensorflow can see {len(tf.config.list_physical_devices('GPU'))} physical GPU(s)")
 
         # This appears to be a known false alarm raised from tf 2.16 which can safely be ignored
         # See https://github.com/tensorflow/tensorflow/issues/62963
