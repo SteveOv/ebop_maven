@@ -5,6 +5,7 @@ Searches for the best model/hyperparams/training for the Mags/Extra-Features mod
 from pathlib import Path
 from contextlib import redirect_stdout
 import os
+import sys
 import random as python_random
 import json
 from io import StringIO
@@ -41,9 +42,9 @@ VALIDSET_DIR = Path(".") / "datasets" / TRAINSET_NAME / "validation"
 TESTSET_DIR = Path(".") / "datasets" / "synthetic-mist-tess-dataset"
 FORMAL_TESTSET_DIR = Path(".") / "datasets/formal-test-dataset/"
 
-MODEL_FILE_NAME = "parameter-search-model"
+MODEL_FILE_NAME = "search-model"
 
-MAX_HYPEROPT_EVALS = 500            # Maximum number of distinct Hyperopt evals to run
+MAX_HYPEROPT_EVALS = 200            # Maximum number of distinct Hyperopt evals to run
 HYPEROPT_LOSS_TH = 0.01             # Will stop search in the unlikely event we get below this loss
 TRAINING_EPOCHS = 250               # Set high if we're using early stopping
 BATCH_FRACTION = 0.001              # larger -> quicker training per epoch but more to converge
@@ -62,10 +63,12 @@ results_dir.mkdir(parents=True, exist_ok=True)
 # CUDA_VISIBLE_DEVICES is set for the conda env. A value of "-1" suppresses GPUs which is
 # useful for repeatable results (Keras advises that out of order processing within GPU/CUDA
 # can lead to varying results) and also avoiding memory constraints on smaller GPUs (mine!).
+print("Runtime environment:", sys.prefix.replace("'", ""))
 print("\n".join(f"{lib.__name__} v{lib.__version__}" for lib in [tf, keras]))
-print(f"Found {len(tf.config.list_physical_devices('GPU'))} GPU(s)")
+
 cuda_visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES", "")
-print(f"The environment variable CUDA_VISIBLE_DEVICES set to '{cuda_visible_devices}'\n")
+print(f"The environment variable CUDA_VISIBLE_DEVICES set to '{cuda_visible_devices}'")
+print(f"Found {len(tf.config.list_physical_devices('GPU'))} GPU(s)\n")
 
 
 # -----------------------------------------------------------
@@ -75,11 +78,11 @@ print(f"The environment variable CUDA_VISIBLE_DEVICES set to '{cuda_visible_devi
 test_map_func = deb_example.create_map_func(mags_bins=MAGS_BINS, mags_wrap_phase=MAGS_WRAP_PHASE,
                                             ext_features=CHOSEN_FEATURES, labels=CHOSEN_LABELS)
 test_ds, test_ct = [tf.data.TFRecordDataset] * 2, [int] * 2
-for ti, (tname, tdir) in enumerate(zip(["test", "formal-test"], [TESTSET_DIR, FORMAL_TESTSET_DIR])):
+for ti, (tname, tdir) in enumerate(zip(["trial", "real"], [TESTSET_DIR, FORMAL_TESTSET_DIR])):
     tfiles = list(tdir.glob("**/*.tfrecord"))
     (test_ds[ti], test_ct[ti]) = \
         deb_example.create_dataset_pipeline(tfiles, BATCH_FRACTION, test_map_func)
-    print(f"Found {test_ct[ti]:,} {tname} insts in {len(tfiles)} tfrecord files in", tdir)
+    print(f"Found {test_ct[ti]:,} {tname} test insts in {len(tfiles)} tfrecord files in", tdir)
 
 
 # -----------------------------------------------------------
@@ -129,6 +132,7 @@ trials_pspace = hp.pchoice("train_and_test_model", [
         "description": "Best: current best model structure with varied dnn, hyperparams and training",
         "model": { 
             "func": make_trained_cnn_model.make_best_model,
+            "model_name":               "Model-Search-Variation-On-Best",
             "chosen_features":          CHOSEN_FEATURES,
             "mags_bins":                MAGS_BINS,
             "mags_wrap_phase":          MAGS_WRAP_PHASE,
@@ -209,6 +213,7 @@ trials_pspace = hp.pchoice("train_and_test_model", [
         "description": "Free: explore model structure and hyperparams",
         "model": {
             "func": modelling.build_mags_ext_model,
+            "name": "Model-Search-Free-Structure",
             "mags_input": {
                 "func": modelling.mags_input_layer,
                 "shape": (MAGS_BINS, 1),
@@ -351,9 +356,8 @@ def train_and_test_model(trial_kwargs):
             candidate.summary(line_length=120, show_trainable=True,
                               print_fn=lambda line: stream.write(line + "\n"))
             model_summary = stream.getvalue()
-        print(model_summary)
+        print(model_summary, "\n")
 
-        print()
         train_callbacks = [
             cb.EarlyStopping("val_loss", min_delta=5e-5, restore_best_weights=True,
                              patience=TRAIN_PATIENCE, start_from_epoch=5, verbose=1),
@@ -362,10 +366,10 @@ def train_and_test_model(trial_kwargs):
         candidate.fit(x=train_ds[0], epochs=TRAINING_EPOCHS, callbacks=train_callbacks,
                       validation_data=train_ds[1], verbose=2)
 
-        print(f"\nEvaluating model against {test_ct[0]} test dataset instances.")
+        print(f"\nTrial evaluation of model against {test_ct[0]} test dataset instances.")
         results = candidate.evaluate(x=test_ds[0], y=None, verbose=2)
 
-        print(f"\nFull evaluation against {test_ct[1]} formal-test dataset instances.")
+        print(f"\n'For info' evaluation against {test_ct[1]} formal-test dataset instances.")
         candidate.evaluate(x=test_ds[1], y=None, verbose=2)
 
         # Out final loss is always MAE from metrics. This allows us to vary the
