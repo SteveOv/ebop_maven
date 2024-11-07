@@ -171,6 +171,22 @@ if __name__ == "__main__":
         print(f"tensorflow can see {len(tf.config.list_physical_devices('GPU'))} physical GPU(s)")
 
         # -----------------------------------------------------------
+        # Define the model
+        # -----------------------------------------------------------
+        model = make_best_model(verbose=True)
+        model.compile(loss=LOSS, optimizer=OPTIMIZER, metrics=METRICS)
+        model.summary()
+        try:
+            # Can only get this working with specific pydot (1.4) & graphviz (8.0) conda packages.
+            # With pip I can't get graphviz beyond 0.2.0 which leads to pydot errors here.
+            PLOTS_DIR.mkdir(parents=True, exist_ok=True)
+            keras.utils.plot_model(model, to_file=PLOTS_DIR / f"{MODEL_FILE_NAME}.pdf",
+                    show_layer_names=True, show_shapes=True, show_layer_activations=True,
+                    show_dtype=False, show_trainable=False, rankdir="TB", dpi=300)
+        except ImportError:
+            print("Unable to plot_model() without pydot and/or graphviz.")
+
+        # -----------------------------------------------------------
         # Set up the training and validation dataset pipelines
         # -----------------------------------------------------------
         print("\nCreating training and validation dataset pipelines.")
@@ -203,32 +219,14 @@ if __name__ == "__main__":
                   f"tfrecords matching glob '{TRAINSET_GLOB_TERM}' within", set_dir)
 
         # -----------------------------------------------------------
-        # Define the model
+        # Train the model
         # -----------------------------------------------------------
-        model = make_best_model(verbose=True)
-        model.compile(loss=LOSS, optimizer=OPTIMIZER, metrics=METRICS)
-        model.summary()
         print("\nTraining:",
               f"epochs={TRAINING_EPOCHS}, patience={ES_PATIENCE}, min_delta={ES_MIN_DELTA}")
         print(f"Optimizer: {OPTIMIZER.name} where LR is",
               LR if isinstance(LR, (int, float)) else f"{LR.name}({vars(LR)})")
         print(f"Loss function {LOSS} and metrics are {METRICS}")
 
-        try:
-            # Can only get this working specific pydot (1.4) & graphviz (8.0) conda packages.
-            # With pip I can't get graphviz beyond 0.2.0 which leads to pydot errors here.
-            # At least with the try block I can degrade gracefully.
-            PLOTS_DIR.mkdir(parents=True, exist_ok=True)
-            keras.utils.plot_model(model, to_file=PLOTS_DIR / f"{MODEL_FILE_NAME}.pdf",
-                    show_layer_names=True, show_shapes=True, show_layer_activations=True,
-                    show_dtype=False, show_trainable=False, rankdir="TB", dpi=300)
-        except ImportError:
-            print("Unable to plot_model() without pydot and/or graphviz.")
-
-
-        # -----------------------------------------------------------
-        # Train the model
-        # -----------------------------------------------------------
         CALLBACKS = [
             # To use tensorboard make sure the containing conda env is active then run
             # $ tensorboard --port 6006 --logdir ./logs
