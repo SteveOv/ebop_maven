@@ -47,6 +47,9 @@ FORMAL_TEST_DATASET_DIR = Path("./datasets/formal-test-dataset/")
 
 DEFAULT_TESTING_SEED = 42
 
+# Those params resulting from predictions that we need to pass to JKTEBOP
+fit_params = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "inc"]
+
 # Superset of all of the potentially fitted parameters
 all_fitted_params = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "inc",
                      "L3", "pe", "period", "bP", "bS", "ecc", "omega", "qphot",
@@ -75,10 +78,11 @@ def evaluate_model_against_dataset(estimator: Union[Model, Estimator],
         estimator = Estimator(estimator)
     mc_type = "mc" if mc_iterations > 1 else "nonmc"
 
-    # Be sure to retrieve the inc label as it's needed to work out which systems have transits
-    ext_label_names = estimator.label_names
-    if "inc" not in ext_label_names:
-        ext_label_names += ["inc"]
+    # To clarify: the estimator publishes a list of what it can predict via its label_names attrib
+    # and fit_params may differ; they are those params required for JKTEBOP fitting and reporting.
+    # super_params is the set of both and is used, for example, to get the superset of label values
+    # We also need inc as it is used to calculate whether a system is transiting or not
+    super_params = estimator.label_names + [n for n in fit_params if n not in estimator.label_names]
 
     print(f"Looking for the test dataset in '{test_dataset_dir}'...", end="")
     ds_name = test_dataset_dir.name
@@ -88,7 +92,7 @@ def evaluate_model_against_dataset(estimator: Union[Model, Estimator],
                                                                 estimator.mags_feature_bins,
                                                                 estimator.mags_feature_wrap_phase,
                                                                 estimator.extra_feature_names,
-                                                                ext_label_names,
+                                                                super_params,
                                                                 include_ids,
                                                                 scaled)
 
@@ -100,34 +104,42 @@ def evaluate_model_against_dataset(estimator: Union[Model, Estimator],
           f"with {mc_iterations} iteration(s) (iterations >1 triggers MC Dropout algorithm).")
     force_seed_on_dropout_layers(estimator)
     pred_vals = estimator.predict(mags_vals, feat_vals, mc_iterations, unscale=not scaled)
+    if "inc" not in estimator.label_names:
+        pred_vals = append_calculated_inc_predictions(pred_vals)
 
     # Work out which are the transiting systems so we can break down the reporting
     pnames = list(inspect.signature(will_transit).parameters)
     argvs = [lbl_vals[p] / (deb_example.labels_and_scales[p] if scaled else 1) for p in pnames]
     tflags = will_transit(*argvs)
 
-    # Now report on the quality of the predictions, for which we will need the errors
-    errors = calculate_prediction_errors(pred_vals, lbl_vals, estimator.label_names)
-    pnames = [n for n in pred_vals.dtype.names if n not in ["ecosw", "esinw"]] + ["ecosw", "esinw"]
+    # Now report on the quality of the predictions.
+    plot_params = [n for n in estimator.label_names if n not in ["ecosw","esinw"]]+["ecosw","esinw"]
     for (subset, tmask) in [("",                 [True]*lbl_vals.shape[0]),
                             (" transiting",      tflags),
                             (" non-transiting",  ~tflags)]:
         suffix = subset.replace(' ','-')
         if any(tmask):
-            print(f"\nMetrics for {sum(tmask)}{subset} system(s).")
-            m_preds, m_lbls, m_errs = pred_vals[tmask], lbl_vals[tmask], errors[tmask]
+            print(f"\nSummary of the estimator's predictions for {sum(tmask)}{subset} system(s)")
+            m_preds, m_lbls = pred_vals[tmask], lbl_vals[tmask]
             predictions_vs_labels_to_table(m_preds, m_lbls, summary_only=True,
                                            selected_param_names=estimator.label_names)
 
+            if set(fit_params) != set(estimator.label_names):
+                print("...and of the corresponding fitting params derived from them")
+                predictions_vs_labels_to_table(m_preds, m_lbls, summary_only=True,
+                                               selected_param_names=fit_params)
+
             # These plot to pdf, which looks better than eps, as it supports transparency/alpha.
+            # For formal-test-dataset we plot only the whole set as the size is too low to split.
             if report_dir and (not subset or "formal" not in ds_name):
-                # For formal-test-dataset plot only the whole set as the size is too low to split.
                 show_fliers = "formal" in ds_name
+                m_errs = calculate_prediction_errors(m_preds[plot_params], m_lbls[plot_params])
                 plots.plot_prediction_boxplot(m_errs, show_fliers=show_fliers, ylabel="Error") \
                     .savefig(report_dir / f"predictions-{mc_type}-box-{ds_name}{suffix}.pdf")
                 plt.close()
+
                 plots.plot_predictions_vs_labels(m_preds, m_lbls, tflags[tmask],
-                                                       pnames, show_errorbars=False) \
+                                                 plot_params, show_errorbars=False) \
                     .savefig(report_dir / f"predictions-{mc_type}-vs-labels-{ds_name}{suffix}.pdf")
                 plt.close()
 
@@ -161,10 +173,9 @@ def fit_against_formal_test_dataset(estimator: Union[Model, Estimator],
     prediction_type = "control" if do_control_fit else "mc" if mc_iterations > 1 else "nonmc"
 
     # To clarify: the estimator publishes a list of what it can predict via its label_names attrib
-    # The fit_names can differ; they are those values required for JKTEBOP fitting and reporting
-    # super_names is the set of both and is used, for example, to get the superset of label values
-    fit_names = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "inc"]
-    super_names = estimator.label_names + [n for n in fit_names if n not in estimator.label_names]
+    # and fit_params may differ; they are those params required for JKTEBOP fitting and reporting.
+    # super_params is the set of both and is used, for example, to get the superset of label values
+    super_params = estimator.label_names + [n for n in fit_params if n not in estimator.label_names]
 
     if include_ids is None or len(include_ids) == 0:
         include_ids = list(targets_config.keys())
@@ -181,7 +192,7 @@ def fit_against_formal_test_dataset(estimator: Union[Model, Estimator],
 
     # For this "deep dive" test we report on labels with uncertainties, so we ignore the label
     # values in the dataset (nominals only) and go to the source config to get the full values.
-    lbl_vals = formal_testing.get_labels_for_targets(targets_config, super_names, targs)
+    lbl_vals = formal_testing.get_labels_for_targets(targets_config, super_params, targs)
 
     # Make predictions, returned as a structured array of shape (#insts, #labels) and dtype=UFloat
     if do_control_fit:
@@ -196,7 +207,7 @@ def fit_against_formal_test_dataset(estimator: Union[Model, Estimator],
             pred_vals = append_calculated_inc_predictions(pred_vals)
 
     # Pre-allocate a structured array to hold the params which are output from each JKTEBOP fitting
-    fit_vals = np.empty((len(targs), ), dtype=[(sn, np.dtype(UFloat.dtype)) for sn in super_names])
+    fit_vals = np.empty((len(targs), ), dtype=[(sn, np.dtype(UFloat.dtype)) for sn in super_params])
 
     # Finally, we have everything in place to fit our targets and report on the results
     for ix, targ in enumerate(targs):
@@ -208,16 +219,16 @@ def fit_against_formal_test_dataset(estimator: Union[Model, Estimator],
         (lc, _) = formal_testing.prepare_lightcurve_for_target(targ, targ_config, True)
 
         print(f"\nWill fit {targ} with these input params from {prediction_type} predictions")
-        predictions_vs_labels_to_table(pred_vals[ix], lbl_vals[ix], [targ], fit_names)
+        predictions_vs_labels_to_table(pred_vals[ix], lbl_vals[ix], [targ], fit_params)
 
         # Perform the task3 fit taking the preds or control as input params and supplementing
         # them with parameter values and fitting instructions from the target's config.
         fit_stem = "model-testing-" + re.sub(r"[^\w\d-]", "-", targ.lower())
-        fit_vals[ix] = fit_target(lc, targ, pred_vals[ix], targ_config, super_names, fit_stem,
+        fit_vals[ix] = fit_target(lc, targ, pred_vals[ix], targ_config, super_params, fit_stem,
                                   task=3, apply_fit_overrides=apply_fit_overrides)
 
         print(f"\nHave fitted {targ} resulting in the following fitted params")
-        predictions_vs_labels_to_table(fit_vals[ix], lbl_vals[ix], [targ], fit_names,
+        predictions_vs_labels_to_table(fit_vals[ix], lbl_vals[ix], [targ], fit_params,
                                        prediction_head="Fitted")
 
     # Save reports on how the predictions and fitting has gone over all of the selected targets
@@ -229,16 +240,16 @@ def fit_against_formal_test_dataset(estimator: Union[Model, Estimator],
             ("All targets (model labels)",          [True]*len(targs),      estimator.label_names),
             ("\nTransiting systems only",           trans_flags,            estimator.label_names),
             ("\nNon-transiting systems only",       ~trans_flags,           estimator.label_names),
-            ("\n\n\nAll targets (fitting params)",  [True]*len(targs),      fit_names),
-            ("\nTransiting systems only",           trans_flags,            fit_names),
-            ("\nNon-transiting systems only",       ~trans_flags,           fit_names)]
+            ("\n\n\nAll targets (fitting params)",  [True]*len(targs),      fit_params),
+            ("\nTransiting systems only",           trans_flags,            fit_params),
+            ("\nNon-transiting systems only",       ~trans_flags,           fit_params)]
 
         for comp_type, comp_head, comp_vals in comparison_type:
             # Summarize this set of predictions as plots-vs-label|control and in text table
             # Control == fit from labels not preds, so no point producing these
             if not do_control_fit:
                 preds_stem = f"predictions-{prediction_type}-vs-{comp_type}"
-                for (source, names) in [("model", estimator.label_names), ("fitting", fit_names)]:
+                for (source, names) in [("model", estimator.label_names), ("fitting", fit_params)]:
                     names = [n for n in names if n not in ["ecosw", "esinw"]] + ["ecosw", "esinw"]
                     fig = plots.plot_predictions_vs_labels(pred_vals, comp_vals, trans_flags,
                                                            names, xlabel_prefix=comp_head)
@@ -253,8 +264,8 @@ def fit_against_formal_test_dataset(estimator: Union[Model, Estimator],
 
             # Summarize this set of fitted params as plots pred-vs-label|control and in text tables
             results_stem = f"fitted-params-from-{prediction_type}-vs-{comp_type}"
-            names = [n for n in fit_names if n not in ["ecosw", "esinw"]] + ["ecosw", "esinw"]
-            fig = plots.plot_predictions_vs_labels(fit_vals, comp_vals, trans_flags, names,
+            plot_params = [n for n in fit_params if n not in ["ecosw", "esinw"]] + ["ecosw","esinw"]
+            fig = plots.plot_predictions_vs_labels(fit_vals, comp_vals, trans_flags, plot_params,
                                                    xlabel_prefix=comp_head, ylabel_prefix="fitted")
             fig.savefig(report_dir / f"{results_stem}.eps")
             plt.close()
