@@ -644,25 +644,24 @@ def calculate_prediction_errors(predictions: np.ndarray[UFloat],
     """
     Calculates the prediction errors by subtracting the predictions from the label values.
 
-    :predictions: the predictions
-    :labels: the labels
-    :selected_names: subset of the columns, or all predicted columns if None
-    :reverse_scaling: whether to reapply label scaling to get the model's values
+    :predictions: the prediction values
+    :labels: the label values
+    :selected_param_names: subset of the columns, or the intersection of prediction & label columns
+    :reverse_scaling: whether to reverse the scaling of the values to represent the model output
     :returns: a structured NDArray[UFloat] of the residuals over the selected names
     """
     # We output the params common to the both labels & predictions or those requested
     # (which we allow to error if a requested name is not found)
     if selected_param_names is None:
-        dtype = [(n, np.dtype(UFloat.dtype))
-                 for n in labels.dtype.names if n in predictions.dtype.names]
-    else:
-        dtype = [(n, np.dtype(UFloat.dtype)) for n in selected_param_names]
+        selected_param_names = [n for n in labels.dtype.names if n in predictions.dtype.names]
+    elif isinstance(selected_param_names, str):
+        selected_param_names = np.array([selected_param_names])
 
     # Haven't found a way to do the subtract directly on the whole NDarray if they contain UFloats
     # (no subtract in unumpy). We do it a (common) column/param at a time, which has the added
     # benefit of being untroubled by the two arrays having different sets of cols (widths).
-    row_count = predictions.shape[0] if predictions.shape else 1
-    errors = np.empty(shape=(row_count, ), dtype=dtype)
+    errors = np.empty(shape=(predictions.shape[0] if predictions.shape else 1, ),
+                      dtype=[(n, np.dtype(UFloat.dtype)) for n in selected_param_names])
 
     # We may have to reverse the scaling
     if reverse_scaling:
