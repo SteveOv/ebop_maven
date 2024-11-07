@@ -255,40 +255,43 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
         transit_flags = np.zeros((labels.shape[0]), dtype=bool)
 
     print(f"Plotting scatter plot {rows}x{cols} grid for: {', '.join(params.keys())}")
-    for ax_ix, (param_name, param_caption) in enumerate(params.items()):
-        lbl_vals = unumpy.nominal_values(labels[param_name])
-        pred_vals = unumpy.nominal_values(predictions[param_name])
-        pred_sigmas = unumpy.std_devs(predictions[param_name])
+    for (ax, param_name) in zip_longest(axes.flatten(), params.keys()):
+        if param_name:
+            lbl_vals = unumpy.nominal_values(labels[param_name])
+            pred_vals = unumpy.nominal_values(predictions[param_name])
+            pred_sigmas = unumpy.std_devs(predictions[param_name])
 
-        # Plot a diagonal line for exact match
-        dmin, dmax = min(lbl_vals.min(), pred_vals.min()), max(lbl_vals.max(), pred_vals.max()) # pylint: disable=nested-min-max
-        dmore = 0.1 * (dmax - dmin)
-        diag = (dmin - dmore, dmax + dmore)
-        ax = axes[ax_ix]
-        ax.plot(diag, diag, color="gray", linestyle="-", linewidth=0.5)
+            # Plot a diagonal line for exact match
+            dmin, dmax = min(lbl_vals.min(), pred_vals.min()), max(lbl_vals.max(), pred_vals.max()) # pylint: disable=nested-min-max
+            dmore = 0.1 * (dmax - dmin)
+            diag = (dmin - dmore, dmax + dmore)
+            ax.plot(diag, diag, color="gray", linestyle="-", linewidth=0.5)
 
-        # If we have lots of data, reduce the size of the maker and add in an alpha
-        (fmt, ms, alpha) = ("o", 5.0, 1.0) if len(lbl_vals) < 100 else (".", 2.0, 0.25)
+            # If we have lots of data, reduce the size of the maker and add in an alpha
+            (fmt, ms, alpha) = ("o", 5.0, 1.0) if len(lbl_vals) < 100 else (".", 2.0, 0.25)
 
-        # Plot the preds vs labels, with those with transits filled.
-        show_errorbars = show_errorbars if show_errorbars else max(np.abs(pred_sigmas)) > 0
-        for tmask, transiting in [(transit_flags, True), (~transit_flags, False)]:
-            if any(tmask):
-                (f, z) = ("full", 10) if transiting else ("none", 0)
-                if show_errorbars:
-                    ax.errorbar(x=lbl_vals[tmask], y=pred_vals[tmask], yerr=pred_sigmas[tmask],
-                                fmt=fmt, c="tab:blue", ms=ms, lw=1.0, alpha=alpha,
-                                capsize=2.0, markeredgewidth=0.5, fillstyle=f, zorder=z)
-                else:
-                    ax.errorbar(x=lbl_vals[tmask], y=pred_vals[tmask], fmt=fmt, c="tab:blue",
-                                alpha=alpha, ms=ms, lw=1.0, fillstyle=f, zorder=z)
+            # Plot the preds vs labels, with those with transits filled.
+            show_errorbars = show_errorbars if show_errorbars else max(np.abs(pred_sigmas)) > 0
+            for tmask, transiting in [(transit_flags, True), (~transit_flags, False)]:
+                if any(tmask):
+                    (f, z) = ("full", 10) if transiting else ("none", 0)
+                    if show_errorbars:
+                        ax.errorbar(x=lbl_vals[tmask], y=pred_vals[tmask], yerr=pred_sigmas[tmask],
+                                    fmt=fmt, c="tab:blue", ms=ms, lw=1.0, alpha=alpha,
+                                    capsize=2.0, markeredgewidth=0.5, fillstyle=f, zorder=z)
+                    else:
+                        ax.errorbar(x=lbl_vals[tmask], y=pred_vals[tmask], fmt=fmt, c="tab:blue",
+                                    alpha=alpha, ms=ms, lw=1.0, fillstyle=f, zorder=z)
 
-        format_axes(ax, xlim=diag, ylim=diag, xlabel=f"{xlabel_prefix} {param_caption}",
-                    ylabel=f"{ylabel_prefix} {param_caption}")
+            param_caption = params[param_name]
+            format_axes(ax, xlim=diag, ylim=diag, xlabel=f"{xlabel_prefix} {param_caption}",
+                        ylabel=f"{ylabel_prefix} {param_caption}")
 
-        # Make sure the plots are squared and have the same ticks
-        ax.set_aspect("equal", "box")
-        ax.set_yticks([t for t in ax.get_xticks() if diag[0] < t < diag[1]])
+            # Make sure the plots are squared and have the same ticks
+            ax.set_aspect("equal", "box")
+            ax.set_yticks([t for t in ax.get_xticks() if diag[0] < t < diag[1]])
+        else:
+            ax.axis("off") # remove the unused ax
     return fig
 
 
