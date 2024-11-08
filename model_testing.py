@@ -361,6 +361,7 @@ def fit_target(lc: LightCurve,
                 fit_overrides.setdefault(f"LD{star}2", c * 2**(-alpha))
 
     attempts = 1 + max(0, retries)
+    best_attempt = 0
     fitted_params = np.empty(shape=(attempts, ),
                              dtype=[(k, np.dtype(UFloat.dtype)) for k in all_fitted_params])
     for attempt in range(attempts):
@@ -426,16 +427,16 @@ def fit_target(lc: LightCurve,
                 if attempt+1 < attempts: # Further attempts available
                     print(f"Attempt {attempt+1} didn't fully converge on a good fit. {attempts}",
                         "attempt(s) allowed so will retry from the final position of this attempt.")
-                    input_params = fitted_params[attempt]
+                    input_params = fitted_params[attempt].copy()
                 else:
                     print(f"Failed to fully converge on a good fit after {attempt+1} attempts.",
-                          "Reverting to the results from the initial attempt.")
-                    attempt = 0
+                          f"Reverting to the results from attempt {best_attempt+1}.")
                     break
-            else: # Successful fit or retries are off
+            else: # Retries are off or the fit worked
+                best_attempt = attempt
                 break
 
-    return fitted_params[attempt][return_keys]
+    return fitted_params[best_attempt][return_keys]
 
 
 def append_calculated_inc_predictions(preds: np.ndarray[UFloat]) -> np.ndarray[UFloat]:
