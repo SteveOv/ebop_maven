@@ -106,6 +106,12 @@ def evaluate_model_against_dataset(estimator: Union[Model, Estimator],
     pred_vals = estimator.predict(mags_vals, feat_vals, mc_iterations, unscale=not scaled)
     if "inc" not in estimator.label_names:
         pred_vals = append_calculated_inc_predictions(pred_vals)
+        if scaled: # Apply any scaling to inc consistent with having predicted it
+            pred_vals["inc"] *= deb_example.labels_and_scales.get("inc", 1)
+
+    if scaled:
+        print("The predictions & labels are scaled with the following values:\n\t" +
+            ", ".join(f"{k} = {deb_example.labels_and_scales.get(k, 1):.3f}" for k in super_params))
 
     # Work out which are the transiting systems so we can break down the reporting
     pnames = list(inspect.signature(will_transit).parameters)
@@ -539,7 +545,6 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
                                    labels: np.ndarray[UFloat],
                                    block_headings: np.ndarray[str]=None,
                                    selected_param_names: np.ndarray[str]=None,
-                                   reverse_scaling: bool=False,
                                    prediction_head: str="Prediction",
                                    label_head: str="Label",
                                    title: str=None,
@@ -555,7 +560,6 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
     :labels: the labels or other comparison values
     :block_headings: the heading for each block of preds-vs-labels
     :selected_param_names: a subset of the full list of labels/prediction names to render
-    :reverse_scaling: whether to reverse the scaling of the values to represent the model output
     :prediction_head: the text of the prediction row headings (10 chars or less)
     :label_head: the text of the label/comparison row headings (10 chars or less)
     :title: optional title text to write above the table
@@ -573,7 +577,7 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
     else:
         keys = selected_param_names
 
-    errors = calculate_prediction_errors(predictions, labels, keys, reverse_scaling)
+    errors = calculate_prediction_errors(predictions, labels, keys)
 
     # Make sure these are iterable; not always the case if we're given a single row
     labels = np.expand_dims(labels, 0) if labels.shape == () else labels
@@ -651,15 +655,13 @@ def get_err(value):
 
 def calculate_prediction_errors(predictions: np.ndarray[UFloat],
                                 labels: np.ndarray[Union[UFloat, float]],
-                                selected_param_names: np.ndarray[str]=None,
-                                reverse_scaling: bool=False) -> np.ndarray[UFloat]:
+                                selected_param_names: np.ndarray[str]=None) -> np.ndarray[UFloat]:
     """
     Calculates the prediction errors by subtracting the predictions from the label values.
 
     :predictions: the prediction values
     :labels: the label values
     :selected_param_names: subset of the columns, or the intersection of prediction & label columns
-    :reverse_scaling: whether to reverse the scaling of the values to represent the model output
     :returns: a structured NDArray[UFloat] of the residuals over the selected names
     """
     # We output the params common to the both labels & predictions or those requested
@@ -674,14 +676,8 @@ def calculate_prediction_errors(predictions: np.ndarray[UFloat],
     # benefit of being untroubled by the two arrays having different sets of cols (widths).
     errors = np.empty(shape=(predictions.shape[0] if predictions.shape else 1, ),
                       dtype=[(n, np.dtype(UFloat.dtype)) for n in selected_param_names])
-
-    # We may have to reverse the scaling
-    if reverse_scaling:
-        for n in selected_param_names:
-            errors[n] = (labels[n] - predictions[n]) * deb_example.labels_and_scales[n]
-    else:
-        for n in selected_param_names:
-            errors[n] = labels[n] - predictions[n]
+    for n in selected_param_names:
+        errors[n] = labels[n] - predictions[n]
     return errors
 
 
