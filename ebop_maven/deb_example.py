@@ -159,14 +159,6 @@ def create_map_func(mags_bins: int = default_mags_bins,
         # Assume mags will have been stored with phase implied by index and primary eclipse at zero
         mags_feature = tf.reshape(example[mags_key], shape=(mags_bins, 1))
 
-        # Put this here for now, as this allowa us to apply noise & roll before the wrap_phase shift
-        # whichs effectively works as previously when we had separate noise & roll conditional code.
-        # If we set the seeds as before, we expect to replicate the previous training results.
-        # Not all potential augmentations support in-place updates (ie tf.Roll) so we have to absorb
-        # the overhead of send/return rather than using the "byref" behaviour of a mutable arg.
-        if augmentation_callback:
-            mags_feature = augmentation_callback(mags_feature)
-
         if mags_wrap_phase is not None:
             roll_phase = mags_wrap_phase
         else:
@@ -183,6 +175,11 @@ def create_map_func(mags_bins: int = default_mags_bins,
             if roll_shift > mags_bins // 2:
                 roll_shift -= mags_bins
             mags_feature = tf.roll(mags_feature, [roll_shift], axis=[0])
+
+        # Augmentations: not all potential augmentations have in-place updates (i.e. tf.roll) so we
+        # endure the overhead of send/return rather than using "byref" behaviour of a mutable arg.
+        if augmentation_callback:
+            mags_feature = augmentation_callback(mags_feature)
 
         # The Extra features: ignore unknown fields and use default if not found
         ext_features = [example.get(k, d) for (k, d) in chosen_ext_feat_and_defs.items()]
