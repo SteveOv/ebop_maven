@@ -239,6 +239,7 @@ def write_in_file(file_name: Path,
     coerce_in_param("k", min_val=0.0, max_val=100.0)
     coerce_in_param("J", min_val=0.0, max_val=1000.0)
     coerce_in_param("rA_plus_rB", min_val=-0.8, max_val=0.8)
+    coerce_in_param("inc", min_val=50.0, max_val=140.0)
     if not _jktebop_support_negative_l3:
         coerce_in_param("L3", min_val=0.)
 
