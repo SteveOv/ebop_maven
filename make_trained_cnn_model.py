@@ -79,14 +79,16 @@ DNN_NUM_FULL_LAYERS = 2
 DNN_DROPOUT_RATE = 0.5
 DNN_NUM_TAPER_UNITS = 64
 
-# Control dataset pipeline augmentations
-NOISE_MAX = 0.030
-ROLL_MAX = int(128 * (MAGS_BINS/1024))
+# Control dataset pipeline augmentations applied to each mags_feature
+NOISE_MAX = 0.030                       # max random sigma value (in mags) of Gaussian noise to add
+ROLL_MAX = int(128 * (MAGS_BINS/1024))  # max random roll (in bins) of featyre left or right
+YSHIFT_MAX = 0.050                      # max random y-shift (in mags) of feature up or down
 @tf.function
 def augmentation_callback(mags_feature: tf.Tensor) -> tf.Tensor:
     """
     Dataset pipeline augmentation function which is called from the map_func. Updates the
-    mags_feature with random amounts of additive Gaussian noise and a random roll left or right.
+    mags_feature with random amounts of additive Gaussian noise, a random roll left or right
+    and a random "vertical" magnitude shift up or down.
     """
     noise_stddev = tf.random.uniform([], 0.001, NOISE_MAX, tf.float32)
     if noise_stddev != 0:
@@ -94,6 +96,9 @@ def augmentation_callback(mags_feature: tf.Tensor) -> tf.Tensor:
     roll_by = tf.random.uniform([], -ROLL_MAX, ROLL_MAX+1, tf.int32)
     if roll_by != 0:
         mags_feature = tf.roll(mags_feature, [roll_by], axis=[0])
+    mags_shift = tf.random.uniform([], -YSHIFT_MAX, YSHIFT_MAX, tf.float32)
+    if mags_shift != 0:
+        mags_feature += mags_shift
     return mags_feature
 
 
@@ -194,7 +199,7 @@ if __name__ == "__main__":
             print("The mags features will be centred on the midpoint between eclipses.")
         else:
             print(f"The mags features will be wrapped beyond phase {MAGS_WRAP_PHASE}.")
-        print(f"Dataset pipeline augmentation with NOISE_MAX={NOISE_MAX} & ROLL_MAX={ROLL_MAX}:",
+        print(f"Augmentations NOISE_MAX={NOISE_MAX}, ROLL_MAX={ROLL_MAX}, YSHIFT_MAX={YSHIFT_MAX}:",
               f"\n{getsource(augmentation_callback)}")
 
         datasets = [tf.data.TFRecordDataset] * 2
