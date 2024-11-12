@@ -257,6 +257,17 @@ def make_dataset_file(inst_count: int,
                             noise = rng.normal(0., scale=noise_sigma, size=len(fluxes))
                             model_data["delta_mag"] = np.multiply(-2.5, np.log10(fluxes + noise))
 
+                    phase_shift = params.get("phase_shift", None)
+                    if phase_shift:
+                        # Add a roll to the model data equal the phase shift
+                        shift = int(len(model_data) * phase_shift)
+                        model_data["delta_mag"] = np.roll(model_data["delta_mag"], shift)
+
+                    mag_shift = params.get("mag_shift", None)
+                    if mag_shift:
+                        # Adds an optional shift the the magnitudes up/down; shifts the zero point
+                        model_data["delta_mag"] += mag_shift
+
                     # We store mags_features for various supported bins values
                     mags_features = {}
                     interp = interp1d(model_data["phase"], model_data["delta_mag"], interp_kind)
