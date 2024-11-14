@@ -23,7 +23,7 @@ from ebop_maven.libs.tee import Tee
 
 # By splitting the dataset over multiple files we have the option of using a subset of the dataset
 # using a wildcard match, for example "trainset00?.tfrecord" picks up the first 10 files only.
-DATASET_SIZE = 250000
+DATASET_SIZE = 500000
 FILE_COUNT = DATASET_SIZE // 10000
 FILE_PREFIX = "trainset"
 dataset_dir = Path(f"./datasets/formal-training-dataset-{DATASET_SIZE // 1000}k/")

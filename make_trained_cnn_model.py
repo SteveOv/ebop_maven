@@ -31,7 +31,7 @@ MAGS_BINS = 4096
 MAGS_WRAP_PHASE = None # None indicates wrap to centre on midpoint between eclipses
 CHOSEN_LABELS = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "bP"]
 OUTPUT_ACTIVATIONS = ["softplus"]*3 + ["linear"]*3
-TRAINSET_SUFFIX = "250k"
+TRAINSET_SUFFIX = "500k"
 
 MODEL_NAME = f"CNN-New-Ext{len(CHOSEN_FEATURES)}-{'-'.join(CHOSEN_LABELS[5:])}-" \
                             + f"{MAGS_BINS}-{MAGS_WRAP_PHASE}-{TRAINSET_SUFFIX}"
@@ -80,9 +80,9 @@ DNN_DROPOUT_RATE = 0.5
 DNN_NUM_TAPER_UNITS = 64
 
 # Control dataset pipeline augmentations applied to each mags_feature
-NOISE_MAX = 0.030                       # max random sigma value (in mags) of Gaussian noise to add
-ROLL_MAX = int(128 * (MAGS_BINS/1024))  # max random roll (in bins) of featyre left or right
-YSHIFT_MAX = 0.050                      # max random y-shift (in mags) of feature up or down
+NOISE_MAX = 0.030               # max random sigma value (in mag) of Gaussian noise to add
+ROLL_SIGMA = 0.066              # 1-sigma of random roll (in phase) of feature left or right
+YSHIFT_SIGMA = 0.030            # 1-sigma of random y-shift (in mag) of feature up or down
 @tf.function
 def augmentation_callback(mags_feature: tf.Tensor) -> tf.Tensor:
     """
@@ -93,12 +93,12 @@ def augmentation_callback(mags_feature: tf.Tensor) -> tf.Tensor:
     noise_stddev = tf.random.uniform([], 0.001, NOISE_MAX, tf.float32)
     if noise_stddev != 0:
         mags_feature += tf.random.normal(mags_feature.shape, stddev=noise_stddev)
-    roll_by = tf.random.uniform([], -ROLL_MAX, ROLL_MAX+1, tf.int32)
+    roll_by = int(MAGS_BINS * tf.random.normal([], stddev=ROLL_SIGMA))
     if roll_by != 0:
         mags_feature = tf.roll(mags_feature, [roll_by], axis=[0])
-    mags_shift = tf.random.uniform([], -YSHIFT_MAX, YSHIFT_MAX, tf.float32)
-    if mags_shift != 0:
-        mags_feature += mags_shift
+    y_shift = tf.random.normal([], stddev=YSHIFT_SIGMA)
+    if y_shift != 0:
+        mags_feature += y_shift
     return mags_feature
 
 
@@ -199,7 +199,8 @@ if __name__ == "__main__":
             print("The mags features will be centred on the midpoint between eclipses.")
         else:
             print(f"The mags features will be wrapped beyond phase {MAGS_WRAP_PHASE}.")
-        print(f"Augmentations NOISE_MAX={NOISE_MAX}, ROLL_MAX={ROLL_MAX}, YSHIFT_MAX={YSHIFT_MAX}:",
+        print("Augmentations based on:",
+              f"NOISE_MAX_SIGMA={NOISE_MAX}, ROLL_SIGMA={ROLL_SIGMA}, YSHIFT_SIGMA={YSHIFT_SIGMA}:",
               f"\n{getsource(augmentation_callback)}")
 
         datasets = [tf.data.TFRecordDataset] * 2

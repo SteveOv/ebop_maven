@@ -35,7 +35,7 @@ MAGS_BINS = deb_example.default_mags_bins
 MAGS_WRAP_PHASE = None # None indicates wrap to centre on midpoint between eclipses
 CHOSEN_LABELS = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "bP"]
 
-TRAINSET_NAME = "formal-training-dataset-250k"
+TRAINSET_NAME = "formal-training-dataset-500k"
 TRAINSET_GLOB_TERM = "trainset00?.tfrecord" # Just the first 10 files, so 80k train/20k validation
 TRAINSET_DIR = Path(".") / "datasets" / TRAINSET_NAME / "training"
 VALIDSET_DIR = Path(".") / "datasets" / TRAINSET_NAME / "validation"

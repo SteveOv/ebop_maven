@@ -76,7 +76,8 @@ estimator = Estimator()
 
 # Get the expected size and wrap to apply to model's input "mags" feature
 mags_bins = estimator.mags_feature_bins         # 4096
-wrap_phase = estimator.mags_feature_wrap_phase  # 0.75 (so phase > 0.75 is wrapped by -1)
+wrap_phase = estimator.mags_feature_wrap_phase  # None == centre on midpoint between eclipses
+                                                # (otherwise values between 0 and 1)
 ```
 
 The Jupyter page [model_interactive_tester.ipynb](./model_interactive_tester.ipynb) more fully
