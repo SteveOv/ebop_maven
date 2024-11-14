@@ -1,4 +1,5 @@
 """ A simple class for querying MIST Isochrones """
+import errno
 from typing import List
 from pathlib import Path
 from inspect import getsourcefile
@@ -22,6 +23,11 @@ class MistIsochrones():
         """
         isos_dir = self._this_dir / "data/mist/MIST_v1.2_vvcrit0.4_basic_isos"
         iso_files = sorted(isos_dir.glob("*.iso"))
+
+        if not iso_files or len(iso_files) == 0:
+            raise FileNotFoundError(errno.ENOENT,
+                                    f"No iso files found in {isos_dir}. The readme.txt file " +
+                                    "in this directory has information on how to populate it.")
 
         # Index the iso files on their [Fe/H]
         self._isos: dict[float, List] = {}
