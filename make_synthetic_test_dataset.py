@@ -154,6 +154,10 @@ def generate_instances_from_mist_models(label: str):
             apparent_mag = rng.uniform(6, 18)
             snr = np.add(np.multiply(apparent_mag, -2.32), 59.4)
 
+            # Add some random shifts to the mags data to mimic less than perfect pre-processing
+            phase_shift = rng.normal(0, scale=0.03)
+            mag_shift = rng.normal(0, scale=0.01)
+
             inst_id = f"{set_id}/{generated_counter:06d}"
             yield {
                 "id":           inst_id,
@@ -177,8 +181,10 @@ def generate_instances_from_mist_models(label: str):
                 "LDA2":         ld_coeffs_A[1],
                 "LDB2":         ld_coeffs_B[1],
 
-                # Used to add Gaussian noise to the light-curve data generated from these params
+                # Used to add Gaussian noise & shifts to mags_feature data being generated
                 "snr":          snr,
+                "phase_shift":  phase_shift,
+                "mag_shift":    mag_shift,
 
                 # Further params for potential use as labels/features
                 "sini":         np.sin(inc_rad),
