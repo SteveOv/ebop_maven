@@ -87,6 +87,8 @@ def evaluate_model_against_dataset(estimator: Union[Model, Estimator],
     print(f"Looking for the test dataset in '{test_dataset_dir}'...", end="")
     ds_name = test_dataset_dir.name
     tfrecord_files = sorted(test_dataset_dir.glob("**/*.tfrecord"))
+    if len(tfrecord_files) == 0:
+        raise ValueError(f"No tfrecord files under {test_dataset_dir}. Please make this dataset.")
     print(f"found {len(tfrecord_files)} file(s).")
     ids, mags_vals, feat_vals, lbl_vals = deb_example.read_dataset(tfrecord_files,
                                                                 estimator.mags_feature_bins,
@@ -189,6 +191,8 @@ def fit_against_formal_test_dataset(estimator: Union[Model, Estimator],
 
     print(f"\nLooking for the test dataset in '{FORMAL_TEST_DATASET_DIR}'.")
     tfrecord_files = sorted(FORMAL_TEST_DATASET_DIR.glob("**/*.tfrecord"))
+    if len(tfrecord_files) == 0:
+        raise ValueError(f"No tfrecords under {FORMAL_TEST_DATASET_DIR}. Please make this dataset.")
     targs, mags_vals, feat_vals, _ = deb_example.read_dataset(tfrecord_files,
                                                               estimator.mags_feature_bins,
                                                               estimator.mags_feature_wrap_phase,
@@ -708,7 +712,7 @@ def force_seed_on_dropout_layers(estimator: Estimator, seed: int=DEFAULT_TESTING
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Runs formal testing on trained model files.")
     ap.add_argument(dest="model_files", type=Path, nargs="*", help="The model file(s) to test.")
-    ap.set_defaults(model_files=[None]) # If None will load the default model under ebop_maven/data
+    ap.set_defaults(model_files=[None]) # None item loads the default model under ebop_maven/data
     args = ap.parse_args()
 
     # This will get the config, labels and published params for formal targets not excluded
