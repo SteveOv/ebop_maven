@@ -31,6 +31,9 @@ dataset_dir.mkdir(parents=True, exist_ok=True)
 # TODO: better way to share inst over multiple calls to generate_instances_from_mist_models()
 _mist_isochones = MistIsochrones()
 
+# max fractional radius: JKTEBOP unsuited to close binaries
+MAX_FRACTIONAL_R = 0.2
+
 def generate_instances_from_mist_models(label: str):
     """
     Generates system instances with a combination of random selecion and lookups of MIST stellar
@@ -102,11 +105,8 @@ def generate_instances_from_mist_models(label: str):
         LB          = np.power(10, results["log_L"]) * u.solLum
         loggB       = results["log_g"] * u.dex(u.cm / u.s**2)
 
-        # The minimum period from Kepler's 3rd law & the minimum separation, which is the greater of
-        # . 3(RA+RB) / 2(1-e) (Wells & Prša) (assuming e==0 for now)
-        # . max(5*RA, 5*RB) (based on JKTEBOP recommendation for rA <= 0.2, rB <= 0.2)
-        # However, the Wells & Prša expression is never > both 5RA and 5RB for all RA and RB, so
-        a_min = max(5*RA, 5*RB)
+        # The minimum period from Kepler's 3rd law based on the minimum supported separation
+        a_min = max(RA, RB) / MAX_FRACTIONAL_R
         per_min = orbital.orbital_period(MA, MB, a_min).to(u.d).value
 
         # We generate period, inc, and omega (argument of periastron) from uniform distributions
@@ -260,10 +260,9 @@ def is_usable_instance(k: float=0.0, J: float=0.0, qphot: float=0.0, ecc: float=
         usable = all(b is not None and b <= 0.75 + k for b in [bP, bS])
 
     # Compatible with JKTEBOP restrictions
-    # Soft restriction of rA & rB both <= 0.2 as its model is not suited to higher
-    # Hard restrictions of rA+rB < 0.8 (covered by above), inc > 50, k <= 100
+    # Hard restrictions of rA+rB < 0.8 (covered MAX_FRACTIONAL_R), inc > 50, k <= 100
     if usable:
-        usable = rA <= 0.2 and rB <= 0.2 and inc > 50 and k <= 100
+        usable = rA <= MAX_FRACTIONAL_R and rB <= MAX_FRACTIONAL_R and inc > 50 and k <= 100
     return usable
 
 
