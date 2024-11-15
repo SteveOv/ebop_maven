@@ -148,13 +148,10 @@ def generate_instances_from_mist_models(label: str):
             ld_coeffs_A = limb_darkening.lookup_tess_pow2_ld_coeffs(loggA, T_eff_A)
             ld_coeffs_B = limb_darkening.lookup_tess_pow2_ld_coeffs(loggB, T_eff_B)
 
-            # Now we have to decide an appropriate Gaussian noise SNR to apply.
-            # Randomly choose an apparent mag in the TESS photometric range then derive
-            # the SNR (based on a linear regression fit of Álvarez et al. (2024) Table 2).
+            # By specifying an apparent mag (withing the TESS expected range) we indication
+            # to the caller the conditions it can use to decide the amount of noise to add.
+            # The shifts to the mags data will mimic less than perfect pre-processing.
             apparent_mag = rng.uniform(6, 18)
-            snr = np.add(np.multiply(apparent_mag, -2.32), 59.4)
-
-            # Add some random shifts to the mags data to mimic less than perfect pre-processing
             phase_shift = rng.normal(0, scale=0.03)
             mag_shift = rng.normal(0, scale=0.01)
 
@@ -181,8 +178,8 @@ def generate_instances_from_mist_models(label: str):
                 "LDA2":         ld_coeffs_A[1],
                 "LDB2":         ld_coeffs_B[1],
 
-                # Used to add Gaussian noise & shifts to mags_feature data being generated
-                "snr":          snr,
+                # Used to dictate noise & shifts to apply to mags_feature data being generated
+                "apparent_mag": apparent_mag,
                 "phase_shift":  phase_shift,
                 "mag_shift":    mag_shift,
 
