@@ -5,7 +5,7 @@ Functions for generating binary system instances and writing their parameters to
 # pylint: disable=invalid-name, no-member, too-many-arguments, too-many-locals
 
 from typing import Callable, Generator
-from sys import gettrace
+import sys
 from pathlib import Path
 from timeit import default_timer
 from datetime import timedelta, datetime
@@ -21,7 +21,6 @@ import tensorflow as tf
 
 # Hack so that this module can see the ebop_maven package and below
 # pylint: disable=wrong-import-order, wrong-import-position
-import sys
 # caution: path[0] is reserved for script path (or '' in REPL)
 sys.path.insert(1, Path("../ebop_maven/"))
 from ebop_maven import deb_example
@@ -111,6 +110,10 @@ The maximum concurrent workers:         {max_workers}\n""")
         elif save_param_csvs:
             print("Parameter CSV files will be saved to accompany dataset files.\n")
 
+    if max_workers > 1 and _is_debugging():
+        print("*** Detected a debugger so overriding the max_workers arg and setting it to 1 ***\n")
+        max_workers = 1
+
     if verbose:
         print(f"Starting process at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}\n")
         start_time = default_timer()
@@ -127,10 +130,6 @@ The maximum concurrent workers:         {max_workers}\n""")
     )
 
     max_workers = min(file_count, max_workers or 1)
-    if max_workers > 1 and (getattr(sys, "gettrace", None) or sys.gettrace()):
-        print("Detected a debugger so I'm overriding the max_workers arg and setting it to 1")
-        max_workers = 1
-
     if max_workers <= 1:
         # We could use a pool of 1, but it's useful to keep execution on the interactive proc
         for params in iter_params:
@@ -413,6 +412,19 @@ def _calculate_file_splits(instance_count: int, file_count: int) -> list[int]:
     file_instance_counts = [int(np.ceil(instance_count / file_count))] * (file_count-1)
     file_instance_counts += [instance_count - sum(file_instance_counts)]
     return file_instance_counts
+
+
+def _is_debugging() -> bool:
+    """
+    Whether the code thinks we are running under the watchful eye of a debugger
+    """
+    # The default way, but no longer appears to be working in later versions of VSCode
+    gt = getattr(sys, "gettrace", None)
+    debugging = gt is not None and gt() is not None
+    if not debugging and hasattr(sys, "monitoring"):
+        # This may work in new version of python - works for me in VSCode & python 3.12
+        debugging = sys.monitoring.get_tool(sys.monitoring.DEBUGGER_ID) is not None
+    return debugging
 
 
 def _swap_instance_components(params: dict[str, any]):
