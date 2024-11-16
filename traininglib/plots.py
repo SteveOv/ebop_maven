@@ -52,7 +52,8 @@ all_histogram_params = {
     "RB":           (100, r"$R_{B}~(\text{R}_{\odot})$"),
     "MA":           (100, r"$M_{A}~(\text{M}_{\odot})$"),
     "MB":           (100, r"$M_{B}~(\text{M}_{\odot})$"),
-    "snr":          (100, r"$S/N$")
+    "snr":          (100, r"$S/N$"),
+    "apparent_mag": (100, r"apparent magnitude (mag)")
 }
 
 
