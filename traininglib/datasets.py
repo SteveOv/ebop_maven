@@ -53,6 +53,13 @@ histogram_params = {
     "bP":           (100, r"$b_{prim}$")
 }
 
+# Sigma ppm derived from Álvarez+ (2024) Table 2 SNRs & re-arranged eqn 7.
+_tess_noise_sigma = np.array([
+    [5, 8, 10, 12, 14, 16, 18],
+    [60.0, 82.5, 240.0, 700.0, 2032.0, 5916.0,  16000.0] # in ppm
+])
+get_noise_sigma_ppm = interp1d(_tess_noise_sigma[0], _tess_noise_sigma[1],"cubic")
+
 
 def make_dataset(instance_count: int,
                  file_count: int,
@@ -248,11 +255,7 @@ def make_dataset_file(inst_count: int,
                     # Optionally, add Gaussian flux noise based on the instance's apparent magnitude
                     apparent_mag = params.get("apparent_mag", None)
                     if apparent_mag:
-                        # The SNR is based on linear regression fit of Álvarez et al. (2024) Table 2
-                        # then noise sigma from re-arranging their eqn 7; SNR = 10*log_10(mu/sigma)
-                        # As the fluxes we derive will be normalized assume the mean ~ 1.
-                        snr = np.add(np.multiply(-2.32, apparent_mag), 59.4)
-                        noise_sigma = np.divide(1, np.power(10, np.divide(snr, 10)))
+                        noise_sigma = get_noise_sigma_ppm(apparent_mag) / 10**6 # undo the ppm
                         if noise_sigma:
                             # We apply the noise to fluxes, so revert delta mags to normalized flux
                             fluxes = np.power(10, np.divide(model_data["delta_mag"], -2.5))
