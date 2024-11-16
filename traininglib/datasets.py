@@ -53,13 +53,6 @@ histogram_params = {
     "bP":           (100, r"$b_{prim}$")
 }
 
-# Sigma ppm derived from Álvarez+ (2024) Table 2 SNRs & re-arranged eqn 7.
-_tess_noise_sigma = np.array([
-    [5, 8, 10, 12, 14, 16, 18],
-    [60.0, 82.5, 240.0, 700.0, 2032.0, 5916.0,  16000.0] # in ppm
-])
-get_noise_sigma_ppm = interp1d(_tess_noise_sigma[0], _tess_noise_sigma[1],"cubic")
-
 
 def make_dataset(instance_count: int,
                  file_count: int,
@@ -255,7 +248,7 @@ def make_dataset_file(inst_count: int,
                     # Optionally, add Gaussian flux noise based on the instance's apparent magnitude
                     apparent_mag = params.get("apparent_mag", None)
                     if apparent_mag:
-                        noise_sigma = get_noise_sigma_ppm(apparent_mag) / 10**6 # undo the ppm
+                        noise_sigma = get_tess_noise_sigma(apparent_mag)
                         if noise_sigma:
                             # We apply the noise to fluxes, so revert delta mags to normalized flux
                             fluxes = np.power(10, np.divide(model_data["delta_mag"], -2.5))
@@ -400,6 +393,23 @@ def get_field_names_from_csvs(file_names: list[Path]) -> list[str]:
         # Modify names so that it hold the names common to both
         names = [n for n in names if n in this_names] if names is not None else this_names
     return names
+
+
+def get_tess_noise_sigma(apparent_mag: float) -> float:
+    """
+    Calculates the noise sigma for normalized TESS photometric timeseries fluxes (120 s)
+    from a target with the passed apparent mag.
+    """
+    # Sigma ppm derived from Álvarez+ (2024) Table 2 SNRs & re-arranged eqn 7.
+    # with value for 5 mag taken as the minimum value in narrative associated with Ricker+2015
+    # Fig 8. and the value for 18 mag my estimate by extrapolating Table 2.
+    tess_noise_sigma_ppm = np.array([
+        [5, 8, 10, 12, 14, 16, 18],
+        [60.0, 82.5, 240.0, 700.0, 2032.0, 5916.0,  16000.0] # in ppm/sqrt(hr)
+    ])
+    get_noise_sigma_ppm = interp1d(tess_noise_sigma_ppm[0], tess_noise_sigma_ppm[1], "cubic")
+    noise_sigma = get_noise_sigma_ppm(apparent_mag) / 10**6 # undo the ppm
+    return noise_sigma
 
 
 def _calculate_file_splits(instance_count: int, file_count: int) -> list[int]:
