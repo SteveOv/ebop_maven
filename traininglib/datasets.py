@@ -249,16 +249,14 @@ def make_dataset_file(inst_count: int,
                     # Optionally, add Gaussian flux noise based on the instance's apparent magnitude
                     apparent_mag = params.get("apparent_mag", None)
                     if apparent_mag:
-                        # We apply the noise to fluxes, so revert delta mags to normalized flux
-                        # and base the noise sigma on the instance's SNR and mean flux
-                        fluxes = np.power(10, np.divide(model_data["delta_mag"], -2.5))
-
-                        # The SNR (based on a linear regression fit of Álvarez et al. (2024) Table 2)
-                        # then noise sigma from re-arranging their eqn 7 (SNR = 10*log_10(mu/sigma))
-                        snr = -2.32*apparent_mag + 59.4
-                        noise_sigma = np.divide(np.mean(fluxes), np.power(10, np.divide(snr, 10)))
-
+                        # The SNR is based on linear regression fit of Álvarez et al. (2024) Table 2
+                        # then noise sigma from re-arranging their eqn 7; SNR = 10*log_10(mu/sigma)
+                        # As the fluxes we derive will be normalized assume the mean ~ 1.
+                        snr = np.add(np.multiply(-2.32, apparent_mag), 59.4)
+                        noise_sigma = np.divide(1, np.power(10, np.divide(snr, 10)))
                         if noise_sigma:
+                            # We apply the noise to fluxes, so revert delta mags to normalized flux
+                            fluxes = np.power(10, np.divide(model_data["delta_mag"], -2.5))
                             noise = rng.normal(0., scale=noise_sigma, size=len(fluxes))
                             model_data["delta_mag"] = np.multiply(-2.5, np.log10(fluxes + noise))
 
