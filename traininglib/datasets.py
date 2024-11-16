@@ -127,8 +127,8 @@ The maximum concurrent workers:         {max_workers}\n""")
     )
 
     max_workers = min(file_count, max_workers or 1)
-    if max_workers > 1 and gettrace is not None and gettrace() is not None:
-        print("Detected a debugger so I'm overriding the max_workers arg, setting it to 1")
+    if max_workers > 1 and (getattr(sys, "gettrace", None) or sys.gettrace()):
+        print("Detected a debugger so I'm overriding the max_workers arg and setting it to 1")
         max_workers = 1
 
     if max_workers <= 1:
