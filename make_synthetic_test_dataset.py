@@ -5,6 +5,7 @@ from contextlib import redirect_stdout
 import hashlib
 
 import numpy as np
+from scipy.interpolate import interp1d
 
 # pylint: disable=no-member
 import astropy.units as u
@@ -149,9 +150,9 @@ def generate_instances_from_mist_models(label: str):
             ld_coeffs_B = limb_darkening.lookup_tess_pow2_ld_coeffs(loggB, T_eff_B)
 
             # By specifying an apparent mag (withing the TESS expected range) we indication
-            # to the caller the conditions it can use to decide the amount of noise to add.
+            # to the conditions from which we decide the amount of noise to add.
             # The shifts to the mags data will mimic less than perfect pre-processing.
-            apparent_mag = rng.uniform(6, 18)
+            noise_sigma = calculate_tess_noise_sigma(apparent_mag=rng.uniform(6, 18))
             phase_shift = rng.normal(0, scale=0.03)
             mag_shift = rng.normal(0, scale=0.01)
 
@@ -179,7 +180,7 @@ def generate_instances_from_mist_models(label: str):
                 "LDB2":         ld_coeffs_B[1],
 
                 # Used to dictate noise & shifts to apply to mags_feature data being generated
-                "apparent_mag": apparent_mag,
+                "noise_sigma":  noise_sigma,
                 "phase_shift":  phase_shift,
                 "mag_shift":    mag_shift,
 
@@ -233,6 +234,22 @@ def chabrier_imf(masses):
 def wells_prsa_multiplicity_function(masses):
     """ Wells & Prša (2021ApJS..253...32W) eqn. 2 with coeffs given in following paragraph """
     return np.tanh(np.add(np.multiply(0.31, masses), 0.18))
+
+def calculate_tess_noise_sigma(apparent_mag: float) -> float:
+    """
+    Calculates the overall random noise sigma for normalized TESS photometric timeseries fluxes
+    for a target with the passed apparent mag.
+    """
+    # Sigma ppm derived from Álvarez+ (2024) Table 2 SNRs & re-arranged eqn 7.
+    # with value for 5 mag taken as the minimum value in narrative associated with Ricker+2015
+    # Fig 8. and the value for 18 mag my estimate by extrapolating Table 2.
+    tess_noise_sigma_ppm = np.array([
+        [5, 8, 10, 12, 14, 16, 18],
+        [60.0, 82.5, 240.0, 700.0, 2032.0, 5916.0,  16000.0] # in ppm/sqrt(hr)
+    ])
+    get_noise_sigma_ppm = interp1d(tess_noise_sigma_ppm[0], tess_noise_sigma_ppm[1], "cubic")
+    noise_sigma = get_noise_sigma_ppm(apparent_mag) / 10**6 # undo the ppm
+    return noise_sigma
 
 def is_usable_instance(k: float=0.0, J: float=0.0, qphot: float=0.0, ecc: float=-1.0,
                        bP: float=None, bS: float=None,

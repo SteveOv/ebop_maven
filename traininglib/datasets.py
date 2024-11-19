@@ -245,25 +245,23 @@ def make_dataset_file(inst_count: int,
                             print(f"{file_stem}[{inst_id}]: Replacing NaN/Inf in processed LC.")
                         np.nan_to_num(x=model_data["delta_mag"], copy=False)
 
-                    # Optionally, add Gaussian flux noise based on the instance's apparent magnitude
-                    apparent_mag = params.get("apparent_mag", None)
-                    if apparent_mag:
-                        noise_sigma = get_tess_noise_sigma(apparent_mag)
-                        if noise_sigma:
-                            # We apply the noise to fluxes, so revert delta mags to normalized flux
-                            fluxes = np.power(10, np.divide(model_data["delta_mag"], -2.5))
-                            noise = rng.normal(0., scale=noise_sigma, size=len(fluxes))
-                            model_data["delta_mag"] = np.multiply(-2.5, np.log10(fluxes + noise))
+                    # Optionally add Gaussian noise to the mags
+                    noise_sigma = params.get("noise_sigma", None)
+                    if noise_sigma:
+                        # We apply the noise to fluxes, so revert delta mags to normalized flux
+                        fluxes = np.power(10, np.divide(model_data["delta_mag"], -2.5))
+                        noise = rng.normal(0., scale=noise_sigma, size=len(fluxes))
+                        model_data["delta_mag"] = np.multiply(-2.5, np.log10(fluxes + noise))
 
+                    # Optionally roll the phase folded mags based on the indicated phase shift
                     phase_shift = params.get("phase_shift", None)
                     if phase_shift:
-                        # Add a roll to the model data equal the phase shift
                         shift = int(len(model_data) * phase_shift)
                         model_data["delta_mag"] = np.roll(model_data["delta_mag"], shift)
 
+                    # Optionally add a y-shift up/down to offset the mags' zero point
                     mag_shift = params.get("mag_shift", None)
                     if mag_shift:
-                        # Adds an optional shift the the magnitudes up/down; shifts the zero point
                         model_data["delta_mag"] += mag_shift
 
                     # We store mags_features for various supported bins values
@@ -393,23 +391,6 @@ def get_field_names_from_csvs(file_names: list[Path]) -> list[str]:
         # Modify names so that it hold the names common to both
         names = [n for n in names if n in this_names] if names is not None else this_names
     return names
-
-
-def get_tess_noise_sigma(apparent_mag: float) -> float:
-    """
-    Calculates the noise sigma for normalized TESS photometric timeseries fluxes (120 s)
-    from a target with the passed apparent mag.
-    """
-    # Sigma ppm derived from Álvarez+ (2024) Table 2 SNRs & re-arranged eqn 7.
-    # with value for 5 mag taken as the minimum value in narrative associated with Ricker+2015
-    # Fig 8. and the value for 18 mag my estimate by extrapolating Table 2.
-    tess_noise_sigma_ppm = np.array([
-        [5, 8, 10, 12, 14, 16, 18],
-        [60.0, 82.5, 240.0, 700.0, 2032.0, 5916.0,  16000.0] # in ppm/sqrt(hr)
-    ])
-    get_noise_sigma_ppm = interp1d(tess_noise_sigma_ppm[0], tess_noise_sigma_ppm[1], "cubic")
-    noise_sigma = get_noise_sigma_ppm(apparent_mag) / 10**6 # undo the ppm
-    return noise_sigma
 
 
 def _calculate_file_splits(instance_count: int, file_count: int) -> list[int]:
