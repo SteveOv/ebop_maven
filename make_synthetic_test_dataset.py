@@ -241,16 +241,20 @@ def calculate_tess_noise_sigma(apparent_mag: float) -> float:
     Calculates the overall random noise sigma for normalized TESS photometric timeseries fluxes
     for a target with the passed apparent mag.
     """
-    # Sigma ppm derived from Álvarez+ (2024) Table 2 SNRs & re-arranged eqn 7.
-    # with value for 5 mag taken as the minimum value in narrative associated with Ricker+2015
-    # Fig 8. and the value for 18 mag my estimate by extrapolating Table 2.
-    tess_noise_sigma_ppm = np.array([
-        [5, 8, 10, 12, 14, 16, 18],
-        [60.0, 82.5, 240.0, 700.0, 2032.0, 5916.0,  16000.0] # in ppm/sqrt(hr)
-    ])
-    get_noise_sigma_ppm = interp1d(tess_noise_sigma_ppm[0], tess_noise_sigma_ppm[1], "cubic")
-    noise_sigma = get_noise_sigma_ppm(apparent_mag) / 10**6 # undo the ppm
-    return noise_sigma
+    # These are coeffs in Stassun+2018 (TESS Input Catalog & Candidate Target List) [V1]
+    # https://arxiv.org/abs/1706.00495v1 on page 24, however they're replaced with a ref to a
+    # Pepper+2018 paper (in prep) in later versions which I have yet to find.
+    # Ultimately the coeffs are derived from Fig 8 of Ricker+(2015JATIS...1a4003R) *The TESS paper*
+    # _ln_noise_sigma_poly = np.poly1d([4.73508403525e-5, -0.0022308015894, 0.0395908321369,
+    #                                   -0.285041632435, 0.850021465753, 3.29685004771])
+    # noise_sigma_ppm_hr = np.exp(_ln_noise_sigma_poly)
+
+    # This is my exp trend fit to datapoints on Ricker+(2015JATIS...1a4003R) Fig 8. Using 60 as the
+    # noise floor, as given in the narrative, and made pessimistic by fitting to 10^5.5 at mag 18.
+    noise_sigma_ppm_hr = max(60, 0.402 * np.exp(0.665 * apparent_mag))
+
+    # Change (sigma) from ppm/hr to ppm/2min then undo the ppm
+    return noise_sigma_ppm_hr * (2/60)**0.5 / 10**6
 
 def is_usable_instance(k: float=0.0, J: float=0.0, qphot: float=0.0, ecc: float=-1.0,
                        bP: float=None, bS: float=None,
