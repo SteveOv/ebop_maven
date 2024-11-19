@@ -1,5 +1,6 @@
 """ Script for generating the full formal training dataset. """
 import os
+import sys
 from pathlib import Path
 from contextlib import redirect_stdout
 import hashlib
@@ -158,6 +159,11 @@ def is_usable_instance(k: float=0, J: float=0, qphot: float=0, ecc: float=0,
 # samples parameter distributions over JKTEBOP's usable range.
 # ------------------------------------------------------------------------------
 if __name__ == "__main__":
+
+    if (dataset_dir/"dataset.log").exists():
+        response =  input("\nFiles exist for this dataset. Continue and overwrite y/N? ")
+        if response.strip().lower() not in ["y", "yes"]:
+            sys.exit()
 
     with redirect_stdout(Tee(open(dataset_dir/"dataset.log", "w", encoding="utf8"))):
         datasets.make_dataset(instance_count=DATASET_SIZE,
