@@ -30,6 +30,9 @@ FILE_PREFIX = "trainset"
 dataset_dir = Path(f"./datasets/formal-training-dataset-{DATASET_SIZE // 1000}k/")
 dataset_dir.mkdir(parents=True, exist_ok=True)
 
+# max fractional radius: JKTEBOP unsuited to close binaries. As a "rule of thumb" the cut-off is
+# at ~0.2. We go further so as to train a model which will be able to predict upto and beyond this.
+MAX_FRACTIONAL_R = 0.23
 
 def generate_instances_from_distributions(label: str):
     """
@@ -147,10 +150,9 @@ def is_usable_instance(k: float=0, J: float=0, qphot: float=0, ecc: float=0,
         usable = all(b is not None and b <= 1 + k for b in [bP, bS])
 
     # Compatible with JKTEBOP restrictions
-    # Soft restriction of rA & rB both <= 0.23 as its model is not well suited to r >~ 0.2
-    # Hard restrictions of rA+rB < 0.8 (covered by above), inc > 50, k <= 100
+    # Hard restrictions of rA+rB < 0.8 (covered by MAX_FRACTIONAL_R), inc > 50, k <= 100
     if usable:
-        usable = rA <= 0.23 and rB <= 0.23 and inc > 50 and k <= 100
+        usable = rA <= MAX_FRACTIONAL_R and rB <= MAX_FRACTIONAL_R and inc > 50 and k <= 100
     return usable
 
 

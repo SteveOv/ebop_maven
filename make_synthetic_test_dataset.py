@@ -33,8 +33,9 @@ dataset_dir.mkdir(parents=True, exist_ok=True)
 # TODO: better way to share inst over multiple calls to generate_instances_from_mist_models()
 _mist_isochones = MistIsochrones()
 
-# max fractional radius: JKTEBOP unsuited to close binaries
-MAX_FRACTIONAL_R = 0.2
+# max fractional radius: JKTEBOP unsuited to close binaries. As a "rule of thumb" the cut-off is
+# at ~0.2. We go further so as to test a model which will be able to predict upto and beyond this.
+MAX_FRACTIONAL_R = 0.23
 
 def generate_instances_from_mist_models(label: str):
     """
