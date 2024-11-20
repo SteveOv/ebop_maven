@@ -6,7 +6,6 @@ from contextlib import redirect_stdout
 import hashlib
 
 import numpy as np
-from scipy.interpolate import interp1d
 
 # pylint: disable=no-member
 import astropy.units as u
