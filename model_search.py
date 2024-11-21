@@ -88,6 +88,7 @@ scope.define(optimizers.Nadam)
 # func calls specific to model type so fmin/TPE has free reign across each.
 cnn_strides_pchoices = [(0.75, None), (0.125, 2), (0.125, 4)]
 cnn_strides_fraction_kwargs = { "low": 0.25, "high": 1, "q": 0.25 }
+cnn_pooling_type_choices_best = [layers.AvgPool1D, layers.MaxPool1D] # cannot be None
 cnn_pooling_type_choices = [layers.AvgPool1D, layers.MaxPool1D, None]
 cnn_padding_choices = ["same", "valid"]
 cnn_activation_choices = ["relu"]
@@ -128,6 +129,7 @@ trials_pspace = hp.pchoice("train_and_test_model", [
             "chosen_labels":            CHOSEN_LABELS,
             "trainset_name":            TRAINSET_NAME,
             "cnn_activation":           hp.choice("best_cnn_activation", cnn_activation_choices),
+            "cnn_pooling":              hp.choice("best_cnn_pooling", cnn_pooling_type_choices_best),
             "dnn_num_layers":           hp.uniformint("best_dnn_num_layers", low=1, high=4),
             "dnn_num_units":            hp.quniform("best_dnn_num_units", low=128, high=512, q=64),
             "dnn_initializer":          hp.choice("best_dnn_initializer", dnn_initializer_choices),

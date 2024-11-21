@@ -19,6 +19,7 @@ import tensorflow as tf
 import tensorboard
 import keras
 from keras import layers, optimizers, callbacks
+from keras.src.layers.pooling.base_pooling import BasePooling
 
 from ebop_maven import modelling, deb_example, plotting
 from ebop_maven.libs.tee import Tee
@@ -71,6 +72,9 @@ CLASS_WEIGHTS = { CHOSEN_LABELS.index(l): 1 for l in CHOSEN_LABELS } # Currently
 CNN_PADDING = "same"
 CNN_ACTIVATE = "relu"
 
+# Currently MaxPool incompatible with tf.config.experimental.enable_op_determinism() / AvgPool1D OK
+CNN_POOLING_TYPE = layers.MaxPool1D # pylint: disable=invalid-name
+
 # For the dense layers: "glorot_uniform" (def) "he_normal", "he_uniform" (he_ goes well with ReLU)
 DNN_INITIALIZER = "he_uniform"
 DNN_ACTIVATE = "leaky_relu"
@@ -109,6 +113,7 @@ def make_best_model(chosen_features: list[str]=CHOSEN_FEATURES,
                     trainset_name: str=TRAINSET_NAME,
                     cnn_padding: str=CNN_PADDING,
                     cnn_activation: str=CNN_ACTIVATE,
+                    cnn_pooling: BasePooling=CNN_POOLING_TYPE,
                     dnn_num_layers: int=DNN_NUM_FULL_LAYERS,
                     dnn_num_units: int=DNN_NUM_UNITS,
                     dnn_initializer: str=DNN_INITIALIZER,
@@ -137,11 +142,11 @@ def make_best_model(chosen_features: list[str]=CHOSEN_FEATURES,
         ext_input=modelling.ext_input_layer(shape=(len(chosen_features), 1), verbose=verbose),
         mags_layers=[
             modelling.conv1d_layers(2, 16, 32, 2, cnn_padding, cnn_activation, "Conv-1-", verbose),
-            modelling.pooling_layer(layers.MaxPool1D, 2, 2, "Pool-1", verbose),
+            modelling.pooling_layer(cnn_pooling, 2, 2, "Pool-1", verbose),
             modelling.conv1d_layers(2, 32, 16, 2, cnn_padding, cnn_activation, "Conv-2-", verbose),
-            modelling.pooling_layer(layers.MaxPool1D, 2, 2, "Pool-2", verbose),
+            modelling.pooling_layer(cnn_pooling, 2, 2, "Pool-2", verbose),
             modelling.conv1d_layers(2, 64, 8, 2, cnn_padding, cnn_activation, "Conv-3-", verbose),
-            modelling.pooling_layer(layers.MaxPool1D, 2, 2, "Pool-3", verbose),
+            modelling.pooling_layer(cnn_pooling, 2, 2, "Pool-3", verbose),
             modelling.conv1d_layers(2, 128, 4, 2, cnn_padding, cnn_activation, "Conv-4-", verbose),
         ],
         dnn_layers=[
