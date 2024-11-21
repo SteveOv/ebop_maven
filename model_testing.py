@@ -7,7 +7,6 @@ from typing import Union, List, Dict
 from io import TextIOBase, StringIO
 import inspect
 import sys
-import os
 from pathlib import Path
 import re
 from contextlib import redirect_stdout
@@ -55,7 +54,7 @@ all_fitted_params = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "inc",
                      "L3", "pe", "period", "bP", "bS", "ecc", "omega", "qphot",
                      "phiS", "rA", "rB", "LDA1", "LDB1", "LDA2", "LDB2"]
 
-def evaluate_model_against_dataset(estimator: Union[Model, Estimator],
+def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
                                    mc_iterations: int=1,
                                    include_ids: List[str]=None,
                                    test_dataset_dir: Path=FORMAL_TEST_DATASET_DIR,
@@ -74,7 +73,7 @@ def evaluate_model_against_dataset(estimator: Union[Model, Estimator],
     """
     # Create our Estimator. It will tell us what its inputs should look like
     # and which labels it (& the underlying model) can predict.
-    if isinstance(estimator, (Model, Path)):
+    if not isinstance(estimator, Estimator):
         estimator = Estimator(estimator)
     mc_type = "mc" if mc_iterations > 1 else "nonmc"
 
@@ -152,7 +151,7 @@ def evaluate_model_against_dataset(estimator: Union[Model, Estimator],
                 plt.close()
 
 
-def fit_against_formal_test_dataset(estimator: Union[Model, Estimator],
+def fit_against_formal_test_dataset(estimator: Union[Path, Model, Estimator],
                                     targets_config: Dict[str, any],
                                     include_ids: List[str]=None,
                                     mc_iterations: int=1,
@@ -175,7 +174,7 @@ def fit_against_formal_test_dataset(estimator: Union[Model, Estimator],
     :returns: a recarray[UFloat] containing the resulting fitted parameters for each target
     """
     # pylint: disable=too-many-statements, too-many-branches
-    if isinstance(estimator, (Model, Path)):
+    if not isinstance(estimator, Estimator):
         estimator = Estimator(estimator)
 
     prediction_type = "control" if do_control_fit else "mc" if mc_iterations > 1 else "nonmc"
@@ -725,8 +724,6 @@ if __name__ == "__main__":
         print(f"\nModel file {file_counter} of {len(args.model_files)}: {model_file}\n")
 
         # Set up the estimator and the reporting directory for this model
-        the_estimator = Estimator(model_file)
-        trainset_name = the_estimator.metadata["trainset_name"]
         if model_file is None or model_file.parent.name == "estimator": # published with ebop_maven
             result_dir = Path(f"./drop/training/published/{TEST_RESULTS_SUBDIR}")
         else:
@@ -740,7 +737,8 @@ if __name__ == "__main__":
 
         labs, all_preds = None, {}
         with redirect_stdout(Tee(open(result_dir / "model_testing.log", "w", encoding="utf8"))):
-            print(f"\nStarting tests of {the_estimator} at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
+            print(f"\nStarting tests on {model_file.parent.name} tests at",
+                  f"{datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
 
             # CUDA_VISIBLE_DEVICES is set for the ebop_maven conda env. A value of "-1" suppresses
             # GPUs, useful for repeatable results (Keras advises that out of order processing within
@@ -760,7 +758,7 @@ if __name__ == "__main__":
             ]:
                 print(f"\nEvaluating the model's {pred_type} estimates (iters={iters})",
                       f"on {dataset_dir.name}\n" + "="*80)
-                evaluate_model_against_dataset(the_estimator, iters, targs, dataset_dir, result_dir)
+                evaluate_model_against_dataset(model_file, iters, targs, dataset_dir, result_dir)
 
             # In depth report on fitting the formal-test-dataset based on estimator predictions.
             # First loop uses labels as the "predictions" to yield a set of control fit results for
@@ -772,7 +770,7 @@ if __name__ == "__main__":
                     ("mc",          False,      1000),
             ]:
                 print(f"\nTesting JKTEBOP fitting of {pred_type} input values\n" + "="*80)
-                fitted_vals = fit_against_formal_test_dataset(the_estimator,
+                fitted_vals = fit_against_formal_test_dataset(model_file,
                                                             formal_targs_cfg,
                                                             formal_targs,
                                                             iterations,
