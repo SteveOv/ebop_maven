@@ -53,9 +53,9 @@ TRAIN_PATIENCE = 7                  # Number of epochs w/o improvement before tr
 TRAIN_TIMEOUT = timedelta(hours=1)  # Timeout training if not completed within this time
 
 SEED = 42                           # Standard random seed ensures repeatable randomization
-np.random.seed(SEED)
-python_random.seed(SEED)
-tf.random.set_seed(SEED)
+
+# Sets the random seed on python, numpy and keras's backend library (in this case tensorflow)
+keras.utils.set_random_seed(SEED)
 
 results_dir = Path(".") / "drop" / "model_search"
 results_dir.mkdir(parents=True, exist_ok=True)

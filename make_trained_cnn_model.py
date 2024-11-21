@@ -53,9 +53,9 @@ MAX_BUFFER_SIZE = 20000000      # Size of Dataset shuffle buffer (in instances)
 ES_PATIENCE = 5                 # Number of epochs w/o val_loss improvement before stopping
 ES_MIN_DELTA = 0.0001           # Minimum val_loss delta to be considered an improvment
 SEED = 42                       # Standard random seed ensures repeatable randomization
-np.random.seed(SEED)
-python_random.seed(SEED)
-tf.random.set_seed(SEED)
+
+# Sets the random seed on python, numpy and keras's backend library (in this case tensorflow)
+keras.utils.set_random_seed(SEED)
 
 # This schedule is effectively init_rate * 0.94^epoch (so is reduced by ~10 in 37 epochs)
 LR = optimizers.schedules.ExponentialDecay(1e-3, decay_steps=1000, decay_rate=0.94)

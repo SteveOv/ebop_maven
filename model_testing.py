@@ -101,6 +101,9 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
     if include_ids is not None:
         assert len(include_ids) == len(ids)
 
+    # Sets the random seed on numpy, keras's backend library (here tensorflow) and python
+    keras.utils.set_random_seed(DEFAULT_TESTING_SEED)
+
     # Make predictions, returned as a structured array of shape (#insts, #labels) and dtype=UFloat
     # Manually batch large datasets in case the model is memory constrained (i.e.: running on a GPU)
     print(f"The Estimator is making predictions on the {len(ids)} test instances",
@@ -211,6 +214,9 @@ def fit_against_formal_test_dataset(estimator: Union[Path, Model, Estimator],
     # For this "deep dive" test we report on labels with uncertainties, so we ignore the label
     # values in the dataset (nominals only) and go to the source config to get the full values.
     lbl_vals = formal_testing.get_labels_for_targets(targets_config, super_params, targs)
+
+    # Sets the random seed on numpy, keras's backend library (here tensorflow) and python
+    keras.utils.set_random_seed(DEFAULT_TESTING_SEED)
 
     # Make predictions, returned as a structured array of shape (#insts, #labels) and dtype=UFloat
     if do_control_fit:
