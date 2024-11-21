@@ -62,7 +62,8 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
                                    scaled: bool=False):
     """
     Will evaluate the indicated model file or Estimator against the contents of the
-    chosen test dataset.
+    chosen test dataset. The evaluation is carried out in the context of an Estimator,
+    rather than with model evaluate, as it gives us more scope to drill into the data.
 
     :estimator: the Estimator or estimator model to use to make predictions
     :mc_iterations: the number of MC Dropout iterations
@@ -101,10 +102,18 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
         assert len(include_ids) == len(ids)
 
     # Make predictions, returned as a structured array of shape (#insts, #labels) and dtype=UFloat
+    # Manually batch large datasets in case the model is memory constrained (i.e.: running on a GPU)
     print(f"The Estimator is making predictions on the {len(ids)} test instances",
           f"with {mc_iterations} iteration(s) (iterations >1 triggers MC Dropout algorithm).")
+    max_batch_size = 1000
+    pred_vals = np.empty((len(mags_vals), ),
+                         dtype=[(n, np.dtype(UFloat.dtype)) for n in estimator.label_names])
     force_seed_on_dropout_layers(estimator)
-    pred_vals = estimator.predict(mags_vals, feat_vals, mc_iterations, unscale=not scaled)
+    for ix in np.arange(0, len(mags_vals), max_batch_size):
+        pv = estimator.predict(mags_vals[ix : ix+max_batch_size], feat_vals[ix : ix+max_batch_size],
+                               mc_iterations, unscale=not scaled)
+        pred_vals[ix : ix+len(pv)] = pv
+
     if "inc" not in estimator.label_names:
         pred_vals = append_calculated_inc_predictions(pred_vals)
         if scaled: # Apply any scaling to inc consistent with having predicted it
@@ -741,9 +750,6 @@ if __name__ == "__main__":
             print(f"\nStarting tests on {model_file.parent.name} tests at",
                   f"{datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
 
-            # CUDA_VISIBLE_DEVICES is set for the ebop_maven conda env. A value of "-1" suppresses
-            # GPUs, useful for repeatable results (Keras advises that out of order processing within
-            # GPU/CUDA can lead to varying results) & also avoids memory constraints on smaller GPUs
             print("\nRuntime environment:", sys.prefix.replace("'", ""))
             print(*(f"{lib.__name__} v{lib.__version__}" for lib in [tf, keras]), sep="\n")
             print(f"tensorflow sees {len(tf.config.list_physical_devices('GPU'))} physical GPU(s)")
