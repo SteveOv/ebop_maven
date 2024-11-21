@@ -30,7 +30,7 @@ import keras
 from keras import Model, layers
 
 from ebop_maven.libs.tee import Tee
-from ebop_maven.libs import jktebop, stellar, limb_darkening
+from ebop_maven.libs import jktebop, stellar, limb_darkening, orbital
 from ebop_maven.estimator import Estimator
 from ebop_maven import deb_example, pipeline
 
@@ -163,32 +163,45 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
                 plt.close()
 
 
-def fit_against_formal_test_dataset(estimator: Union[Path, Model, Estimator],
-                                    targets_config: Dict[str, any],
-                                    include_ids: List[str]=None,
-                                    mc_iterations: int=1,
-                                    apply_fit_overrides: bool=True,
-                                    do_control_fit: bool=False,
-                                    comparison_vals: np.ndarray[UFloat]=None,
-                                    report_dir: Path=None) -> np.ndarray[UFloat]:
+def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
+                            targets_config: Dict[str, any],
+                            include_ids: List[str]=None,
+                            mc_iterations: int=1,
+                            apply_fit_overrides: bool=True,
+                            do_control_fit: bool=False,
+                            comparison_vals: np.ndarray[UFloat]=None,
+                            report_dir: Path=None) -> np.ndarray[UFloat]:
     """
-    Will fit members of the formal test dataset, as configured in targets_config,
-    based on the sets of input_params passed in returning the corresponding fitted params.
+    Will fit members of the formal test dataset, as configured in targets_config, based on
+    predictions made with the passed estimator model, returning the corresponding fitted params
+    (except when do_control_fit==True when the label values are used instead of predictions).
+
+    Unlike evaluate_model_against_dataset() these tests do not use the dataset tfrecord files,
+    rather the targets' mags_features are sourced and pre-processed directly from the TESS fits
+    files so that these tests and the equivalent logic in model_interactive_tester are similar.
+    This means that MC Dropout predictions may vary from those of evaluate_model_against_dataset()
+    because that method performs a single bulk predict on all chosen targets in the dataset
+    (the mags_features should be the same, so it's down to the random behaviour of MC Dropout).
 
     :estimator: the Estimator or estimator model to use to make predictions
     :targets_config: the full config for all targets
-    :selected_targets: list of target ids to fit, or all if empty
+    :include_ids: list of target ids to fit, or all in targets_config if not given
     :mc_iterations: the number of MC iterations to use when making predictions
     :apply_fit_overrides: apply any fit_overrides from each target's config
     :do_control_fit: when True labels, rather than predictions, will be the input params for fitting
-    :comparison_vals: optional recarray[UFloat] to compare to fitting results, in addition to labels
+    :comparison_vals: optional recarray[UFloat] to compare to fitting results, alternative to labels
     :report_dir: optional directory into which to save reports, reports not saved if this is None
-    :returns: a recarray[UFloat] containing the resulting fitted parameters for each target
+    :returns: a structured NDArray[UFloat] containing the fitted parameters for each target
     """
     # pylint: disable=too-many-statements, too-many-branches
     if not isinstance(estimator, Estimator):
         estimator = Estimator(estimator)
+    mags_bins = estimator.mags_feature_bins
+    mags_wrap_phase = estimator.mags_feature_wrap_phase
 
+    targs = include_ids if len(include_ids or []) > 0 else [*targets_config.keys()]
+    targs = np.array(targs) if not isinstance(targs, np.ndarray) else targs
+    trans_flags = np.array([targets_config.get(t, {}).get("transits", False) for t in targs])
     prediction_type = "control" if do_control_fit else "mc" if mc_iterations > 1 else "nonmc"
 
     # To clarify: the estimator publishes a list of what it can predict via its label_names attrib
@@ -196,42 +209,13 @@ def fit_against_formal_test_dataset(estimator: Union[Path, Model, Estimator],
     # super_params is the set of both and is used, for example, to get the superset of label values
     super_params = estimator.label_names + [n for n in fit_params if n not in estimator.label_names]
 
-    if include_ids is None or len(include_ids) == 0:
-        include_ids = list(targets_config.keys())
-    trans_flags = np.array([targets_config.get(t,{}).get("transits", False) for t in include_ids])
-
-    print(f"\nLooking for the test dataset in '{FORMAL_TEST_DATASET_DIR}'.")
-    tfrecord_files = sorted(FORMAL_TEST_DATASET_DIR.glob("**/*.tfrecord"))
-    if len(tfrecord_files) == 0:
-        raise ValueError(f"No tfrecords under {FORMAL_TEST_DATASET_DIR}. Please make this dataset.")
-    targs, mags_vals, feat_vals, _ = deb_example.read_dataset(tfrecord_files,
-                                                              estimator.mags_feature_bins,
-                                                              estimator.mags_feature_wrap_phase,
-                                                              estimator.extra_feature_names,
-                                                              [],
-                                                              include_ids)
-
     # For this "deep dive" test we report on labels with uncertainties, so we ignore the label
     # values in the dataset (nominals only) and go to the source config to get the full values.
     lbl_vals = formal_testing.get_labels_for_targets(targets_config, super_params, targs)
 
-    # Sets the random seed on numpy, keras's backend library (here tensorflow) and python
-    keras.utils.set_random_seed(DEFAULT_TESTING_SEED)
-
-    # Make predictions, returned as a structured array of shape (#insts, #labels) and dtype=UFloat
-    if do_control_fit:
-        print("\nControl fits will use label values as 'predictions' and fitting inputs.")
-        pred_vals = copy.deepcopy(lbl_vals)
-    else:
-        print(f"\nThe Estimator will make predictions on {len(targs)} formal test instance(s)",
-              f"with {mc_iterations} iteration(s) (iterations >1 triggers MC Dropout algorithm).")
-        force_seed_on_dropout_layers(estimator)
-        pred_vals = estimator.predict(mags_vals, feat_vals, mc_iterations)
-        if "inc" not in pred_vals.dtype.names:
-            pred_vals = append_calculated_inc_predictions(pred_vals)
-
-    # Pre-allocate a structured array to hold the params which are output from each JKTEBOP fitting
-    fit_vals = np.empty((len(targs), ), dtype=[(sn, np.dtype(UFloat.dtype)) for sn in super_params])
+    # Pre-allocate a structured arrays to hold the predictions and equivalent fit results
+    pred_vals = np.empty((len(targs), ), dtype=[(p, np.dtype(UFloat.dtype)) for p in super_params])
+    fit_vals = np.empty((len(targs), ), dtype=[(p, np.dtype(UFloat.dtype)) for p in super_params])
 
     # Finally, we have everything in place to fit our targets and report on the results
     for ix, targ in enumerate(targs):
@@ -241,8 +225,33 @@ def fit_against_formal_test_dataset(estimator: Union[Path, Model, Estimator],
 
         # The basic lightcurve data read, rectified & extended with delta_mag and delta_mag_err cols
         (lc, _) = formal_testing.prepare_lightcurve_for_target(targ, targ_config, True)
+        period = targ_config["period"] * u.d
+        pe = pipeline.to_lc_time(targ_config["primary_epoch"], lc)
 
-        print(f"\nWill fit {targ} with these input params from {prediction_type} predictions")
+        # Work out how we will position/wrap the phase folded mags feature
+        wrap_phase = mags_wrap_phase
+        if wrap_phase is None:
+            ecosw = lbl_vals[ix]["ecosw"].nominal_value
+            wrap_phase = 0.5+(orbital.secondary_eclipse_phase(ecosw, targ_config.get("ecc", 0)) / 2)
+
+        # Get the phase folded and binned mags feature
+        print(f"Creating folded and phase normalized lightcurves about {pe.format} {pe} & {period}",
+              f"wrapped beyond phase {wrap_phase}" if wrap_phase not in [0.0, 1.0] else "")
+        fold_lc = lc.fold(period, pe, wrap_phase=u.Quantity(wrap_phase), normalize_phase=True)
+        _, mags = pipeline.get_sampled_phase_mags_data(fold_lc, mags_bins, wrap_phase)
+
+        if do_control_fit:
+            pred_vals[ix] = copy.deepcopy(lbl_vals[ix])
+        else:
+            print(f"\nThe Estimator will make {prediction_type} predictions on {targ}",
+                  f"with {mc_iterations} MC Dropout iterations" if prediction_type == "mc" else "")
+            keras.utils.set_random_seed(DEFAULT_TESTING_SEED)
+            force_seed_on_dropout_layers(estimator)
+            pv = estimator.predict(np.array([mags]), None, mc_iterations)
+            predictions_vs_labels_to_table(pv, lbl_vals[ix], [targ])
+            pred_vals[ix] = pv if "inc" in pv.dtype.names else append_calculated_inc_predictions(pv)
+
+        print(f"\nThe {prediction_type} sourced input params for fitting {targ}")
         predictions_vs_labels_to_table(pred_vals[ix], lbl_vals[ix], [targ], fit_params)
 
         # Perform the task3 fit taking the preds or control as input params and supplementing
@@ -783,14 +792,14 @@ if __name__ == "__main__":
                     ("mc",          False,      1000),
             ]:
                 print(f"\nTesting JKTEBOP fitting of {pred_type} input values\n" + "="*80)
-                fitted_vals = fit_against_formal_test_dataset(model_file,
-                                                            formal_targs_cfg,
-                                                            formal_targs,
-                                                            iterations,
-                                                            True,
-                                                            is_ctrl_fit,
-                                                            None if is_ctrl_fit else ctrl_fit_vals,
-                                                            result_dir)
+                fitted_vals = fit_formal_test_dataset(model_file,
+                                                      formal_targs_cfg,
+                                                      formal_targs,
+                                                      iterations,
+                                                      True,
+                                                      is_ctrl_fit,
+                                                      None if is_ctrl_fit else ctrl_fit_vals,
+                                                      result_dir)
                 if is_ctrl_fit:
                     ctrl_fit_vals = fitted_vals
 
