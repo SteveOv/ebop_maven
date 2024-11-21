@@ -726,6 +726,7 @@ if __name__ == "__main__":
         # Set up the estimator and the reporting directory for this model
         if model_file is None or model_file.parent.name == "estimator": # published with ebop_maven
             result_dir = Path(f"./drop/training/published/{TEST_RESULTS_SUBDIR}")
+            model_file = Path("./ebop_maven/data/estimator/default-model.keras")
         else:
             result_dir = model_file.parent / TEST_RESULTS_SUBDIR
         result_dir.mkdir(parents=True, exist_ok=True)
