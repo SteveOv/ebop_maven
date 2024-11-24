@@ -3,9 +3,7 @@ Trains a regression CNN to estimate fitting parameters from folded dEB light cur
 """
 #pylint: disable=line-too-long
 from pathlib import Path
-import os
 import sys
-import random as python_random
 import json
 from inspect import getsource
 from datetime import datetime, timezone
@@ -57,6 +55,12 @@ SEED = 42                       # Standard random seed ensures repeatable random
 # Sets the random seed on python, numpy and keras's backend library (in this case tensorflow)
 keras.utils.set_random_seed(SEED)
 
+# Make GPU ops as deterministic as possible, for repeatable results, at the expense of performance.
+# Note that MaxPool1D layers are incompatible with this setting; they cause the following error
+# "GPU MaxPool gradient ops do not yet have a deterministic XLA implementation", however AvgPool1D
+# are fine. Even with this setting, GPUs are seen only if CUDA_VISIBLE_DEVICES isn't set to -1.
+#tf.config.experimental.enable_op_determinism()
+
 # This schedule is effectively init_rate * 0.94^epoch (so is reduced by ~10 in 37 epochs)
 LR = optimizers.schedules.ExponentialDecay(1e-3, decay_steps=1000, decay_rate=0.94)
 OPTIMIZER = optimizers.Nadam(learning_rate=LR)
@@ -71,8 +75,6 @@ CLASS_WEIGHTS = { CHOSEN_LABELS.index(l): 1 for l in CHOSEN_LABELS } # Currently
 # LeakyReLU addresses issue of dead neurons & PReLU similar but trains alpha param
 CNN_PADDING = "same"
 CNN_ACTIVATE = "relu"
-
-# Currently MaxPool incompatible with tf.config.experimental.enable_op_determinism() / AvgPool1D OK
 CNN_POOLING_TYPE = layers.MaxPool1D # pylint: disable=invalid-name
 
 # For the dense layers: "glorot_uniform" (def) "he_normal", "he_uniform" (he_ goes well with ReLU)
