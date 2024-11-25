@@ -966,7 +966,7 @@
         "transits": false,
         "eclipses_similar": false,
         "components_similar": false,
-        "notes": "e=0 & ω=0 & L3=0 (fixed); bP derived from rA, inc, e & esinw; control fit includes time masks, LD params, fixed L3 and lrat from source article and sector 18 to give an MAE~0.0078",
+        "notes": "e=0 & ω=0 & L3=0 (fixed); bP derived from rA, inc, e & esinw; control fit includes time masks, LD params, fixed L3 and lrat from source article and sector 18 to give an MAE~0.0078; predictions on S58 tend to be more accurate but the control fit of S18 is closer to published values;",
         "primary_epoch": 1808.957210950,
         "period": 1.900928407,
         "labels": { 
