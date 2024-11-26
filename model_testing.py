@@ -151,6 +151,7 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
             # These plot to pdf, which looks better than eps, as it supports transparency/alpha.
             # For formal-test-dataset we plot only the whole set as the size is too low to split.
             if report_dir and (not subset or "formal" not in ds_name):
+                report_dir.mkdir(parents=True, exist_ok=True)
                 show_fliers = "formal" in ds_name
                 m_errs = calculate_prediction_errors(m_preds[plot_params], m_lbls[plot_params])
                 plots.plot_prediction_boxplot(m_errs, show_fliers=show_fliers, ylabel="Error") \
@@ -266,6 +267,7 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
 
     # Save reports on how the predictions and fitting has gone over all of the selected targets
     if report_dir:
+        report_dir.mkdir(parents=True, exist_ok=True)
         comparison_type = [("labels", "label", lbl_vals)] # type, heading, values
         if comparison_vals is not None:
             comparison_type += [("control", "control", comparison_vals)]
@@ -780,7 +782,8 @@ if __name__ == "__main__":
             ]:
                 print(f"\nEvaluating the model's {pred_type} estimates (iters={iters})",
                       f"on {dataset_dir.name}\n" + "="*80)
-                evaluate_model_against_dataset(model_file, iters, targs, dataset_dir, result_dir)
+                evaluate_model_against_dataset(model_file, iters, targs,
+                                               dataset_dir, result_dir / "eval")
 
             # In depth report on fitting the formal-test-dataset based on estimator predictions.
             # First loop uses labels as the "predictions" to yield a set of control fit results for
@@ -799,7 +802,7 @@ if __name__ == "__main__":
                                                       True,
                                                       is_ctrl_fit,
                                                       None if is_ctrl_fit else ctrl_fit_vals,
-                                                      result_dir)
+                                                      result_dir / "fit")
                 if is_ctrl_fit:
                     ctrl_fit_vals = fitted_vals
 
