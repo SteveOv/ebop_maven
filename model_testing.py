@@ -151,16 +151,20 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
             # These plot to pdf, which looks better than eps, as it supports transparency/alpha.
             # For formal-test-dataset we plot only the whole set as the size is too low to split.
             if report_dir and (not subset or "formal" not in ds_name):
-                report_dir.mkdir(parents=True, exist_ok=True)
+                sub_dir = report_dir / ds_name / mc_type
+                sub_dir.mkdir(parents=True, exist_ok=True)
+                save_predictions_to_csv(ids, tflags, pred_vals, sub_dir / "predictions.csv")
+                save_predictions_to_csv(ids, tflags, lbl_vals, sub_dir/ "labels.csv")
+
                 show_fliers = "formal" in ds_name
                 m_errs = calculate_prediction_errors(m_preds[plot_params], m_lbls[plot_params])
                 plots.plot_prediction_boxplot(m_errs, show_fliers=show_fliers, ylabel="Error") \
-                    .savefig(report_dir / f"predictions-{mc_type}-box-{ds_name}{suffix}.pdf")
+                    .savefig(sub_dir / f"predictions-{mc_type}-box-{ds_name}{suffix}.pdf")
                 plt.close()
 
                 plots.plot_predictions_vs_labels(m_preds, m_lbls, tflags[tmask],
                                                  plot_params, show_errorbars=False) \
-                    .savefig(report_dir / f"predictions-{mc_type}-vs-labels-{ds_name}{suffix}.pdf")
+                    .savefig(sub_dir / f"predictions-{mc_type}-vs-labels-{ds_name}{suffix}.pdf")
                 plt.close()
 
 
@@ -267,10 +271,16 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
 
     # Save reports on how the predictions and fitting has gone over all of the selected targets
     if report_dir:
-        report_dir.mkdir(parents=True, exist_ok=True)
+        sub_dir = report_dir / prediction_type
+        sub_dir.mkdir(parents=True, exist_ok=True)
+        save_predictions_to_csv(targs, trans_flags, pred_vals, sub_dir / "predictions.csv")
+        save_predictions_to_csv(targs, trans_flags, fit_vals, sub_dir / "fitted-params.csv")
+        save_predictions_to_csv(targs, trans_flags, lbl_vals, sub_dir / "labels.csv")
+
         comparison_type = [("labels", "label", lbl_vals)] # type, heading, values
         if comparison_vals is not None:
             comparison_type += [("control", "control", comparison_vals)]
+            save_predictions_to_csv(targs, trans_flags, comparison_vals, sub_dir / "controls.csv")
         sub_reports = [
             ("All targets (model labels)",          [True]*len(targs),      estimator.label_names),
             ("\nTransiting systems only",           trans_flags,            estimator.label_names),
@@ -288,9 +298,9 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
                     names = [n for n in names if n not in ["ecosw", "esinw"]] + ["ecosw", "esinw"]
                     fig = plots.plot_predictions_vs_labels(pred_vals, comp_vals, trans_flags,
                                                            names, xlabel_prefix=comp_head)
-                    fig.savefig(report_dir / f"{preds_stem}-{source}.eps")
+                    fig.savefig(sub_dir / f"{preds_stem}-{source}.eps")
 
-                with open(report_dir / f"{preds_stem}.txt", mode="w", encoding="utf8") as txtf:
+                with open(sub_dir / f"{preds_stem}.txt", mode="w", encoding="utf8") as txtf:
                     for (sub_head, mask, rep_names) in sub_reports:
                         if any(mask):
                             predictions_vs_labels_to_table(pred_vals[mask], comp_vals[mask],
@@ -302,10 +312,10 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
             plot_params = [n for n in fit_params if n not in ["ecosw", "esinw"]] + ["ecosw","esinw"]
             fig = plots.plot_predictions_vs_labels(fit_vals, comp_vals, trans_flags, plot_params,
                                                    xlabel_prefix=comp_head, ylabel_prefix="fitted")
-            fig.savefig(report_dir / f"{results_stem}.eps")
+            fig.savefig(sub_dir / f"{results_stem}.eps")
             plt.close()
 
-            with open(report_dir / f"{results_stem}.txt", "w", encoding="utf8") as txtf:
+            with open(sub_dir / f"{results_stem}.txt", "w", encoding="utf8") as txtf:
                 for (sub_head, mask, rep_names) in sub_reports:
                     if any(mask):
                         predictions_vs_labels_to_table(fit_vals[mask], comp_vals[mask], targs[mask],
@@ -574,6 +584,36 @@ def will_transit(rA_plus_rB: Union[np.ndarray[float], np.ndarray[UFloat]],
     primary_trans = cosi < np.multiply(pt1, np.add(1, esinw))
     secondary_trans = cosi < np.multiply(pt1, np.subtract(1, esinw))
     return np.bitwise_or(primary_trans, secondary_trans)
+
+
+def save_predictions_to_csv(target_names: np.ndarray[str],
+                            flags: np.ndarray[Union[int, bool]],
+                            predictions: np.ndarray[UFloat],
+                            file_name: Path):
+    """
+    Writes a csv file for a predictions or labels array. It will include an initial column of
+    the target names, a column of the flags, followed by columns for the values split into the
+    nominal value (named '{param_name}') and the std_dev error value (named '{param_name}_err').
+    The zeroth row is a header row with the column names.
+
+    :target_names: names of the targets, one per row
+    :flags: any flags associated with each row; must be a single column of bools or ints (bitmask)
+    :predictions: the predictions
+    :file_name: the file to (over)write to
+    """
+    # Life is too short to spend time fighting numpy when trying to split the ufloats, concatenate
+    # all of the the columns (with different dtypes) and then use savetxt(), however I did try :-(
+    with open(file_name, mode="w", encoding="utf8") as f:
+        pkeys = list(predictions.dtype.names)
+        f.write("target,flags,")
+        f.write(",".join(f"{k:s},{k:s}_err" for k in pkeys))
+        f.write("\n")
+
+        # Will error if the zeroth dims are not of equal length
+        for targ, flag, preds in zip(target_names, flags, predictions):
+            f.write(f"'{targ:s}',{flag:d},")
+            f.write(",".join(f"{get_nom(preds[k]):.9f},{get_err(preds[k]):.9f}" for k in pkeys))
+            f.write("\n")
 
 
 def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
