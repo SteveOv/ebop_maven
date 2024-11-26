@@ -140,13 +140,16 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
         if any(tmask):
             print(f"\nSummary of the estimator's predictions for {sum(tmask)}{subset} system(s)")
             m_preds, m_lbls = pred_vals[tmask], lbl_vals[tmask]
+            show_error_bars = mc_iterations > 1
             predictions_vs_labels_to_table(m_preds, m_lbls, summary_only=True,
-                                           selected_param_names=estimator.label_names)
+                                           selected_param_names=estimator.label_names,
+                                           error_bars=show_error_bars)
 
             if set(fit_params) != set(estimator.label_names):
                 print("...and of the corresponding fitting params derived from them")
                 predictions_vs_labels_to_table(m_preds, m_lbls, summary_only=True,
-                                               selected_param_names=fit_params)
+                                               selected_param_names=fit_params,
+                                               error_bars=show_error_bars)
 
             # These plot to pdf, which looks better than eps, as it supports transparency/alpha.
             # For formal-test-dataset we plot only the whole set as the size is too low to split.
@@ -163,7 +166,7 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
                 plt.close()
 
                 plots.plot_predictions_vs_labels(m_preds, m_lbls, tflags[tmask],
-                                                 plot_params, show_errorbars=False) \
+                                                 plot_params, show_errorbars=show_error_bars) \
                     .savefig(sub_dir / f"predictions-{mc_type}-vs-labels-{ds_name}{suffix}.pdf")
                 plt.close()
 
