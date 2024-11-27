@@ -249,26 +249,31 @@ def write_targets_tabular_file(targets_cfg: dict, targets_tex_file: Path, cite_n
 # Makes the formal test dataset of real systems with TESS photometry.
 # ------------------------------------------------------------------------------
 if __name__ == "__main__":
+    # Details of only those targets not excluded from testing
+    targets_config = dict(formal_testing.iterate_target_configs(targets_config_file,
+                                                                include_excluded=False))
+    inc_targs = list(targets_config.keys())
+
     with redirect_stdout(Tee(open(dataset_dir / "dataset.log", "w", encoding="utf8"))):
         # Process differs from that with synthetic data.
         # We have a config file with MAST search params & labels (from published works).
         # Build the dataset directly by downloading fits & folding LCs.
         # This will include all targets, including those excluded.
-        formal_testset_file = make_formal_test_dataset(config_file=targets_config_file,
-                                                       output_dir=dataset_dir,
-                                                       target_names=None,
-                                                       verbose=True,
-                                                       simulate=False)
+        ds_file = make_formal_test_dataset(config_file=targets_config_file,
+                                           output_dir=dataset_dir,
+                                           target_names=inc_targs,
+                                           verbose=True,
+                                           simulate=False)
 
     # Plot a H-R diagram of those test targets not excluded from testing
-    targets_config = dict(formal_testing.iterate_target_configs(targets_config_file))
     fig = plots.plot_formal_test_dataset_hr_diagram(targets_config, verbose=True)
     fig.savefig(dataset_dir / "formal-test-hr-logl-vs-logteff.eps")
     fig.clf()
 
-    write_targets_tabular_file(targets_config, dataset_dir / "formal-test-targets-tabular.tex")
-
-    # Diagnostics plot of the mags features of each target, including those "not enabled"
-    fig = plots.plot_dataset_instance_mags_features([formal_testset_file], cols=5)
+    # The mags features of these targets not marked as excluded from testing
+    fig = plots.plot_dataset_instance_mags_features([ds_file], inc_targs, cols=5)
+    fig.savefig(dataset_dir / "formal-test-mags-features.eps")
     fig.savefig(dataset_dir / "formal-test-mags-features.png", dpi=300)
     fig.clf()
+
+    write_targets_tabular_file(targets_config, dataset_dir / "formal-test-targets-tabular.tex")

@@ -202,15 +202,16 @@ def plot_dataset_instance_mags_features(dataset_files: Iterable[Path],
             xlabel = "Phase" if ix >= len(instances)-cols else None
 
             # We'll rely on the caller to config the output if it's an Axes
-            format_axes(ax, xlabel=xlabel, ylabel=ylabel, legend_loc="best", **format_kwargs)
+            format_axes(ax, xlabel=xlabel, ylabel=ylabel, legend_loc="lower right", **format_kwargs)
         else:
             ax.axis("off") # remove the unused ax
 
     # Now we have the maximum extent of the mags go back through setting the ylims and phase vlines
+    ymax += 0.075 # extend the y-axis so there is always space for the legend
     for ix, ax in enumerate(axes.flatten()):
         if ix < len(instances):
             ax.set_ylim((ymax, ymin)) # Has side effect of inverting the y-axis
-            ax.vlines(major_xticks, ymin, ymax, ls="--", color="k", lw=.5, alpha=.25, zorder=-10)
+            ax.vlines(major_xticks, ymin, ymax, ls="--", color="lightgray", lw=.5, zorder=-10)
 
     return fig
 
