@@ -1230,7 +1230,7 @@
         "logLB": 0.713,         "logLB_err": null,
         "rA": 0.037688,         "rA_err": 0.000032,
         "rB": 0.061263,         "rB_err": 0.000074,
-        "desc": "An eccentric orbit with the secondary occuring before phase 0.5. Star B is significantly larger and evolved with k~1.6. Only sector 2 shows both eclipses with sectors 29 and 69 having incomplete eclipses. Primary eclipses are transits and whereas the secondary eclipses are partial.",
+        "desc": "An eccentric orbit with the secondary occuring before phase 0.5. Star B is significantly larger and evolved with k~1.6. Only sector 2 shows both eclipses with sectors 29 and 69 having incomplete eclipses. Primary eclipses are transits and whereas the secondary eclipses are partial. We use the parameters from Maxted et al. (2020) run K as our labels and effective temperatures and luminosities from Kirby et al. (2016).",
         "transits": true,
         "eclipses_similar": false,
         "components_similar": false,
@@ -1247,7 +1247,7 @@
             "bP": 0.623,            "bP_err": 0.003,
             "inc": 88.359,          "inc_err": 0.007,
             "ecosw": -0.065161,     "ecosw_err": 0.000010,
-            "esinw": 0.1765,        "esinw_err": 0.000022,
+            "esinw": 0.1765,        "esinw_err": 0.0008,
             "L3": 0.0053,           "L3_err": 0.0025
         },
         "sectors": {
