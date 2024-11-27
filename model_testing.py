@@ -90,6 +90,8 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
     if len(tfrecord_files) == 0:
         raise ValueError(f"No tfrecord files under {test_dataset_dir}. Please make this dataset.")
     print(f"found {len(tfrecord_files)} file(s).")
+
+    # The label values here will have zero uncertainties as we only store the nominals in the ds
     ids, mags_vals, feat_vals, lbl_vals = deb_example.read_dataset(tfrecord_files,
                                                                 estimator.mags_feature_bins,
                                                                 estimator.mags_feature_wrap_phase,
@@ -132,6 +134,7 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
     tflags = will_transit(*argvs)
 
     # Now report on the quality of the predictions.
+    # If the labels have been read from the dataset/tfrecord then they will have no uncertainties
     plot_params = [n for n in estimator.label_names if n not in ["ecosw","esinw"]]+["ecosw","esinw"]
     for (subset, tmask) in [("",                 [True]*lbl_vals.shape[0]),
                             (" transiting",      tflags),
