@@ -232,8 +232,8 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
     :transit_flags: the associated transit flags; points where the transit flag is True
     are plotted as a filled shape otherwise as an empty shape
     :selected_params: a subset of the full list of prediction/label params to render
-    :show_errorbars: whether to plot errorbars - if not set the function will plot errorbars
-    if there are non-zero error/sigma values in the predictions
+    :show_errorbars: whether to plot errorbars for predictions and labels - if not set the function
+    will plot errorbars if there are non-zero error/sigma values in the predictions
     :xlabel_prefix: the prefix text for the labels/x-axis label
     :ylabel_prefix: the prefix text for the predictions/y-axis label
     :returns: the Figure
@@ -260,6 +260,7 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
     for (ax, param_name) in zip_longest(axes.flatten(), params.keys()):
         if param_name:
             lbl_vals = unumpy.nominal_values(labels[param_name])
+            lbl_sigmas = unumpy.std_devs(labels[param_name])
             pred_vals = unumpy.nominal_values(predictions[param_name])
             pred_sigmas = unumpy.std_devs(predictions[param_name])
 
@@ -279,7 +280,8 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
                 if any(tmask):
                     (f, z) = ("full", 10) if transiting else ("none", 0)
                     if show_errorbars:
-                        ax.errorbar(x=lbl_vals[tmask], y=pred_vals[tmask], yerr=pred_sigmas[tmask],
+                        ax.errorbar(x=lbl_vals[tmask], y=pred_vals[tmask],
+                                    xerr=lbl_sigmas[tmask], yerr=pred_sigmas[tmask],
                                     fmt=fmt, c="tab:blue", ms=ms, lw=1.0, alpha=alpha,
                                     capsize=2.0, markeredgewidth=0.5, fillstyle=f, zorder=z)
                     else:
