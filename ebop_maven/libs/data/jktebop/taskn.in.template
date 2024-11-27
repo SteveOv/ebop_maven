@@ -20,7 +20,7 @@
  ${LDA1_fit} ${LDB1_fit}  Adjust LDA coeff 1  or  LDB coeff 1    (0, 1, 2, 3)
  ${LDA2_fit} ${LDB2_fit}  Adjust LDA coeff 2  or  LDB coeff 2    (0, 1, 2, 3)
  1 1  Adjust REFLECTION A or  REFLECTION B   (-1,0,1,2,3)     
- 0 0  Adjust PHASESHIFT   or  SCALE FACTOR   (0, 1, 2, 3)
+ 0 1  Adjust PHASESHIFT   or  SCALE FACTOR   (0, 1, 2, 3)
  ${period_fit} ${primary_epoch_fit}  Adjust PERIOD       or  T(pri.ecl.)    (0, 1, 2, 3)
  
  ${data_file_name}
