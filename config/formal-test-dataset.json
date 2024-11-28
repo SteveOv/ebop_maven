@@ -1314,7 +1314,8 @@
             "LDB1": -0.031,
             "LDB2": 0.23,
             "LDA1_fit": 0,
-            "LDB1_fit": 0
+            "LDB1_fit": 0,
+            "sf_fit": 0
         }
     },
     "QR Hya": {
