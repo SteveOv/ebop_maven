@@ -22,8 +22,8 @@ from hyperopt.pyll import scope
 
 from ebop_maven import modelling, deb_example
 from ebop_maven.libs.keras_custom.callbacks import TrainingTimeoutCallback
-from ebop_maven.libs.tee import Tee
 
+from traininglib.tee import Tee
 from traininglib import model_search_helpers
 import make_trained_cnn_model
 

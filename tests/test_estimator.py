@@ -11,7 +11,7 @@ from uncertainties import unumpy, UFloat
 import tensorflow as tf
 from keras import layers
 
-from ebop_maven.libs.tee import Tee
+from traininglib.tee import Tee
 from ebop_maven import modelling, deb_example
 
 from ebop_maven.estimator import Estimator

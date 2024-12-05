@@ -19,10 +19,10 @@ if not "JKTEBOP_DIR" in os.environ:
 # Put these after the above environ statements so the values are picked up
 from traininglib import datasets, plots
 from traininglib.mistisochrones import MistIsochrones
+from traininglib.tee import Tee
 
 from ebop_maven.libs import orbital, limb_darkening
 from ebop_maven.libs.mission import Mission
-from ebop_maven.libs.tee import Tee
 
 DATASET_SIZE = 20000
 FILE_PREFIX = "trainset"

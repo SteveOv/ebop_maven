@@ -15,9 +15,9 @@ import tensorflow as tf
 
 from ebop_maven import deb_example, pipeline
 from ebop_maven.libs import orbital
-from ebop_maven.libs.tee import Tee
 
 from traininglib import datasets, plots, formal_testing
+from traininglib.tee import Tee
 
 # In this case there us no need to generate any intermediate CSV files
 # as the system parameters are already known and are held this config file.

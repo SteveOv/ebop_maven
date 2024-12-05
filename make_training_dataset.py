@@ -18,9 +18,9 @@ if not "JKTEBOP_DIR" in os.environ:
 # pylint: disable=wrong-import-position
 # Put these after the above environ statements so the values are picked up if needed
 from traininglib import datasets, plots
+from traininglib.tee import Tee
 
 from ebop_maven.libs import orbital
-from ebop_maven.libs.tee import Tee
 
 # By splitting the dataset over multiple files we have the option of using a subset of the dataset
 # using a wildcard match, for example "trainset00?.tfrecord" picks up the first 10 files only.

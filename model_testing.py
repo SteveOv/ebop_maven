@@ -29,12 +29,12 @@ import tensorflow as tf
 import keras
 from keras import Model, layers
 
-from ebop_maven.libs.tee import Tee
 from ebop_maven.libs import jktebop, stellar, limb_darkening, orbital
 from ebop_maven.estimator import Estimator
 from ebop_maven import deb_example, pipeline
 
 from traininglib import formal_testing, plots
+from traininglib.tee import Tee
 
 
 # These are used if you run this module directly
