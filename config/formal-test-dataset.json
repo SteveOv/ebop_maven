@@ -1216,7 +1216,7 @@
         }
     },
     "AI Phe": {
-        "source": "DEBCat and Maxted et al. (2020), Tables 2 and 3. The Southworth analysis of TESS sector 2 PDCSAP flux (K, JKTEBOP v38, quad LD law).  Teff and subsequently calculated L from Kirkby+Kent et al. (2016)",
+        "source": "DEBCat and Maxted et al. (2020), Tables 2 and 3. The Southworth analysis of TESS sector 2 PDCSAP flux (K, JKTEBOP v38, quad LD law).  Teff and subsequently calculated L from Kirkby+Kent et al. (2016) table 8 best fit (alpha_ml=1.78/DeltaY=0.00)",
         "reference": "Maxted+20mnras, Kirkby-KentMaxted+16aa",
         "aka": "TIC 102069549, HD 6980",
         "SpT": "G3 V",
