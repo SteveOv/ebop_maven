@@ -17,7 +17,7 @@ from ebop_maven import deb_example, pipeline
 from ebop_maven.libs import orbital
 from ebop_maven.libs.tee import Tee
 
-from traininglib import plots, formal_testing
+from traininglib import datasets, plots, formal_testing
 
 # In this case there us no need to generate any intermediate CSV files
 # as the system parameters are already known and are held this config file.
@@ -29,6 +29,7 @@ dataset_dir.mkdir(parents=True, exist_ok=True)
 def make_formal_test_dataset(config_file: Path,
                              output_dir: Path,
                              target_names: Iterable[str]=None,
+                             save_param_csv: bool=True,
                              verbose: bool=True,
                              simulate: bool=True) -> Path:
     """
@@ -72,6 +73,7 @@ def make_formal_test_dataset(config_file: Path,
     :input_file: the input json file containing the parameters for one or more targets
     :output_dir: the directory to write the output dataset tfrecord file
     :target_names: a list of targets to select from input_file, or None for all
+    :save_param_csv: whether to create a csv of the labels/features added to datasets
     :verbose: whether to print verbose progress/diagnostic messages
     :simulate: whether to simulate the process, skipping only file/directory actions
     :returns: the Path of the newly created dataset file
@@ -95,12 +97,15 @@ Selected targets are:               {', '.join(target_names) if target_names els
             targets = { name: targets[name] for name in target_names if name in targets }
 
     out_file = output_dir / f"{config_file.stem}.tfrecord"
+    csv_file = output_dir / f"{config_file.stem}.csv"
     if not simulate:
         out_file.parent.mkdir(parents=True, exist_ok=True)
         ds = tf.io.TFRecordWriter(f"{out_file}", deb_example.ds_options)
+        csv_file.unlink(missing_ok=True)
 
     try:
         inst_counter = 0
+        csv_dicts = []
         for target_counter, (target, target_cfg) in enumerate(targets.items(), start=1):
             if verbose:
                 print(f"\nProcessing target {target_counter} of {len(targets)}: {target}")
@@ -159,9 +164,14 @@ Selected targets are:               {', '.join(target_names) if target_names els
             elif verbose:
                 print(f"{target}: Simulated saving serialized instance to dataset:", out_file)
             inst_counter += 1
+
+            # Will be written out to file below
+            csv_dicts.append({ "target": target, **labels, **extra_features })
     finally:
         if ds:
             ds.close()
+        if save_param_csv and len(csv_dicts) > 0:
+            datasets.write_param_sets_to_csv(csv_file, csv_dicts)
 
     action = "Finished " + ("simulating the saving of" if simulate else "saving")
     print(f"\n{action} {inst_counter} instance(s) from {len(targets)} target(s) to", out_file)
@@ -262,6 +272,7 @@ if __name__ == "__main__":
         ds_file = make_formal_test_dataset(config_file=targets_config_file,
                                            output_dir=dataset_dir,
                                            target_names=inc_targs,
+                                           save_param_csv=True,
                                            verbose=True,
                                            simulate=False)
 
