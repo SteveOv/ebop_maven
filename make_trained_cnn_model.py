@@ -20,7 +20,7 @@ from keras import layers, optimizers, callbacks
 from keras.src.layers.pooling.base_pooling import BasePooling
 
 from ebop_maven import modelling, deb_example, plotting
-from ebop_maven.libs.keras_custom.metrics import MeanAbsoluteErrorForLabel
+from traininglib.keras_custom.metrics import MeanAbsoluteErrorForLabel
 from traininglib.tee import Tee
 import model_testing
 

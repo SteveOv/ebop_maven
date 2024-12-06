@@ -20,11 +20,12 @@ from tensorflow.python.framework.errors_impl import OpError # pylint: disable=no
 from hyperopt import fmin, tpe, hp, space_eval, STATUS_OK, STATUS_FAIL
 from hyperopt.pyll import scope
 
-from ebop_maven import modelling, deb_example
-from ebop_maven.libs.keras_custom.callbacks import TrainingTimeoutCallback
+from ebop_maven import deb_example
 
 from traininglib.tee import Tee
 from traininglib import model_search_helpers
+from traininglib.keras_custom.callbacks import TrainingTimeoutCallback
+
 import make_trained_cnn_model
 
 # Configure the inputs and outputs of the model
@@ -55,7 +56,7 @@ SEED = 42                           # Standard random seed ensures repeatable ra
 # Sets the random seed on python, numpy and keras's backend library (in this case tensorflow)
 keras.utils.set_random_seed(SEED)
 
-results_dir = Path(".") / "drop" / "model_search_current"
+results_dir = Path(".") / "drop" / "model_search_current_jkt"
 results_dir.mkdir(parents=True, exist_ok=True)
 
 # -----------------------------------------------------------
