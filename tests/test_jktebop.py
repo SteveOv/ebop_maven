@@ -11,12 +11,12 @@ from astropy.time import Time
 
 import tests.libs.helpers.lightcurve_helpers as th
 
-from ebop_maven.libs import jktebop
-from ebop_maven.libs.jktebop import _prepare_params_for_task
-from ebop_maven.libs.jktebop import get_jktebop_dir
-from ebop_maven.libs.jktebop import run_jktebop_task, generate_model_light_curve
-from ebop_maven.libs.jktebop import write_in_file, write_light_curve_to_dat_file
-from ebop_maven.libs.jktebop import JktebopParameterWarning
+from traininglib import jktebop
+from traininglib.jktebop import _prepare_params_for_task
+from traininglib.jktebop import get_jktebop_dir
+from traininglib.jktebop import run_jktebop_task, generate_model_light_curve
+from traininglib.jktebop import write_in_file, write_light_curve_to_dat_file
+from traininglib.jktebop import JktebopParameterWarning
 
 # pylint: disable=invalid-name, too-many-public-methods, line-too-long, protected-access
 class Testjktebop(unittest.TestCase):

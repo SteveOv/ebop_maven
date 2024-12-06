@@ -19,12 +19,14 @@ from scipy.interpolate import interp1d
 import astropy.units as u
 import tensorflow as tf
 
+from traininglib import jktebop
+
 # Hack so that this module can see the ebop_maven package and below
 # pylint: disable=wrong-import-order, wrong-import-position
 # caution: path[0] is reserved for script path (or '' in REPL)
 sys.path.insert(1, Path("../ebop_maven/"))
 from ebop_maven import deb_example
-from ebop_maven.libs import jktebop, orbital
+from ebop_maven.libs import orbital
 
 # Useable "general use" limb-darkening algo and coefficients
 # for a F-type star T_eff~7200 K and logg~4.0
