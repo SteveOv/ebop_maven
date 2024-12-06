@@ -1,4 +1,6 @@
-""" Utility functions a light-curve ingest, pre-processing, estimation and fitting pipeline. """
+"""
+Low level utility functions for light curve ingest, pre-processing, estimation and fitting.
+"""
 #pylint: disable=no-member
 from typing import Union, List, Iterable, Tuple, Generator
 from pathlib import Path

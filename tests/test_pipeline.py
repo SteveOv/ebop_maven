@@ -6,7 +6,7 @@ import astropy.units as u
 from astropy.time import TimeDelta
 import tests.libs.helpers.lightcurve_helpers as th
 
-from ebop_maven import pipeline
+from traininglib import pipeline
 
 # pylint: disable=too-many-public-methods, line-too-long
 class Testpipeline(unittest.TestCase):

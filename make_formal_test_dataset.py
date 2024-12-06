@@ -13,10 +13,10 @@ import numpy as np
 import astropy.units as u
 import tensorflow as tf
 
-from ebop_maven import deb_example, pipeline
+from ebop_maven import deb_example
 from ebop_maven.libs import orbital
 
-from traininglib import datasets, plots, formal_testing
+from traininglib import datasets, formal_testing, pipeline, plots
 from traininglib.tee import Tee
 
 # In this case there us no need to generate any intermediate CSV files

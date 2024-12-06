@@ -10,9 +10,9 @@ import numpy as np
 from scipy.stats import binned_statistic
 from uncertainties import UFloat, unumpy
 
-from ebop_maven.plotting import format_axes
 from ebop_maven import deb_example
 
+from .plotting import format_axes
 from .datasets import read_param_sets_from_csvs, get_field_names_from_csvs
 from .mistisochrones import MistIsochrones
 

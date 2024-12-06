@@ -10,7 +10,7 @@ from astropy.time import Time
 import lightkurve as lk
 
 # Use this as it will use previously downloaded fits if available, avoiding remote MAST calls.
-from ebop_maven.pipeline import find_lightcurves
+from traininglib.pipeline import find_lightcurves
 
 TEST_DATA_DIR = Path(getsourcefile(lambda:0)).parent / "../../../../cache/test_data"
 

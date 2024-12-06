@@ -14,7 +14,7 @@ import astropy.units as u
 from lightkurve import LightCurve, LightCurveCollection
 from uncertainties import ufloat, UFloat
 
-from ebop_maven import pipeline
+from . import pipeline
 
 
 def iterate_target_configs(target_configs: Union[Path, dict[str, any]],
