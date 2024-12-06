@@ -50,11 +50,14 @@ class Testjktebop(unittest.TestCase):
         "primary_epoch": 59876.54321,
         "qphot_fit": 1,
         "ecosw_fit": 1,     "esinw_fit": 1,
+        "gravA_fit": 0,     "gravB_fit": 0,
                             "L3_fit": 1,
         "LDA1_fit": 1,      "LDB1_fit": 1,
         "LDA2_fit": 0,      "LDB2_fit": 0,
-        "period_fit": 1,
-        "primary_epoch_fit": 1,
+        "reflA_fit": 1,     "reflB_fit": 1,
+                            "sf_fit": 1,
+        "period_fit": 1,    "primary_epoch_fit": 1, 
+
         "data_file_name": "cw_eri_s0004.dat"
     }
 
