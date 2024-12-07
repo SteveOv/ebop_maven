@@ -4,7 +4,7 @@ import unittest
 
 import astropy.units as u
 from astropy.time import TimeDelta
-import tests.libs.helpers.lightcurve_helpers as th
+import tests.helpers.lightcurve_helpers as th
 
 from traininglib import pipeline
 

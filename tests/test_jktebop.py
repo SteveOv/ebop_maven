@@ -9,7 +9,7 @@ from uncertainties import ufloat, UFloat
 import numpy as np
 from astropy.time import Time
 
-import tests.libs.helpers.lightcurve_helpers as th
+import tests.helpers.lightcurve_helpers as th
 
 from traininglib import jktebop
 from traininglib.jktebop import _prepare_params_for_task
