@@ -171,7 +171,7 @@ class Estimator(ABC):
 
         if not isinstance(mags_feature, np.ndarray):
             raise TypeError("Expect mags_feature to be an numpy ndarray")
-        if not isinstance(extra_features, (None|np.ndarray)):
+        if extra_features is not None and not isinstance(extra_features, np.ndarray):
             raise TypeError("Expect extra_features to be a numpy ndarray")
 
         # Check the mags features are in the expected shape; (#insts, #bins) or (#insts, #bins, 1)
