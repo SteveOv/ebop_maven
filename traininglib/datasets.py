@@ -24,14 +24,6 @@ from ebop_maven import deb_example
 from traininglib import jktebop
 
 
-# Useable "general use" limb-darkening algo and coefficients
-# for a F-type star T_eff~7200 K and logg~4.0
-default_limb_darkening_params = {
-    "LDA": "quad", "LDB": "quad",
-    "LDA1": 0.28,  "LDB1": 0.28,
-    "LDA2": 0.22,  "LDB2": 0.22
-}
-
 # The full set of parameters available for histograms, their #bins and plot labels
 histogram_params = {
     "rA_plus_rB":   (100, r"$r_{A}+r_{B}$"),

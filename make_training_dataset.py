@@ -30,6 +30,14 @@ dataset_dir.mkdir(parents=True, exist_ok=True)
 # at ~0.2. We go further so as to train a model which will be able to predict upto and beyond this.
 MAX_FRACTIONAL_R = 0.23
 
+# Useable "general use" limb-darkening algo and coefficients
+# for a F-type star T_eff~7200 K and logg~4.0
+general_purpose_ld_params = {
+    "LDA": "quad", "LDB": "quad",
+    "LDA1": 0.28,  "LDB1": 0.28,
+    "LDA2": 0.22,  "LDB2": 0.22
+}
+
 def generate_instances_from_distributions(label: str):
     """
     Generates system instances by picking from random distributions over the
@@ -107,7 +115,7 @@ def generate_instances_from_distributions(label: str):
             "J":            J,
             "L3":           L3,
 
-            **datasets.default_limb_darkening_params,
+            **general_purpose_ld_params,
 
             # Further params for potential use as labels/features
             "sini":         np.sin(inc_rad),
