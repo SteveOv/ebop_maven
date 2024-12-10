@@ -16,17 +16,13 @@ import hashlib
 
 import numpy as np
 from scipy.interpolate import interp1d
-import astropy.units as u
 import tensorflow as tf
+
+from deblib import orbital
+from ebop_maven import deb_example
 
 from traininglib import jktebop
 
-# Hack so that this module can see the ebop_maven package and below
-# pylint: disable=wrong-import-order, wrong-import-position
-# caution: path[0] is reserved for script path (or '' in REPL)
-sys.path.insert(1, Path("../ebop_maven/"))
-from ebop_maven import deb_example
-from ebop_maven.libs import orbital
 
 # Useable "general use" limb-darkening algo and coefficients
 # for a F-type star T_eff~7200 K and logg~4.0
@@ -460,7 +456,7 @@ def _swap_instance_components(params: dict[str, any]):
 
     # Recalculate the impact parameters as we have changed the primary star. It's not just a case of
     # swapping the values, as both impact params are related to the primary's fractional radius.
-    params["bP"], params["bS"] = orbital.impact_parameter(params["rA"], params["inc"] * u.deg,
-                                                          e=params.get("ecc", 0),
-                                                          esinw=params["esinw"],
-                                                          eclipse=orbital.EclipseType.BOTH)
+    params["bP"] = orbital.impact_parameter(params["rA"], params["inc"],
+                                            params.get("ecc", 0), params["esinw"], False)
+    params["bS"] = orbital.impact_parameter(params["rA"], params["inc"],
+                                            params.get("ecc", 0), params["esinw"], True)

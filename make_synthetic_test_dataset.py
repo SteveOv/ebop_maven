@@ -7,22 +7,20 @@ import hashlib
 
 import numpy as np
 
-# pylint: disable=no-member
-import astropy.units as u
-
 # Tell the libraries where the JKTEBOP executable lives.
 # The conda yaml based env sets this but it's not set for venvs.
+# pylint: disable=wrong-import-position
 if not "JKTEBOP_DIR" in os.environ:
     os.environ["JKTEBOP_DIR"] = "~/jktebop/"
 
-# pylint: disable=wrong-import-position
+from deblib import limb_darkening, orbital
+from deblib.mission import Mission
+from deblib.constants import M_sun, R_sun
+
 # Put these after the above environ statements so the values are picked up
 from traininglib import datasets, plots
 from traininglib.mistisochrones import MistIsochrones
 from traininglib.tee import Tee
-
-from ebop_maven.libs import orbital, limb_darkening
-from ebop_maven.libs.mission import Mission
 
 DATASET_SIZE = 20000
 FILE_PREFIX = "trainset"
@@ -66,7 +64,7 @@ def generate_instances_from_mist_models(label: str):
 
     feh_values = _mist_isochones.list_metallicities()
     min_phase, max_phase = 0.0, 2.0     # M-S to RGB
-    min_mass_value = 0.07               # Adopted from Wells & Prša (although MIST bottoms at 0.1)
+    min_mass = 0.07                     # M_sun. From Wells & Prša (although MIST bottoms at 0.1)
     cols = ["star_mass", "log_R", "log_Teff", "log_L", "log_g"]
 
     while True: # infinite loop; we will continue to yield new instances until closed
@@ -74,81 +72,83 @@ def generate_instances_from_mist_models(label: str):
         feh = rng.choice(feh_values)
         ages = _mist_isochones.list_ages(feh, min_phase, max_phase)
         while True:
-            age = rng.choice(ages) * u.dex(u.yr)
-            init_masses = _mist_isochones.list_initial_masses(feh, age.value,
-                                                              min_phase, max_phase, min_mass_value)
-            if len(init_masses):
+            age = rng.choice(ages)
+            init_Ms = _mist_isochones.list_initial_masses(feh, age, min_phase, max_phase, min_mass)
+            if len(init_Ms):
                 break
 
         # First choose the primary mass based on an IMF and multiplicity probability function
         # Choose our stars and then get the basic physical params from the isochrones
-        probs = chabrier_imf(init_masses)
-        probs *= wells_prsa_multiplicity_function(init_masses)
-        probs = np.divide(probs, np.sum(probs))     # Scaled to get a pmf() == 1
-        init_MA = rng.choice(init_masses, p=probs) * u.solMass
+        probs = chabrier_imf(init_Ms)
+        probs *= wells_prsa_multiplicity_function(init_Ms)
+        probs = np.divide(probs, np.sum(probs))         # Scaled to get a pmf() == 1
+        init_MA = rng.choice(init_Ms, p=probs)          # in units of M_sun
 
-        init_MB_mask = (init_masses >= min_mass_value) & (init_masses <= init_MA.value)
+        init_MB_mask = (init_Ms >= min_mass) & (init_Ms <= init_MA)
         if any(init_MB_mask):
-            init_MB = rng.choice(init_masses[init_MB_mask]) * u.solMass
+            init_MB = rng.choice(init_Ms[init_MB_mask])
         else:
             init_MB = init_MA
 
-        results = _mist_isochones.lookup_stellar_params(feh, age.value, init_MA.value, cols)
-        MA          = results["star_mass"] * u.solMass
-        RA          = np.power(10, results["log_R"]) * u.solRad
-        T_eff_A     = np.power(10, results["log_Teff"]) * u.K
-        LA          = np.power(10, results["log_L"]) * u.solLum
-        loggA       = results["log_g"] * u.dex(u.cm / u.s**2)
+        results = _mist_isochones.lookup_stellar_params(feh, age, init_MA, cols)
+        MA          = results["star_mass"]              # M_sun
+        RA          = np.power(10, results["log_R"])    # R_sun
+        T_eff_A     = np.power(10, results["log_Teff"]) # K
+        LA          = np.power(10, results["log_L"])    # L_sun
+        loggA       = results["log_g"]
 
-        results = _mist_isochones.lookup_stellar_params(feh, age.value, init_MB.value, cols)
-        MB          = results["star_mass"] * u.solMass
-        RB          = np.power(10, results["log_R"]) * u.solRad
-        T_eff_B     = np.power(10, results["log_Teff"]) * u.K
-        LB          = np.power(10, results["log_L"]) * u.solLum
-        loggB       = results["log_g"] * u.dex(u.cm / u.s**2)
+        results = _mist_isochones.lookup_stellar_params(feh, age, init_MB, cols)
+        MB          = results["star_mass"]              # M_sun
+        RB          = np.power(10, results["log_R"])    # R_sun
+        T_eff_B     = np.power(10, results["log_Teff"]) # K
+        LB          = np.power(10, results["log_L"])    # L_sun
+        loggB       = results["log_g"]
 
         # The minimum period from Kepler's 3rd law based on the minimum supported separation
-        a_min = max(RA, RB) / MAX_FRACTIONAL_R
-        per_min = orbital.orbital_period(MA, MB, a_min).to(u.d).value
+        min_a = max(RA, RB) / MAX_FRACTIONAL_R          # R_sun
+        min_per = orbital.orbital_period(MA * M_sun, MB * M_sun, min_a * R_sun).nominal_value # s
+        min_per /= 86400                                # d
 
         # We generate period, inc, and omega (argument of periastron) from uniform distributions
-        per         = rng.uniform(low=per_min, high=max(per_min, 25)) * u.d
-        inc         = rng.uniform(low=50., high=90.00001) * u.deg
-        omega       = rng.uniform(low=0., high=360.) * u.deg
+        per         = rng.uniform(low=min_per, high=max(min_per, 25))   # d
+        inc         = rng.uniform(low=50., high=90.00001)               # deg
+        omega       = rng.uniform(low=0., high=360.)                    # deg
 
         # Eccentricity from uniform distribution, subject to a maximum value which depends on
         # orbital period/seperation (again, based on Wells & Prsa (eqn 6); Moe & Di Stefano)
-        a = orbital.semi_major_axis(MA, MB, per)
-        if per <= 2 * u.d:
+        a = (orbital.semi_major_axis(MA * M_sun, MB * M_sun, per * 86400) / R_sun).nominal_value
+        if per <= 2:
             ecc = 0
         else:
-            e_max = max(min(1-(per.value/2)**(-2/3), 1-(1.5*(RA+RB)/a).value), 0)
+            e_max = max(min(1-(per/2)**(-2/3), 1-(1.5*(RA+RB)/a)), 0)
             ecc = rng.uniform(low=0, high=e_max)
 
         # Introduce some third light (versions of JKTEBOP up to 43 do not accept negative L3 input)
         L3          = max(0, rng.normal(loc=0.0, scale=0.05)) # ~half will be zero
 
         # Now we can calculate other params which we need to decide whether to use this
-        q = (MB / MA).value
-        rA = (RA.to(u.solRad) / a.to(u.solRad)).value
-        rB = (RB.to(u.solRad) / a.to(u.solRad)).value
-        inc_rad = inc.to(u.rad).value
-        omega_rad = omega.to(u.rad).value
+        q = MB / MA
+        rA = RA / a
+        rB = RB / a
+        inc_rad = np.radians(inc)
+        omega_rad = np.radians(omega)
         esinw = ecc * np.sin(omega_rad)
         ecosw = ecc * np.cos(omega_rad)
-        imp_prm = orbital.impact_parameter(rA, inc, ecc, None, esinw, orbital.EclipseType.BOTH)
+        imp_prm = (
+            orbital.impact_parameter(rA, inc, ecc, esinw, False),
+            orbital.impact_parameter(rA, inc, ecc, esinw, True)
+        )
 
         # Check usability before calculating J & LD params to avoid expensive calls if unnecessary.
         generated_counter += 1
-        if is_usable_instance(rB/rA, 1., q, ecc, imp_prm[0], imp_prm[1],
-                              rA, rB, inc.to(u.deg).value):
+        if is_usable_instance(rB/rA, 1., q, ecc, imp_prm[0], imp_prm[1], rA, rB, inc):
             # Central surface brightness ratio (i.e. in absence of LD) within the mission's bandpass
             J = mission.expected_brightness_ratio(T_eff_A, T_eff_B)
 
             # Lookup the nearest matching LD coeffs
             LD_ALGO = "pow2"
-            ld_coeffs_A = limb_darkening.lookup_tess_pow2_ld_coeffs(loggA, T_eff_A)
-            ld_coeffs_B = limb_darkening.lookup_tess_pow2_ld_coeffs(loggB, T_eff_B)
+            ld_coeffs_A = limb_darkening.lookup_pow2_coefficients(loggA, T_eff_A, "TESS")
+            ld_coeffs_B = limb_darkening.lookup_pow2_coefficients(loggB, T_eff_B, "TESS")
 
             # By specifying an apparent mag (withing the TESS expected range) we indication
             # to the conditions from which we decide the amount of noise to add.
@@ -165,7 +165,7 @@ def generate_instances_from_mist_models(label: str):
                 # The keys (& those for LD below) are those expected by make_dateset
                 "rA_plus_rB":   rA + rB,
                 "k":            rB / rA,
-                "inc":          inc.to(u.deg).value, 
+                "inc":          inc, 
                 "qphot":        q,
                 "ecosw":        ecosw,
                 "esinw":        esinw,
@@ -191,20 +191,20 @@ def generate_instances_from_mist_models(label: str):
                 "rA":           rA,
                 "rB":           rB,
                 "ecc":          ecc,
-                "omega":        omega.to(u.deg).value,
+                "omega":        omega,
                 "bP":           imp_prm[0],
                 "bS":           imp_prm[1],
-                "phiS":         orbital.secondary_eclipse_phase(ecosw, ecc),
+                "phiS":         orbital.phase_of_secondary_eclipse(ecosw, ecc),
                 "dS_over_dP":   orbital.ratio_of_eclipse_duration(esinw),
 
                 # For reference: physical params.
-                "LB_over_LA":   (LB / LA).value,
-                "P":            per.to(u.d).value,                   
-                "a":            a.to(u.solRad).value,
-                "RA":           RA.to(u.solRad).value,
-                "RB":           RB.to(u.solRad).value,
-                "MA":           MA.to(u.solMass).value,
-                "MB":           MB.to(u.solMass).value
+                "LB_over_LA":   LB / LA,
+                "P":            per,                   
+                "a":            a,
+                "RA":           RA,
+                "RB":           RB,
+                "MA":           MA,
+                "MB":           MB
             }
 
 def salpeter_imf(masses):

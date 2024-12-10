@@ -13,8 +13,8 @@ import numpy as np
 import astropy.units as u
 import tensorflow as tf
 
+from deblib import orbital
 from ebop_maven import deb_example
-from ebop_maven.libs import orbital
 
 from traininglib import datasets, formal_testing, pipeline, plots
 from traininglib.tee import Tee
@@ -144,15 +144,14 @@ Selected targets are:               {', '.join(target_names) if target_names els
             bP = labels.get("bP", None)
             if bP is None:
                 rA = np.divide(labels["rA_plus_rB"], np.add(1, labels["k"]))
-                labels["bP"] = orbital.impact_parameter(rA, labels["inc"] * u.deg, ecc, None,
-                                                        esinw, orbital.EclipseType.PRIMARY)
+                labels["bP"] = orbital.impact_parameter(rA, labels["inc"], ecc, esinw)
                 if verbose:
                     print(f"{target}: No impact parameter (bP) supplied;",
                             f"calculated rA = {rA} and then bP = {labels['bP']}")
 
             # Now assemble the extra features needed: phiS (phase secondary) and dS_over_dP
             extra_features = {
-                "phiS": orbital.secondary_eclipse_phase(ecosw, ecc),
+                "phiS": orbital.phase_of_secondary_eclipse(ecosw, ecc),
                 "dS_over_dP": orbital.ratio_of_eclipse_duration(esinw)
             }
 

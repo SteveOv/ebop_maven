@@ -7,20 +7,16 @@ import hashlib
 
 import numpy as np
 
-# pylint: disable=no-member
-import astropy.units as u
+from deblib import orbital
 
 # Tell the libraries where the JKTEBOP executable lives.
 # The conda yaml based env sets this but it's not set for venvs.
+# pylint: disable=wrong-import-position
 if not "JKTEBOP_DIR" in os.environ:
     os.environ["JKTEBOP_DIR"] = "~/jktebop/"
 
-# pylint: disable=wrong-import-position
-# Put these after the above environ statements so the values are picked up if needed
 from traininglib import datasets, plots
 from traininglib.tee import Tee
-
-from ebop_maven.libs import orbital
 
 # By splitting the dataset over multiple files we have the option of using a subset of the dataset
 # using a wildcard match, for example "trainset00?.tfrecord" picks up the first 10 files only.
@@ -63,7 +59,7 @@ def generate_instances_from_distributions(label: str):
         rB          = rA_plus_rB - rA
 
         # Simple uniform dist for inc (JKTEBOP bottoms out at 50 deg)
-        inc         = rng.uniform(low=50., high=90.00001) * u.deg
+        inc         = rng.uniform(low=50., high=90.00001)   # deg
         J           = rng.normal(loc=0.5, scale=0.8)
 
         # We need a version of JKTEBOP which supports negative L3 input values
@@ -84,14 +80,15 @@ def generate_instances_from_distributions(label: str):
         # reduces the max eccentricity with the separation plus 10% are fixed at 0 to ensure
         # sufficient examples. This trains better than simple uniform or normal distributions tried.
         ecc         = rng.choice([0, rng.uniform(low=0., high=1-(1.5*rA_plus_rB))], p=[0.1, 0.9])
-        omega       = rng.uniform(low=0., high=360.) * u.deg
+        omega       = rng.uniform(low=0., high=360.)        # deg
 
         # Now we can calculate the derived values, sufficient to check we've a usable system
-        inc_rad     = inc.to(u.rad).value
-        omega_rad   = omega.to(u.rad).value
+        inc_rad     = np.radians(inc)
+        omega_rad   = np.radians(omega)
         esinw       = ecc * np.sin(omega_rad)
         ecosw       = ecc * np.cos(omega_rad)
-        imp_prm     = orbital.impact_parameter(rA, inc, ecc, None, esinw, orbital.EclipseType.BOTH)
+        bp          = orbital.impact_parameter(rA, inc, ecc, esinw, False)
+        bs          = orbital.impact_parameter(rA, inc, ecc, esinw, True)
 
         # Create the pset dictionary.
         generated_counter += 1
@@ -103,7 +100,7 @@ def generate_instances_from_distributions(label: str):
             # The keys (& those for LD below) are those expected by make_dateset
             "rA_plus_rB":   rA_plus_rB,
             "k":            k,
-            "inc":          inc.to(u.deg).value, 
+            "inc":          inc, 
             "qphot":        qphot,
             "ecosw":        ecosw,
             "esinw":        esinw,
@@ -118,10 +115,10 @@ def generate_instances_from_distributions(label: str):
             "rA":           rA,
             "rB":           rB,
             "ecc":          ecc,
-            "omega":        omega.to(u.deg).value,
-            "bP":           imp_prm[0],
-            "bS":           imp_prm[1],
-            "phiS":         orbital.secondary_eclipse_phase(ecosw, ecc),
+            "omega":        omega,
+            "bP":           bp,
+            "bS":           bs,
+            "phiS":         orbital.phase_of_secondary_eclipse(ecosw, ecc),
             "dS_over_dP":   orbital.ratio_of_eclipse_duration(esinw),
         }
 

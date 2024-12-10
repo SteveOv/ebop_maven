@@ -26,3 +26,6 @@ keras-preprocessing
 
 # For hyperparameter grid search
 hyperopt
+
+# dEB characterisation support library
+git+https://github.com/SteveOv/deblib

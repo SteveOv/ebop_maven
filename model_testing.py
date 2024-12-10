@@ -19,8 +19,6 @@ import warnings
 import matplotlib.pylab as plt
 
 from uncertainties import ufloat, UFloat, unumpy
-from uncertainties.umath import acos, asin, cos, degrees, radians # pylint: disable=no-name-in-module
-
 from lightkurve import LightCurve
 import astropy.units as u
 import numpy as np
@@ -29,7 +27,10 @@ import tensorflow as tf
 import keras
 from keras import Model, layers
 
-from ebop_maven.libs import stellar, limb_darkening, orbital
+from deblib import stellar, limb_darkening, orbital
+from deblib.constants import M_sun, R_sun
+from deblib.vmath import arccos, arcsin, cos, degrees, radians
+
 from ebop_maven.estimator import Estimator
 from ebop_maven import deb_example
 
@@ -243,7 +244,7 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
         wrap_phase = mags_wrap_phase
         if wrap_phase is None:
             ecosw = lbl_vals[ix]["ecosw"].nominal_value
-            wrap_phase = 0.5+(orbital.secondary_eclipse_phase(ecosw, targ_config.get("ecc", 0)) / 2)
+            wrap_phase = 0.5+(orbital.phase_of_secondary_eclipse(ecosw, targ_config.get("ecc",0))/2)
 
         # Get the phase folded and binned mags feature
         print(f"Creating folded and phase normalized lightcurves about {pe.format} {pe} & {period}",
@@ -390,15 +391,15 @@ def fit_target(lc: LightCurve,
         if f"LD{star}" not in fit_overrides \
                 or f"LD{star}1" not in fit_overrides or f"LD{star}2" not in fit_overrides:
             # If we've not been given overrides for both the algo and coeffs we can look them up
-            # provided we have the stellar mass (M*), radius (R*) & effective temp (Teff*) in config
-            logg = stellar.log_g(target_cfg[f"M{star}"]*u.solMass, target_cfg[f"R{star}"]*u.solRad)
-            teff = target_cfg[f"Teff{star}"] * u.K
+            # provided we have the stellar mass (M?), radius (R?) & effective temp (Teff?) in config
+            logg = stellar.log_g(target_cfg[f"M{star}"] * M_sun, target_cfg[f"R{star}"] * R_sun).n
+            teff = target_cfg[f"Teff{star}"]
             if algo == "same":
                 c, alpha = 0, 0 # JKTEBOP uses the A star params for both
             elif algo == "quad":
-                c, alpha = limb_darkening.lookup_tess_quad_ld_coeffs(logg, teff)
+                c, alpha = limb_darkening.lookup_quad_coefficients(logg, teff)
             else:
-                c, alpha = limb_darkening.lookup_tess_pow2_ld_coeffs(logg, teff)
+                c, alpha = limb_darkening.lookup_pow2_coefficients(logg, teff)
 
             # Add any missing algo/coeffs tags to the overrides
             fit_overrides.setdefault(f"LD{star}", algo)
@@ -507,13 +508,13 @@ def append_calculated_inc_predictions(preds: np.ndarray[UFloat]) -> np.ndarray[U
         e_squared = preds["ecosw"]**2 + preds["esinw"]**2
         cosi = np.clip(preds["bP"] * r1 * (1+preds["esinw"]) / (1-e_squared),
                        ufloat(-1, 0), ufloat(1, 0))
-        inc = np.array([degrees(acos(csi)) for csi in cosi], dtype=np.dtype(UFloat.dtype))
+        inc = degrees(arccos(cosi))
     elif "cosi" in names:
         cosi = np.clip(preds["cosi"], ufloat(-1, 0), ufloat(1, 0))
-        inc = np.array([degrees(acos(csi)) for csi in cosi], dtype=np.dtype(UFloat.dtype))
+        inc = degrees(arccos(cosi))
     elif "sini" in names:
         sini = np.clip(preds["sini"], ufloat(-1, 0), ufloat(1, 0))
-        inc = np.array([degrees(asin(sni)) for sni in sini], dtype=np.dtype(UFloat.dtype))
+        inc = degrees(arcsin(sini))
     else:
         raise KeyError("Missing bP, cosi or sini in predictions required to calc inc.")
 
