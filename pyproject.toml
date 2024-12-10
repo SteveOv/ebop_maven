@@ -14,6 +14,7 @@ dependencies = [
     "lightkurve>=2.4",
     "numba",
     "scikit-learn>=1.0",
+    "uncertainties",
     "tensorflow[and-cuda]",
     "tensorflow-estimator",
     "keras",
