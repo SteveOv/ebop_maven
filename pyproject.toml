@@ -7,12 +7,6 @@ requires-python = ">=3.9"
 dependencies = [
     "numpy<2.0",
     "pathlib",
-    "scipy",
-    "matplotlib",
-    "astropy>=5.1",
-    "lightkurve>=2.4",
-    "numba",
-    "scikit-learn>=1.0",
     "uncertainties",
     "tensorflow[and-cuda]",
     "tensorflow-estimator",
