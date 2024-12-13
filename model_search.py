@@ -57,7 +57,7 @@ SEED = 42                           # Standard random seed ensures repeatable ra
 # Sets the random seed on python, numpy and keras's backend library (in this case tensorflow)
 keras.utils.set_random_seed(SEED)
 
-results_dir = Path(".") / "drop" / "model_search_current_jkt"
+results_dir = Path(".") / "drop" / "model_search_current"
 results_dir.mkdir(parents=True, exist_ok=True)
 
 # -----------------------------------------------------------
