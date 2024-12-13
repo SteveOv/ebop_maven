@@ -216,6 +216,49 @@ def plot_dataset_instance_mags_features(dataset_files: Iterable[Path],
     return fig
 
 
+def plot_limb_darkening_coeffs(lookup_table: np.ndarray[float],
+                               coeffs_used: Iterable[Dict[str, float]] = None,
+                               x_col: str="a",
+                               y_col: str="b",
+                               logg_col: str="logg",
+                               teff_col: str="Teff",
+                               **format_kwargs) -> Figure:
+    """
+    Will create a plot figure with a single set of axes upon which will be plotted
+    the progression of the limb darkening coefficients (as indicated by x_col & y_col)
+    for each distinct value of logg in the passed lookup table. On this will then be
+    plotted any chosen (LDA1, LDA2) coefficient values.
+
+    :lookup_table: the table of coefficients to compare the chosen with
+    :coeffs_used: the chosen coeffs to plot over the lookups
+    :x_col: the column of the lookup table to plot on the x-axis
+    :y_col: the column of the lookup table to plot on the y-axis
+    :logg_col: the logg column name; used to iterate over the distinct values
+    :teff_col: the T_eff column name; used to sort the rows for each distinct logg
+    :format_kwargs: kwargs to be passed on to format_axes()
+    """
+    fig, ax = plt.subplots(figsize=(6, 6), constrained_layout=True)
+
+    # Plot the lookup data, joined up points of the coeffs for each distinct logg
+    for logg in sorted(np.unique(lookup_table[logg_col])):
+        params = np.sort(lookup_table[lookup_table[logg_col] == logg], order=teff_col)
+        ax.plot(params[x_col], params[y_col], "-", alpha=1/3, label=f"$\\log{{g}}={logg}$")
+
+        # Overplot with dot markers which scale with the T_eff as a proxy for M*
+        ms = params[teff_col] / 500
+        ax.scatter(params[x_col], params[y_col], s=ms, marker="o", alpha=1/2, zorder=5)
+
+    # Overplot with the coeffs used as black cross(es)
+    if isinstance(coeffs_used, Dict) or coeffs_used is None:
+        coeffs_used = [coeffs_used]
+    for i, used in enumerate(coeffs_used):
+        cf = (used["LDA1"], used["LDA2"])
+        ax.scatter(cf[0], cf[1], marker="+", c="k", s=150, zorder=10, label=f"used[{i}]\n{cf}")
+
+    format_axes(ax, **format_kwargs)
+    return fig
+
+
 def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
                                labels: np.ndarray[UFloat],
                                transit_flags: np.ndarray[bool],

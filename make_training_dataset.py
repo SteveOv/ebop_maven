@@ -7,7 +7,7 @@ import hashlib
 
 import numpy as np
 
-from deblib import orbital
+from deblib import orbital, limb_darkening
 
 # Tell the libraries where the JKTEBOP executable lives.
 # The conda yaml based env sets this but it's not set for venvs.
@@ -173,6 +173,14 @@ if __name__ == "__main__":
             sys.exit()
 
     with redirect_stdout(Tee(open(dataset_dir/"dataset.log", "w", encoding="utf8"))):
+        # Plot the general purpose quad/TESS coefficients against values for Z=0 & various logg
+        ctable = limb_darkening._quad_ld_coeffs_table("TESS") # pylint: disable=protected-access
+        fig = plots.plot_limb_darkening_coeffs(ctable[ctable["Z"]==0], general_purpose_ld_params,
+                title=r"TESS Quadratic LD coefficients v $T_{eff}$ at $Z=0$ (Claret, 2018)",
+                xlabel="Linear coefficient", ylabel="Quadratic coefficient", legend_loc="best")
+        fig.savefig(dataset_dir / "limb_darkening.png", dpi=150)
+        fig.clf()
+
         datasets.make_dataset(instance_count=DATASET_SIZE,
                               file_count=FILE_COUNT,
                               output_dir=dataset_dir,
