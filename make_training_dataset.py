@@ -32,11 +32,11 @@ MAX_FRACTIONAL_R = 0.23
 
 # Useable "general use" limb-darkening algo and coefficients
 # for a F-type star T_eff~7200 K and logg~4.0
-general_purpose_ld_params = {
+general_purpose_ld_params = [{
     "LDA": "quad", "LDB": "quad",
     "LDA1": 0.28,  "LDB1": 0.28,
     "LDA2": 0.22,  "LDB2": 0.22
-}
+}]
 
 def generate_instances_from_distributions(label: str):
     """
@@ -115,7 +115,7 @@ def generate_instances_from_distributions(label: str):
             "J":            J,
             "L3":           L3,
 
-            **general_purpose_ld_params,
+            **general_purpose_ld_params[generated_counter % len(general_purpose_ld_params)],
 
             # Further params for potential use as labels/features
             "sini":         np.sin(inc_rad),
