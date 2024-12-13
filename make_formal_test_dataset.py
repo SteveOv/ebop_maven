@@ -16,7 +16,7 @@ import tensorflow as tf
 from deblib import orbital
 from ebop_maven import deb_example
 
-from traininglib import datasets, formal_testing, pipeline, plots
+from traininglib import datasets, formal_testing, param_sets, pipeline, plots
 from traininglib.tee import Tee
 
 # In this case there us no need to generate any intermediate CSV files
@@ -170,7 +170,7 @@ Selected targets are:               {', '.join(target_names) if target_names els
         if ds:
             ds.close()
         if save_param_csv and len(csv_dicts) > 0:
-            datasets.write_param_sets_to_csv(csv_file, csv_dicts)
+            param_sets.write_to_csv(csv_file, csv_dicts, append=False)
 
     action = "Finished " + ("simulating the saving of" if simulate else "saving")
     print(f"\n{action} {inst_counter} instance(s) from {len(targets)} target(s) to", out_file)

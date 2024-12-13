@@ -11,7 +11,6 @@ from timeit import default_timer
 from datetime import timedelta, datetime
 import traceback
 from multiprocessing import Pool
-import csv
 import hashlib
 
 import numpy as np
@@ -21,7 +20,7 @@ import tensorflow as tf
 from deblib import orbital
 from ebop_maven import deb_example
 
-from traininglib import jktebop
+from traininglib import jktebop, param_sets
 
 
 # The full set of parameters available for histograms, their #bins and plot labels
@@ -276,7 +275,7 @@ def make_dataset_file(inst_count: int,
                     ds_writers[inst_file_ixs[inst_ix]].write(row)
 
                     if csv_file:
-                        write_param_sets_to_csv(csv_file, [params], append=True)
+                        param_sets.write_to_csv(csv_file, [params], append=True)
 
                     inst_ix += 1
                     if verbose and inst_ix % 100 == 0:
@@ -307,80 +306,6 @@ def make_dataset_file(inst_count: int,
         if swap_count > 0:
             print(f"{file_stem}: Swapped the components of {swap_count} instance(s)",
                   "where the secondary eclipse was deeper.")
-
-def write_param_sets_to_csv(file_name: Path,
-                            param_sets: list[dict],
-                            field_names: list[any] = None,
-                            append: bool=False) -> None:
-    """
-    Writes the list of parameter set dictionaries to a csv file.
-
-    :file_name: the full name of the file to create or overwrite.
-    :param_sets: the list of dictionaries to write out.
-    :field_names: the list of fields to write, in the required order. If
-    None, the field_names will be read from the first item in param_sets
-    :mode: the mode to open the file, "w" write or "a" append
-    """
-    # This data is saved in an intermediate form as we've yet to
-    # generate the actual light-curves. We use csv, as this is
-    # easily read/consumed by apps for reviewing and the
-    # tensorflow data API for subsequent processing.
-    if field_names is None:
-        field_names = param_sets[0].keys()
-    with open(file_name, mode="a+" if append else "w", encoding="UTF8", newline='') as f:
-        dw = csv.DictWriter(f,
-                            field_names,
-                            quotechar="'",
-                            quoting=csv.QUOTE_NONNUMERIC)
-        if not append or not f.tell():
-            dw.writeheader()
-        dw.writerows(param_sets)
-
-
-def read_param_sets_from_csv(file_name: Path) -> Generator[dict, any, None]:
-    """
-    Reads a list of parameter set dictionaries from a csv file,
-    as created by write_param_sets_to_csv()
-
-    :file_name: the full name of the csv file containing the parameter sets
-    :returns: a generator for the dictionaries
-    """
-    with open(file_name, mode="r", encoding="UTF8") as pf:
-        dr = csv.DictReader(pf, quotechar="'", quoting=csv.QUOTE_NONNUMERIC)
-        for param_set in dr:
-            yield param_set
-
-
-def read_param_sets_from_csvs(file_names: list[Path]) -> Generator[dict, any, None]:
-    """
-    Reads a list of parameter set dictionaries from across all of the csv files,
-    as created by write_param_sets_to_csv()
-
-    :file_names: the full names of the csv files containing the parameter sets
-    :returns: a generator for the dictionaries
-    """
-    for file_name in file_names:
-        for param_set in read_param_sets_from_csv(file_name):
-            yield param_set
-
-
-def get_field_names_from_csvs(file_names: list[Path]) -> list[str]:
-    """
-    Returns a list of the field names common to all of the passed CSV files.
-
-    :file_names: the full names of the csv files containing the parameter sets
-    :returns: a list[str] of the common names
-    """
-    names: list[str] = None
-    for file_name in file_names:
-        # pylint: disable=not-an-iterable
-        with open(file_name, mode="r", encoding="utf8") as pf:
-            csv_reader = csv.reader(pf, quotechar="'", quoting=csv.QUOTE_NONNUMERIC)
-            this_names = next(csv_reader)
-
-        # Modify names so that it hold the names common to both
-        names = [n for n in names if n in this_names] if names is not None else this_names
-    return names
 
 
 def _calculate_file_splits(instance_count: int, file_count: int) -> list[int]:

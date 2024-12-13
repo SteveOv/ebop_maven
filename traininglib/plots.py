@@ -13,7 +13,7 @@ from uncertainties import UFloat, unumpy
 from ebop_maven import deb_example
 
 from .plotting import format_axes
-from .datasets import read_param_sets_from_csvs, get_field_names_from_csvs
+from .param_sets import read_from_csvs, get_field_names_from_csvs
 from .mistisochrones import MistIsochrones
 
 all_param_captions = {
@@ -94,7 +94,7 @@ def plot_dataset_histograms(csv_files: Iterable[Path],
         for (ax, field) in zip_longest(axes.flatten(), param_specs):
             if field:
                 bins, label = param_specs[field]
-                data = [row.get(field, None) for row in read_param_sets_from_csvs(csv_files)]
+                data = [row.get(field, None) for row in read_from_csvs(csv_files)]
                 if verbose:
                     print(f"Plotting histogram for {len(data):,} {field} values.")
                 ax.hist(data, bins=bins)
