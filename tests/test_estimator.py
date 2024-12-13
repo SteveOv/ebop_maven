@@ -12,7 +12,8 @@ import tensorflow as tf
 from keras import layers
 
 from traininglib.tee import Tee
-from ebop_maven import modelling, deb_example
+from traininglib import datasets
+from ebop_maven import modelling
 
 from ebop_maven.estimator import Estimator
 
@@ -55,7 +56,7 @@ class TestEstimator(unittest.TestCase):
                 # These are created by make_synthetic_test_dataset.py (smaller than full trainset)
                 files = list(Path("./datasets/synthetic-mist-tess-dataset").glob("**/*.tfrecord"))
                 train_ds = tf.data.TFRecordDataset(files, num_parallel_reads=100)
-                x = train_ds.shuffle(100000, 42).map(deb_example.create_map_func()).batch(100)
+                x = train_ds.shuffle(100000, 42).map(datasets.create_map_func()).batch(100)
                 model.fit(x, epochs=10, verbose=2)
 
                 model_file.parent.mkdir(parents=True, exist_ok=True)

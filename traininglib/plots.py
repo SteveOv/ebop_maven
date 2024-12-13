@@ -10,8 +10,7 @@ import numpy as np
 from scipy.stats import binned_statistic
 from uncertainties import UFloat, unumpy
 
-from ebop_maven import deb_example
-
+from .datasets import iterate_dataset
 from .plotting import format_axes
 from .param_sets import read_from_csvs, get_field_names_from_csvs
 from .mistisochrones import MistIsochrones
@@ -167,8 +166,8 @@ def plot_dataset_instance_mags_features(dataset_files: Iterable[Path],
     """
     # pylint: disable=too-many-locals
     # Get the instances for each matching target
-    instances = [*deb_example.iterate_dataset(dataset_files, mags_bins, mags_wrap_phase,
-                                        identifiers=chosen_targets, max_instances=max_instances)]
+    instances = [*iterate_dataset(dataset_files, mags_bins, mags_wrap_phase,
+                                  identifiers=chosen_targets, max_instances=max_instances)]
 
     rows = math.ceil(len(instances) / cols)
     fig, axes = plt.subplots(rows, cols, sharex="all", sharey="all",

@@ -1,10 +1,11 @@
 """
-Functions for generating binary system instances and writing their parameters to trainset csv files.
+Functions for generating binary system instances and for writing/reading dataset files.
 """
 # Use ucase variable names where they match the equivalent symbol and pylint can't find units alias
 # pylint: disable=invalid-name, no-member, too-many-arguments, too-many-locals
-
-from typing import Callable, Generator
+from typing import Callable, Generator, List, Tuple, Iterable
+import os
+import errno
 import sys
 from pathlib import Path
 from timeit import default_timer
@@ -23,24 +24,8 @@ from ebop_maven import deb_example
 from traininglib import jktebop, param_sets
 
 
-# The full set of parameters available for histograms, their #bins and plot labels
-histogram_params = {
-    "rA_plus_rB":   (100, r"$r_{A}+r_{B}$"),
-    "k":            (100, r"$k$"),
-    "inc":          (100, r"$i~(^{\circ})$"),
-    "sini":         (100, r"$\sin{i}$"),
-    "cosi":         (100, r"$\cos{i}$"),
-    "qphot":        (100, r"$q_{phot}$"),
-    #"L3":           (100, r"$L_3$"), # currently always zero
-    "ecc":          (100, r"$e$"),
-    "omega":        (100, r"$\omega~(^{\circ})$"),
-    "J":            (100, r"$J$"),
-    "ecosw":        (100, r"$e\,\cos{\omega}$"),
-    "esinw":        (100, r"$e\,\sin{\omega}$"),
-    "rA":           (100, r"$r_A$"),
-    "rB":           (100, r"$r_B$"),
-    "bP":           (100, r"$b_{prim}$")
-}
+# Common options used when reading or writing a deb Example dataset file
+ds_options = tf.io.TFRecordOptions(compression_type=None)
 
 
 def make_dataset(instance_count: int,
@@ -196,8 +181,7 @@ def make_dataset_file(inst_count: int,
                 ds_subset_file = output_dir / ds_subset / ds_filename
                 if subset_ix in inst_file_ixs:
                     ds_subset_file.parent.mkdir(parents=True, exist_ok=True)
-                    ds_writers[subset_ix] = tf.io.TFRecordWriter(f"{ds_subset_file}",
-                                                                 deb_example.ds_options)
+                    ds_writers[subset_ix] = tf.io.TFRecordWriter(f"{ds_subset_file}", ds_options)
                 else:
                     ds_subset_file.unlink(missing_ok=True)
         rng.shuffle(inst_file_ixs)
@@ -306,6 +290,279 @@ def make_dataset_file(inst_count: int,
         if swap_count > 0:
             print(f"{file_stem}: Swapped the components of {swap_count} instance(s)",
                   "where the secondary eclipse was deeper.")
+
+
+def create_map_func(mags_bins: int = deb_example.default_mags_bins,
+                    mags_wrap_phase: float = deb_example.default_mags_wrap_phase,
+                    ext_features: List[str] = None,
+                    labels: List[str] = None,
+                    augmentation_callback: Callable[[tf.Tensor], tf.Tensor] = None,
+                    scale_labels: bool=True,
+                    include_id: bool=False) -> Callable:
+    """
+    Configures and returns a dataset map function for deb_examples. The map function is used by
+    TFRecordDataset().map() to deserialize each raw tfrecord row into the corresponding features
+    and labels required for model training or testing.
+        
+    In addition to deserializing the rows, the map function supports the option of augmenting the
+    mags_feature data by supplying a reference to an augmentation_callback function. This callback
+    will be called from a graphed function so must be compatible with tf.function.
+    A simple example to augment the mags_feature with additive Gaussian noise:
+    ```Python
+    @tf.function
+    def sample_aug_callback(mags_feature: tf.Tensor) -> tf.Tensor:
+        return mags_feature + tf.random.normal(mags_feature.shape, stddev=0.005)
+    ```
+
+    The mags_wrap_phase argument controls at which point the cyclic, phase normalized mags data is
+    wrapped when read. This can be in the range [0, 1] or None (in which case the mags data is
+    adaptively wrapped to centre on the mid-point between the primary and secondary eclipses).
+
+    :mags_bins: the width of the mags to publish
+    :mags_wrap_phase: the wrap phase of the mags to publish, or None to use adaptive wrap
+    :ext_features: chosen subset of available ext_features, in the requested order, or all if None
+    :labels: chosen subset of available labels, in requested order, or all if None
+    :augmentation_callback: optional function with which client code can augment mags_feature data.
+    :scale_labels: whether to apply scaling to the map function's returned labels
+    :include_id: whether to include the id in the function's returned tuple. If true, it returns
+    (id, (mags_feature, ext_features), labels) per inst else ((mags_feature, ext_features), labels)
+    :returns: the newly generated map function
+    """
+    # pylint: disable=too-many-arguments
+    mags_key = deb_example.create_mags_key(mags_bins)
+    if mags_wrap_phase is not None:
+        mags_wrap_phase %= 1 # Treat the wrap as cyclic & force it into the range [0, 1)
+
+    if ext_features is not None:
+        chosen_ext_feat_and_defs = \
+            { ef: deb_example.extra_features_and_defaults[ef] for ef in ext_features}
+    else:
+        chosen_ext_feat_and_defs = deb_example.extra_features_and_defaults
+
+    if labels is not None:
+        chosen_lab_and_scl = { l: deb_example.labels_and_scales[l] for l in labels }
+    else:
+        chosen_lab_and_scl = deb_example.labels_and_scales
+
+    # Define the map function with the two, optional perturbing actions on the mags feature
+    def map_func(record_bytes):
+        example = tf.io.parse_single_example(record_bytes, deb_example.description)
+
+        # Get mags feature and reshape to match ML model's requirements; from (#bins,) to (#bins, 1)
+        # Assume mags will have been stored with phase implied by index and primary eclipse at zero
+        mags_feature = tf.reshape(example[mags_key], shape=(mags_bins, 1))
+
+        if mags_wrap_phase is not None:
+            roll_phase = mags_wrap_phase
+        else:
+            # Adaptive; chosen to centre mags on the midpoint between primary & secondary eclipses
+            # With the primary initially at phase 0, the midpoint is half the secondary phase
+            roll_phase = 0.5 + example.get("phiS", 0.5) / 2
+
+        # Now roll the mags to match the requested wrap phase. For example, if the roll phase
+        # is 0.75 then the mags will be rolled right by 0.25 phase so that those mags originally
+        # beyond phase 0.75 are rolled round to lie before phase 0 (effectively phases -0.25 to 0).
+        # Combine with any roll augmentation so we only incur the overhead of rolling once
+        roll_shift = 0 if roll_phase == 0 else int(mags_bins * (1.0 - roll_phase))
+        if roll_shift != 0:
+            if roll_shift > mags_bins // 2:
+                roll_shift -= mags_bins
+            mags_feature = tf.roll(mags_feature, [roll_shift], axis=[0])
+
+        # Augmentations: not all potential augmentations have in-place updates (i.e. tf.roll) so we
+        # endure the overhead of send/return rather than using "byref" behaviour of a mutable arg.
+        if augmentation_callback:
+            mags_feature = augmentation_callback(mags_feature)
+
+        # The Extra features: ignore unknown fields and use default if not found
+        ext_features = [example.get(k, d) for (k, d) in chosen_ext_feat_and_defs.items()]
+        ext_features = tf.reshape(ext_features, shape=(len(ext_features), 1))
+
+        # Copy labels in the expected order & optionally apply any scaling
+        if scale_labels:
+            labels = [example[k] * s for k, s in chosen_lab_and_scl.items()]
+        else:
+            labels = [example[k] for k in chosen_lab_and_scl]
+
+        if include_id:
+            return (example["id"], (mags_feature, ext_features), labels)
+        return ((mags_feature, ext_features), labels)
+    return map_func
+
+
+def create_dataset_pipeline(dataset_files: Iterable[str],
+                            batch_size: float=100,
+                            map_func: Callable=create_map_func(),
+                            filter_func: Callable=None,
+                            shuffle: bool=False,
+                            reshuffle_each_iteration: bool=False,
+                            max_buffer_size: int=1000000,
+                            prefetch: int=tf.data.AUTOTUNE,
+                            seed: int=42) -> Tuple[tf.data.TFRecordDataset, int]:
+    """
+    Creates the requested TFRecordDataset pipeline.
+
+    :dataset_files: the source tfrecord dataset files.
+    :batch_size: the relative size of each batch. May be set to 0 (no batch, effectively all rows),
+    <1 (this fraction of all rows) or >=1 this size (will be rounded)
+    :map_func: the map function to use to deserialize each row
+    :filter_func: an optional func to filter the results (must be a tf.function)
+    :shuffle: whether to include a shuffle step in the pipeline
+    :reshuffle_each_iteration: whether the shuffle step suffles on each epoch
+    :max_buffer_size: the maximum size of the shuffle buffer
+    :prefetch: the number of prefetch operations to perform, or leave to autotune
+    :seed: seed for any random behaviour
+    :returns: a tuple of (dataset pipeline, row count). The row count is the total
+    rows without any optional filtering applied.
+    """
+    # pylint: disable=too-many-arguments
+    # Explicitly check the dataset_files otherwise we may get a cryptic errors further down.
+    if dataset_files is None or len(dataset_files) == 0:
+        raise ValueError("No dataset_files specified")
+    for file in dataset_files:
+        if not Path(file).exists():
+            raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), file)
+
+    # Read through once to get the total number of records
+    ds = tf.data.TFRecordDataset(list(dataset_files), num_parallel_reads=100,
+                                 compression_type=ds_options.compression_type)
+    row_count = ds.reduce(0, lambda count, _: count+1).numpy()
+
+    # Now build the full pipeline
+    if shuffle or reshuffle_each_iteration:
+        buffer_size = min(row_count, max_buffer_size)
+        ds = ds.shuffle(buffer_size, seed, reshuffle_each_iteration=reshuffle_each_iteration)
+
+    ds = ds.map(map_func)
+
+    if filter_func:
+        ds = ds.filter(filter_func)
+
+    if batch_size:
+        if batch_size < 1:
+            batch_size = int(np.ceil(row_count * batch_size))
+        else:
+            batch_size = min(row_count, int(batch_size))
+        if batch_size:
+            ds = ds.batch(batch_size, drop_remainder=True)
+
+    if prefetch:
+        ds = ds.prefetch(prefetch)
+    return (ds, row_count)
+
+
+def iterate_dataset(dataset_files: Iterable[str],
+                    mags_bins: int = deb_example.default_mags_bins,
+                    mags_wrap_phase: float = deb_example.default_mags_wrap_phase,
+                    ext_features: List[str] = None,
+                    labels: List[str]=None,
+                    identifiers: List[str]=None,
+                    scale_labels: bool=False,
+                    augmentation_callback: Callable[[tf.Tensor], tf.Tensor] = None,
+                    max_instances: int = np.inf):
+    """
+    Utility/diagnostics function which will parse a saved dataset yielding rows,
+    and within the rows labels and features, which match the requested criteria.
+    
+    The rows are yielded in the order in which they appear in the supplied dataset files.
+    
+    The extra_features and labels are listed in the order they have been specified or in the
+    order of extra_features_and_defaults and labels_and_scales if not specified.
+
+    This function is not for use when training a model; for that, requirement use
+    create_dataset_pipeline() directly. Instead this gives easy access to the
+    contents of a dataset for diagnostics lookup, testing or plotting.
+
+    :dataset_files: the set of dataset files to parse
+    :mags_bins: the width of the mags to publish
+    :mags_wrap_phase: the wrap phase of the mags to publish
+    :ext_features: a chosen subset of the available features, in this order, or all if None
+    :labels: a chosen subset of the available labels, in this order, or all if None
+    :identifiers: optional list of ids to yield, or all ids if None
+    :augmentation_callback: optional function with which client code can augment mags_feature data.
+    :max_instances: the maximum number of instances to yield
+    :returns: for each matching row yields a tuple of (id, mags vals, ext feature vals, label vals)
+    """
+    # pylint: disable=too-many-arguments, too-many-locals
+    if identifiers is not None and len(identifiers) < max_instances:
+        max_instances = len(identifiers)
+
+    map_func = create_map_func(mags_bins, mags_wrap_phase, ext_features, labels,
+                               augmentation_callback, scale_labels, include_id=True)
+    (ds, _) = create_dataset_pipeline(dataset_files, 0, map_func)
+
+    yield_count = 0
+    for id_val, (mags_val, feat_vals), lab_vals in ds.as_numpy_iterator():
+        id_val = id_val.decode(encoding="utf8")
+        if identifiers is None or id_val in identifiers:
+            # Primarily, create_map_func supports a pipeline for training an ML model where the mags
+            # and ext_features for each inst is required to be shaped as (#bins, 1) and (#feats, 1).
+            # Here our client code expects shapes of (#bins,) and (#feats,).
+            yield id_val, mags_val[:, 0], feat_vals[:, 0], lab_vals
+            yield_count += 1
+            if yield_count >= max_instances:
+                break
+
+def read_dataset(dataset_files: Iterable[str],
+                 mags_bins: int = deb_example.default_mags_bins,
+                 mags_wrap_phase: float = deb_example.default_mags_wrap_phase,
+                 ext_features: List[str] = None,
+                 labels: List[str]=None,
+                 identifiers: List[str]=None,
+                 scale_labels: bool=False,
+                 augmentation_callback: Callable[[tf.Tensor], tf.Tensor] = None,
+                 max_instances: int = np.inf) \
+            -> Tuple[np.ndarray, np.ndarray[float], np.ndarray[float], np.ndarray[float]]:
+    """
+    Wrapper around iterate_dataset() which handles the iteration and returns separate
+    np ndarrays for the dataset ids, mags values, feature values and label values.
+
+    The labels array is structured, so labels may be accessed with their names, for example;
+    ```Python
+    ecosw = labels[0]["ecosw"]
+    ```
+    
+    This may not be hugely performant, especially with large datasets, but it's for convenience.
+
+    :dataset_files: the set of dataset files to parse
+    :mags_bins: the width of the mags to publish
+    :mags_wrap_phase: the wrap phase of the mags to publish
+    :ext_features: a chosen subset of the available features, in this order, or all if None
+    :labels: a chosen subset of the available labels, in this order, or all if None
+    :identifiers: optional list of ids to yield, or all ids if None
+    :scale_values: if True values will be scaled
+    :augmentation_callback: optional function with which client code can augment mags_feature data.
+    :max_instances: the maximum number of instances to return
+    :returns: a Tuple[NDArray[#insts, 1], NDArray[#insts, #bins], NDArray[#insts, #feats],
+    NDArray[#insts, #labels]], with the labels being a structured NDArray supporting named columns
+    """
+    # pylint: disable=too-many-arguments, too-many-locals
+    if labels is not None:
+        labels = [l for l in labels if l in deb_example.labels_and_scales]
+    else:
+        labels = list(deb_example.labels_and_scales.keys())
+
+    ids, mags_vals, feature_vals, label_vals = [], [], [], []
+    for row in iterate_dataset(dataset_files, mags_bins, mags_wrap_phase,
+                               ext_features, labels, identifiers, scale_labels,
+                               augmentation_callback, max_instances):
+        ids += [row[0]]
+        mags_vals += [row[1]]
+        feature_vals += [row[2]]
+        label_vals += [tuple(row[3])]
+
+    # Need to sort the data in the order of the requested ids (if given).
+    # Not hugely performant, but we only ever expect short lists of indices.
+    if identifiers is not None and len(identifiers) > 0:
+        indices = [ids.index(i) for i in identifiers if i in ids]
+        ids = [ids[ix] for ix in indices]
+        mags_vals = [mags_vals[ix] for ix in indices]
+        feature_vals = [feature_vals[ix] for ix in indices]
+        label_vals = [label_vals[ix] for ix in indices]
+
+    # Turn label vals into a structured array
+    dtype = [(name, np.dtype(float)) for name in labels]
+    return np.array(ids), np.array(mags_vals), np.array(feature_vals), np.array(label_vals, dtype)
 
 
 def _calculate_file_splits(instance_count: int, file_count: int) -> list[int]:

@@ -100,7 +100,7 @@ Selected targets are:               {', '.join(target_names) if target_names els
     csv_file = output_dir / f"{config_file.stem}.csv"
     if not simulate:
         out_file.parent.mkdir(parents=True, exist_ok=True)
-        ds = tf.io.TFRecordWriter(f"{out_file}", deb_example.ds_options)
+        ds = tf.io.TFRecordWriter(f"{out_file}", datasets.ds_options)
         csv_file.unlink(missing_ok=True)
 
     try:

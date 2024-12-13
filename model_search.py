@@ -24,6 +24,7 @@ from ebop_maven import deb_example
 
 from traininglib.tee import Tee
 from traininglib import model_search_helpers
+from traininglib.datasets import create_map_func, create_dataset_pipeline
 from traininglib.keras_custom.callbacks import TrainingTimeoutCallback
 
 import make_trained_cnn_model
@@ -63,13 +64,12 @@ results_dir.mkdir(parents=True, exist_ok=True)
 # Set up the test datasets - we don't need to recreate per trial
 # -----------------------------------------------------------
 # No added noise or roll as this is already present in the datasets
-test_map_func = deb_example.create_map_func(mags_bins=MAGS_BINS, mags_wrap_phase=MAGS_WRAP_PHASE,
-                                            ext_features=CHOSEN_FEATURES, labels=CHOSEN_LABELS)
+test_mfunc = create_map_func(mags_bins=MAGS_BINS, mags_wrap_phase=MAGS_WRAP_PHASE,
+                             ext_features=CHOSEN_FEATURES, labels=CHOSEN_LABELS)
 test_ds, test_ct = [tf.data.TFRecordDataset] * 2, [int] * 2
 for ti, (tname, tdir) in enumerate(zip(["trial", "real"], [TESTSET_DIR, FORMAL_TESTSET_DIR])):
     tfiles = list(tdir.glob("**/*.tfrecord"))
-    (test_ds[ti], test_ct[ti]) = \
-        deb_example.create_dataset_pipeline(tfiles, BATCH_FRACTION, test_map_func)
+    test_ds[ti], test_ct[ti] = create_dataset_pipeline(tfiles, BATCH_FRACTION, test_mfunc)
     print(f"Found {test_ct[ti]:,} {tname} test insts in {len(tfiles)} tfrecord files in", tdir)
 
 
@@ -317,14 +317,14 @@ def train_and_test_model(trial_kwargs):
 
     # Set up the training and validation dataset pipelines
     # Redo this every trial so we can potentially include these pipeline params in the search
-    tr_map_func = deb_example.create_map_func(mags_bins=MAGS_BINS, mags_wrap_phase=MAGS_WRAP_PHASE,
-                                ext_features=CHOSEN_FEATURES, labels=CHOSEN_LABELS,
-                                augmentation_callback=make_trained_cnn_model.augmentation_callback)
+    tr_mfunc = create_map_func(mags_bins=MAGS_BINS, mags_wrap_phase=MAGS_WRAP_PHASE,
+                               ext_features=CHOSEN_FEATURES, labels=CHOSEN_LABELS,
+                               augmentation_callback=make_trained_cnn_model.augmentation_callback)
     train_ds, train_ct = [tf.data.TFRecordDataset] * 2, [int] * 2
     for ix, (dn, dd) in enumerate(zip(["training", "validation"],[TRAINSET_DIR, VALIDSET_DIR])):
         files = list(dd.glob(TRAINSET_GLOB_TERM))
-        (train_ds[ix], train_ct[ix]) = deb_example.create_dataset_pipeline(
-                    files, BATCH_FRACTION, tr_map_func, None, True, True, MAX_BUFFER_SIZE,seed=SEED)
+        train_ds[ix], train_ct[ix] = create_dataset_pipeline(files, BATCH_FRACTION, tr_mfunc, None,
+                                                             True, True, MAX_BUFFER_SIZE,seed=SEED)
         print(f"Found {train_ct[ix]:,} {dn} instances over {len(files)}",
               f"tfrecord file(s) matching glob '{TRAINSET_GLOB_TERM}' within", dd)
 

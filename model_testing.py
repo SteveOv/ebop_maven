@@ -34,7 +34,7 @@ from deblib.vmath import arccos, arcsin, cos, degrees, radians
 from ebop_maven.estimator import Estimator
 from ebop_maven import deb_example
 
-from traininglib import formal_testing, jktebop, pipeline, plots
+from traininglib import datasets, formal_testing, jktebop, pipeline, plots
 from traininglib.tee import Tee
 
 
@@ -93,7 +93,7 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
     print(f"found {len(tfrecord_files)} file(s).")
 
     # The label values here will have zero uncertainties as we only store the nominals in the ds
-    ids, mags_vals, feat_vals, lbl_vals = deb_example.read_dataset(tfrecord_files,
+    ids, mags_vals, feat_vals, lbl_vals = datasets.read_dataset(tfrecord_files,
                                                                 estimator.mags_feature_bins,
                                                                 estimator.mags_feature_wrap_phase,
                                                                 estimator.extra_feature_names,
