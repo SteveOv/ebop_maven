@@ -242,11 +242,12 @@ def plot_limb_darkening_coeffs(lookup_table: np.ndarray[float],
     # Plot the lookup data, joined up points of the coeffs for each distinct logg
     for logg in sorted(np.unique(lookup_table[logg_col])):
         params = np.sort(lookup_table[lookup_table[logg_col] == logg], order=teff_col)
-        ax.plot(params[x_col], params[y_col], "-", alpha=1/3, label=f"$\\log{{g}}={logg}$")
+        ax.plot(params[x_col], params[y_col], "-", lw=0.5, alpha=1/3)
 
         # Overplot with dot markers which scale with the T_eff as a proxy for M*
-        ms = params[teff_col] / 500
-        ax.scatter(params[x_col], params[y_col], s=ms, marker="o", alpha=1/2, zorder=5)
+        size = params[teff_col] / 500
+        ax.scatter(params[x_col], params[y_col], s=size, marker="o", alpha=1/2, zorder=5,
+                   label=f"$\\log{{g}}={logg}$")
 
     # Overplot with the coeffs used as black cross(es)
     if isinstance(coeffs_used, Dict) or coeffs_used is None:
