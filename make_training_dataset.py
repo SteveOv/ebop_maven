@@ -33,7 +33,7 @@ MAX_FRACTIONAL_R = 0.23
 # Useable "general use" limb-darkening algo and coefficients.
 # Centred within the distribution of coefficients on bulk of M-S stars and logg 3.0 to 5.0.
 # We plot coefficients.png showing chosen values over the trails of coeffs (by Teff) for each logg.
-general_purpose_ld_params = [{
+fixed_ld_params = [{
     "LDA": "quad",  "LDB": "quad",
     "LDA1": 0.38,   "LDB1": 0.38,
     "LDA2": 0.22,   "LDB2": 0.22
@@ -116,7 +116,7 @@ def generate_instances_from_distributions(label: str):
             "J":            J,
             "L3":           L3,
 
-            **general_purpose_ld_params[generated_counter % len(general_purpose_ld_params)],
+            **fixed_ld_params[generated_counter % len(fixed_ld_params)],
 
             # Further params for potential use as labels/features
             "sini":         np.sin(inc_rad),
@@ -175,10 +175,10 @@ if __name__ == "__main__":
 
     with redirect_stdout(Tee(open(dataset_dir/"dataset.log", "w", encoding="utf8"))):
         # Plot the general purpose quad/TESS coefficients against values for Z=0 & various Teff/logg
-        ctable = limb_darkening._quad_ld_coeffs_table("TESS") # pylint: disable=protected-access
-        fig = plots.plot_limb_darkening_coeffs(ctable[ctable["Z"]==0], general_purpose_ld_params,
-                title=r"TESS Quadratic LD coefficients v $T_{\rm eff}$ at $Z=0$ (Claret, 2018)",
-                xlabel="Linear coefficient", ylabel="Quadratic coefficient", legend_loc="best")
+        table = limb_darkening._quad_ld_coeffs_table("TESS") # pylint: disable=protected-access
+        fig = plots.plot_limb_darkening_coeffs(table[table["Z"]==0], fixed_ld_params, xlim=(.09,.7),
+                title=r"TESS LD coefficients v $T_{\rm eff}$ at $Z=0$ (Claret, 2018)",
+                xlabel="linear coefficient", ylabel="quadratic coefficient", legend_loc="best")
         fig.gca().text(0.10, 0.12, r"Larger markers indicate higher $T_{\rm eff}$") # data coords
         fig.savefig(dataset_dir / "limb_darkening.png", dpi=150)
         fig.clf()

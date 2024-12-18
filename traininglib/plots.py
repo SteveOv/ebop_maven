@@ -55,6 +55,10 @@ all_histogram_params = {
     "apparent_mag": (100, r"apparent magnitude (mag)")
 }
 
+# Standard width & heights for 6:4 and 6:5 aspect ratios and the plots being 2 or 4 columns wide
+COL_WIDTH = 3.0
+ROW_HEIGHT_6_4 = 2.0
+ROW_HEIGHT_6_5 = 2.5
 
 def plot_dataset_histograms(csv_files: Iterable[Path],
                             params: List[str]=None,
@@ -85,8 +89,8 @@ def plot_dataset_histograms(csv_files: Iterable[Path],
     fig = None
     if param_specs and csv_files:
         rows = math.ceil(len(param_specs) / cols)
-        fig, axes = plt.subplots(rows, cols, sharey="all",
-                                 figsize=(cols*3, rows*2.5), constrained_layout=True)
+        fig, axes = plt.subplots(rows, cols, sharey="all", constrained_layout=True,
+                                 figsize=(cols * COL_WIDTH, rows * ROW_HEIGHT_6_5))
         if verbose:
             print(f"Plotting histograms in a {cols}x{rows} grid for:", ", ".join(param_specs))
 
@@ -119,7 +123,7 @@ def plot_formal_test_dataset_hr_diagram(targets_cfg: Dict[str, any],
     if verbose:
         print("Plotting log(Teff) vs log(L) 'H-R' diagram")
 
-    fig = plt.figure(figsize=(6, 4), constrained_layout=True)
+    fig = plt.figure(figsize=(2 * COL_WIDTH, 2 * ROW_HEIGHT_6_4), constrained_layout=True)
     ax = fig.add_subplot(1, 1, 1)
     for comp, fillstyle in [("A", "full"), ("B", "none") ]:
         # Don't bother with error bars as this is just an indicative distribution.
@@ -141,8 +145,8 @@ def plot_formal_test_dataset_hr_diagram(targets_cfg: Dict[str, any],
     ax.plot(zams[0], zams[1], c="k", ls=(0, (15, 5)), linewidth=0.5, label="ZAMS", zorder=-10)
 
     format_axes(ax, xlim=(4.45, 3.35), ylim=(-2.6, 4.5),
-                xlabel= r"$\log{(\mathrm{T_{eff}\,/\,K})}$",
-                ylabel=r"$\log{(\mathrm{L\,/\,L_{\odot}})}$")
+                xlabel= r"$\log{(T_{\rm eff}\,/\,{\rm K})}$",
+                ylabel=r"$\log{(L\,/\,{\rm L_{\odot}})}$")
     return fig
 
 
@@ -170,8 +174,8 @@ def plot_dataset_instance_mags_features(dataset_files: Iterable[Path],
                                   identifiers=chosen_targets, max_instances=max_instances)]
 
     rows = math.ceil(len(instances) / cols)
-    fig, axes = plt.subplots(rows, cols, sharex="all", sharey="all",
-                             figsize=(cols*4, rows*3), constrained_layout=True)
+    fig, axes = plt.subplots(rows, cols, sharex="all", sharey="all", constrained_layout=True,
+                             figsize=(cols * COL_WIDTH, rows * ROW_HEIGHT_6_5))
 
     # Infer the common phase data from the details of the bins we're given
     phases = np.linspace(mags_wrap_phase-1, mags_wrap_phase, mags_bins)
@@ -236,7 +240,7 @@ def plot_limb_darkening_coeffs(lookup_table: np.ndarray[float],
     :teff_col: the T_eff column name; used to sort the rows for each distinct logg
     :format_kwargs: kwargs to be passed on to format_axes()
     """
-    fig, ax = plt.subplots(figsize=(6, 6), constrained_layout=True)
+    fig, ax = plt.subplots(figsize=(2 * COL_WIDTH, 2 * ROW_HEIGHT_6_5), constrained_layout=True)
 
     # Plot the lookup data, joined up points of the coeffs for each distinct logg
     for logg in sorted(np.unique(lookup_table[logg_col])):
@@ -291,9 +295,12 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
         selected_params = [selected_params]
     params = { n: all_param_captions[n] for n in selected_params }
 
+    # Special aspect ratio for each axes of 3.0:2.9, slightly wider than high, to look balanced
+    # with a sqaure plot area and slightly more width for y-tick labels than those for x-ticks.
     cols = 2
     rows = math.ceil(len(params) / cols)
-    fig, axes = plt.subplots(rows, cols, figsize=(cols * 3, rows * 2.9), constrained_layout=True)
+    fig, axes = plt.subplots(rows, cols, constrained_layout=True,
+                             figsize=(cols * COL_WIDTH, rows * COL_WIDTH * 2.9/3.0))
     axes = axes.flatten()
 
     if transit_flags is None:
@@ -374,7 +381,7 @@ def plot_binned_mae_vs_labels(residuals: np.rec.recarray[UFloat],
     params = { n: all_param_captions[n] for n in selected_params }
 
     print("Plotting binned MAE vs label values for:", ", ".join(params))
-    fig, ax = plt.subplots(1, 1, figsize=(6, 4), constrained_layout=True)
+    fig, ax = plt.subplots(figsize=(2 * COL_WIDTH, 2 * ROW_HEIGHT_6_4), constrained_layout=True)
 
     # We need to know the extent of all the data beforehand, so we can apply equivalent bins to all
     lbl_vals = unumpy.nominal_values(labels[selected_params].tolist())
@@ -421,7 +428,7 @@ def plot_prediction_boxplot(predictions: np.rec.recarray[UFloat],
     xdata = unumpy.nominal_values(predictions.tolist())
 
     # For customizations https://matplotlib.org/stable/gallery/statistics/boxplot.html
-    fig, ax = plt.subplots(figsize=(6, 4), constrained_layout=True)
+    fig, ax = plt.subplots(figsize=(2 * COL_WIDTH, 2 * ROW_HEIGHT_6_4), constrained_layout=True)
     flier_props = { "marker": "x", "alpha": 0.5 }
     ax.boxplot(xdata, showmeans=False, meanline=True, vert=True, patch_artist=False,
                showfliers=show_fliers, flierprops=flier_props)
