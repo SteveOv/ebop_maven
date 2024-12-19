@@ -159,7 +159,7 @@
     },
     "IQ Per": {
         "source": "DEBCat and Southworth24obsR21 with initial JKTEBOP v43 anlysis of TESS sector 59 and full analysis of sectors 19 and 59 with WD2004 code.",
-        "reference": "Southworth24obsR21, LacyFrueh85aj",
+        "reference": "Southworth24obsR21, LacyFrueh85apj",
         "exclude": false,
         "why_exclude": "promoted to the formal-test-ds based on new Southworth24obsR21 characterisation; note that rA > 0.2",
         "aka": "TIC 265767012, HD 24909",
@@ -178,7 +178,7 @@
         "transits": true,
         "eclipses_similar": false,
         "components_similar": false,
-        "notes": "estimate J from test fit (from T_effs it's ~0.33); qphot from MB/MA of LacyFrueh85aj; bP derived from rA+rB, k, inc, ecosw & esinw; control fit has MAE~0.009 when compared to Southworth24obsR21 characterisation;",
+        "notes": "estimate J from test fit (from T_effs it's ~0.33); qphot from MB/MA of LacyFrueh85apj; bP derived from rA+rB, k, inc, ecosw & esinw; control fit has MAE~0.009 when compared to Southworth24obsR21 characterisation;",
         "primary_epoch": 2917.950970,
         "period": 1.7435699,
         "ecc": 0.0677,              "ecc_err": 0.0022,
