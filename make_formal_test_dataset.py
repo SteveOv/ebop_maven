@@ -208,8 +208,9 @@ def write_targets_tabular_file(targets_cfg: dict, targets_tex_file: Path, cite_n
         tex.writelines([
             "\\begin{tabular}{lrrrrrrrccccl}\n",
             "\\hline\n",
-            " & $r_A+r_B$ & $k$ & $J$ & $e\\cos{\\omega}$ & $e\\sin{\\omega}$ & $i~(\\degr)$ & ",
-                "$L_3$ & Spectral Type & \\multicolumn{3}{|c|}{Flags} & Reference \\\\ \n",
+            " & $r_{\\rm A}+r_{\\rm B}$ & $k$ & $J$ & ",
+                "$e\\cos{\\omega}$ & $e\\sin{\\omega}$ & $i~(\\degr)$ & ",
+                "$L_{\\rm 3}$ & Spectral Type & \\multicolumn{3}{|c|}{Flags} & Reference \\\\ \n",
             " & & & & & & & & & T & E & C & \\\\ \n",
             "\\hline\n"
         ])
