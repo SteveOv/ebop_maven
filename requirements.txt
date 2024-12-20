@@ -26,5 +26,8 @@ keras-preprocessing
 # For hyperparameter grid search
 hyperopt
 
+# We don't have a code dependency on pandas but it's useful to have for data wrangler support in VSCode
+pandas
+
 # dEB characterisation support library
 git+https://github.com/SteveOv/deblib
