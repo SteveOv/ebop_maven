@@ -9,15 +9,15 @@ from lightkurve import LightCurve, FoldedLightCurve
 from astropy.time import Time
 
 label_text = {
-    "rA_plus_rB": "$r_A+r_B$",
-    "k": "$k$",
-    "inc": "$i$",
-    "J": "$J$",
-    "qphot": r"$q_{phot}$",
+    "rA_plus_rB": r"$r_{\rm A}+r_{\rm B}$",
+    "k": r"$k$",
+    "inc": r"$i$",
+    "J": r"$J$",
+    "qphot": r"$q_{\rm phot}$",
     "ecosw": r"$e\,\cos{\omega}$",
     "esinw": r"$e\,\sin{\omega}$",
-    "L3": "$L_3$",
-    "bP": "$b_P$",
+    "L3": r"$L_3$",
+    "bP": r"$b_{\rm P}$",
 }
 
 def format_axes(ax: Axes, title: str=None,
