@@ -58,7 +58,7 @@ def find_lightcurves(search_term: any,
         sectors = [sectors]
 
     if verbose:
-        print(f"Searching for lightcurves based on; search term={search_term}, sectors={sectors},",
+        print(f"Searching for light curves based on; search term={search_term}, sectors={sectors},",
               f"mission={mission}, author={author} and exptime={exptime}")
 
     if not force_mast and sectors and mission and author:
@@ -108,7 +108,7 @@ def find_lightcurves(search_term: any,
                 # We're on! Load these into a collection and return them.
                 if verbose:
                     print(f"Found the required {len(hduls)} fits file(s) meeting the TIC, sector &",
-                          "exptime criteria. Will load the requested lightcurves from these.")
+                          "exptime criteria. Will load the requested light curves from these.")
                 lcs = LightCurveCollection(
                     lk.read(h.filename(), flux_column=flux_column, quality_bitmask=quality_bitmask)
                         for h in sorted(hduls, key=lambda hdul: hdul[0].header["SECTOR"])
@@ -246,9 +246,9 @@ def bin_lightcurve(lc: LightCurve,
         lc = lc.bin(time_bin_size=time_bin_seconds, aggregate_func=np.nanmean)
         lc = lc[~np.isnan(lc.flux)] # Binning may have re-introduced NaNs
         if verbose:
-            print(f"After binning light-curve has reduced from {orig_len} to {len(lc)} rows.")
+            print(f"After binning the light curve has reduced from {orig_len} to {len(lc)} rows.")
     elif verbose:
-        print(f"Light-curve already in bins >= {time_bin_seconds}. Will leave unchanged.")
+        print(f"Light curve already in bins >= {time_bin_seconds}. Will leave unchanged.")
     return lc
 
 
@@ -376,7 +376,7 @@ def flatten_lightcurve(lc: LightCurve,
         raise ValueError("Must specify mask_time_ranges and period, or give a mask kwarg")
 
     if verbose:
-        print("Flattening the Light-curve")
+        print("Flattening the light curve")
     return lc.flatten(**kwargs)
 
 

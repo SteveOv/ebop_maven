@@ -103,7 +103,7 @@ def prepare_lightcurve_for_target(target: str,
                                   verbose: bool=True) \
                                     -> Tuple[LightCurve, int]:
     """
-    Will prepare a lightcurve for the passed test target.
+    Will prepare a light curve for the passed test target.
     If the target has multiple sectors configured, these will be downloaded
     separately and stitched into a single Lightcurve
 
@@ -116,7 +116,7 @@ def prepare_lightcurve_for_target(target: str,
     search_term = target_cfg.get("search_term", target) or target
     sectors = list_sectors_in_target_config(target_cfg)
     if verbose:
-        print(f"Downloading and stitching the lightcurves for {target}",
+        print(f"Downloading and stitching the light curves for {target}",
               f"(search term='{search_term}')" if search_term != target else "",
               "sector(s)", 
               ", ".join(f"{s}" for s in sectors))
@@ -145,16 +145,16 @@ def _prepare_lc_for_target_sector(search_term: str,
                                  fits_dir: Path,
                                  verbose: bool=True) -> LightCurve:
     """
-    Will find and load the requested target/sector lightcurve then mask, bin and
-    append the rectified delta_mag and delta_mag_err columns. It will read the
-    information required for these steps from the passed sector config.
+    Will find and load the requested target/sector light curve then mask, bin
+    and append the rectified delta_mag and delta_mag_err columns. It will read
+    the information required for these steps from the passed sector config.
 
     :search_term: the name or id of the chosen target system
     :sector: which sector
     :target_cfg: the target's config dictionary, as read from the config json
     :fits_dir: the location of the local cache for the downloaded MAST fits assets
     :verbose: whether to write detailed progress information to stdout
-    :returns: a LightCurve object with prepared light-curve data
+    :returns: a LightCurve object with prepared light curve data
     """
     lc = pipeline.find_lightcurves(search_term,
                                    fits_dir,
@@ -167,7 +167,7 @@ def _prepare_lc_for_target_sector(search_term: str,
                                    verbose=verbose)[0]
 
     if verbose:
-        print(f"Opened light-curve fits for {lc.meta['OBJECT']} sector {lc.meta['SECTOR']}")
+        print(f"Opened light curve fits for {lc.meta['OBJECT']} sector {lc.meta['SECTOR']}")
 
     # Here we mask out any "bad" data which may adversely affect detrending and subsequent processes
     lc = pipeline.apply_invalid_flux_masks(lc, verbose)

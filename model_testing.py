@@ -247,7 +247,7 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
             wrap_phase = 0.5+(orbital.phase_of_secondary_eclipse(ecosw, targ_config.get("ecc",0))/2)
 
         # Get the phase folded and binned mags feature
-        print(f"Creating folded and phase normalized lightcurves about {pe.format} {pe} & {period}",
+        print(f"Creating a folded & phase-normalized light curve about {pe.format} {pe} & {period}",
               f"wrapped beyond phase {wrap_phase}" if wrap_phase not in [0.0, 1.0] else "")
         fold_lc = lc.fold(period, pe, wrap_phase=u.Quantity(wrap_phase), normalize_phase=True)
         _, mags = pipeline.get_sampled_phase_mags_data(fold_lc, mags_bins, wrap_phase)
