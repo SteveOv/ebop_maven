@@ -259,7 +259,20 @@ def plot_limb_darkening_coeffs(lookup_table: np.ndarray[float],
         cf = (used["LDA1"], used["LDA2"])
         ax.scatter(cf[0], cf[1], marker="+", c="k", s=150, zorder=10, label=f"used[{i}]\n{cf}")
 
+    if format_kwargs is None:
+        format_kwargs = {}
+
+    # If not given, extend the limits so that there is room for the potentially rather large legend
+    if format_kwargs.get("legend_loc", None):
+        (xfrom, xto) = ax.get_xlim()
+        format_kwargs.setdefault("xlim", (xfrom-0.01, xto+0.15))
+        (yfrom, yto) = ax.get_ylim()
+        format_kwargs.setdefault("ylim", (yfrom-0.05, yto+0.05))
+
     format_axes(ax, **format_kwargs)
+
+    ax.text(ax.get_xlim()[0] + 0.02, ax.get_ylim()[0] + 0.02, # data coords
+            r"Larger markers indicate higher $T_{\rm eff}$") 
     return fig
 
 

@@ -176,10 +176,9 @@ if __name__ == "__main__":
     with redirect_stdout(Tee(open(dataset_dir/"dataset.log", "w", encoding="utf8"))):
         # Plot the general purpose quad/TESS coefficients against values for Z=0 & various Teff/logg
         table = limb_darkening._quad_ld_coeffs_table("TESS") # pylint: disable=protected-access
-        fig = plots.plot_limb_darkening_coeffs(table[table["Z"]==0], fixed_ld_params, xlim=(.09,.7),
+        fig = plots.plot_limb_darkening_coeffs(table[table["Z"]==0], fixed_ld_params,
                 title=r"TESS LD coefficients v $T_{\rm eff}$ at $Z=0$ (Claret, 2018)",
                 xlabel="linear coefficient", ylabel="quadratic coefficient", legend_loc="best")
-        fig.gca().text(0.10, 0.12, r"Larger markers indicate higher $T_{\rm eff}$") # data coords
         fig.savefig(dataset_dir / "limb_darkening.png", dpi=150)
         fig.clf()
 
