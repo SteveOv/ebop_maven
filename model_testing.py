@@ -169,7 +169,11 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
                     .savefig(sub_dir / f"predictions-{mc_type}-box-{ds_name}{suffix}.pdf")
                 plt.close()
 
-                plots.plot_predictions_vs_labels(m_preds, m_lbls, tflags[tmask],
+                # If we have a very large dataset then adopt a strategy of skipping data in the plot
+                # as there's little point plotting every one as individual points become meaningless
+                # with the plot area being small. This will help keep the file size under control.
+                pick = slice(0, None, int(np.ceil(len(tflags) / 10000)))
+                plots.plot_predictions_vs_labels(m_preds[pick], m_lbls[pick], tflags[tmask][pick],
                                                  plot_params, show_errorbars=show_error_bars) \
                     .savefig(sub_dir / f"predictions-{mc_type}-vs-labels-{ds_name}{suffix}.pdf")
                 plt.close()
