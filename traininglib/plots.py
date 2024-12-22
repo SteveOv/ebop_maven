@@ -55,10 +55,13 @@ all_histogram_params = {
     "apparent_mag": (100, r"apparent magnitude (mag)")
 }
 
-# Standard width & heights for 6:4 and 6:5 aspect ratios and the plots being 2 or 4 columns wide
-COL_WIDTH = 3.0
-ROW_HEIGHT_6_4 = 2.0
-ROW_HEIGHT_6_5 = 2.5
+# Standard width & heights for 6:4, 6:5 & square aspect ratios where plots will generally be either
+# 2 (half page) or 4 (whole page) COL_WIDTH wide, as many of the plots are grids of axes.
+# Width set so that font size ~matches when 2x2 plot is fitted to one column of two col LaTeX doc.
+COL_WIDTH = 2.7
+ROW_HEIGHT_6_4 = COL_WIDTH * 2/3
+ROW_HEIGHT_6_5 = COL_WIDTH * 5/6
+ROW_HEIGHT_SQUARE = COL_WIDTH
 
 def plot_dataset_histograms(csv_files: Iterable[Path],
                             params: List[str]=None,
@@ -199,23 +202,21 @@ def plot_dataset_instance_mags_features(dataset_files: Iterable[Path],
             ax.set_xticklabels(major_xticks)
             ax.set_xticks(minor_xticks, minor=True)
 
-            # Work out whether we need a label on each axis. Basically only down the left
-            # and at the bottom, if no further axes are going to appear below this one.
-            ylabel = "Relative magnitude (mag)" if ix % cols == 0 else None
-            xlabel = "Phase" if ix >= len(instances)-cols else None
-
             # We'll rely on the caller to config the output if it's an Axes
-            format_axes(ax, xlabel=xlabel, ylabel=ylabel, legend_loc="lower right", **format_kwargs)
+            format_axes(ax, legend_loc="lower right", **format_kwargs)
         else:
             ax.axis("off") # remove the unused ax
 
     # Now we have the maximum extent of the mags go back through setting the ylims and phase vlines
-    ymax += 0.075 # extend the y-axis so there is always space for the legend
+    ymax += 0.1 # extend the y-axis so there is always space for the legend
     for ix, ax in enumerate(axes.flatten()):
         if ix < len(instances):
             ax.set_ylim((ymax, ymin)) # Has side effect of inverting the y-axis
             ax.vlines(major_xticks, ymin, ymax, ls="--", color="lightgray", lw=.5, zorder=-10)
 
+    # Common x- and y-axis labels
+    fig.supxlabel("Orbital Phase")
+    fig.supylabel("Differential magnitude (mag)")
     return fig
 
 
@@ -313,7 +314,7 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
     cols = 2
     rows = math.ceil(len(params) / cols)
     fig, axes = plt.subplots(rows, cols, constrained_layout=True,
-                             figsize=(cols * COL_WIDTH, rows * COL_WIDTH * 2.9/3.0))
+                             figsize=(cols * COL_WIDTH, rows * ROW_HEIGHT_SQUARE))
     axes = axes.flatten()
 
     if transit_flags is None:
@@ -329,11 +330,14 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
 
             # Plot a diagonal line for exact match
             dmin, dmax = min(lbl_vals.min(), pred_vals.min()), max(lbl_vals.max(), pred_vals.max()) # pylint: disable=nested-min-max
-            dmore = 0.1 * (dmax - dmin)
+            if param_name in ["rA_plus_rB", "k", "J", "bP"]:
+                dmin = min(0, dmin)
+            drange = dmax - dmin
+            dmore = 0.125 * drange
             diag = (dmin - dmore, dmax + dmore)
             ax.plot(diag, diag, color="gray", linestyle="-", linewidth=0.5)
 
-            # If we have lots of data, reduce the size of the maker and add in an alpha
+            # If we have lots of data, reduce the size of the marker and add in an alpha
             (fmt, ms, alpha) = ("o", 5.0, 1.0) if len(lbl_vals) < 100 else (".", 2.0, 0.25)
 
             # Plot the preds vs labels, with those with transits filled.
@@ -355,9 +359,24 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
             format_axes(ax, xlim=diag, ylim=diag, xlabel=f"{xlabel_prefix} {param_caption}",
                         ylabel=f"{ylabel_prefix} {param_caption}")
 
-            # Make sure the plots are squared and have the same ticks
+            # Make sure the plot areas are squared and have similar label areas.
             ax.set_aspect("equal", "box")
-            ax.set_yticks([t for t in ax.get_xticks() if diag[0] < t < diag[1]])
+            ax.tick_params("y", rotation=90)
+
+            # We want up to 5 tick labels at suitable points across the range of values.
+            if param_name == "inc":
+                maj_ticks = np.arange(50, 90.1, 5 if drange < 25 else 10)
+            elif param_name in ["ecosw", "esinw"]:
+                maj_ticks = [-0.4, -0.2, 0, 0.2, 0.4] if drange < 1 else [-0.8, -0.4, 0.0, 0.4, 0.8]
+            else:
+                lim = max(diag)
+                for tick_step in [0.1, 0.2, 0.5, 1, 2, 2.5, 5, 10]:
+                    if lim / tick_step < 5:
+                        break
+                maj_ticks = np.arange(0, lim, tick_step)
+            maj_ticks = [t for t in maj_ticks if diag[0] < t < diag[1]]
+            ax.set_yticks(maj_ticks, minor=False)
+            ax.set_xticks(maj_ticks, minor=False)
         else:
             ax.axis("off") # remove the unused ax
     return fig
