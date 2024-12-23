@@ -233,6 +233,11 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
     pred_vals = np.empty((len(targs), ), dtype=[(p, np.dtype(UFloat.dtype)) for p in super_params])
     fit_vals = np.empty((len(targs), ), dtype=[(p, np.dtype(UFloat.dtype)) for p in super_params])
 
+    # Pre-allocate the mags feature and equivalent LC from predicted and fitted parameters
+    mags_feats = np.empty((len(targs), mags_bins), dtype=float)
+    pred_mags = np.empty((len(targs), 1001), dtype=float)
+    fit_mags = np.empty((len(targs), 1001), dtype=float)
+
     # Finally, we have everything in place to fit our targets and report on the results
     for ix, targ in enumerate(targs):
         print(f"\n\nProcessing target {ix + 1} of {len(targs)}: {targ}\n" + "-"*40)
@@ -280,6 +285,13 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
         predictions_vs_labels_to_table(fit_vals[ix], lbl_vals[ix], [targ], fit_params,
                                        prediction_head="Fitted")
 
+        # Get the phase-folded mags data for the mags feature, predicted and actual fit.
+        # We need to undo the wrap of the mags_feature as the plot will apply its own fixed wrap.
+        mags_feats[ix] = np.roll(mags, -int((1-wrap_phase) * len(mags)), axis=0)
+        pred_mags[ix] = None
+        with open(jktebop.get_jktebop_dir() /f"{fit_stem}.fit", mode="r", encoding="utf8") as ff:
+            fit_mags[ix] = np.loadtxt(ff, usecols=[1], comments="#", dtype=float)[0::10]
+
     # Save reports on how the predictions and fitting has gone over all of the selected targets
     if report_dir:
         sub_dir = report_dir / prediction_type
@@ -325,6 +337,14 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
                                                    xlabel_prefix=comp_head, ylabel_prefix="fitted")
             fig.savefig(sub_dir / f"{results_stem}.eps")
             plt.close()
+
+            if not do_control_fit:
+                # Plot out the input feature vs predicted fit vs actual fit for each test system
+                fig = plots.plot_folded_lightcurves(mags_feats, targs, pred_mags, fit_mags,
+                                                    mags_wrap_phase=0.75, cols=5)
+                fig.savefig(sub_dir / f"phase-folded-lcs-from-{prediction_type}.eps")
+                fig.savefig(sub_dir / f"phase-folded-lcs-from-{prediction_type}.png", dpi=150)
+                plt.close()
 
             with open(sub_dir / f"{results_stem}.txt", "w", encoding="utf8") as txtf:
                 for (sub_head, mask, rep_names) in sub_reports:

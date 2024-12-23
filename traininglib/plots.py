@@ -10,7 +10,7 @@ import numpy as np
 from scipy.stats import binned_statistic
 from uncertainties import UFloat, unumpy
 
-from .datasets import iterate_dataset
+from .datasets import read_dataset
 from .plotting import format_axes
 from .param_sets import read_from_csvs, get_field_names_from_csvs
 from .mistisochrones import MistIsochrones
@@ -171,32 +171,88 @@ def plot_dataset_instance_mags_features(dataset_files: Iterable[Path],
     :format_kwargs: kwargs to be passed on to format_axes()
     :returns: the figure
     """
-    # pylint: disable=too-many-locals
-    # Get the instances for each matching target
-    instances = [*iterate_dataset(dataset_files, mags_bins, mags_wrap_phase,
-                                  identifiers=chosen_targets, max_instances=max_instances)]
+    # Get the instances for each matching target.
+    # We don't wrap the mags data here as the wrapping is handled in plot_folded_lightcurves()
+    # which infers the actual phase from the data index
+    (names, mags_features, _, _) = read_dataset(dataset_files,
+                                                mags_bins=mags_bins,
+                                                mags_wrap_phase=1.0,
+                                                identifiers=chosen_targets,
+                                                max_instances=max_instances)
+    return plot_folded_lightcurves(mags_features, names,
+                                   mags_wrap_phase=mags_wrap_phase, cols=cols, **format_kwargs)
 
-    rows = math.ceil(len(instances) / cols)
+
+def plot_folded_lightcurves(mags_features: np.ndarray[float],
+                            names: np.ndarray[str],
+                            predicted_fits: np.ndarray[float]=None,
+                            actual_fits: np.ndarray[float]=None,
+                            vshift: float=0.1,
+                            mags_wrap_phase: float=0.75,
+                            cols: int=3,
+                            **format_kwargs) -> Figure:
+    """
+    Utility function to produce a plot of one or more sets of light curve data for a range
+    of target systems. The intended use is to show the relationship between the original
+    mags_feature and one or both of the predicted and actual fitted models to the data.
+
+    The mags_features, predicted_fits and actual_fits arrays are expected to have the
+    shape (#insts, #bins) with the phases being inferred by position based on the range [0, 1).
+
+    :mags_features: the array of features to plot, one feature, per ax
+    :names: the names or id for each of the features
+    :predicted_fits: optional array of predicted fitted models to plot, one per ax
+    :actual_fits: optional array of actual fitted models to plot, one per ax
+    :vshift: a vertical shift to apply to each of the predicted & actual fits  
+    :mags_wrap_phase: the wrap phase of the mags - used to position x-axis ticks
+    :format_kwargs: kwargs to be passed on to format_axes()
+    :returns: the figure
+    """
+    if predicted_fits is None:
+        predicted_fits = []
+    if actual_fits is None:
+        actual_fits = []
+    count = max(len(mags_features), len(names), len(predicted_fits), len(actual_fits))
+
+    row_height = ROW_HEIGHT_SQUARE if len(actual_fits) else ROW_HEIGHT_6_5
+    rows = math.ceil(count / cols)
     fig, axes = plt.subplots(rows, cols, sharex="all", sharey="all", constrained_layout=True,
-                             figsize=(cols * COL_WIDTH, rows * ROW_HEIGHT_6_5))
+                             figsize=(cols * COL_WIDTH, rows * row_height))
 
-    # Infer the common phase data from the details of the bins we're given
-    phases = np.linspace(mags_wrap_phase-1, mags_wrap_phase, mags_bins)
-
-    phase_start = round(min(phases), 1)
-    minor_xticks = np.arange(phase_start, phase_start + 1.0 if phase_start < 0.0 else 1.1, 0.1)
+    # Shared over all axes
+    phase_start = mags_wrap_phase - 1
+    minor_xticks = np.arange(phase_start, phase_start + (1.0 if phase_start < 0.0 else 1.1), 0.1)
     major_xticks = [0.0, 0.5]
     ymin, ymax = 0, 0
-    for ix, (ax, instance) in enumerate(zip_longest(axes.flatten(), instances)):
-        if instance:
-            # Only the mags are stored in the dataset. Infer the x/phase data
-            (identifier, model_feature, _, _) = instance
-            ax.scatter(x=phases, y=model_feature, marker=".", s=0.25, label=identifier)
 
-            # Find the y-range which covers all the instances
-            ylim = ax.get_ylim()
-            ymin = min(ymin, min(ylim)) # pylint: disable=nested-min-max
-            ymax = max(ymax, max(ylim)) # pylint: disable=nested-min-max
+    for ax, feature, name, predicted, actual in zip_longest(
+        axes.flatten(),
+        mags_features,
+        names,
+        predicted_fits,
+        actual_fits):
+
+        # We expect to "run out" of features before we run out of axes in the grid.
+        # The predicted and actual fits are optional, so may not exist.
+        if feature is not None and name is not None:
+            for curve_ix, (label, mags) in enumerate([
+                (name,              feature),
+                ("predicted fit",   predicted),
+                ("actual fit",      actual)
+            ]):
+                if mags is not None and len(mags) > 0:
+                    # Infer the phases from index of the mags data and apply any wrap
+                    phases = np.linspace(0, 1, len(mags) + 1)[1:]
+                    if 0 < mags_wrap_phase < 1:
+                        phases[phases > mags_wrap_phase] -= 1.0
+
+                    # Plot the mags data against the phases
+                    ax.scatter(x=phases, y=mags + curve_ix*vshift, marker=".", s=0.25, label=label)
+
+                    # Find the widest y-range which covers all data across the instances
+                    ylim = ax.get_ylim()
+                    ymin = min(ymin, min(ylim)) # pylint: disable=nested-min-max
+                    ymax = max(ymax, max(ylim)) # pylint: disable=nested-min-max
 
             ax.set_xticks(major_xticks, minor=False)
             ax.set_xticklabels(major_xticks)
@@ -205,12 +261,14 @@ def plot_dataset_instance_mags_features(dataset_files: Iterable[Path],
             # We'll rely on the caller to config the output if it's an Axes
             format_axes(ax, legend_loc="lower right", **format_kwargs)
         else:
-            ax.axis("off") # remove the unused ax
+            # We've reached the end of the mags features, so removed the unsed axes
+            ax.axis("off")
 
-    # Now we have the maximum extent of the mags go back through setting the ylims and phase vlines
+    # Now we have the maximum extent of the potentially vshifted mags
+    # go back through setting the common ylims and phase vlines.
     ymax += 0.1 # extend the y-axis so there is always space for the legend
-    for ix, ax in enumerate(axes.flatten()):
-        if ix < len(instances):
+    for curve_ix, ax in enumerate(axes.flatten()):
+        if curve_ix < count:
             ax.set_ylim((ymax, ymin)) # Has side effect of inverting the y-axis
             ax.vlines(major_xticks, ymin, ymax, ls="--", color="lightgray", lw=.5, zorder=-10)
 
