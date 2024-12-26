@@ -183,10 +183,11 @@ def plot_dataset_instance_mags_features(dataset_files: Iterable[Path],
                                    mags_wrap_phase=mags_wrap_phase, cols=cols, **format_kwargs)
 
 
-def plot_folded_lightcurves(mags_features: np.ndarray[float],
+def plot_folded_lightcurves(main_mags_sets: np.ndarray[float],
                             names: np.ndarray[str],
-                            predicted_fits: np.ndarray[float]=None,
-                            actual_fits: np.ndarray[float]=None,
+                            extra_mags_sets1: np.ndarray[float]=None,
+                            extra_mags_sets2: np.ndarray[float]=None,
+                            extra_names: Iterable[str]=("extra mags 1", "extra mags 2"),
                             vshift: float=0.1,
                             mags_wrap_phase: float=0.75,
                             cols: int=3,
@@ -194,28 +195,30 @@ def plot_folded_lightcurves(mags_features: np.ndarray[float],
     """
     Utility function to produce a plot of one or more sets of light curve data for a range
     of target systems. The intended use is to show the relationship between the original
-    mags_feature and one or both of the predicted and actual fitted models to the data.
+    main mags_feature and one or both of the extra mags features.
 
-    The mags_features, predicted_fits and actual_fits arrays are expected to have the
-    shape (#insts, #bins) with the phases being inferred by position based on the range [0, 1).
+    The main_mags_sets, extra_mags_sets1 and extra_mags_sets2 arrays are expected to have the
+    shape (#insts, #bins) with mags phases being inferred within the range [0, 1) by data index.
 
-    :mags_features: the array of features to plot, one feature, per ax
+    :main_mags_sets: the main set of mags features to plot, one feature, per ax
     :names: the names or id for each of the features
-    :predicted_fits: optional array of predicted fitted models to plot, one per ax
-    :actual_fits: optional array of actual fitted models to plot, one per ax
-    :vshift: a vertical shift to apply to each of the predicted & actual fits  
+    :extra_mags_sets1: optional second set of mags features to plot, one per ax
+    :extra_mags_sets2: optional third set of mags features to plot, one per ax
+    :extra_names: the fixed names to give the extra mags features for every plot
+    :vshift: a vertical shift to apply to each of the extra features  
     :mags_wrap_phase: the wrap phase of the mags - used to position x-axis ticks
     :format_kwargs: kwargs to be passed on to format_axes()
     :returns: the figure
     """
-    if predicted_fits is None:
-        predicted_fits = []
-    if actual_fits is None:
-        actual_fits = []
-    count = max(len(mags_features), len(names), len(predicted_fits), len(actual_fits))
+    # pylint: disable=too-many-arguments, too-many-locals
+    if extra_mags_sets1 is None:
+        extra_mags_sets1 = []
+    if extra_mags_sets2 is None:
+        extra_mags_sets2 = []
+    plot_count = max(len(main_mags_sets), len(names), len(extra_mags_sets1), len(extra_mags_sets2))
 
-    row_height = ROW_HEIGHT_SQUARE if len(actual_fits) else ROW_HEIGHT_6_5
-    rows = math.ceil(count / cols)
+    row_height = ROW_HEIGHT_SQUARE if len(extra_mags_sets2) else ROW_HEIGHT_6_5
+    rows = math.ceil(plot_count / cols)
     fig, axes = plt.subplots(rows, cols, sharex="all", sharey="all", constrained_layout=True,
                              figsize=(cols * COL_WIDTH, rows * row_height))
 
@@ -225,20 +228,20 @@ def plot_folded_lightcurves(mags_features: np.ndarray[float],
     major_xticks = [0.0, 0.5]
     ymin, ymax = 0, 0
 
-    for ax, feature, name, predicted, actual in zip_longest(
+    for ax, main_mags, name, extra_mags1, extra_mags2 in zip_longest(
         axes.flatten(),
-        mags_features,
+        main_mags_sets,
         names,
-        predicted_fits,
-        actual_fits):
+        extra_mags_sets1,
+        extra_mags_sets2):
 
         # We expect to "run out" of features before we run out of axes in the grid.
         # The predicted and actual fits are optional, so may not exist.
-        if feature is not None and name is not None:
+        if main_mags is not None and name is not None:
             for curve_ix, (label, mags) in enumerate([
-                (name,              feature),
-                ("predicted fit",   predicted),
-                ("actual fit",      actual)
+                (name,              main_mags),
+                (extra_names[0],    extra_mags1),
+                (extra_names[1],    extra_mags2)
             ]):
                 if mags is not None and len(mags) > 0:
                     # Infer the phases from index of the mags data and apply any wrap
@@ -268,7 +271,7 @@ def plot_folded_lightcurves(mags_features: np.ndarray[float],
     # go back through setting the common ylims and phase vlines.
     ymax += 0.1 # extend the y-axis so there is always space for the legend
     for curve_ix, ax in enumerate(axes.flatten()):
-        if curve_ix < count:
+        if curve_ix < plot_count:
             ax.set_ylim((ymax, ymin)) # Has side effect of inverting the y-axis
             ax.vlines(major_xticks, ymin, ymax, ls="--", color="lightgray", lw=.5, zorder=-10)
 
