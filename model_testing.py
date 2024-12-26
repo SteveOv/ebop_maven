@@ -340,13 +340,15 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
             plt.close()
 
             if not do_control_fit:
-                # Plot out the input feature vs predicted fit vs actual fit for each test system
-                fig = plots.plot_folded_lightcurves(mags_feats, targs, pred_feats, fit_feats,
-                                                    extra_names=("predicted fit", "final fit"),
-                                                    mags_wrap_phase=0.75, cols=5)
-                fig.savefig(sub_dir / f"phase-folded-lcs-from-{prediction_type}.eps")
-                fig.savefig(sub_dir / f"phase-folded-lcs-from-{prediction_type}.png", dpi=150)
-                plt.close()
+                # Plot out the input feature vs predicted fit vs actual fit for each test system.
+                # This can get very large, so we can split it into multiple plots with slices.
+                for ix, sl in enumerate([slice(0, 25)], start=1):
+                    fig = plots.plot_folded_lightcurves(mags_feats[sl], targs[sl],
+                                                        pred_feats[sl], fit_feats[sl],
+                                                        extra_names=("predicted fit", "final fit"),
+                                                        init_ymax=1.2, extra_yshift=0.2, cols=5)
+                    fig.savefig(sub_dir / f"fold-mags-from-{prediction_type}-pt-{ix}.eps")
+                    plt.close()
 
             with open(sub_dir / f"{results_stem}.txt", "w", encoding="utf8") as txtf:
                 for (sub_head, mask, rep_names) in sub_reports:

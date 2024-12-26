@@ -188,7 +188,8 @@ def plot_folded_lightcurves(main_mags_sets: np.ndarray[float],
                             extra_mags_sets1: np.ndarray[float]=None,
                             extra_mags_sets2: np.ndarray[float]=None,
                             extra_names: Iterable[str]=("extra mags 1", "extra mags 2"),
-                            vshift: float=0.1,
+                            init_ymax: float=1.0,
+                            extra_yshift: float=0.1,
                             mags_wrap_phase: float=0.75,
                             cols: int=3,
                             **format_kwargs) -> Figure:
@@ -205,7 +206,8 @@ def plot_folded_lightcurves(main_mags_sets: np.ndarray[float],
     :extra_mags_sets1: optional second set of mags features to plot, one per ax
     :extra_mags_sets2: optional third set of mags features to plot, one per ax
     :extra_names: the fixed names to give the extra mags features for every plot
-    :vshift: a vertical shift to apply to each of the extra features  
+    :init_ymax: minimum initial y-axis max value which will be extended if needed
+    :extra_yshift: a vertical shift to apply to each of the extra features  
     :mags_wrap_phase: the wrap phase of the mags - used to position x-axis ticks
     :format_kwargs: kwargs to be passed on to format_axes()
     :returns: the figure
@@ -226,19 +228,14 @@ def plot_folded_lightcurves(main_mags_sets: np.ndarray[float],
     phase_start = mags_wrap_phase - 1
     minor_xticks = np.arange(phase_start, phase_start + (1.0 if phase_start < 0.0 else 1.1), 0.1)
     major_xticks = [0.0, 0.5]
-    ymin, ymax = 0, 0
+    ymin, ymax = 0, init_ymax
 
-    for ax, main_mags, name, extra_mags1, extra_mags2 in zip_longest(
-        axes.flatten(),
-        main_mags_sets,
-        names,
-        extra_mags_sets1,
-        extra_mags_sets2):
-
+    for ax, main_mags, name, extra_mags1, extra_mags2 in \
+            zip_longest(axes.flatten(), main_mags_sets, names, extra_mags_sets1, extra_mags_sets2):
         # We expect to "run out" of features before we run out of axes in the grid.
         # The predicted and actual fits are optional, so may not exist.
         if main_mags is not None and name is not None:
-            for curve_ix, (label, mags) in enumerate([
+            for ix, (label, mags) in enumerate([
                 (name,              main_mags),
                 (extra_names[0],    extra_mags1),
                 (extra_names[1],    extra_mags2)
@@ -250,7 +247,7 @@ def plot_folded_lightcurves(main_mags_sets: np.ndarray[float],
                         phases[phases > mags_wrap_phase] -= 1.0
 
                     # Plot the mags data against the phases
-                    ax.scatter(x=phases, y=mags + curve_ix*vshift, marker=".", s=0.25, label=label)
+                    ax.scatter(x=phases, y=mags + ix*extra_yshift, marker=".", s=0.25, label=label)
 
                     # Find the widest y-range which covers all data across the instances
                     ylim = ax.get_ylim()
@@ -270,8 +267,8 @@ def plot_folded_lightcurves(main_mags_sets: np.ndarray[float],
     # Now we have the maximum extent of the potentially vshifted mags
     # go back through setting the common ylims and phase vlines.
     ymax += 0.1 # extend the y-axis so there is always space for the legend
-    for curve_ix, ax in enumerate(axes.flatten()):
-        if curve_ix < plot_count:
+    for ix, ax in enumerate(axes.flatten()):
+        if ix < plot_count:
             ax.set_ylim((ymax, ymin)) # Has side effect of inverting the y-axis
             ax.vlines(major_xticks, ymin, ymax, ls="--", color="lightgray", lw=.5, zorder=-10)
 
