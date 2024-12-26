@@ -235,7 +235,7 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
 
     # Pre-allocate the mags feature and equivalent LC from predicted and fitted parameters
     mags_feats = np.empty((len(targs), mags_bins), dtype=float)
-    pred_feats = [None] * len(targs) # np.empty((len(targs), 1001), dtype=float)
+    pred_feats = np.empty((len(targs), 1001), dtype=float)
     fit_feats = np.empty((len(targs), 1001), dtype=float)
 
     # Finally, we have everything in place to fit our targets and report on the results
@@ -288,7 +288,8 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
         # Get the phase-folded mags data for the mags feature, predicted and actual fit.
         # We need to undo the wrap of the mags_feature as the plot will apply its own fixed wrap.
         mags_feats[ix] = np.roll(mags, -int((1-wrap_phase) * len(mags)), axis=0)
-        pred_feats[ix] = None
+        pred_lc = generate_predicted_fit(pred_vals[ix], targ_config, apply_fit_overrides)
+        pred_feats[ix] = pred_lc["delta_mag"][::10]
         with open(jktebop.get_jktebop_dir() /f"{fit_stem}.fit", mode="r", encoding="utf8") as ff:
             fit_feats[ix] = np.loadtxt(ff, usecols=[1], comments="#", dtype=float)[0::10]
 
@@ -407,35 +408,9 @@ def fit_target(lc: LightCurve,
     dat_fname = fit_dir / f"{file_stem}.dat"
     par_fname = fit_dir / f"{file_stem}.par"
 
-    # published fitting params that may be needed for reliable fit
-    fit_overrides = target_cfg.get("fit_overrides", {}) if apply_fit_overrides else {}
-
-    # Set up star specific LD params on the overrides if we haven't been given both algo & coeffs
-    for star in ["A", "B"]:
-        algo = fit_overrides.get(f"LD{star}", "quad") # Only quad, pow2 or h1h2 supported
-        if f"LD{star}" not in fit_overrides \
-                or f"LD{star}1" not in fit_overrides or f"LD{star}2" not in fit_overrides:
-            # If we've not been given overrides for both the algo and coeffs we can look them up
-            # provided we have the stellar mass (M?), radius (R?) & effective temp (Teff?) in config
-            logg = stellar.log_g(target_cfg[f"M{star}"] * M_sun, target_cfg[f"R{star}"] * R_sun).n
-            teff = target_cfg[f"Teff{star}"]
-            if algo == "same":
-                c, alpha = 0, 0 # JKTEBOP uses the A star params for both
-            elif algo == "quad":
-                c, alpha = limb_darkening.lookup_quad_coefficients(logg, teff)
-            else:
-                c, alpha = limb_darkening.lookup_pow2_coefficients(logg, teff)
-
-            # Add any missing algo/coeffs tags to the overrides
-            fit_overrides.setdefault(f"LD{star}", algo)
-            if algo != "h1h2" or algo == "same":
-                fit_overrides.setdefault(f"LD{star}1", c)
-                fit_overrides.setdefault(f"LD{star}2", alpha)
-            else:
-                # The h1h2 reparameterisation of the pow2 law addreeses correlation between the
-                # coeffs; see Maxted (2018A&A...616A..39M) and Southworth (2023Obs...143...71S)
-                fit_overrides.setdefault(f"LD{star}1", 1 - c*(1 - 2**(-alpha)))
-                fit_overrides.setdefault(f"LD{star}2", c * 2**(-alpha))
+    # The fit_overrides are optional overrides to any derived value and should be applied last
+    fit_overrides = copy.deepcopy(target_cfg.get("fit_overrides",{})) if apply_fit_overrides else {}
+    ld_params = pop_and_complete_ld_config(fit_overrides, target_cfg) # leaves LD*_fit items
 
     attempts = 1 + max(0, retries)
     best_attempt = 0
@@ -455,7 +430,7 @@ def fit_target(lc: LightCurve,
             "period": target_cfg["period"],
             "primary_epoch": pipeline.to_lc_time(target_cfg["primary_epoch"], lc).value,
 
-            "simulations": simulations if task in [8, 9] else "",
+            "simulations": simulations if task == 8 else "",
 
             "qphot_fit": 0,
             "ecosw_fit": 1,             "esinw_fit": 1,
@@ -472,6 +447,7 @@ def fit_target(lc: LightCurve,
 
             **{ n: input_params[n] for n in input_params.dtype.names },
             **fit_overrides,
+            **ld_params,
         }
 
         # Add scale-factor poly fitting, chi^2 adjustment (to 1.0) and any light-ratio instructions
@@ -516,6 +492,80 @@ def fit_target(lc: LightCurve,
                 break
 
     return fitted_params[best_attempt][return_keys]
+
+
+def generate_predicted_fit(input_params: np.ndarray[UFloat],
+                           target_cfg: dict[str, any],
+                           apply_fit_overrides: bool=True) -> np.ndarray[float]:
+    """
+    Will generate a phase-folded model light curve for the passed params and any
+    LD algo/coefficients in the target config.
+
+    :input_params: the param set to use to generate the model LC
+    :target_cfg: the full config for this target - allows access to fit_overrides
+    :apply_fit_overrides: whether we should use or ignore the contents of fit_overrides
+    :returns: the model data as a numpy structured array of shape (#rows, ["phase", "delta_mag])
+    """
+    # The fit_overrides are optional overrides to any derived value and should be applied last
+    fit_overrides = copy.deepcopy(target_cfg.get("fit_overrides",{})) if apply_fit_overrides else {}
+    ld_params = pop_and_complete_ld_config(fit_overrides, target_cfg)
+
+    # We only need a small subset of the params here as we're not fitting, but generating a model LC
+    params = {
+        "L3":       0,
+        "qphot":    -1,
+        **{ n: input_params[n] for n in input_params.dtype.names },
+        **fit_overrides,
+        **ld_params,
+    }
+
+    return jktebop.generate_model_light_curve("model-testing-pred-fit", **params)
+
+
+def pop_and_complete_ld_config(source_cfg: Dict[str, any],
+                               target_cfg: Dict[str, any]) -> Dict[str, any]:
+    """
+    Will set up the limb darkening algo and coeffs, first by popping them from
+    the source_cfg dictionary then completing the config with missing values.
+    Where missing, the algo defaults to quad unless pow2, h1h2 or same specified
+    and coefficient lookups are performed to populate any missing values.
+
+    NOTE: pops the LD* items from source_cfg (except those ending _fit) into the returned config
+
+    :source_cfg: the config fragment which may contain predefined LD params
+    :target_cfg: the full target config dictionary, which may contain params needed for lookups
+    :return: the LD params only dict
+    """
+    ld_params = {}
+    for ld in [k for k in source_cfg if k.startswith("LD") and not k.endswith("_fit")]:
+        ld_params[ld] = source_cfg.pop(ld)
+
+    for star in ["A", "B"]:
+        algo = ld_params.get(f"LD{star}", "quad") # Only quad, pow2 or h1h2 supported
+        if f"LD{star}" not in ld_params \
+                or f"LD{star}1" not in ld_params or f"LD{star}2" not in ld_params:
+            # If we've not been given overrides for both the algo and coeffs we can look them up
+            # provided we have the stellar mass (M?), radius (R?) & effective temp (Teff?) in config
+            logg = stellar.log_g(target_cfg[f"M{star}"] * M_sun, target_cfg[f"R{star}"] * R_sun).n
+            teff = target_cfg[f"Teff{star}"]
+            if algo.lower() == "same":
+                coeffs = (0, 0) # JKTEBOP uses the A star params for both
+            elif algo.lower() == "quad":
+                coeffs = limb_darkening.lookup_quad_coefficients(logg, teff)
+            else:
+                coeffs = limb_darkening.lookup_pow2_coefficients(logg, teff)
+
+            # Add any missing algo/coeffs tags to the overrides
+            ld_params.setdefault(f"LD{star}", algo)
+            if algo.lower() == "h1h2":
+                # The h1h2 reparameterisation of the pow2 law addreeses correlation between the
+                # coeffs; see Maxted (2018A&A...616A..39M) and Southworth (2023Obs...143...71S)
+                ld_params.setdefault(f"LD{star}1", 1 - coeffs[0]*(1 - 2**(-coeffs[1])))
+                ld_params.setdefault(f"LD{star}2", coeffs[0] * 2**(-coeffs[1]))
+            else:
+                ld_params.setdefault(f"LD{star}1", coeffs[0])
+                ld_params.setdefault(f"LD{star}2", coeffs[1])
+    return ld_params
 
 
 def append_calculated_inc_predictions(preds: np.ndarray[UFloat]) -> np.ndarray[UFloat]:
