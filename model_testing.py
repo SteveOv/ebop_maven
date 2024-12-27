@@ -220,6 +220,10 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
     trans_flags = np.array([targets_config.get(t, {}).get("transits", False) for t in targs])
     prediction_type = "control" if do_control_fit else "mc" if mc_iterations > 1 else "nonmc"
 
+    # Highlighting with plot_predictions_vs_labels(): AI Phe (tough fit), V570 Per (tough to pred)
+    hl_mask1 = targs == "AI Phe"
+    hl_mask2 = targs == "V570 Per"
+
     # To clarify: the estimator publishes a list of what it can predict via its label_names attrib
     # and fit_params may differ; they are those params required for JKTEBOP fitting and reporting.
     # super_params is the set of both and is used, for example, to get the superset of label values
@@ -318,10 +322,11 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
             # Control == fit from labels not preds, so no point producing these
             if not do_control_fit:
                 preds_stem = f"predictions-{prediction_type}-vs-{comp_type}"
-                for (source, names) in [("model", estimator.label_names), ("fitting", fit_params)]:
-                    names = [n for n in names if n not in ["ecosw", "esinw"]] + ["ecosw", "esinw"]
+                for (source, pnames) in [("model", estimator.label_names), ("fitting", fit_params)]:
+                    pnames = [n for n in pnames if n not in ["ecosw", "esinw"]] + ["ecosw", "esinw"]
                     fig = plots.plot_predictions_vs_labels(pred_vals, comp_vals, trans_flags,
-                                                           names, xlabel_prefix=comp_head)
+                                                           pnames, xlabel_prefix=comp_head,
+                                                           hl_mask1=hl_mask1, hl_mask2=hl_mask2)
                     fig.savefig(sub_dir / f"{preds_stem}-{source}.eps")
 
                 with open(sub_dir / f"{preds_stem}.txt", mode="w", encoding="utf8") as txtf:
@@ -333,9 +338,10 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
 
             # Summarize this set of fitted params as plots pred-vs-label|control and in text tables
             results_stem = f"fitted-params-from-{prediction_type}-vs-{comp_type}"
-            plot_params = [n for n in fit_params if n not in ["ecosw", "esinw"]] + ["ecosw","esinw"]
-            fig = plots.plot_predictions_vs_labels(fit_vals, comp_vals, trans_flags, plot_params,
-                                                   xlabel_prefix=comp_head, ylabel_prefix="fitted")
+            pnames = [n for n in fit_params if n not in ["ecosw", "esinw"]] + ["ecosw","esinw"]
+            fig = plots.plot_predictions_vs_labels(fit_vals, comp_vals, trans_flags, pnames,
+                                                   xlabel_prefix=comp_head, ylabel_prefix="fitted",
+                                                   hl_mask1=hl_mask1, hl_mask2=hl_mask2)
             fig.savefig(sub_dir / f"{results_stem}.eps")
             plt.close()
 

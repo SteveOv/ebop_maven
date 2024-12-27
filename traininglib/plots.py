@@ -343,8 +343,8 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
                                show_errorbars: bool=None,
                                xlabel_prefix: str="label",
                                ylabel_prefix: str="predicted",
-                               highlight_mask1: np.ndarray[bool]=None,
-                               highlight_mask2: np.ndarray[bool]=None) -> Figure:
+                               hl_mask1: np.ndarray[bool]=None,
+                               hl_mask2: np.ndarray[bool]=None) -> Figure:
     """
     Will create a plot figure with a grid of axes, one per label, showing the
     predictions vs label values. It is up to calling code to show or save the figure.
@@ -358,8 +358,8 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
     will plot errorbars if there are non-zero error/sigma values in the predictions
     :xlabel_prefix: the prefix text for the labels/x-axis label
     :ylabel_prefix: the prefix text for the predictions/y-axis label
-    :highlight_mask1: optional mask for targets to be plotted with 1st alternative/highlight marker
-    :highlight_mask2: optional mask for targets to be plotted with 2nd alternative/highlight marker
+    :hl_mask1: optional mask for targets to be plotted with 1st alternative/highlight marker
+    :hl_mask2: optional mask for targets to be plotted with 2nd alternative/highlight marker
     :returns: the Figure
     """
     # pylint: disable=too-many-arguments, too-many-locals
@@ -367,18 +367,18 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
         raise ValueError("labels are of a different length to predictions")
     if transit_mask is not None and transit_mask.shape[0] != predictions.shape[0]:
         raise ValueError("transit_mask are of a different length to predictions")
-    if highlight_mask1 is not None and highlight_mask1.shape[0] != predictions.shape[0]:
-        raise ValueError("highlight_mask1 are given with a different length to predictions")
-    if highlight_mask2 is not None and highlight_mask2.shape[0] != predictions.shape[0]:
-        raise ValueError("highlight_mask2 are given with a different length to predictions")
+    if hl_mask1 is not None and hl_mask1.shape[0] != predictions.shape[0]:
+        raise ValueError("hl_mask1 are given with a different length to predictions")
+    if hl_mask2 is not None and hl_mask2.shape[0] != predictions.shape[0]:
+        raise ValueError("hl_mask2 are given with a different length to predictions")
     inst_count = predictions.shape[0]
 
     if transit_mask is None:
         transit_mask = np.zeros((inst_count), dtype=bool)
-    if highlight_mask1 is None:
-        highlight_mask1 = np.zeros((inst_count), dtype=bool)
-    if highlight_mask2 is None:
-        highlight_mask2 = np.zeros((inst_count), dtype=bool)
+    if hl_mask1 is None:
+        hl_mask1 = np.zeros((inst_count), dtype=bool)
+    if hl_mask2 is None:
+        hl_mask2 = np.zeros((inst_count), dtype=bool)
 
     # We plot the params common to the labels & preds, & optionally the input list
     # of names. Avoiding using set() as we want requested names or the labels to set order
@@ -420,22 +420,23 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
             if show_errorbars is None:
                 show_errorbars = max(np.abs(pred_sigmas)) > 0
 
-            non_hl_mask = ~highlight_mask1 & ~highlight_mask2
-            for (mask,                              fmt,    c,              ms,         filled) in [
-                (~transit_mask & non_hl_mask,       "o",    "tab:blue",     bms,        False),
-                (transit_mask & non_hl_mask,        "o",    "tab:blue",     bms,        True),
-                (~transit_mask & highlight_mask1,   "s",    "tab:orange",   bms*1.3,    False),
-                (transit_mask & highlight_mask1,    "s",    "tab:orange",   bms*1.3,    True),
-                (~transit_mask & highlight_mask2,   "D",    "k",            bms*1.3,    False),
-                (transit_mask & highlight_mask2,    "D",    "k",            bms*1.3,    True),
+            non_hl_mask = ~hl_mask1 & ~hl_mask2
+            for (mask,                          fmt,    c,              ms,         filled) in [
+                (~transit_mask & non_hl_mask,   "o",    "tab:blue",     bms,        False),
+                (transit_mask & non_hl_mask,    "o",    "tab:blue",     bms,        True),
+                (~transit_mask & hl_mask1,      "s",    "tab:orange",   bms*1.33,   False),
+                (transit_mask & hl_mask1,       "s",    "tab:orange",   bms*1.33,   True),
+                (~transit_mask & hl_mask2,      "D",    "k",            bms*1.33,   False),
+                (transit_mask & hl_mask2,       "D",    "k",            bms*1.33,   True),
             ]:
                 if any(mask):
                     fs = "full" if filled else "none"
                     if show_errorbars:
+                        # Reduce the marker size here so it's easier to make out any errorbars
                         ax.errorbar(x=lbl_vals[mask], y=pred_vals[mask],
                                     xerr=lbl_sigmas[mask], yerr=pred_sigmas[mask],
                                     c=c, lw=ms/5, markeredgewidth=ms/5, capsize=2.0,
-                                    fmt=fmt, ms=ms, alpha=alpha, fillstyle=fs)
+                                    fmt=fmt, ms=ms*0.75, alpha=alpha, fillstyle=fs)
                     else:
                         ax.errorbar(x=lbl_vals[mask], y=pred_vals[mask],
                                     c=c, lw=ms/5, markeredgewidth=ms/5,
