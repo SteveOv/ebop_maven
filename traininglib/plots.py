@@ -338,27 +338,47 @@ def plot_limb_darkening_coeffs(lookup_table: np.ndarray[float],
 
 def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
                                labels: np.ndarray[UFloat],
-                               transit_flags: np.ndarray[bool],
+                               transit_mask: np.ndarray[bool],
                                selected_params: List[str]=None,
                                show_errorbars: bool=None,
                                xlabel_prefix: str="label",
-                               ylabel_prefix: str="predicted") -> Figure:
+                               ylabel_prefix: str="predicted",
+                               highlight_mask1: np.ndarray[bool]=None,
+                               highlight_mask2: np.ndarray[bool]=None) -> Figure:
     """
     Will create a plot figure with a grid of axes, one per label, showing the
     predictions vs label values. It is up to calling code to show or save the figure.
 
     :predictions: the prediction values
     :labels: the label values
-    :transit_flags: the associated transit flags; points where the transit flag is True
-    are plotted as a filled shape otherwise as an empty shape
+    :transit_mask: the associated transit mask; points where the mask is True
+    are plotted as a filled marker otherwise as an empty marker
     :selected_params: a subset of the full list of prediction/label params to render
     :show_errorbars: whether to plot errorbars for predictions and labels - if not set the function
     will plot errorbars if there are non-zero error/sigma values in the predictions
     :xlabel_prefix: the prefix text for the labels/x-axis label
     :ylabel_prefix: the prefix text for the predictions/y-axis label
+    :highlight_mask1: optional mask for targets to be plotted with 1st alternative/highlight marker
+    :highlight_mask2: optional mask for targets to be plotted with 2nd alternative/highlight marker
     :returns: the Figure
     """
     # pylint: disable=too-many-arguments, too-many-locals
+    if labels.shape[0] != predictions.shape[0]:
+        raise ValueError("labels are of a different length to predictions")
+    if transit_mask is not None and transit_mask.shape[0] != predictions.shape[0]:
+        raise ValueError("transit_mask are of a different length to predictions")
+    if highlight_mask1 is not None and highlight_mask1.shape[0] != predictions.shape[0]:
+        raise ValueError("highlight_mask1 are given with a different length to predictions")
+    if highlight_mask2 is not None and highlight_mask2.shape[0] != predictions.shape[0]:
+        raise ValueError("highlight_mask2 are given with a different length to predictions")
+    inst_count = predictions.shape[0]
+
+    if transit_mask is None:
+        transit_mask = np.zeros((inst_count), dtype=bool)
+    if highlight_mask1 is None:
+        highlight_mask1 = np.zeros((inst_count), dtype=bool)
+    if highlight_mask2 is None:
+        highlight_mask2 = np.zeros((inst_count), dtype=bool)
 
     # We plot the params common to the labels & preds, & optionally the input list
     # of names. Avoiding using set() as we want requested names or the labels to set order
@@ -376,10 +396,10 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
                              figsize=(cols * COL_WIDTH, rows * ROW_HEIGHT_SQUARE))
     axes = axes.flatten()
 
-    if transit_flags is None:
-        transit_flags = np.zeros((labels.shape[0]), dtype=bool)
+    # If we have lots of data, reduce the size of the markers and reduce the alpha
+    (bms, alpha) = (4.0, 1.0) if inst_count < 100 else (2.0, 0.33)
 
-    print(f"Plotting scatter plot {rows}x{cols} grid for: {', '.join(params.keys())}")
+    print(f"Plotting {inst_count} instances on {rows}x{cols} grid for:", ", ".join(params.keys()))
     for (ax, param_name) in zip_longest(axes.flatten(), params.keys()):
         if param_name:
             lbl_vals = unumpy.nominal_values(labels[param_name])
@@ -394,25 +414,32 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
             drange = dmax - dmin
             dmore = 0.125 * drange
             diag = (dmin - dmore, dmax + dmore)
-            ax.plot(diag, diag, color="gray", linestyle="-", linewidth=0.5)
-
-            # If we have lots of data, reduce the size of the marker and add in an alpha
-            (fmt, ms, alpha) = ("o", 5.0, 1.0) if len(lbl_vals) < 100 else (".", 2.0, 0.25)
+            ax.plot(diag, diag, color="gray", linestyle="--", linewidth=1.0, zorder=-10)
 
             # Plot the preds vs labels, with those with transits filled.
             if show_errorbars is None:
                 show_errorbars = max(np.abs(pred_sigmas)) > 0
-            for tmask, transiting in [(transit_flags, True), (~transit_flags, False)]:
-                if any(tmask):
-                    (f, z) = ("full", 10) if transiting else ("none", 0)
+
+            non_hl_mask = ~highlight_mask1 & ~highlight_mask2
+            for (mask,                              fmt,    c,              ms,         filled) in [
+                (~transit_mask & non_hl_mask,       "o",    "tab:blue",     bms,        False),
+                (transit_mask & non_hl_mask,        "o",    "tab:blue",     bms,        True),
+                (~transit_mask & highlight_mask1,   "s",    "tab:orange",   bms*1.3,    False),
+                (transit_mask & highlight_mask1,    "s",    "tab:orange",   bms*1.3,    True),
+                (~transit_mask & highlight_mask2,   "D",    "k",            bms*1.3,    False),
+                (transit_mask & highlight_mask2,    "D",    "k",            bms*1.3,    True),
+            ]:
+                if any(mask):
+                    fs = "full" if filled else "none"
                     if show_errorbars:
-                        ax.errorbar(x=lbl_vals[tmask], y=pred_vals[tmask],
-                                    xerr=lbl_sigmas[tmask], yerr=pred_sigmas[tmask],
-                                    fmt=fmt, c="tab:blue", ms=ms, lw=1.0, alpha=alpha,
-                                    capsize=2.0, markeredgewidth=0.5, fillstyle=f, zorder=z)
+                        ax.errorbar(x=lbl_vals[mask], y=pred_vals[mask],
+                                    xerr=lbl_sigmas[mask], yerr=pred_sigmas[mask],
+                                    c=c, lw=ms/5, markeredgewidth=ms/5, capsize=2.0,
+                                    fmt=fmt, ms=ms, alpha=alpha, fillstyle=fs)
                     else:
-                        ax.errorbar(x=lbl_vals[tmask], y=pred_vals[tmask], fmt=fmt, c="tab:blue",
-                                    alpha=alpha, ms=ms, lw=1.0, fillstyle=f, zorder=z)
+                        ax.errorbar(x=lbl_vals[mask], y=pred_vals[mask],
+                                    c=c, lw=ms/5, markeredgewidth=ms/5,
+                                    fmt=fmt, ms=ms, alpha=alpha, fillstyle=fs)
 
             param_caption = params[param_name]
             format_axes(ax, xlim=diag, ylim=diag, xlabel=f"{xlabel_prefix} {param_caption}",
