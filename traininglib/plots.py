@@ -219,7 +219,8 @@ def plot_folded_lightcurves(main_mags_sets: np.ndarray[float],
         extra_mags_sets2 = []
     plot_count = max(len(main_mags_sets), len(names), len(extra_mags_sets1), len(extra_mags_sets2))
 
-    row_height = ROW_HEIGHT_SQUARE if len(extra_mags_sets2) else ROW_HEIGHT_6_5
+    height_factor = 1 + (0.2 if len(extra_mags_sets2) else 0.1 if len(extra_mags_sets1) else 0.0)
+    row_height = ROW_HEIGHT_SQUARE * height_factor
     rows = math.ceil(plot_count / cols)
     fig, axes = plt.subplots(rows, cols, sharex="all", sharey="all", constrained_layout=True,
                              figsize=(cols * COL_WIDTH, rows * row_height))

@@ -343,10 +343,9 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
                 # Plot out the input feature vs predicted fit vs actual fit for each test system.
                 # This can get very large, so we can split it into multiple plots with slices.
                 for ix, sl in enumerate([slice(0, 25)], start=1):
-                    fig = plots.plot_folded_lightcurves(mags_feats[sl], targs[sl],
-                                                        pred_feats[sl], fit_feats[sl],
-                                                        extra_names=("predicted fit", "final fit"),
-                                                        init_ymax=1.2, extra_yshift=0.2, cols=5)
+                    fig = plots.plot_folded_lightcurves(mags_feats[sl], targs[sl], pred_feats[sl],
+                                                        fit_feats[sl], extra_names=(None, None),
+                                                        init_ymax=1., extra_yshift=0.2, cols=5)
                     fig.savefig(sub_dir / f"fold-mags-from-{prediction_type}-pt-{ix}.eps")
                     plt.close()
 
