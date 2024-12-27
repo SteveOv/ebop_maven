@@ -1,4 +1,4 @@
-# EBOP Model Automatic input Value Estimation Neural network
+# EBOP Model Analysis input Value Estimation Neural network
 A machine learning model for predicting eclipsing binary light curve fitting parameters for
 formal analysis with [JKTEBOP](https://www.astro.keele.ac.uk/jkt/codes/jktebop.html).
 
