@@ -432,11 +432,12 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
                 if any(mask):
                     fs = "full" if filled else "none"
                     if show_errorbars:
-                        # Reduce the marker size here so it's easier to make out any errorbars
+                        # Reduce marker size (& lines) with errorbars so they're easier to make out
+                        ms *= 0.75
                         ax.errorbar(x=lbl_vals[mask], y=pred_vals[mask],
                                     xerr=lbl_sigmas[mask], yerr=pred_sigmas[mask],
                                     c=c, lw=ms/5, markeredgewidth=ms/5, capsize=2.0,
-                                    fmt=fmt, ms=ms*0.75, alpha=alpha, fillstyle=fs)
+                                    fmt=fmt, ms=ms, alpha=alpha, fillstyle=fs)
                     else:
                         ax.errorbar(x=lbl_vals[mask], y=pred_vals[mask],
                                     c=c, lw=ms/5, markeredgewidth=ms/5,
