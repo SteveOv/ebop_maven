@@ -75,7 +75,7 @@ This module depends on
 [MIST isochrone files](http://waps.cfa.harvard.edu/MIST/data/tarballs_v1.2/MIST_v1.2_vvcrit0.4_basic_isos.txz)
 which are not distributed as part of this GitHub repo. You will need to download and extract a
 pre-built model grid by following the instructions in
-[readme.txt](../blob/kopal2024/traininglib/data/mist/MIST_v1.2_vvcrit0.4_basic_isos/readme.txt). 
+[readme.txt](./traininglib/data/mist/MIST_v1.2_vvcrit0.4_basic_isos/readme.txt). 
 
 #### The formal test dataset of real systems
 Finally run
