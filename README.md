@@ -3,7 +3,7 @@ A machine learning model for predicting eclipsing binary light curve fitting par
 formal analysis with [JKTEBOP](https://www.astro.keele.ac.uk/jkt/codes/jktebop.html).
 
 Detailed instructions on setting up the runtime environment, training & testing datasets,
-and training a model can be found [here in the wiki](../blob/kopal2024/readme-setup.md)
+and training a model can be found [here in the wiki](../kopal2024/readme-setup.md)
 
 An article on the development of EBOP MAVEN is being prepared for publication.
 
