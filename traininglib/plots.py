@@ -164,53 +164,110 @@ def plot_dataset_instance_mags_features(dataset_files: Iterable[Path],
     :format_kwargs: kwargs to be passed on to format_axes()
     :returns: the figure
     """
-    # pylint: disable=too-many-locals
-    # Get the instances for each matching target
-    instances = [*deb_example.iterate_dataset(dataset_files, mags_bins, mags_wrap_phase,
-                                        identifiers=chosen_targets, max_instances=max_instances)]
+    # pylint: disable=too-many-arguments
+    # Get the instances for each matching target. We don't wrap the mags data here as the wrapping
+    # is handled in plot_folded_lightcurves() which infers the actual phase from the data index.
+    (names, mags_features, _, _) = deb_example.read_dataset(dataset_files,
+                                                            mags_bins=mags_bins,
+                                                            mags_wrap_phase=1.0,
+                                                            identifiers=chosen_targets,
+                                                            max_instances=max_instances)
+    return plot_folded_lightcurves(mags_features, names,
+                                   mags_wrap_phase=mags_wrap_phase, cols=cols, **format_kwargs)
 
-    rows = math.ceil(len(instances) / cols)
-    fig, axes = plt.subplots(rows, cols, sharex="all", sharey="all",
-                             figsize=(cols*4, rows*3), constrained_layout=True)
 
-    # Infer the common phase data from the details of the bins we're given
-    phases = np.linspace(mags_wrap_phase-1, mags_wrap_phase, mags_bins)
+def plot_folded_lightcurves(main_mags_sets: np.ndarray[float],
+                            names: np.ndarray[str],
+                            extra_mags_sets1: np.ndarray[float]=None,
+                            extra_mags_sets2: np.ndarray[float]=None,
+                            extra_names: Iterable[str]=("extra mags 1", "extra mags 2"),
+                            init_ymax: float=1.0,
+                            extra_yshift: float=0.1,
+                            mags_wrap_phase: float=0.75,
+                            cols: int=3,
+                            **format_kwargs) -> Figure:
+    """
+    Utility function to produce a plot of one or more sets of light curve data for a range
+    of target systems. The intended use is to show the relationship between the original
+    main mags_feature and one or both of the extra mags features.
 
-    phase_start = round(min(phases), 1)
-    minor_xticks = np.arange(phase_start, phase_start + 1.0 if phase_start < 0.0 else 1.1, 0.1)
+    The main_mags_sets, extra_mags_sets1 and extra_mags_sets2 arrays are expected to have the
+    shape (#insts, #bins) with mags phases being inferred within the range [0, 1) by data index.
+
+    :main_mags_sets: the main set of mags features to plot, one feature, per ax
+    :names: the names or id for each of the features
+    :extra_mags_sets1: optional second set of mags features to plot, one per ax
+    :extra_mags_sets2: optional third set of mags features to plot, one per ax
+    :extra_names: the fixed names to give the extra mags features for every plot
+    :init_ymax: minimum initial y-axis max value which will be extended if needed
+    :extra_yshift: a vertical shift to apply to each of the extra features  
+    :mags_wrap_phase: the wrap phase of the mags - used to position x-axis ticks
+    :format_kwargs: kwargs to be passed on to format_axes()
+    :returns: the figure
+    """
+    # pylint: disable=too-many-arguments, too-many-locals
+    if extra_mags_sets1 is None:
+        extra_mags_sets1 = []
+    if extra_mags_sets2 is None:
+        extra_mags_sets2 = []
+    plot_count = max(len(main_mags_sets), len(names), len(extra_mags_sets1), len(extra_mags_sets2))
+
+    col_width = 4
+    row_height = 4 * (1.2 if len(extra_mags_sets2) else 1.1 if len(extra_mags_sets1) else 1.0)
+    rows = math.ceil(plot_count / cols)
+    fig, axes = plt.subplots(rows, cols, sharex="all", sharey="all", constrained_layout=True,
+                             figsize=(cols * col_width, rows * row_height))
+
+    # Shared over all axes
+    phase_start = mags_wrap_phase - 1
+    minor_xticks = np.arange(phase_start, phase_start + (1.0 if phase_start < 0.0 else 1.1), 0.1)
     major_xticks = [0.0, 0.5]
-    ymin, ymax = 0, 0
-    for ix, (ax, instance) in enumerate(zip_longest(axes.flatten(), instances)):
-        if instance:
-            # Only the mags are stored in the dataset. Infer the x/phase data
-            (identifier, model_feature, _, _) = instance
-            ax.scatter(x=phases, y=model_feature, marker=".", s=0.25, label=identifier)
+    ymin, ymax = 0, init_ymax
 
-            # Find the y-range which covers all the instances
-            ylim = ax.get_ylim()
-            ymin = min(ymin, min(ylim)) # pylint: disable=nested-min-max
-            ymax = max(ymax, max(ylim)) # pylint: disable=nested-min-max
+    for ax, main_mags, name, extra_mags1, extra_mags2 in \
+            zip_longest(axes.flatten(), main_mags_sets, names, extra_mags_sets1, extra_mags_sets2):
+        # We expect to "run out" of features before we run out of axes in the grid.
+        # The predicted and actual fits are optional, so may not exist.
+        if main_mags is not None and name is not None:
+            for ix, (label, mags) in enumerate([
+                (name,              main_mags),
+                (extra_names[0],    extra_mags1),
+                (extra_names[1],    extra_mags2)
+            ]):
+                if mags is not None and len(mags) > 0:
+                    # Infer the phases from index of the mags data and apply any wrap
+                    phases = np.linspace(0, 1, len(mags) + 1)[1:]
+                    if 0 < mags_wrap_phase < 1:
+                        phases[phases > mags_wrap_phase] -= 1.0
+
+                    # Plot the mags data against the phases
+                    ax.scatter(x=phases, y=mags + ix*extra_yshift, marker=".", s=0.25, label=label)
+
+                    # Find the widest y-range which covers all data across the instances
+                    ylim = ax.get_ylim()
+                    ymin = min(ymin, min(ylim)) # pylint: disable=nested-min-max
+                    ymax = max(ymax, max(ylim)) # pylint: disable=nested-min-max
 
             ax.set_xticks(major_xticks, minor=False)
             ax.set_xticklabels(major_xticks)
             ax.set_xticks(minor_xticks, minor=True)
 
-            # Work out whether we need a label on each axis. Basically only down the left
-            # and at the bottom, if no further axes are going to appear below this one.
-            ylabel = "Relative magnitude (mag)" if ix % cols == 0 else None
-            xlabel = "Phase" if ix >= len(instances)-cols else None
-
-            # We'll rely on the caller to config the output if it's an Axes
-            format_axes(ax, xlabel=xlabel, ylabel=ylabel, legend_loc="best", **format_kwargs)
+            format_axes(ax, legend_loc="lower right", **format_kwargs)
         else:
-            ax.axis("off") # remove the unused ax
+            # We've reached the end of the mags features, so hide the unused axes
+            ax.axis("off")
 
-    # Now we have the maximum extent of the mags go back through setting the ylims and phase vlines
+    # Now we have the maximum extent of the potentially vshifted mags
+    # go back through setting the common ylims and phase vlines.
+    ymax += 0.1 # extend the y-axis so there is always space for the legend
     for ix, ax in enumerate(axes.flatten()):
-        if ix < len(instances):
+        if ix < plot_count:
             ax.set_ylim((ymax, ymin)) # Has side effect of inverting the y-axis
-            ax.vlines(major_xticks, ymin, ymax, ls="--", color="k", lw=.5, alpha=.25, zorder=-10)
+            ax.vlines(major_xticks, ymin, ymax, ls="--", color="lightgray", lw=.5, zorder=-10)
 
+    # Common x- and y-axis labels
+    fig.supxlabel("Orbital Phase")
+    fig.supylabel("Differential magnitude (mag)")
     return fig
 
 

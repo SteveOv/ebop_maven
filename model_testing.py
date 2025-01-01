@@ -191,6 +191,10 @@ def fit_against_formal_test_dataset(estimator: Union[Model, Estimator],
     fitted_vals = np.empty(shape=(len(targs), ),
                            dtype=[(name, np.dtype(UFloat.dtype)) for name in super_names])
 
+    # Pre-allocate arrays for the LCs from predicted and fitted params to be plotted with mags_vals
+    pred_mags = np.empty((len(targs), 1001), dtype=float)
+    fit_mags = np.empty((len(targs), 1001), dtype=float)
+
     # Finally, we have everything in place to fit our targets and report on the results
     for ix, targ in enumerate(targs):
         print(f"\n\nProcessing target {ix + 1} of {len(targs)}: {targ}\n" + "-"*40)
@@ -241,6 +245,17 @@ def fit_against_formal_test_dataset(estimator: Union[Model, Estimator],
         predictions_vs_labels_to_table(fitted_vals[ix], lbl_vals[ix], [targ], fit_names,
                                        prediction_head="Fitted")
 
+        # Get the phase-folded mags data for the predicted and actual fit (for plotting later)
+        pred_lc = generate_predicted_fit(pred_vals[ix], targ_config, apply_fit_overrides)
+        pred_mags[ix] = pred_lc["delta_mag"][::10]
+        with open(jktebop.get_jktebop_dir() /f"{fit_stem}.fit", mode="r", encoding="utf8") as ff:
+            fit_mags[ix] = np.loadtxt(ff, usecols=[1], comments="#", dtype=float)[0::10]
+
+    # We need to undo the wrap of mags_vals for use in the LC plot as it applies its own fixed wrap.
+    mags_vals = np.roll(mags_vals,
+                        -int((1 - estimator.mags_feature_wrap_phase) * estimator.mags_feature_bins),
+                        axis=1)
+
     # Save reports on how the predictions and fitting has gone over all of the selected targets
     if report_dir:
         comparison_type = [("labels", "label", lbl_vals)] # type, heading, values
@@ -279,6 +294,15 @@ def fit_against_formal_test_dataset(estimator: Union[Model, Estimator],
             fig.savefig(report_dir / f"{results_stem}.eps")
             plt.close()
 
+            # Plot out the input feature vs predicted fit vs actual fit for each test system
+            if not do_control_fit:
+                fig = plots.plot_folded_lightcurves(mags_vals, targs, pred_mags, fit_mags,
+                                                    extra_names=(None, None),
+                                                    init_ymax=1.2, extra_yshift=0.2, cols=5)
+                fig.savefig(report_dir / f"phase-folded-lcs-from-{prediction_type}.eps")
+                fig.savefig(report_dir / f"phase-folded-lcs-from-{prediction_type}.png", dpi=150)
+                plt.close()
+
             with open(report_dir / f"{results_stem}.txt", "w", encoding="utf8") as txtf:
                 for (sub_head, mask, rep_names) in sub_reports:
                     if any(mask):
@@ -287,6 +311,38 @@ def fit_against_formal_test_dataset(estimator: Union[Model, Estimator],
                                                        comparison_head=comp_head.capitalize(),
                                                        prediction_head="Fitted", to=txtf)
     return fitted_vals
+
+
+def generate_predicted_fit(input_params: np.ndarray[UFloat],
+                           target_cfg: dict[str, any],
+                           apply_fit_overrides: bool=True) -> np.ndarray[float]:
+    """
+    Will generate a phase-folded model light curve for the passed params and any
+    LD algo/coefficients in the target config.
+
+    :input_params: the param set to use to generate the model LC
+    :target_cfg: the full config for this target - allows access to fit_overrides
+    :apply_fit_overrides: whether we should use or ignore the contents of fit_overrides
+    :returns: the model data as a numpy structured array of shape (#rows, ["phase", "delta_mag])
+    """
+    # This functionality has been added since branching and is based on similar functionality
+    # in main, where it depends on significant refactoring for a more elegant approach.
+    # Here, without the refactoring, we take a more pragmatic approach of using whatever
+    # works well enough to meet the limited requirements for this older branch.
+
+    # published fitting params that may be needed for reliable fit
+    fit_overrides = target_cfg.get("fit_overrides", {}) if apply_fit_overrides else {}
+    params = {
+        **base_jktebop_fit_params(task=2, sector_cfg=target_cfg,
+                                  # remaining args ignored for task 2
+                                  period=0, primary_epoch=1999,
+                                  dat_file_name=None, file_name_stem=None),
+        "qphot": -1,    # Default to no deformations but overrides can still apply
+        **{ n: input_params[n] for n in input_params.dtype.names },
+        **fit_overrides,
+    }
+
+    return jktebop.generate_model_light_curve("model-testing-pred-fit", **params)
 
 
 def base_jktebop_fit_params(task: int,
@@ -317,9 +373,11 @@ def base_jktebop_fit_params(task: int,
         ld_params[f"LD{star}1"] = coeffs[0]
         ld_params[f"LD{star}2"] = coeffs[1]
 
-    if task == 3:
-        simulations = "" # The only valid option for task 3
+    if task != 8:
+        simulations = ""
 
+    # Most of these tokens are used for tasks 3, 8 & 9
+    # Task 2 will not use (and ignore) those from period downwards
     return {
         "task": task,
         "qphot": 0.,
@@ -329,6 +387,7 @@ def base_jktebop_fit_params(task: int,
         **ld_params,
 
         "reflA": 0.,        "reflB": 0.,
+
         "period": period,
         "primary_epoch": primary_epoch,
 
