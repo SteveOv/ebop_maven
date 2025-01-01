@@ -3,9 +3,14 @@ A machine learning model for predicting eclipsing binary light curve fitting par
 formal analysis with [JKTEBOP](https://www.astro.keele.ac.uk/jkt/codes/jktebop.html).
 
 Detailed instructions on setting up the runtime environment, training & testing datasets,
-and training a model can be found [here in the wiki](./readme-setup.md)
+and training a model can be found in [readme-setup.md](./readme-setup.md)
 
-An article on the development of EBOP MAVEN is being prepared for publication.
+This branch covers the work presented at the
+[Binary and Multiple Stars in the Era of Big Sky Surveys Conference](https://kopal2024.physics.muni.cz/)
+held in Litomyšl, Czech Republic during September 2024.
+
+Work is ongoing in the main branch, with an article on the development of EBOP MAVEN
+being prepared for publication in 2025.
 
 ## Overview
 The EBOP MAVEN is a Convolutional Neural Network (CNN) machine learning regression model
