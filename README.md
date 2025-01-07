@@ -5,7 +5,10 @@ formal analysis with [JKTEBOP](https://www.astro.keele.ac.uk/jkt/codes/jktebop.h
 Detailed instructions on setting up the runtime environment, training & testing datasets,
 and training a model can be found [here in the wiki](https://github.com/SteveOv/ebop_maven/wiki/setup-instructions)
 
-[Release v0.1 for KOPAL2024](https://github.com/SteveOv/ebop_maven/releases/tag/v0.1)
+An earlier release of this code and model was presented at the
+[Binary and Multiple Stars in the Era of Big Sky Surveys Conference](https://kopal2024.physics.muni.cz/)
+held in Litomyšl, Czech Republic during September 2024. The
+[kopal2024](https://github.com/SteveOv/ebop_maven/tree/kopal2024) branch supports this.
 
 An article on the development of EBOP MAVEN is being prepared for publication.
 
