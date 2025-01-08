@@ -17,41 +17,41 @@ from .datasets import read_param_sets_from_csvs, get_field_names_from_csvs
 from .mistisochrones import MistIsochrones
 
 all_param_captions = {
-    "rA_plus_rB":   r"$r_{A}+r_{B}$",
+    "rA_plus_rB":   r"$r_{\rm A}+r_{\rm B}$",
     "k":            r"$k$",
     "inc":          r"$i$",
     "J":            r"$J$",
-    "qphot":        r"$q_{phot}$",
+    "qphot":        r"$q_{\rm phot}$",
     "ecosw":        r"$e\,\cos{\omega}$",
     "esinw":        r"$e\,\sin{\omega}$",
-    "L3":           r"$L_{3}$",
-    "bP":           r"$b_{P}$",
+    "L3":           r"$L_{\rm 3}$",
+    "bP":           r"$b_{\rm P}$",
     "ecc":          r"$e$",
     "e":            r"$e$",
 }
 
 # The full set of parameters available for histograms, their #bins and plot labels
 all_histogram_params = {
-    "rA_plus_rB":   (100, r"$r_{A}+r_{B}$"),
+    "rA_plus_rB":   (100, r"$r_{\rm A}+r_{\rm B}$"),
     "k":            (100, r"$k$"),
     "inc":          (100, r"$i~(^{\circ})$"),
     "J":            (100, r"$J$"),
-    "qphot":        (100, r"$q_{phot}$"),
+    "qphot":        (100, r"$q_{\rm phot}$"),
     "ecosw":        (100, r"$e\,\cos{\omega}$"),
     "esinw":        (100, r"$e\,\sin{\omega}$"),
-    #"L3":           (100, r"$L_3$"), # currently always zero
-    "bP":           (100, r"$b_{pri}$"),
-    "bS":           (100, r"$b_{sec}$"),
+    #"L3":           (100, r"$L_{\rm 3}$"), # currently always zero
+    "bP":           (100, r"$b_{\rm P}$"),
+    "bS":           (100, r"$b_{\rm S}$"),
     "ecc":          (100, r"$e$"),
     "omega":        (100, r"$\omega~(^{\circ})$"),
-    "rA":           (100, r"$r_A$"),
-    "rB":           (100, r"$r_B$"),
-    "phiS":         (100, r"$\phi_{sec}$"),
-    "dS_over_dP":   (100, r"$d_{sec}/d_{pri}$"),
-    "RA":           (100, r"$R_{A}~(\text{R}_{\odot})$"),
-    "RB":           (100, r"$R_{B}~(\text{R}_{\odot})$"),
-    "MA":           (100, r"$M_{A}~(\text{M}_{\odot})$"),
-    "MB":           (100, r"$M_{B}~(\text{M}_{\odot})$"),
+    "rA":           (100, r"$r_{\rm A}$"),
+    "rB":           (100, r"$r_{\rm B}$"),
+    "phiS":         (100, r"$\phi_{\rm S}$"),
+    "dS_over_dP":   (100, r"$d_{\rm S}/d_{\rm P}$"),
+    "RA":           (100, r"$R_{\rm A}~({\rm R_{\odot}})$"),
+    "RB":           (100, r"$R_{\rm B}~({\rm R_{\odot}})$"),
+    "MA":           (100, r"$M_{\rm A}~({\rm M_{\odot}})$"),
+    "MB":           (100, r"$M_{\rm B}~({\rm M_{\odot}})$"),
     "snr":          (100, r"$S/N$")
 }
 
