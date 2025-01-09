@@ -112,7 +112,7 @@ def evaluate_model_against_dataset(estimator: Union[Model, Estimator],
                 fig.savefig(report_dir / f"predictions-{mc_type}-box-{ds_name}{sub_suffix}.pdf")
 
                 fig = plots.plot_predictions_vs_labels(pred_vals[tmask], lbl_vals[tmask],
-                                                       tflags[tmask], pnames, show_errorbars=False)
+                                                       tflags[tmask], pnames)
                 fig.savefig(report_dir/f"predictions-{mc_type}-vs-labels-{ds_name}{sub_suffix}.pdf")
 
             if report_dir and "formal" not in ds_name:
@@ -156,6 +156,8 @@ def fit_against_formal_test_dataset(estimator: Union[Model, Estimator],
         estimator = Estimator(estimator)
 
     prediction_type = "control" if do_control_fit else "mc" if mc_iterations > 1 else "nonmc"
+    pub_targs = np.array(["V456 Cyg", "V570 Per", "AI Phe"])
+    pub_markers = np.array(["o", "s", "D"])
 
     # To clarify: the estimator publishes a list of what it can predict via its label_names attrib
     # The fit_names can differ; they are those values required for JKTEBOP fitting and reporting
@@ -269,6 +271,7 @@ def fit_against_formal_test_dataset(estimator: Union[Model, Estimator],
             ("\nTransiting systems only",           trans_flags,            fit_names),
             ("\nNon-transiting systems only",       ~trans_flags,           fit_names)]
 
+        pub_mask = [t in pub_targs for t in targs]
         for comp_type, comp_head, comp_vals in comparison_type:
             # Summarize this set of predictions as plots-vs-label|control and in text table
             # Control == fit from labels not preds, so no point producing these
@@ -276,9 +279,18 @@ def fit_against_formal_test_dataset(estimator: Union[Model, Estimator],
                 preds_stem = f"predictions-{prediction_type}-vs-{comp_type}"
                 for (source, names) in [("model", estimator.label_names), ("fitting", fit_names)]:
                     names = [n for n in names if n not in ["ecosw", "esinw"]] + ["ecosw", "esinw"]
-                    fig = plots.plot_predictions_vs_labels(pred_vals, comp_vals, trans_flags,
-                                                           names, xlabel_prefix=comp_head)
+                    xlabel = f"{comp_head} value"
+                    fig = plots.plot_predictions_vs_labels(pred_vals, comp_vals, trans_flags, names,
+                                                           xlabel=xlabel)
                     fig.savefig(report_dir / f"{preds_stem}-{source}.eps")
+                    plt.close()
+
+                    # Publication print of interesting subset. No trans_flags so all markers open.
+                    fig = plots.plot_predictions_vs_labels(pred_vals[pub_mask], comp_vals[pub_mask],
+                                                        None, names, xlabel=xlabel,
+                                                        markers=pub_markers, for_publication=True)
+                    fig.savefig(report_dir / f"pub-{preds_stem}-{source}.eps")
+                    plt.close()
 
                 with open(report_dir / f"{preds_stem}.txt", mode="w", encoding="utf8") as txtf:
                     for (sub_head, mask, rep_names) in sub_reports:
@@ -290,17 +302,24 @@ def fit_against_formal_test_dataset(estimator: Union[Model, Estimator],
             results_stem = f"fitted-params-from-{prediction_type}-vs-{comp_type}"
             names = [n for n in fit_names if n not in ["ecosw", "esinw"]] + ["ecosw", "esinw"]
             fig = plots.plot_predictions_vs_labels(fitted_vals, comp_vals, trans_flags, names,
-                                                   xlabel_prefix=comp_head, ylabel_prefix="fitted")
+                                                xlabel=f"{comp_head} value", ylabel="fitted value")
             fig.savefig(report_dir / f"{results_stem}.eps")
             plt.close()
 
             # Plot out the input feature vs predicted fit vs actual fit for each test system
             if not do_control_fit:
                 fig = plots.plot_folded_lightcurves(mags_vals, targs, pred_mags, fit_mags,
-                                                    extra_names=(None, None),
+                                                    extra_names=("predicted params", "final fit"),
                                                     init_ymax=1.2, extra_yshift=0.2, cols=5)
-                fig.savefig(report_dir / f"phase-folded-lcs-from-{prediction_type}.eps")
                 fig.savefig(report_dir / f"phase-folded-lcs-from-{prediction_type}.png", dpi=150)
+                plt.close()
+
+                # Publication style print for an interesting subset of the targets
+                fig = plots.plot_folded_lightcurves(mags_vals[pub_mask], pub_targs,
+                                                    pred_mags[pub_mask], fit_mags[pub_mask],
+                                                    extra_names=(None, None), for_publication=True,
+                                                    init_ymax=1.2, extra_yshift=0.3, cols=3)
+                fig.savefig(report_dir / f"pub-phase-folded-lcs-from-{prediction_type}.eps")
                 plt.close()
 
             with open(report_dir / f"{results_stem}.txt", "w", encoding="utf8") as txtf:

@@ -1,5 +1,5 @@
 """ Training and testing specific plots. """
-from typing import List, Dict, Iterable
+from typing import List, Dict, Iterable, Union
 import math
 from pathlib import Path
 from itertools import zip_longest
@@ -55,6 +55,8 @@ all_histogram_params = {
     "snr":          (100, r"$S/N$")
 }
 
+# inches per cm
+cm = 0.3937
 
 def plot_dataset_histograms(csv_files: Iterable[Path],
                             params: List[str]=None,
@@ -185,6 +187,7 @@ def plot_folded_lightcurves(main_mags_sets: np.ndarray[float],
                             extra_yshift: float=0.1,
                             mags_wrap_phase: float=0.75,
                             cols: int=3,
+                            for_publication: bool=False,
                             **format_kwargs) -> Figure:
     """
     Utility function to produce a plot of one or more sets of light curve data for a range
@@ -202,6 +205,7 @@ def plot_folded_lightcurves(main_mags_sets: np.ndarray[float],
     :init_ymax: minimum initial y-axis max value which will be extended if needed
     :extra_yshift: a vertical shift to apply to each of the extra features  
     :mags_wrap_phase: the wrap phase of the mags - used to position x-axis ticks
+    :for_publication: will adjust dimensions and colors for publication
     :format_kwargs: kwargs to be passed on to format_axes()
     :returns: the figure
     """
@@ -210,10 +214,16 @@ def plot_folded_lightcurves(main_mags_sets: np.ndarray[float],
         extra_mags_sets1 = []
     if extra_mags_sets2 is None:
         extra_mags_sets2 = []
-    plot_count = max(len(main_mags_sets), len(names), len(extra_mags_sets1), len(extra_mags_sets2))
+    plot_count = min(len(main_mags_sets), len(names), len(extra_mags_sets1), len(extra_mags_sets2))
 
-    col_width = 4
-    row_height = 4 * (1.2 if len(extra_mags_sets2) else 1.1 if len(extra_mags_sets1) else 1.0)
+    if for_publication:
+        colors = np.array(["k"] * 3)
+        col_width = 6.5 * cm
+    else:
+        colors = np.array(["tab:blue", "tab:orange", "tab:green"])
+        col_width = 4
+
+    row_height = col_width*(1.2 if len(extra_mags_sets2) else 1.1 if len(extra_mags_sets1) else 1.0)
     rows = math.ceil(plot_count / cols)
     fig, axes = plt.subplots(rows, cols, sharex="all", sharey="all", constrained_layout=True,
                              figsize=(cols * col_width, rows * row_height))
@@ -241,7 +251,8 @@ def plot_folded_lightcurves(main_mags_sets: np.ndarray[float],
                         phases[phases > mags_wrap_phase] -= 1.0
 
                     # Plot the mags data against the phases
-                    ax.scatter(x=phases, y=mags + ix*extra_yshift, marker=".", s=0.25, label=label)
+                    ax.scatter(x=phases, y=mags + ix*extra_yshift, marker=".", s=0.1,
+                               c=colors[ix], label=label)
 
                     # Find the widest y-range which covers all data across the instances
                     ylim = ax.get_ylim()
@@ -266,8 +277,8 @@ def plot_folded_lightcurves(main_mags_sets: np.ndarray[float],
             ax.vlines(major_xticks, ymin, ymax, ls="--", color="lightgray", lw=.5, zorder=-10)
 
     # Common x- and y-axis labels
-    fig.supxlabel("Orbital Phase")
-    fig.supylabel("Differential magnitude (mag)")
+    fig.supxlabel("orbital phase")
+    fig.supylabel("differential magnitude (mag)")
     return fig
 
 
@@ -276,8 +287,10 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
                                transit_flags: np.ndarray[bool],
                                selected_params: List[str]=None,
                                show_errorbars: bool=None,
-                               xlabel_prefix: str="label",
-                               ylabel_prefix: str="predicted") -> Figure:
+                               xlabel: str="label value",
+                               ylabel: str="predicted value",
+                               for_publication: bool=False,
+                               markers: Union[str, np.ndarray[str]]="o") -> Figure:
     """
     Will create a plot figure with a grid of axes, one per label, showing the
     predictions vs label values. It is up to calling code to show or save the figure.
@@ -291,10 +304,11 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
     if there are non-zero error/sigma values in the predictions
     :xlabel_prefix: the prefix text for the labels/x-axis label
     :ylabel_prefix: the prefix text for the predictions/y-axis label
+    :for_publication: will adjust dimensions and orientation (landscape) for publication
+    :markers: the list of markers to use, or a single value if they're to be all alike
     :returns: the Figure
     """
     # pylint: disable=too-many-arguments, too-many-locals
-
     # We plot the params common to the labels & preds, & optionally the input list
     # of names. Avoiding using set() as we want requested names or the labels to set order
     if selected_params is None:
@@ -302,50 +316,94 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
     elif isinstance(selected_params, str):
         selected_params = [selected_params]
     params = { n: all_param_captions[n] for n in selected_params }
+    inst_count = predictions.shape[0]
 
-    cols = 2
-    rows = math.ceil(len(params) / cols)
-    fig, axes = plt.subplots(rows, cols, figsize=(cols * 3, rows * 2.9), constrained_layout=True)
-    axes = axes.flatten()
+    if isinstance(markers, str):
+        markers = np.full((inst_count), markers, dtype=str)
 
     if transit_flags is None:
         transit_flags = np.zeros((labels.shape[0]), dtype=bool)
 
-    print(f"Plotting scatter plot {rows}x{cols} grid for: {', '.join(params.keys())}")
-    for ax_ix, (param_name, param_caption) in enumerate(params.items()):
-        lbl_vals = unumpy.nominal_values(labels[param_name])
-        pred_vals = unumpy.nominal_values(predictions[param_name])
-        pred_sigmas = unumpy.std_devs(predictions[param_name])
+    # adjust dimensions, orientation and other sizes depending on intended use
+    cols = 3 if for_publication else 2
+    rows = math.ceil(len(params) / cols)
+    if for_publication:
+        # For publication in caosp309 we have a max width on the page of 11.5 cm (& height 17 cm)
+        # We make the plot a bit bigger and scale it in the LaTeX doc
+        figsize = (cols * 6.0 * cm, rows * 6.0 * cm)
+        bms, c =  6.0, "k"
+    else:
+        figsize = (cols * 3.0, rows * 2.9)
+        bms, c = 6.0, "tab:blue"
 
-        # Plot a diagonal line for exact match
+    # If we have lots of data, reduce the size of the marker and add in an alpha
+    bms, alpha = (bms, 1.0) if inst_count < 100 else (bms * 0.25, 0.33)
+
+    fig, axes = plt.subplots(rows, cols, figsize=figsize, constrained_layout=True)
+    axes = axes.flatten()
+
+    print(f"Plotting scatter plot {rows}x{cols} grid for: {', '.join(params.keys())}")
+    for ax, param_name in zip_longest(axes.flatten(), params.keys()):
+        lbl_vals = unumpy.nominal_values(labels[param_name])
+        lbl_errs = unumpy.std_devs(labels[param_name])
+        pred_vals = unumpy.nominal_values(predictions[param_name])
+        pred_errs = unumpy.std_devs(predictions[param_name])
+
+        # Work out the value range and make sure of a minimum range for context.
         dmin, dmax = min(lbl_vals.min(), pred_vals.min()), max(lbl_vals.max(), pred_vals.max()) # pylint: disable=nested-min-max
+        if param_name in ["rA_plus_rB", "k", "J", "bP"]:
+            dmin, dmax = min(dmin, 0), max(dmax, 0.3)
+        elif param_name in ["ecosw", "esinw"]:
+            dmin, dmax = min(dmin, -0.15), max(dmax, 0.15)
         dmore = 0.1 * (dmax - dmin)
         diag = (dmin - dmore, dmax + dmore)
-        ax = axes[ax_ix]
-        ax.plot(diag, diag, color="gray", linestyle="-", linewidth=0.5)
 
-        # If we have lots of data, reduce the size of the maker and add in an alpha
-        (fmt, ms, alpha) = ("o", 5.0, 1.0) if len(lbl_vals) < 100 else (".", 2.0, 0.25)
+        # Plot the preds vs labels, with those with transits filled & a diag showing exact match.
+        show_errorbars = show_errorbars if show_errorbars else max(np.abs(pred_errs)) > 0
+        ax.plot(diag, diag, color="lightgray", linestyle="--", linewidth=0.75, zorder=-10)
+        for (mask,             ms,     fs) in [
+            (~transit_flags,   bms,    "none"),
+            (transit_flags,    bms,    "full")
+        ]:
+            if any(mask):
+                for (fmt, lbl_val, pred_val, lbl_err, pred_err) in zip(
+                    markers[mask], lbl_vals[mask], pred_vals[mask], lbl_errs[mask], pred_errs[mask]
+                ):
+                    if show_errorbars:
+                        ax.errorbar(x=lbl_val, y=pred_val, xerr=lbl_err, yerr=pred_err,
+                                    fmt=fmt, c=c, ms=ms, lw=ms/5, alpha=alpha,
+                                    capsize=None, markeredgewidth=ms/5, fillstyle=fs)
+                    else:
+                        ax.errorbar(x=lbl_val, y=pred_val, fmt=fmt, c=c,
+                                    alpha=alpha, ms=ms, lw=ms/5, fillstyle=fs)
 
-        # Plot the preds vs labels, with those with transits filled.
-        show_errorbars = show_errorbars if show_errorbars else max(np.abs(pred_sigmas)) > 0
-        for tmask, transiting in [(transit_flags, True), (~transit_flags, False)]:
-            if any(tmask):
-                (f, z) = ("full", 10) if transiting else ("none", 0)
-                if show_errorbars:
-                    ax.errorbar(x=lbl_vals[tmask], y=pred_vals[tmask], yerr=pred_sigmas[tmask],
-                                fmt=fmt, c="tab:blue", ms=ms, lw=1.0, alpha=alpha,
-                                capsize=2.0, markeredgewidth=0.5, fillstyle=f, zorder=z)
-                else:
-                    ax.errorbar(x=lbl_vals[tmask], y=pred_vals[tmask], fmt=fmt, c="tab:blue",
-                                alpha=alpha, ms=ms, lw=1.0, fillstyle=f, zorder=z)
-
-        format_axes(ax, xlim=diag, ylim=diag, xlabel=f"{xlabel_prefix} {param_caption}",
-                    ylabel=f"{ylabel_prefix} {param_caption}")
+        # Param caption at top left
+        drange = dmax - dmin
+        ax.text(x=dmin + (drange * 0.05), y=dmax - (drange * 0.05), s=params[param_name])
+        format_axes(ax, xlim=diag, ylim=diag)
 
         # Make sure the plots are squared and have the same ticks
         ax.set_aspect("equal", "box")
-        ax.set_yticks([t for t in ax.get_xticks() if diag[0] < t < diag[1]])
+        ax.tick_params("y", rotation=90)
+
+        # We want up to 5 tick labels at suitable points across the range of values.
+        if param_name == "inc":
+            maj_ticks = np.arange(50, 90.1, 5 if drange < 25 else 10)
+        elif param_name in ["ecosw", "esinw"]:
+            tick_step = 0.1 if drange < 0.4 else 0.2 if drange < 1 else 0.4
+            maj_ticks = np.arange(-0.8, 0.85, tick_step)
+        else:
+            lim = max(diag)
+            for tick_step in [0.1, 0.2, 0.5, 1, 2, 2.5, 5, 10]:
+                if lim / tick_step < 5:
+                    break
+            maj_ticks = np.arange(0, lim, tick_step)
+        maj_ticks = [t for t in maj_ticks if diag[0] < t < diag[1]]
+        ax.set_yticks(maj_ticks, minor=False)
+        ax.set_xticks(maj_ticks, minor=False)
+
+    fig.supxlabel(xlabel)
+    fig.supylabel(ylabel)
     return fig
 
 
