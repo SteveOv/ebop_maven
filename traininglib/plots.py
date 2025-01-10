@@ -214,7 +214,7 @@ def plot_folded_lightcurves(main_mags_sets: np.ndarray[float],
         extra_mags_sets1 = []
     if extra_mags_sets2 is None:
         extra_mags_sets2 = []
-    plot_count = min(len(main_mags_sets), len(names), len(extra_mags_sets1), len(extra_mags_sets2))
+    plot_count = max(len(main_mags_sets), len(names), len(extra_mags_sets1), len(extra_mags_sets2))
 
     if for_publication:
         colors = np.array(["k"] * 3)
