@@ -356,7 +356,11 @@ def generate_predicted_fit(input_params: np.ndarray[UFloat],
                                   # remaining args ignored for task 2
                                   period=0, primary_epoch=1999,
                                   dat_file_name=None, file_name_stem=None),
-        "qphot": -1,    # Default to no deformations but overrides can still apply
+
+        # Default to 1, as setting to 0 or -1 tends to give light curves with strange reflection
+        # effects on very close systems (k >~ 0.4). Overrides can still apply to replace this.
+        "qphot": 1.0,
+
         **{ n: input_params[n] for n in input_params.dtype.names },
         **fit_overrides,
     }
