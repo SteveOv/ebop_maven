@@ -520,7 +520,11 @@ def generate_predicted_fit(input_params: np.ndarray[UFloat],
     # We only need a small subset of the params here as we're not fitting, but generating a model LC
     params = {
         "L3":       0,
-        "qphot":    -1,
+
+        # Default to 1, as setting to 0 or -1 leads to jktebop (43) generated light curves
+        # showing pronounced dips between eclipses for very close systems (k >~ 0.4).
+        "qphot":    1.0,
+
         **{ n: input_params[n] for n in input_params.dtype.names },
         **fit_overrides,
         **ld_params,
