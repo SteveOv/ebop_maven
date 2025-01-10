@@ -1264,7 +1264,7 @@
         },
         "flux_column": "sap_flux"
     },
-    "ZZ Uma": {
+    "ZZ UMa": {
         "source": "DEBCat and Rediscussion XI, Table II. TESS sectors 14, 21, 41, 47 and 48 SAP photometry analysed with JKTEBOP version 42.",
         "reference": "Southworth22obsR11",
         "aka": "TIC 138505004",
