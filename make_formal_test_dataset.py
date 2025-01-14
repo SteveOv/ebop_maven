@@ -278,13 +278,13 @@ if __name__ == "__main__":
 
     # Plot a H-R diagram of those test targets not excluded from testing
     fig = plots.plot_formal_test_dataset_hr_diagram(targets_config, verbose=True)
-    fig.savefig(dataset_dir / "formal-test-hr-logl-vs-logteff.eps")
+    fig.savefig(dataset_dir / "formal-test-hr-logl-vs-logteff.pdf")
     fig.clf()
 
     # The mags features of these targets not marked as excluded from testing
     fig = plots.plot_dataset_instance_mags_features([ds_file], inc_targs, cols=5)
-    fig.savefig(dataset_dir / "formal-test-mags-features.eps")
-    fig.savefig(dataset_dir / "formal-test-mags-features.png", dpi=300)
+    fig.savefig(dataset_dir / "formal-test-mags-features.pdf")
+    fig.savefig(dataset_dir / "formal-test-mags-features.png", dpi=150)
     fig.clf()
 
     write_targets_tabular_file(targets_config, dataset_dir / "formal-test-targets-tabular.tex")

@@ -155,7 +155,7 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
                                                selected_param_names=fit_params,
                                                error_bars=show_error_bars)
 
-            # These plot to pdf, which looks better than eps, as it supports transparency/alpha.
+            # Use pdf as usually smaller file size than eps and also supports transparency/alpha.
             # For formal-test-dataset we plot only the whole set as the size is too low to split.
             if report_dir and (not subset or "formal" not in ds_name):
                 sub_dir = report_dir / ds_name / mc_type
@@ -298,6 +298,7 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
             fit_feats[ix] = np.loadtxt(ff, usecols=[1], comments="#", dtype=float)[0::10]
 
     # Save reports on how the predictions and fitting has gone over all of the selected targets
+    # Publication plots use pdf as this usually gives smaller file sizes than eps & supports alpha.
     if report_dir:
         sub_dir = report_dir / prediction_type
         sub_dir.mkdir(parents=True, exist_ok=True)
@@ -327,7 +328,7 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
                     fig = plots.plot_predictions_vs_labels(pred_vals, comp_vals, trans_flags,
                                                            pnames, xlabel_prefix=comp_head,
                                                            hl_mask1=hl_mask1, hl_mask2=hl_mask2)
-                    fig.savefig(sub_dir / f"{preds_stem}-{source}.eps")
+                    fig.savefig(sub_dir / f"{preds_stem}-{source}.pdf")
 
                 with open(sub_dir / f"{preds_stem}.txt", mode="w", encoding="utf8") as txtf:
                     for (sub_head, mask, rep_names) in sub_reports:
@@ -342,7 +343,7 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
             fig = plots.plot_predictions_vs_labels(fit_vals, comp_vals, trans_flags, pnames,
                                                    xlabel_prefix=comp_head, ylabel_prefix="fitted",
                                                    hl_mask1=hl_mask1, hl_mask2=hl_mask2)
-            fig.savefig(sub_dir / f"{results_stem}.eps")
+            fig.savefig(sub_dir / f"{results_stem}.pdf")
             plt.close()
 
             if not do_control_fit:
@@ -352,7 +353,7 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
                     fig = plots.plot_folded_lightcurves(mags_feats[sl], targs[sl], pred_feats[sl],
                                                         fit_feats[sl], extra_names=(None, None),
                                                         init_ymax=1., extra_yshift=0.2, cols=5)
-                    fig.savefig(sub_dir / f"fold-mags-from-{prediction_type}-pt-{ix}.eps")
+                    fig.savefig(sub_dir / f"fold-mags-from-{prediction_type}-pt-{ix}.pdf")
                     plt.close()
 
             with open(sub_dir / f"{results_stem}.txt", "w", encoding="utf8") as txtf:

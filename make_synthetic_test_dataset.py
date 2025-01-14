@@ -313,7 +313,7 @@ if __name__ == "__main__":
         csvs = sorted(dataset_dir.glob(f"**/{FILE_PREFIX}*.csv"))
         plots.plot_dataset_histograms(csvs, cols=5).savefig(dataset_dir/"synth-histogram-full.png")
         plots.plot_dataset_histograms(csvs, ["rA_plus_rB", "k", "J", "inc", "ecosw", "esinw"],
-                                      cols=2).savefig(dataset_dir/"synth-histogram-main.eps")
+                                      cols=2).savefig(dataset_dir/"synth-histogram-main.pdf")
 
         # Simple diagnostic plot of the mags feature of a small sample of the instances.
         print("Plotting a sample of the set's mags features")
