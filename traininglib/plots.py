@@ -55,6 +55,11 @@ all_histogram_params = {
     "apparent_mag": (100, r"apparent magnitude (mag)")
 }
 
+# Colours to use to ensure consistency across plots.
+# Attempted to select for accessibility (i.e.: high-contrast, consideration of colour blindness)
+PLOT_COLORS = [ "tab:blue", "tab:orange", "tab:green", "k" ]
+REF_LINE_COLORS = "lightgray"
+
 # Standard width & heights for 6:4, 6:5 & square aspect ratios where plots will generally be either
 # 2 (half page) or 4 (whole page) COL_WIDTH wide, as many of the plots are grids of axes.
 # Width set so that font size ~matches when 2x2 plot is fitted to one column of two col LaTeX doc.
@@ -103,7 +108,7 @@ def plot_dataset_histograms(csv_files: Iterable[Path],
                 data = [row.get(field, None) for row in read_from_csvs(csv_files)]
                 if verbose:
                     print(f"Plotting histogram for {len(data):,} {field} values.")
-                ax.hist(data, bins=bins)
+                ax.hist(data, bins=bins, color=PLOT_COLORS[0])
                 ax.set_xlabel(label)
                 ax.tick_params(axis="both", which="both", direction="in",
                                top=True, bottom=True, left=True, right=True)
@@ -134,7 +139,7 @@ def plot_formal_test_dataset_hr_diagram(targets_cfg: Dict[str, any],
         y = [cfg.get(f"logL{comp}", None) or 0 for _, cfg in targets_cfg.items()]
 
         ax.errorbar(x, y, fmt = "o", fillstyle = fillstyle, linewidth = 0.5,
-                    ms = 7., markeredgewidth=0.5, c='tab:blue', label=f"Star{comp}")
+                    ms = 7., markeredgewidth=0.5, c=PLOT_COLORS[0], label=f"Star{comp}")
 
         if verbose:
             print(f"Star {comp}: log(x) range [{min(x):.3f}, {max(x):.3f}],",
@@ -236,10 +241,10 @@ def plot_folded_lightcurves(main_mags_sets: np.ndarray[float],
         # We expect to "run out" of features before we run out of axes in the grid.
         # The predicted and actual fits are optional, so may not exist.
         if main_mags is not None and name is not None:
-            for ix, (label, mags) in enumerate([
-                (name,              main_mags),
-                (extra_names[0],    extra_mags1),
-                (extra_names[1],    extra_mags2)
+            for ix, (mags,      color,              label) in enumerate([
+                (main_mags,     PLOT_COLORS[0],     name),
+                (extra_mags1,   PLOT_COLORS[1],     extra_names[0]),
+                (extra_mags2,   PLOT_COLORS[2],     extra_names[1]),
             ]):
                 if mags is not None and len(mags) > 0:
                     # Infer the phases from index of the mags data and apply any wrap
@@ -248,7 +253,8 @@ def plot_folded_lightcurves(main_mags_sets: np.ndarray[float],
                         phases[phases > mags_wrap_phase] -= 1.0
 
                     # Plot the mags data against the phases
-                    ax.scatter(x=phases, y=mags + ix*extra_yshift, marker=".", s=0.25, label=label)
+                    ax.scatter(x=phases, y=mags + ix*extra_yshift, marker=".", s=0.25,
+                               c=color, label=label)
 
                     # Find the widest y-range which covers all data across the instances
                     ylim = ax.get_ylim()
@@ -271,7 +277,7 @@ def plot_folded_lightcurves(main_mags_sets: np.ndarray[float],
     for ix, ax in enumerate(axes.flatten()):
         if ix < plot_count:
             ax.set_ylim((ymax, ymin)) # Has side effect of inverting the y-axis
-            ax.vlines(major_xticks, ymin, ymax, ls="--", color="lightgray", lw=.5, zorder=-10)
+            ax.vlines(major_xticks, ymin, ymax, ls="--", color=REF_LINE_COLORS, lw=.5, zorder=-10)
 
     # Common x- and y-axis labels
     fig.supxlabel("Orbital Phase")
@@ -308,6 +314,7 @@ def plot_limb_darkening_coeffs(lookup_table: np.ndarray[float],
         ax.plot(params[x_col], params[y_col], "-", lw=0.5, alpha=1/3)
 
         # Overplot with dot markers which scale with the T_eff as a proxy for M*
+        # We don't worry about color choice here as this plot is not for publication.
         size = params[teff_col] / 500
         ax.scatter(params[x_col], params[y_col], s=size, marker="o", alpha=1/2, zorder=5,
                    label=f"$\\log{{g}}={logg}$")
@@ -397,7 +404,7 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
     axes = axes.flatten()
 
     # If we have lots of data, reduce the size of the markers and reduce the alpha
-    (bms, alpha) = (4.0, 1.0) if inst_count < 100 else (2.0, 0.33)
+    (bms, alpha) = (6.0, 1.0) if inst_count < 100 else (2.0, 0.33)
 
     print(f"Plotting {inst_count} instances on {rows}x{cols} grid for:", ", ".join(params.keys()))
     for (ax, param_name) in zip_longest(axes.flatten(), params.keys()):
@@ -414,20 +421,20 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
             drange = dmax - dmin
             dmore = 0.125 * drange
             diag = (dmin - dmore, dmax + dmore)
-            ax.plot(diag, diag, color="gray", linestyle="--", linewidth=1.0, zorder=-10)
+            ax.plot(diag, diag, color=REF_LINE_COLORS, linestyle="--", linewidth=1.0, zorder=-10)
 
             # Plot the preds vs labels, with those with transits filled.
             if show_errorbars is None:
                 show_errorbars = max(np.abs(pred_sigmas)) > 0
 
             non_hl_mask = ~hl_mask1 & ~hl_mask2
-            for (mask,                          fmt,    c,              ms,         filled) in [
-                (~transit_mask & non_hl_mask,   "o",    "tab:blue",     bms,        False),
-                (transit_mask & non_hl_mask,    "o",    "tab:blue",     bms,        True),
-                (~transit_mask & hl_mask1,      "s",    "tab:orange",   bms*1.33,   False),
-                (transit_mask & hl_mask1,       "s",    "tab:orange",   bms*1.33,   True),
-                (~transit_mask & hl_mask2,      "D",    "k",            bms*1.33,   False),
-                (transit_mask & hl_mask2,       "D",    "k",            bms*1.33,   True),
+            for (mask,                          fmt,    c,                  ms,         filled) in [
+                (~transit_mask & non_hl_mask,   "o",    PLOT_COLORS[0],     bms,        False),
+                (transit_mask & non_hl_mask,    "o",    PLOT_COLORS[0],     bms,        True),
+                (~transit_mask & hl_mask1,      "s",    PLOT_COLORS[1],     bms*1.33,   False),
+                (transit_mask & hl_mask1,       "s",    PLOT_COLORS[1],     bms*1.33,   True),
+                (~transit_mask & hl_mask2,      "D",    PLOT_COLORS[3],     bms*1.33,   False),
+                (transit_mask & hl_mask2,       "D",    PLOT_COLORS[3],     bms*1.33,   True),
             ]:
                 if any(mask):
                     fs = "full" if filled else "none"
@@ -515,13 +522,13 @@ def plot_binned_mae_vs_labels(residuals: np.rec.recarray[UFloat],
 
         if indicate_bin_counts:
             counts, _, _ = binned_statistic(lbl_vals[:, ix], abs_resids, "count", bins)
-            marker_sizes = 1.0 * (counts/10)
+            ms = 1.0 * (counts/10)
             alpha = 0.5 # more likely to overlap
         else:
-            marker_sizes = 5.0
+            ms = 5.0
             alpha = 0.75
 
-        ax.scatter(bin_centres, means, s=marker_sizes, alpha=alpha, label=params[param_name])
+        ax.scatter(bin_centres, means, ms, c=PLOT_COLORS[0], alpha=alpha, label=params[param_name])
 
     format_axes(ax, xlabel=xlabel, ylabel=ylabel, legend_loc="best", **format_kwargs)
     return fig
