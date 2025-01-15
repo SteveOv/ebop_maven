@@ -57,9 +57,10 @@ all_histogram_params = {
 }
 
 # Colours to use to ensure consistency across plots.
-# Attempted to select for accessibility (i.e.: high-contrast, consideration of colour blindness)
-PLOT_COLORS = [ "tab:blue", "tab:orange", "tab:green", "k" ]
-REF_LINE_COLORS = "lightgray"
+# Attempted to select for accessibility (i.e.: contrast, consideration of colour blindness)
+#    base colour (lighter); darker for alternatives/highlights
+PLOT_COLORS = [ "tab:blue", "darkgreen", "darkred", "k" ]
+REF_LINE_COLOR = "darkgray"
 
 # Standard width & heights for 6:4, 6:5 & square aspect ratios where plots will generally be either
 # 2 (half page) or 4 (whole page) COL_WIDTH wide, as many of the plots are grids of axes.
@@ -134,13 +135,16 @@ def plot_formal_test_dataset_hr_diagram(targets_cfg: Dict[str, any],
 
     fig = plt.figure(figsize=(2 * COL_WIDTH, 2 * ROW_HEIGHT_6_4), constrained_layout=True)
     ax = fig.add_subplot(1, 1, 1)
-    for comp, fillstyle in [("A", "full"), ("B", "none") ]:
+    for (comp,  marker,     size,   color,              label) in [
+        ("A",   "x",        40,     PLOT_COLORS[1],     "primary star"),
+        ("B",   "+",        70,     PLOT_COLORS[2],     "secondary star"),
+
+    ]:
         # Don't bother with error bars as this is just an indicative distribution.
         x = np.log10([cfg.get(f"Teff{comp}", None) or 0 for _, cfg in targets_cfg.items()])
         y = [cfg.get(f"logL{comp}", None) or 0 for _, cfg in targets_cfg.items()]
 
-        ax.errorbar(x, y, fmt = "o", fillstyle = fillstyle, linewidth = 0.5,
-                    ms = 7., markeredgewidth=0.5, c=PLOT_COLORS[0], label=f"Star{comp}")
+        ax.scatter(x, y, marker=marker, s=size, lw=1.0, c=color, label=label)
 
         print(f"Star {comp}: log(x) range [{min(x):.3f}, {max(x):.3f}],",
                            f"log(y) range [{min(y):.3f}, {max(y):.3f}]")
@@ -150,7 +154,7 @@ def plot_formal_test_dataset_hr_diagram(targets_cfg: Dict[str, any],
 
     mist_isos = MistIsochrones(metallicities=[0.0])
     zams = mist_isos.lookup_zams_params(feh=0.0, cols=["log_Teff", "log_L"])
-    ax.plot(zams[0], zams[1], c="k", ls=(0, (15, 5)), linewidth=0.5, label="ZAMS", zorder=-10)
+    ax.plot(zams[0], zams[1], c=REF_LINE_COLOR, ls="--", linewidth=1, label="ZAMS", zorder=-10)
 
     format_axes(ax, xlim=(4.45, 3.35), ylim=(-2.6, 4.5),
                 xlabel= r"$\log{(T_{\rm eff}\,/\,{\rm K})}$",
@@ -240,20 +244,24 @@ def plot_folded_lightcurves(main_mags_sets: np.ndarray[float],
         # We expect to "run out" of features before we run out of axes in the grid.
         # The predicted and actual fits are optional, so may not exist.
         if main_mags is not None and name is not None:
-            for ix, (mags,      color,              label) in enumerate([
-                (main_mags,     PLOT_COLORS[0],     name),
-                (extra_mags1,   PLOT_COLORS[1],     extra_names[0]),
-                (extra_mags2,   PLOT_COLORS[2],     extra_names[1]),
+            for ix, (mags,      color,              alpha,      label) in enumerate([
+                (main_mags,     PLOT_COLORS[0],     1.0,        name),
+                (extra_mags1,   PLOT_COLORS[1],     1.0,        extra_names[0]),
+                (extra_mags2,   PLOT_COLORS[2],     1.0,        extra_names[1]),
             ]):
                 if mags is not None and len(mags) > 0:
+                    num_points = len(mags)
+
                     # Infer the phases from index of the mags data and apply any wrap
-                    phases = np.linspace(0, 1, len(mags) + 1)[1:]
+                    phases = np.linspace(0, 1, num_points + 1)[1:]
                     if 0 < mags_wrap_phase < 1:
                         phases[phases > mags_wrap_phase] -= 1.0
 
+                    alpha *= 0.33 if num_points > 4000 else 0.66 if num_points > 1001 else 1
+
                     # Plot the mags data against the phases
                     ax.scatter(x=phases, y=mags + ix*extra_yshift, marker=".", s=0.25,
-                               c=color, label=label)
+                               c=color, alpha=alpha, label=label)
 
                     # Find the widest y-range which covers all data across the instances
                     ylim = ax.get_ylim()
@@ -276,7 +284,7 @@ def plot_folded_lightcurves(main_mags_sets: np.ndarray[float],
     for ix, ax in enumerate(axes.flatten()):
         if ix < plot_count:
             ax.set_ylim((ymax, ymin)) # Has side effect of inverting the y-axis
-            ax.vlines(major_xticks, ymin, ymax, ls="--", color=REF_LINE_COLORS, lw=.5, zorder=-10)
+            ax.vlines(major_xticks, ymin, ymax, ls="--", color=REF_LINE_COLOR, lw=.5, zorder=-10)
 
     # Common x- and y-axis labels
     fig.supxlabel("Orbital Phase")
@@ -401,8 +409,12 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
                              figsize=(cols * COL_WIDTH, rows * ROW_HEIGHT_SQUARE))
     axes = axes.flatten()
 
-    # If we have lots of data, reduce the size of the markers and reduce the alpha
-    (bms, alpha) = (6.0, 1.0) if inst_count < 100 else (2.0, 0.33)
+    # If we have lots of data, reduce the size of the markers and reduce the base item alpha
+    (bms, balpha) = (7.0, 1.0) if inst_count < 100 else (3.0, 0.5)
+
+    # If we are highlighting certain instances reduce the base item alpha for better contrast
+    if any(hl_mask1) or any(hl_mask2):
+        balpha *= 0.66
 
     print(f"Plotting {inst_count} instances on {rows}x{cols} grid for:", ", ".join(params.keys()))
     for (ax, param_name) in zip_longest(axes.flatten(), params.keys()):
@@ -419,29 +431,31 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
             drange = dmax - dmin
             dmore = 0.125 * drange
             diag = (dmin - dmore, dmax + dmore)
-            ax.plot(diag, diag, color=REF_LINE_COLORS, linestyle="--", linewidth=1.0, zorder=-10)
+            ax.plot(diag, diag, color=REF_LINE_COLOR, linestyle="--", linewidth=1.0, zorder=-10)
 
             # Plot the preds vs labels, with those with transits filled.
             if show_errorbars is None:
                 show_errorbars = max(np.abs(pred_sigmas)) > 0
+                if show_errorbars:
+                    bms *= 0.66 # Reduce marker sizes so the errorbars are easier to make out
 
             non_hl_mask = ~hl_mask1 & ~hl_mask2
-            for (mask,                          fmt,    c,                  ms,         filled) in [
-                (~transit_mask & non_hl_mask,   "o",    PLOT_COLORS[0],     bms,        False),
-                (transit_mask & non_hl_mask,    "o",    PLOT_COLORS[0],     bms,        True),
-                (~transit_mask & hl_mask1,      "s",    PLOT_COLORS[1],     bms*1.33,   False),
-                (transit_mask & hl_mask1,       "s",    PLOT_COLORS[1],     bms*1.33,   True),
-                (~transit_mask & hl_mask2,      "D",    PLOT_COLORS[3],     bms*1.33,   False),
-                (transit_mask & hl_mask2,       "D",    PLOT_COLORS[3],     bms*1.33,   True),
+            for (mask,                          fmt,    c,              ms,         alpha,  filled) in [ # pylint: disable=line-too-long
+                (~transit_mask & non_hl_mask,   "o",    PLOT_COLORS[0], bms,        balpha, False),
+                (transit_mask & non_hl_mask,    "o",    PLOT_COLORS[0], bms,        balpha, True),
+
+                # If present, these are larger and more bold so they stand out
+                (~transit_mask & hl_mask1,      "s",    PLOT_COLORS[3], bms*1.5,    1,      False),
+                (transit_mask & hl_mask1,       "s",    PLOT_COLORS[3], bms*1.5,    1,      True),
+                (~transit_mask & hl_mask2,      "D",    PLOT_COLORS[3], bms*1.5,    1,      False),
+                (transit_mask & hl_mask2,       "D",    PLOT_COLORS[3], bms*1.5,    1,      True),
             ]:
                 if any(mask):
                     fs = "full" if filled else "none"
                     if show_errorbars:
-                        # Reduce marker size (& lines) with errorbars so they're easier to make out
-                        ms *= 0.75
                         ax.errorbar(x=lbl_vals[mask], y=pred_vals[mask],
                                     xerr=lbl_sigmas[mask], yerr=pred_sigmas[mask],
-                                    c=c, lw=ms/5, markeredgewidth=ms/5, capsize=2.0,
+                                    c=c, lw=ms/5, markeredgewidth=ms/5, capsize=None,
                                     fmt=fmt, ms=ms, alpha=alpha, fillstyle=fs)
                     else:
                         ax.errorbar(x=lbl_vals[mask], y=pred_vals[mask],
