@@ -1,4 +1,5 @@
 """ Training and testing specific plots. """
+# pylint: disable=too-many-arguments, too-many-locals, too-many-branches, too-many-statements
 from typing import List, Dict, Iterable
 import math
 from pathlib import Path
@@ -86,7 +87,6 @@ def plot_dataset_histograms(csv_files: Iterable[Path],
     :format_kwargs: kwargs to be passed on to format_axes()
     :returns: the figure
     """
-    # pylint: disable=too-many-arguments, too-many-locals
     csv_files = sorted(csv_files)   # Happy for this to error if there's a problem
     csv_params = get_field_names_from_csvs(csv_files)
     if params:
@@ -217,7 +217,6 @@ def plot_folded_lightcurves(main_mags_sets: np.ndarray[float],
     :format_kwargs: kwargs to be passed on to format_axes()
     :returns: the figure
     """
-    # pylint: disable=too-many-arguments, too-many-locals
     if extra_mags_sets1 is None:
         extra_mags_sets1 = []
     if extra_mags_sets2 is None:
@@ -369,7 +368,6 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
     :hl_mask2: optional mask for targets to be plotted with 2nd alternative/highlight marker
     :returns: the Figure
     """
-    # pylint: disable=too-many-arguments, too-many-locals
     if labels.shape[0] != predictions.shape[0]:
         raise ValueError("labels are of a different length to predictions")
     if transit_mask is not None and transit_mask.shape[0] != predictions.shape[0]:
@@ -500,7 +498,6 @@ def plot_binned_mae_vs_labels(residuals: np.rec.recarray[UFloat],
     :format_kwargs: kwargs to be passed on to format_axes()
     :returns: the figure
     """
-    # pylint: disable=too-many-arguments, too-many-locals
     if selected_params is None:
         selected_params = [n for n in labels.dtype.names if n in residuals.dtype.names]
     elif isinstance(selected_params, str):
