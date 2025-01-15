@@ -277,7 +277,7 @@ if __name__ == "__main__":
                                            simulate=False)
 
     # Plot a H-R diagram of those test targets not excluded from testing
-    fig = plots.plot_formal_test_dataset_hr_diagram(targets_config, verbose=True)
+    fig = plots.plot_formal_test_dataset_hr_diagram(targets_config)
     fig.savefig(dataset_dir / "formal-test-hr-logl-vs-logteff.pdf")
     fig.clf()
 

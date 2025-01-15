@@ -72,7 +72,7 @@ def plot_dataset_histograms(csv_files: Iterable[Path],
                             params: List[str]=None,
                             cols: int=3,
                             yscale: str="log",
-                            verbose: bool=True):
+                            **format_kwargs) -> Figure:
     """
     Saves histogram plots to a single figure on a grid of axes. The params will be plotted
     in the order they are listed, scanning from left to right and down. These are generated
@@ -83,7 +83,8 @@ def plot_dataset_histograms(csv_files: Iterable[Path],
     if None. In either case params will only be plotted if they are present in the csv files.
     :cols: the width of the axes grid (the rows automatically adjust)
     :yscale: set to "linear" or "log" to control the y-axis scale
-    :verbose: whether to print verbose progress/diagnostic messages
+    :format_kwargs: kwargs to be passed on to format_axes()
+    :returns: the figure
     """
     # pylint: disable=too-many-arguments, too-many-locals
     csv_files = sorted(csv_files)   # Happy for this to error if there's a problem
@@ -99,37 +100,37 @@ def plot_dataset_histograms(csv_files: Iterable[Path],
         rows = math.ceil(len(param_specs) / cols)
         fig, axes = plt.subplots(rows, cols, sharey="all", constrained_layout=True,
                                  figsize=(cols * COL_WIDTH, rows * ROW_HEIGHT_6_5))
-        if verbose:
-            print(f"Plotting histograms in a {cols}x{rows} grid for:", ", ".join(param_specs))
+
+        print(f"Plotting histograms in a {cols}x{rows} grid for:", ", ".join(param_specs))
 
         for (ax, field) in zip_longest(axes.flatten(), param_specs):
             if field:
                 bins, label = param_specs[field]
                 data = [row.get(field, None) for row in read_from_csvs(csv_files)]
-                if verbose:
-                    print(f"Plotting histogram for {len(data):,} {field} values.")
-                ax.hist(data, bins=bins, color=PLOT_COLORS[0])
+
+                print(f"Plotting histogram for {len(data):,} {field} values.")
+                ax.hist(data, bins=bins, color=PLOT_COLORS[0], label=field)
                 ax.set_xlabel(label)
                 ax.tick_params(axis="both", which="both", direction="in",
                                top=True, bottom=True, left=True, right=True)
                 ax.set_yscale(yscale)
             else:
                 ax.axis("off") # remove the unused ax
+            format_axes(ax, **format_kwargs)
     return fig
 
 
 def plot_formal_test_dataset_hr_diagram(targets_cfg: Dict[str, any],
-                                        verbose: bool=True):
+                                        **format_kwargs) -> Figure:
     """
     Plots a log(L) vs log(Teff) H-R diagram with ZAMS line. Returns the figure
     of the plot and it is up to calling code to show or save this.
 
     :targets_cfg: the config data to plot from
-    :verbose: whether to print out progress messages
+    :format_kwargs: kwargs to be passed on to format_axes()
     :returns: the Figure
     """
-    if verbose:
-        print("Plotting log(Teff) vs log(L) 'H-R' diagram")
+    print("Plotting log(Teff) vs log(L) 'H-R' diagram")
 
     fig = plt.figure(figsize=(2 * COL_WIDTH, 2 * ROW_HEIGHT_6_4), constrained_layout=True)
     ax = fig.add_subplot(1, 1, 1)
@@ -141,20 +142,19 @@ def plot_formal_test_dataset_hr_diagram(targets_cfg: Dict[str, any],
         ax.errorbar(x, y, fmt = "o", fillstyle = fillstyle, linewidth = 0.5,
                     ms = 7., markeredgewidth=0.5, c=PLOT_COLORS[0], label=f"Star{comp}")
 
-        if verbose:
-            print(f"Star {comp}: log(x) range [{min(x):.3f}, {max(x):.3f}],",
-                               f"log(y) range [{min(y):.3f}, {max(y):.3f}]")
+        print(f"Star {comp}: log(x) range [{min(x):.3f}, {max(x):.3f}],",
+                           f"log(y) range [{min(y):.3f}, {max(y):.3f}]")
 
     # Now plot a ZAMS line from the MIST on the same criteria
-    if verbose:
-        print("Loading MIST isochrone for ZAMS data")
+    print("Loading MIST isochrone for ZAMS data")
+
     mist_isos = MistIsochrones(metallicities=[0.0])
     zams = mist_isos.lookup_zams_params(feh=0.0, cols=["log_Teff", "log_L"])
     ax.plot(zams[0], zams[1], c="k", ls=(0, (15, 5)), linewidth=0.5, label="ZAMS", zorder=-10)
 
     format_axes(ax, xlim=(4.45, 3.35), ylim=(-2.6, 4.5),
                 xlabel= r"$\log{(T_{\rm eff}\,/\,{\rm K})}$",
-                ylabel=r"$\log{(L\,/\,{\rm L_{\odot}})}$")
+                ylabel=r"$\log{(L\,/\,{\rm L_{\odot}})}$", **format_kwargs)
     return fig
 
 
