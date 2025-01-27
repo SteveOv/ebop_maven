@@ -615,9 +615,12 @@ def _swap_instance_components(params: dict[str, any]):
     if "omega" in params:
         params["omega"] = (params["omega"] + 180) % 360
 
+    # Eccentricity will be unchanged but we need it for the following updates
+    e = params["ecc"] if "ecc" in params else np.sqrt(params["ecosw"]**2 + params["esinw"]**2)
+
     # These are related to the Poincare elements.
     if "phiS" in params:
-        params["phiS"] = orbital.secondary_eclipse_phase(params["ecosw"], None, params["esinw"])
+        params["phiS"] = orbital.phase_of_secondary_eclipse(params["ecosw"], e)
     if "dS_over_dP" in params:
         params["dS_over_dP"] = np.reciprocal(params["dS_over_dP"])
 
@@ -630,7 +633,5 @@ def _swap_instance_components(params: dict[str, any]):
 
     # Recalculate the impact parameters as we have changed the primary star. It's not just a case of
     # swapping the values, as both impact params are related to the primary's fractional radius.
-    params["bP"] = orbital.impact_parameter(params["rA"], params["inc"],
-                                            params.get("ecc", 0), params["esinw"], False)
-    params["bS"] = orbital.impact_parameter(params["rA"], params["inc"],
-                                            params.get("ecc", 0), params["esinw"], True)
+    params["bP"] = orbital.impact_parameter(params["rA"], params["inc"], e, params["esinw"], False)
+    params["bS"] = orbital.impact_parameter(params["rA"], params["inc"], e, params["esinw"], True)
