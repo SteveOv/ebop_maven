@@ -292,10 +292,11 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
         # Get the phase-folded mags data for the mags feature, predicted and actual fit.
         # We need to undo the wrap of the mags_feature as the plot will apply its own fixed wrap.
         mags_feats[ix] = np.roll(mags, -int((1-wrap_phase) * len(mags)), axis=0)
-        pred_lc = generate_predicted_fit(pred_vals[ix], targ_config, apply_fit_overrides)
-        pred_feats[ix] = pred_lc["delta_mag"][::10]
+        pred_lc = generate_predicted_fit(pred_vals[ix], targ_config, apply_fit_overrides, 1001)
+        pred_feats[ix] = pred_lc["delta_mag"]
         with open(jktebop.get_jktebop_dir() /f"{fit_stem}.fit", mode="r", encoding="utf8") as ff:
-            fit_feats[ix] = np.loadtxt(ff, usecols=[1], comments="#", dtype=float)[0::10]
+            fit = np.loadtxt(ff, usecols=[1], comments="#", dtype=float)
+            fit_feats[ix] = fit[np.round(np.linspace(0, fit.shape[0]-1, 1001)).astype(int)]
 
     # Save reports on how the predictions and fitting has gone over all of the selected targets
     # Publication plots use pdf as this usually gives smaller file sizes than eps & supports alpha.
@@ -504,7 +505,8 @@ def fit_target(lc: LightCurve,
 
 def generate_predicted_fit(input_params: np.ndarray[UFloat],
                            target_cfg: dict[str, any],
-                           apply_fit_overrides: bool=True) -> np.ndarray[float]:
+                           apply_fit_overrides: bool=True,
+                           bins: int=None) -> np.ndarray[float]:
     """
     Will generate a phase-folded model light curve for the passed params and any
     LD algo/coefficients in the target config.
@@ -512,6 +514,7 @@ def generate_predicted_fit(input_params: np.ndarray[UFloat],
     :input_params: the param set to use to generate the model LC
     :target_cfg: the full config for this target - allows access to fit_overrides
     :apply_fit_overrides: whether we should use or ignore the contents of fit_overrides
+    :bins: optionally indicate the number of bins to return
     :returns: the model data as a numpy structured array of shape (#rows, ["phase", "delta_mag])
     """
     # The fit_overrides are optional overrides to any derived value and should be applied last
@@ -531,7 +534,11 @@ def generate_predicted_fit(input_params: np.ndarray[UFloat],
         **ld_params,
     }
 
-    return jktebop.generate_model_light_curve("model-testing-pred-fit", **params)
+    fit = jktebop.generate_model_light_curve("model-testing-pred-fit", **params)
+    length = fit.shape[0]
+    if bins is None or bins == length:
+        return fit
+    return fit[np.round(np.linspace(0, length-1, bins)).astype(int)]
 
 
 def pop_and_complete_ld_config(source_cfg: Dict[str, any],
