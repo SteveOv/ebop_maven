@@ -194,6 +194,8 @@ def make_dataset_file(inst_count: int,
                 generated_count += 1
                 inst_id = params.get("id", inst_id)
                 params.setdefault("swapped", 0)
+                phiS = params.get("phis", None) or \
+                                orbital.phase_of_secondary_eclipse(params["ecosw"], params["ecc"])
 
                 is_usable = check_func(**params)
                 if is_usable:
@@ -248,8 +250,7 @@ def make_dataset_file(inst_count: int,
 
                     # Any extra features which may be used for predictions alongside the LC.
                     extra_features = {
-                        "phiS": params.get("phiS", None) \
-                                or orbital.secondary_eclipse_phase(params["ecosw"], params["ecc"]),
+                        "phiS": phiS,
                         "dS_over_dP": params.get("dS_over_dP", None) \
                                 or orbital.ratio_of_eclipse_duration(params["esinw"]),
                     }
