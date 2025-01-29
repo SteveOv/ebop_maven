@@ -335,6 +335,50 @@ class Test_datasets(unittest.TestCase):
             id_vals += [id_val]
         self.assertEqual(exp_inst_count, len(id_vals))
 
+    def test_iterate_dataset_filter_func_on_id(self):
+        """ Tests iterate_dataset(with filter_func set) -> yields only instances matching filter """
+        files = list((Path.cwd() / "datasets/formal-test-dataset/").glob("**/*.tfrecord"))
+        exp_id_vals = ["CW Eri"]
+        id_vals = []
+
+        @tf.function
+        def filter_func(inst_id, feature_vals, label_vals): # pylint: disable=unused-argument
+            return inst_id == "CW Eri"
+
+        for (id_val, _, _, _) in iterate_dataset(files, filter_func=filter_func):
+            id_vals += [id_val]
+        self.assertListEqual(exp_id_vals, id_vals)
+
+    def test_iterate_dataset_filter_func_on_extra_feature(self):
+        """ Tests iterate_dataset(with filter_func set) -> yields only instances matching filter """
+        files = list((Path.cwd() / "datasets/formal-test-dataset/").glob("**/*.tfrecord"))
+        exp_id_vals = ["MU Cas", "V362 Pav", "CW Eri", "AN Cam", "IT Cas"]
+        id_vals = []
+        ix_phiS = [*deb_example.extra_features_and_defaults.keys()].index("phiS")
+
+        @tf.function
+        def filter_func(inst_id, feature_vals, label_vals): # pylint: disable=unused-argument
+            return feature_vals[1][ix_phiS][0] > 0.5
+
+        for (id_val, _, _, _) in iterate_dataset(files, filter_func=filter_func):
+            id_vals += [id_val]
+        self.assertListEqual(exp_id_vals, id_vals)
+
+    def test_iterate_dataset_filter_func_on_label(self):
+        """ Tests iterate_dataset(with filter_func set) -> yields only instances matching filter """
+        files = list((Path.cwd() / "datasets/formal-test-dataset/").glob("**/*.tfrecord"))
+        exp_id_vals = ["V436 Per", "V889 Aql"]
+        id_vals = []
+        ix_esinw = [*deb_example.labels_and_scales.keys()].index("esinw")
+
+        @tf.function
+        def filter_func(inst_id, feature_vals, label_vals): # pylint: disable=unused-argument
+            return label_vals[ix_esinw] > 0.3
+
+        for (id_val, _, _, _) in iterate_dataset(files, filter_func=filter_func):
+            id_vals += [id_val]
+        self.assertListEqual(exp_id_vals, id_vals)
+
     def test_iterate_dataset_max_instances_low(self):
         """ Tests iterate_dataset(max_instances < ds rows) -> return requested number of rows """
         files = list((Path.cwd() / "datasets/formal-test-dataset/").glob("**/*.tfrecord"))
@@ -445,6 +489,20 @@ class Test_datasets(unittest.TestCase):
         self.assertEqual(mags.shape[0], exp_inst_count)
         self.assertEqual(feats.shape[0], exp_inst_count)
         self.assertEqual(labs.shape[0], exp_inst_count)
+
+    def test_read_dataset_filter_func_on_feature(self):
+        """ Tests read_dataset(with filter_func set) -> yields only instances matching filter """
+        files = list((Path.cwd() / "datasets/formal-test-dataset/").glob("**/*.tfrecord"))
+        exp_id_vals = ["MU Cas", "V362 Pav", "CW Eri", "AN Cam", "IT Cas"]
+        id_vals = []
+        ix_phiS = [*deb_example.extra_features_and_defaults.keys()].index("phiS")
+
+        @tf.function
+        def filter_func(inst_id, feature_vals, label_vals): # pylint: disable=unused-argument
+            return feature_vals[1][ix_phiS][0] > 0.5
+
+        (id_vals, _, _, _) = read_dataset(files, filter_func=filter_func)
+        self.assertListEqual(exp_id_vals, id_vals.tolist())
 
     @unittest.skip("only run this interactively as it may take a long time")
     def test_read_dataset_scalability_test(self):

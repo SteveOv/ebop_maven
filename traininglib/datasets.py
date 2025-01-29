@@ -417,6 +417,28 @@ def create_dataset_pipeline(dataset_files: Iterable[str],
     """
     Creates the requested TFRecordDataset pipeline.
 
+    The filter_func must be in a form simlar to the example below, where;
+    - it will be called from a graphed function so must be compatible with tf.function
+    - id argument is each instance's id of type tf.Tensor(shape=(), dtype=string)
+    - x argument is the instance's features as ( mags_feature, extra_features ), where
+        - mags_feature is of type tf.Tensor(shape=(#bins,1), dtype=float)
+        - extra_features is of type tf.Tensor(shape=(#extra_features, 1), dtype=float) 
+    - y argument is the instance's labels as tf.Tensor(shape=(#labels, 1), dtype=float)
+    - returns a boolean
+
+    ```python
+    @tf.function
+    def sample_filter_func(id, x, y):
+        ix_phiS = [*deb_example.extra_features_and_defaults.keys()].index("phiS")
+        return x[1][ix_phiS][0] > 0.5
+    ```
+    or
+    ```python
+    @tf.function
+    def sample_filter_func(id, x, y):
+        return id == "CW Eri"
+    ```
+
     :dataset_files: the source tfrecord dataset files.
     :batch_size: the relative size of each batch. May be set to 0 (no batch, effectively all rows),
     <1 (this fraction of all rows) or >=1 this size (will be rounded)
@@ -473,6 +495,7 @@ def iterate_dataset(dataset_files: Iterable[str],
                     labels: List[str]=None,
                     identifiers: List[str]=None,
                     scale_labels: bool=False,
+                    filter_func: Callable=None,
                     augmentation_callback: Callable[[tf.Tensor], tf.Tensor] = None,
                     max_instances: int = np.inf):
     """
@@ -481,8 +504,9 @@ def iterate_dataset(dataset_files: Iterable[str],
     
     The rows are yielded in the order in which they appear in the supplied dataset files.
     
-    The extra_features and labels are listed in the order they have been specified or in the
-    order of extra_features_and_defaults and labels_and_scales if not specified.
+    For details of filter_func argument see documentation for create_dataset_pipeline()
+
+    For details of augmentation_callback argument see documentation for create_map_func()
 
     This function is not for use when training a model; for that, requirement use
     create_dataset_pipeline() directly. Instead this gives easy access to the
@@ -494,6 +518,7 @@ def iterate_dataset(dataset_files: Iterable[str],
     :ext_features: a chosen subset of the available features, in this order, or all if None
     :labels: a chosen subset of the available labels, in this order, or all if None
     :identifiers: optional list of ids to yield, or all ids if None
+    :filter_func: an optional func to filter the results (must be a tf.function)
     :augmentation_callback: optional function with which client code can augment mags_feature data.
     :max_instances: the maximum number of instances to yield
     :returns: for each matching row yields a tuple of (id, mags vals, ext feature vals, label vals)
@@ -504,7 +529,7 @@ def iterate_dataset(dataset_files: Iterable[str],
 
     map_func = create_map_func(mags_bins, mags_wrap_phase, ext_features, labels,
                                augmentation_callback, scale_labels, include_id=True)
-    (ds, _) = create_dataset_pipeline(dataset_files, 0, map_func)
+    (ds, _) = create_dataset_pipeline(dataset_files, 0, map_func, filter_func)
 
     yield_count = 0
     for id_val, (mags_val, feat_vals), lab_vals in ds.as_numpy_iterator():
@@ -525,12 +550,17 @@ def read_dataset(dataset_files: Iterable[str],
                  labels: List[str]=None,
                  identifiers: List[str]=None,
                  scale_labels: bool=False,
+                 filter_func: Callable=None,
                  augmentation_callback: Callable[[tf.Tensor], tf.Tensor] = None,
                  max_instances: int = np.inf) \
             -> Tuple[np.ndarray, np.ndarray[float], np.ndarray[float], np.ndarray[float]]:
     """
     Wrapper around iterate_dataset() which handles the iteration and returns separate
     np ndarrays for the dataset ids, mags values, feature values and label values.
+    
+    For details of filter_func argument see documentation for create_dataset_pipeline()
+
+    For details of augmentation_callback argument see documentation for create_map_func()
 
     The labels array is structured, so labels may be accessed with their names, for example;
     ```Python
@@ -546,6 +576,7 @@ def read_dataset(dataset_files: Iterable[str],
     :labels: a chosen subset of the available labels, in this order, or all if None
     :identifiers: optional list of ids to yield, or all ids if None
     :scale_values: if True values will be scaled
+    :filter_func: an optional func to filter the results (must be a tf.function)
     :augmentation_callback: optional function with which client code can augment mags_feature data.
     :max_instances: the maximum number of instances to return
     :returns: a Tuple[NDArray[#insts, 1], NDArray[#insts, #bins], NDArray[#insts, #feats],
@@ -560,7 +591,7 @@ def read_dataset(dataset_files: Iterable[str],
     ids, mags_vals, feature_vals, label_vals = [], [], [], []
     for row in iterate_dataset(dataset_files, mags_bins, mags_wrap_phase,
                                ext_features, labels, identifiers, scale_labels,
-                               augmentation_callback, max_instances):
+                               filter_func, augmentation_callback, max_instances):
         ids += [row[0]]
         mags_vals += [row[1]]
         feature_vals += [row[2]]
