@@ -35,6 +35,11 @@ labels_and_scales = {
 extra_features_and_defaults = {
     "phiS": 0.5,        # Phase of secondary eclipse; correlated with ecosw
     "dS_over_dP": 1.0,  # Ratio of eclipse durations; correlated with esinw
+
+    # These are not expected to be used as features but may be useful for filtering
+    "depthP": 0.,
+    "depthS": 0.,
+    "excluded": 0.,
 }
 
 # The deb Example protobuf description used by tf.Datasets

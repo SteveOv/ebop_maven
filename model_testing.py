@@ -79,7 +79,7 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
         estimator = Estimator(estimator)
     mc_type = "mc" if mc_iterations > 1 else "nonmc"
 
-    # We'll need these for any filter_func, as this will run before any labels/feats are named.
+    # Need these for any filtering on extra_features; we use the names to find the Tensor indices
     all_feat_names = deb_example.get_all_extra_feature_names()
 
     # To clarify: the estimator publishes a list of what it can predict via its label_names attrib
@@ -95,6 +95,12 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
         raise ValueError(f"No tfrecord files under {test_dataset_dir}. Please make this dataset.")
     print(f"found {len(tfrecord_files)} file(s).")
 
+    # # Example filter_func which only matches where both eclipses > 0.05 mag deep
+    # ix_depthP, ix_depthS = all_feat_names.index("depthP"), all_feat_names.index("depthS")
+    # @tf.function
+    # def filter_on_min_eclipse_depth(inst_id, fvals, lvals): # pylint: disable=unused-argument
+    #     return tf.minimum(fvals[1][ix_depthP][0], fvals[1][ix_depthS][0]) > 0.05
+
     # The label values here will have zero uncertainties as we only store the nominals in the ds
     # We don't directly exclude the features here as we may want them for filtering.
     ids, mags_vals, feat_vals, lbl_vals = datasets.read_dataset(tfrecord_files,
@@ -102,7 +108,8 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
                                                 mags_wrap_phase=estimator.mags_feature_wrap_phase,
                                                 labels=super_params,
                                                 identifiers=include_ids,
-                                                scale_labels=scaled)
+                                                scale_labels=scaled,
+                                                filter_func=None)
 
     # Get the subset of the feat_vals that are required by the estimator for predictions.
     pred_feat_vals = feat_vals[...,[all_feat_names.index(k) for k in estimator.extra_feature_names]]
