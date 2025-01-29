@@ -104,8 +104,8 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
                                                 identifiers=include_ids,
                                                 scale_labels=scaled)
 
-    # Now revert feat_vals to just those that are required by the estimator
-    feat_vals = feat_vals[..., [all_feat_names.index(k) for k in estimator.extra_feature_names]]
+    # Get the subset of the feat_vals that are required by the estimator for predictions.
+    pred_feat_vals = feat_vals[...,[all_feat_names.index(k) for k in estimator.extra_feature_names]]
 
     # Sets the random seed on numpy, keras's backend library (here tensorflow) and python
     keras.utils.set_random_seed(DEFAULT_TESTING_SEED)
@@ -119,8 +119,10 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
                          dtype=[(n, np.dtype(UFloat.dtype)) for n in estimator.label_names])
     force_seed_on_dropout_layers(estimator)
     for ix in np.arange(0, len(mags_vals), max_batch_size):
-        pv = estimator.predict(mags_vals[ix : ix+max_batch_size], feat_vals[ix : ix+max_batch_size],
-                               mc_iterations, unscale=not scaled)
+        pv = estimator.predict(mags_feature=mags_vals[ix : ix+max_batch_size],
+                               extra_features=pred_feat_vals[ix : ix+max_batch_size],
+                               iterations=mc_iterations,
+                               unscale=not scaled)
         pred_vals[ix : ix+len(pv)] = pv
 
     if "inc" not in estimator.label_names:
