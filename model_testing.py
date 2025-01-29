@@ -79,6 +79,9 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
         estimator = Estimator(estimator)
     mc_type = "mc" if mc_iterations > 1 else "nonmc"
 
+    # We'll need these for any filter_func, as this will run before any labels/feats are named.
+    all_feat_names = deb_example.get_all_extra_feature_names()
+
     # To clarify: the estimator publishes a list of what it can predict via its label_names attrib
     # and fit_params may differ; they are those params required for JKTEBOP fitting and reporting.
     # super_params is the set of both and is used, for example, to get the superset of label values
@@ -93,16 +96,16 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
     print(f"found {len(tfrecord_files)} file(s).")
 
     # The label values here will have zero uncertainties as we only store the nominals in the ds
+    # We don't directly exclude the features here as we may want them for filtering.
     ids, mags_vals, feat_vals, lbl_vals = datasets.read_dataset(tfrecord_files,
-                                                                estimator.mags_feature_bins,
-                                                                estimator.mags_feature_wrap_phase,
-                                                                estimator.extra_feature_names,
-                                                                super_params,
-                                                                include_ids,
-                                                                scaled)
+                                                mags_bins=estimator.mags_feature_bins,
+                                                mags_wrap_phase=estimator.mags_feature_wrap_phase,
+                                                labels=super_params,
+                                                identifiers=include_ids,
+                                                scale_labels=scaled)
 
-    if include_ids is not None:
-        assert len(include_ids) == len(ids)
+    # Now revert feat_vals to just those that are required by the estimator
+    feat_vals = feat_vals[..., [all_feat_names.index(k) for k in estimator.extra_feature_names]]
 
     # Sets the random seed on numpy, keras's backend library (here tensorflow) and python
     keras.utils.set_random_seed(DEFAULT_TESTING_SEED)

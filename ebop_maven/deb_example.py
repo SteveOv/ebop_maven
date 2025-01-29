@@ -59,6 +59,14 @@ def create_mags_key(mags_bins: int) -> str:
     """ Helper function to format a key to the stored_mags_features dict """
     return f"mags_{int(mags_bins)}"
 
+def get_all_extra_feature_names() -> List[str]:
+    """ A list of the all the known extra feature names in the order they're stored. """
+    return [*extra_features_and_defaults]
+
+def get_all_label_names() -> List[str]:
+    """ A list of the all the known label names in the order they're stored. """
+    return [*labels_and_scales]
+
 def serialize(identifier: str,
               labels: Dict[str, float],
               mags_features: Dict[str, List[float]],
