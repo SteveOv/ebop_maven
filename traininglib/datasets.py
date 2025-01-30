@@ -199,8 +199,11 @@ def make_dataset_file(inst_count: int,
                 generated_count += 1
                 inst_id = params.get("id", inst_id)
                 params.setdefault("swapped", 0)
-                phiS = params.get("phis", None) or \
-                                orbital.phase_of_secondary_eclipse(params["ecosw"], params["ecc"])
+
+                # Extra params/features
+                params.setdefault("dS_over_dP", orbital.ratio_of_eclipse_duration(params["esinw"]))
+                phiS = params.setdefault("phiS", orbital.phase_of_secondary_eclipse(params["ecosw"],
+                                                                                    params["ecc"]))
 
                 is_usable = check_func(**params)
                 if is_usable:
@@ -208,8 +211,8 @@ def make_dataset_file(inst_count: int,
 
                     # Find secondary eclipse & depth of both eclipses (assuming primary at phase 0)
                     ixS = np.round(len(model_data) * phiS).astype(int)
-                    params["depthS"] = depthS = model_data[ixS]["delta_mag"]
-                    params["depthP"] = depthP = model_data[0]["delta_mag"]
+                    depthS = params.setdefault("depthS", model_data[ixS]["delta_mag"])
+                    depthP = params.setdefault("depthP", model_data[0]["delta_mag"])
 
                     if min_eclipse_depth and min(depthP, depthS) < min_eclipse_depth:
                         is_usable = False # avoid marginal eclipses
@@ -259,15 +262,9 @@ def make_dataset_file(inst_count: int,
                         bin_model_data = np.array([new_phases, interp(new_phases)], dtype=np.double)
                         mags_features[mag_name] = bin_model_data[1]
 
-                    # Any extra features which may be used for predictions alongside the LC.
-                    extra_features = {
-                        "phiS": phiS,
-                        "dS_over_dP": params.get("dS_over_dP", None) \
-                                or orbital.ratio_of_eclipse_duration(params["esinw"]),
-                    }
-
-                    # Write the appropriate dataset train/val/test file, based on inst/file indices
-                    row = deb_example.serialize(inst_id, params, mags_features, extra_features)
+                    # Write the appropriate dataset train/val/test file based on inst/file indices
+                    # Use the params dict for labels & extra_features as it's now a superset of both
+                    row = deb_example.serialize(inst_id, params, mags_features, params)
                     ds_writers[inst_file_ixs[inst_ix]].write(row)
 
                     if csv_file:
@@ -439,6 +436,9 @@ def create_dataset_pipeline(dataset_files: Iterable[str],
         return id == "CW Eri"
     ```
 
+    The filter_func is positioned after map_func in the pipeline so can only
+    filter on mapped values (& cannot see any that are omitted).
+    
     :dataset_files: the source tfrecord dataset files.
     :batch_size: the relative size of each batch. May be set to 0 (no batch, effectively all rows),
     <1 (this fraction of all rows) or >=1 this size (will be rounded)
