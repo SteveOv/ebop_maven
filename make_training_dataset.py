@@ -18,6 +18,10 @@ if not "JKTEBOP_DIR" in os.environ:
 from traininglib import datasets, plots
 from traininglib.tee import Tee
 
+# Optional filtering/processing on generated LCs before acceptance
+MIN_ECLIPSE_DEPTH = None
+SWAP_IF_DEEPER_SECONDARY = False
+
 # By splitting the dataset over multiple files we have the option of using a subset of the dataset
 # using a wildcard match, for example "trainset00?.tfrecord" picks up the first 10 files only.
 DATASET_SIZE = 500000
@@ -187,6 +191,8 @@ if __name__ == "__main__":
                               output_dir=dataset_dir,
                               generator_func=generate_instances_from_distributions,
                               check_func=is_usable_instance,
+                              min_eclipse_depth=MIN_ECLIPSE_DEPTH,
+                              swap_if_deeper_secondary=SWAP_IF_DEEPER_SECONDARY,
                               file_prefix=FILE_PREFIX,
                               valid_ratio=0.2,
                               test_ratio=0,

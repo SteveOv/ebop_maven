@@ -22,6 +22,14 @@ from traininglib import datasets, plots
 from traininglib.mistisochrones import MistIsochrones
 from traininglib.tee import Tee
 
+# Optional filtering/processing on generated LCs before acceptance
+MIN_ECLIPSE_DEPTH = None
+SWAP_IF_DEEPER_SECONDARY = False
+
+# max fractional radius: JKTEBOP unsuited to close binaries. As a "rule of thumb" the cut-off is
+# at ~0.2. We go further so as to test a model which will be able to predict upto and beyond this.
+MAX_FRACTIONAL_R = 0.23
+
 DATASET_SIZE = 20000
 FILE_PREFIX = "trainset"
 dataset_dir = Path("./datasets/synthetic-mist-tess-dataset/")
@@ -29,10 +37,6 @@ dataset_dir.mkdir(parents=True, exist_ok=True)
 
 # TODO: better way to share inst over multiple calls to generate_instances_from_mist_models()
 _mist_isochones = MistIsochrones()
-
-# max fractional radius: JKTEBOP unsuited to close binaries. As a "rule of thumb" the cut-off is
-# at ~0.2. We go further so as to test a model which will be able to predict upto and beyond this.
-MAX_FRACTIONAL_R = 0.23
 
 def generate_instances_from_mist_models(label: str):
     """
@@ -301,6 +305,8 @@ if __name__ == "__main__":
                               output_dir=dataset_dir,
                               generator_func=generate_instances_from_mist_models,
                               check_func=is_usable_instance,
+                              min_eclipse_depth=MIN_ECLIPSE_DEPTH,
+                              swap_if_deeper_secondary=SWAP_IF_DEEPER_SECONDARY,
                               file_prefix=FILE_PREFIX,
                               valid_ratio=0.,
                               test_ratio=1.,
