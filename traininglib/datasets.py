@@ -209,8 +209,11 @@ def make_dataset_file(inst_count: int,
                 if is_usable:
                     model_data = jktebop.generate_model_light_curve(file_prefix, **params)
 
-                    # Find secondary eclipse & depth of both eclipses (assuming primary at phase 0)
+                    # Find secondary eclipse & depth of both eclipses (assuming primary at phase 0).
+                    # Look where the secondary is expected. Can't get argmax to work with islice.
                     ixS = np.round(len(model_data) * phiS).astype(int)
+                    eclipseS_range = slice(max(0, ixS-25), min(ixS+25, len(model_data)-1,))
+                    ixS = eclipseS_range.start + np.argmax(model_data["delta_mag"][eclipseS_range])
                     depthS = params.setdefault("depthS", model_data[ixS]["delta_mag"])
                     depthP = params.setdefault("depthP", model_data[0]["delta_mag"])
 
