@@ -136,21 +136,19 @@ def generate_instances_from_distributions(label: str):
         }
 
 
-def is_usable_instance(k: float=0, J: float=0, qphot: float=0, ecc: float=0,
-                       bP: float= None, bS: float=None,
-                       rA: float=1., rB: float=1., inc: float=0,
+def is_usable_instance(rA_plus_rB: float, k: float, J: float, qphot: float, ecc: float,
+                       bP: float, bS: float, rA: float, rB: float, inc: float,
+                       phiP: float=0, phiS: float=0.5, depthP: float=100, depthS: float=100,
                        **_ # Used to ignore any unexpected **params
                        ) -> bool:
     """
     Checks various parameter values to decide whether this represents a usable instance.
     Checks on;
     - is system physically plausible
-    - will it generate eclipses
+    - will it generate eclipses and are they sufficiently prominent to be usable
     - is it suitable for modelling with JKTEBOP
     """
     # pylint: disable=invalid-name, too-many-arguments, unused-argument
-    usable = False
-
     # Use invalid values as defaults so that if any are missing we fail
     # Physically plausible (qphot of -100 is a magic number to force spherical)
     usable = k > 0 and J > 0 and (qphot > 0 or qphot == -100) and ecc < 1
@@ -158,6 +156,10 @@ def is_usable_instance(k: float=0, J: float=0, qphot: float=0, ecc: float=0,
     # Will eclipse
     if usable:
         usable = all(b is not None and b <= 1 + k for b in [bP, bS])
+
+    # Ensure the eclipses are sufficiently clear to meet our needs.
+    if usable and MIN_ECLIPSE_DEPTH is not None:
+        usable = min(depthP, depthS) >= MIN_ECLIPSE_DEPTH
 
     # Compatible with JKTEBOP restrictions
     # Hard restrictions of rA+rB < 0.8 (covered by MAX_FRACTIONAL_R), inc > 50, k <= 100
@@ -191,7 +193,6 @@ if __name__ == "__main__":
                               output_dir=dataset_dir,
                               generator_func=generate_instances_from_distributions,
                               check_func=is_usable_instance,
-                              min_eclipse_depth=MIN_ECLIPSE_DEPTH,
                               swap_if_deeper_secondary=SWAP_IF_DEEPER_SECONDARY,
                               file_prefix=FILE_PREFIX,
                               valid_ratio=0.2,

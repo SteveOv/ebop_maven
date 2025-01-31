@@ -33,7 +33,6 @@ def make_dataset(instance_count: int,
                  output_dir: Path,
                  generator_func: Callable[[str], Generator[dict[str, any], any, any]],
                  check_func: Callable[[dict[str, any]], bool],
-                 min_eclipse_depth: float=None,
                  valid_ratio: float=0.,
                  test_ratio: float=0,
                  file_prefix: str="dataset",
@@ -53,7 +52,6 @@ def make_dataset(instance_count: int,
     which must have arguments (file_stem: str) and return a Generator[dict[str, any]]
     :check_func: the boolean function to call to confirm an instance's params are usable.
     Will be called with the instance's **params dictionary (as kwargs)
-    :min_eclipse_depth: an instance will be discarded if one or other eclipse is shallower than this
     :valid_ratio: proportion of rows to be written to the validation files
     :test_ratio: proportion of rows to be written to the testing files
     :file_prefix: naming prefix for each of the dataset files
@@ -76,7 +74,6 @@ The number of instances to generate:    {instance_count:,} across {file_count} f
 The dataset files to be written within: {output_dir}
 The instance generator function is:     {generator_func.__name__}
 The instance check function is:         {check_func.__name__}
-The minimum 'usable' eclipse depth is:  {min_eclipse_depth}
 Training : Validation : Test ratio is:  {train_ratio:.2f} : {valid_ratio:.2f} : {test_ratio:.2f}
 File names will be prefixed with:       {file_prefix}
 The maximum concurrent workers:         {max_workers}\n""")
@@ -101,8 +98,8 @@ The maximum concurrent workers:         {max_workers}\n""")
     # args for each make_dataset_file call as required by process_pool starmap
     file_inst_counts = list(_calculate_file_splits(instance_count, file_count))
     iter_params = (
-        (count, file_ix, output_dir, generator_func, check_func, min_eclipse_depth, valid_ratio,
-         test_ratio, file_prefix, swap_if_deeper_secondary, save_param_csvs, verbose, simulate)
+        (count, file_ix, output_dir, generator_func, check_func, valid_ratio, test_ratio,
+         file_prefix, swap_if_deeper_secondary, save_param_csvs, verbose, simulate)
             for (file_ix, count) in enumerate(file_inst_counts)
     )
 
@@ -125,7 +122,6 @@ def make_dataset_file(inst_count: int,
                       output_dir: Path,
                       generator_func: Callable[[str], Generator[dict[str, any], any, any]],
                       check_func: Callable[[dict[str, any]], bool],
-                      min_eclipse_depth: float=None,
                       valid_ratio: float=0.,
                       test_ratio: float=0,
                       file_prefix: str="dataset",
@@ -148,7 +144,6 @@ def make_dataset_file(inst_count: int,
     which must have arguments (file_stem: str) and return a Generator[dict[str, any]]
     :check_func: the boolean function to call to confirm an instance's params are usable.
     Will be called with the instance's **params dictionary (as kwargs)
-    :min_eclipse_depth: an instance will be discarded if one or other eclipse is shallower than this
     :valid_ratio: proportion of rows to be written to the validation files
     :test_ratio: proportion of rows to be written to the testing files
     :file_prefix: naming prefix for each of the dataset files
@@ -173,7 +168,7 @@ def make_dataset_file(inst_count: int,
         csv_file = None
 
     inst_ix = 0
-    generated_count, below_min_count, swap_count = 0, 0, 0
+    generated_count, swap_count = 0, 0
     generator = generator_func(file_stem)
     ds_writers = [None] * 3
     ds_subsets = ["training", "validation", "testing"]
@@ -217,14 +212,13 @@ def make_dataset_file(inst_count: int,
                     depthS = params.setdefault("depthS", model_data[ixS]["delta_mag"])
                     depthP = params.setdefault("depthP", model_data[0]["delta_mag"])
 
-                    if min_eclipse_depth and min(depthP, depthS) < min_eclipse_depth:
-                        is_usable = False # avoid marginal eclipses
-                        below_min_count += 1
+                    # Give the caller the option to reject now we have more eclipse information
+                    is_usable = check_func(**params)
 
                     # Optionally, swap the components & reposition the eclipses if secondary deeper.
                     if is_usable and swap_if_deeper_secondary and depthS > depthP:
                         _swap_instance_components(params)
-                        is_usable &= check_func(**params)
+                        is_usable = check_func(**params)
                         if is_usable:
                             model_data["delta_mag"] = np.roll(model_data["delta_mag"], -ixS)
                             swap_count += 1
@@ -299,9 +293,6 @@ def make_dataset_file(inst_count: int,
         else:
             print(f"{file_stem}: \033[93m\033[1m!!!Failed after generating",
                   f"{generated_count-1} of {inst_count} instances!!!\033[0m")
-        if below_min_count > 0:
-            print(f"{file_stem}: Discarded {below_min_count} potential instance(s)",
-                  f"where one or both eclipses are less deep than {min_eclipse_depth}.")
         if swap_count > 0:
             print(f"{file_stem}: Swapped the components of {swap_count} instance(s)",
                   "where the secondary eclipse was deeper.")
