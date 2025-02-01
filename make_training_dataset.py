@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 from contextlib import redirect_stdout
 import hashlib
+from inspect import getsource
 
 import numpy as np
 
@@ -214,3 +215,9 @@ if __name__ == "__main__":
         fig = plots.plot_dataset_instance_mags_features(dataset_files, cols=5, max_instances=50)
         fig.savefig(dataset_dir / "sample.png", dpi=150)
         fig.clf()
+
+        with open(dataset_dir / "distributions-and-constraints.txt", "w", encoding="utf8") as of:
+            of.write(getsource(generate_instances_from_distributions))
+            of.write("\n\n")
+            of.write(getsource(is_usable_instance))
+            print(f"Saved a copy of the param distribution and constraint functions to {of.name}")

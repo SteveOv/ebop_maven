@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 from contextlib import redirect_stdout
 import hashlib
-
+from inspect import getsource
 import numpy as np
 
 # Tell the libraries where the JKTEBOP executable lives.
@@ -328,3 +328,10 @@ if __name__ == "__main__":
         fig = plots.plot_dataset_instance_mags_features(dataset_files, cols=5, max_instances=50)
         fig.savefig(dataset_dir / "sample.png", dpi=150)
         fig.clf()
+
+        code_file = dataset_dir / "distributions-and-constraints.txt"
+        with code_file.open("w", encoding="utf8") as of:
+            of.write(getsource(generate_instances_from_mist_models))
+            of.write("\n\n")
+            of.write(getsource(is_usable_instance))
+        print(f"Saved copies of the parameter distributions and constraints to {code_file.name}")
