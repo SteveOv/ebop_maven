@@ -329,9 +329,9 @@ if __name__ == "__main__":
         fig.savefig(dataset_dir / "sample.png", dpi=150)
         fig.clf()
 
-        code_file = dataset_dir / "distributions-and-constraints.txt"
+        code_file = dataset_dir / "parameter-distributions.txt"
         with code_file.open("w", encoding="utf8") as of:
             of.write(getsource(generate_instances_from_mist_models))
             of.write("\n\n")
             of.write(getsource(is_usable_instance))
-        print(f"Saved copies of the parameter distributions and constraints to {code_file.name}")
+        print(f"Saved copies of the param distribution & constraint functions to {code_file.name}")
