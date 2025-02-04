@@ -204,11 +204,20 @@ def make_dataset_file(inst_count: int,
                 if is_usable:
                     model_data = jktebop.generate_model_light_curve(file_prefix, **params)
 
-                    # Find secondary eclipse & depth of both eclipses (assuming primary at phase 0).
-                    # Look where the secondary is expected. Can't get argmax to work with islice.
+                    # JKTEBOP will output NaNs for model LC if it doesn't like the params; skip
+                    nans = np.isnan(model_data["delta_mag"])
+                    if any(nans):
+                        num = sum(nans)
+                        print(f"{file_stem}[{inst_id}]: Dropping inst as jktebop generated",
+                              f"{num} of {len(model_data)} mags as NaN in model LC.")
+                        is_usable = False
+
+                if is_usable:
+                    # Find secondary eclipse & depth of both eclipses (assuming primary at 0).
+                    # Look where the secondary is expected. Can't get argmax to work with islice
                     ixS = np.round(len(model_data) * phiS).astype(int)
-                    eclipseS_range = slice(max(0, ixS-25), min(ixS+25, len(model_data)-1,))
-                    ixS = eclipseS_range.start + np.argmax(model_data["delta_mag"][eclipseS_range])
+                    ixS_range = slice(max(0, ixS-25), min(ixS+25, len(model_data)-1,))
+                    ixS = ixS_range.start + np.argmax(model_data["delta_mag"][ixS_range])
                     depthS = params.setdefault("depthS", model_data[ixS]["delta_mag"])
                     depthP = params.setdefault("depthP", model_data[0]["delta_mag"])
 
@@ -225,12 +234,6 @@ def make_dataset_file(inst_count: int,
                             params["swapped"] = 1
 
                 if is_usable:
-                    # Occasionally, JKTEBOP outputs NaN for a mag. Handle this by setting it to zero
-                    if np.isnan(np.min(model_data["delta_mag"])):
-                        if verbose:
-                            print(f"{file_stem}[{inst_id}]: Replacing NaN/Inf in processed LC.")
-                        np.nan_to_num(x=model_data["delta_mag"], copy=False)
-
                     # Optionally add Gaussian noise to the mags
                     noise_sigma = params.get("noise_sigma", None)
                     if noise_sigma:
