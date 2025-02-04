@@ -287,7 +287,8 @@ def is_usable_instance(rA_plus_rB: float, k: float, J: float, qphot: float, ecc:
     # Compatible with JKTEBOP restrictions
     # Hard restrictions of rA+rB < 0.8 (covered MAX_FRACTIONAL_R), inc > 50, k <= 100
     if usable:
-        usable = rA <= MAX_FRACTIONAL_R and rB <= MAX_FRACTIONAL_R and inc > 50 and k <= 100
+        usable = rA <= MAX_FRACTIONAL_R and rB <= MAX_FRACTIONAL_R and inc > 50 \
+            and 0.01 <= k <= 100 and (qphot == -100 or 0.001 <= qphot <= 1000)
     return usable
 
 
