@@ -331,6 +331,9 @@ if __name__ == "__main__":
 
         code_file = dataset_dir / "parameter-distributions.txt"
         with code_file.open("w", encoding="utf8") as of:
+            of.write(f"MIN_ECLIPSE_DEPTH = {MIN_ECLIPSE_DEPTH}\n")
+            of.write(f"SWAP_IF_DEEPER_SECONDARY = {SWAP_IF_DEEPER_SECONDARY}\n")
+            of.write(f"MAX_FRACTIONAL_R = {MAX_FRACTIONAL_R}\n\n")
             of.write(getsource(generate_instances_from_mist_models))
             of.write("\n\n")
             of.write(getsource(is_usable_instance))
