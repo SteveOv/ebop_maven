@@ -5,10 +5,12 @@ import unittest
 
 import numpy as np
 import tensorflow as tf
+from deblib.orbital import impact_parameter
 
 from ebop_maven import deb_example
 from traininglib.datasets import create_map_func, create_dataset_pipeline
 from traininglib.datasets import iterate_dataset, read_dataset
+from traininglib.datasets import _swap_instance_components # pylint: disable=protected-access
 
 
 # pylint: disable=invalid-name, too-many-public-methods, line-too-long, protected-access, too-many-locals, cell-var-from-loop
@@ -515,6 +517,57 @@ class Test_datasets(unittest.TestCase):
         self.assertTrue(len(id_vals) > 100000)
         self.assertTrue(len(lrows) > 100000)
         self.assertEqual(len(lrows), len(id_vals))
+
+    #
+    #   TEST _swap_instance_components(params: dict[str, any])
+    #
+    def test_swap_instance_components_known_system(self):
+        """ Tests _swap_instance_components(well known params) -> correctly swaps/updates params """  
+        params = {
+            "rA_plus_rB": 0.306652,     "k": 0.703667,
+            "J": 0.925529,              "qphot": 0.84,
+            "ecosw": 0.005128,          "esinw": -0.011822,
+            "inc": 86.381,              "bP": 0.355,
+            "ecc": 0.012886,            "omega": 293.450947,
+            "L3": 0,                    "phiS": 0.503265,
+            "rA": 0.18000,              "rB": 0.12667,
+            "LDA1": 0.6437,             "LDB1": 0.6445,
+            "MA": 1.568,                "MB": 1.314,
+        }
+
+        swap_params = params.copy()
+        _swap_instance_components(swap_params) # Will update swap_params in place
+
+        # Unchanged - system as a whole
+        self.assertEqual(swap_params["rA_plus_rB"], params["rA_plus_rB"])
+        self.assertEqual(swap_params["inc"], params["inc"])
+        self.assertEqual(swap_params["ecc"], params["ecc"])
+
+        # Swapped component params
+        self.assertEqual(swap_params["rA"], params["rB"])
+        self.assertEqual(swap_params["rB"], params["rA"])
+        self.assertEqual(swap_params["LDA1"], params["LDB1"])
+        self.assertEqual(swap_params["LDB1"], params["LDA1"])
+        self.assertEqual(swap_params["MA"], params["MB"])
+        self.assertEqual(swap_params["MB"], params["MA"])
+
+        # Updated ratios (invert the relations)
+        self.assertEqual(swap_params["k"], 1 / params["k"])
+        self.assertEqual(swap_params["J"], 1 / params["J"])
+        self.assertEqual(swap_params["qphot"], 1 / params["qphot"])
+
+        # Updated ascending node as the orgin is moved from star A to B : +pi
+        self.assertEqual(swap_params["omega"], params["omega"] + 180 - 360)
+
+        # Updated args of pariastron: ecc unchanged however omega is modified
+        ecc, swap_omega = swap_params["ecc"], np.deg2rad(swap_params["omega"])
+        self.assertAlmostEqual(swap_params["ecosw"], ecc * np.cos(swap_omega), 6)
+        self.assertAlmostEqual(swap_params["esinw"], ecc * np.sin(swap_omega), 6)
+
+        # bP recalculated, as it should now relate to what was originally rB
+        exp_bp = impact_parameter(params["rB"], params["inc"],
+                                  params["ecc"], -params["esinw"])
+        self.assertAlmostEqual(swap_params["bP"], exp_bp, 6)
 
 
 if __name__ == "__main__":
