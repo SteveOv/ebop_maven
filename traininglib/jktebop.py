@@ -225,10 +225,10 @@ def write_in_file(file_name: Path,
             msg = None
             value = in_params[key]
             if min_val is not None and value < min_val:
-                msg = f"{key}={value} and less than the min value {min_val} so set to {min_val}"
+                msg = f"{key} = {value} and will be coerced to the min value of {min_val}"
                 in_params[key] = min_val
             elif max_val is not None and value > max_val:
-                msg = f"{key}={value} and greater than the max value {max_val} so set to {max_val}"
+                msg = f"{key} = {value} and will be coerced to the max value of {max_val}"
                 in_params[key] = max_val
             if warn_if_outside_range and msg:
                 warnings.warn(msg, JktebopParameterWarning)
@@ -236,8 +236,8 @@ def write_in_file(file_name: Path,
             # Unlikely to need this as what's required is set by the template more than JKTEBOP
             warnings.warn(f"The expected parameter {key} is not found.", JktebopParameterWarning)
 
-    coerce_in_param("k", min_val=0.0, max_val=100.0)
-    coerce_in_param("J", min_val=0.0, max_val=1000.0)
+    coerce_in_param("k", min_val=0.01, max_val=100.0)
+    coerce_in_param("J", min_val=0.001, max_val=1000.0)
     coerce_in_param("rA_plus_rB", min_val=-0.8, max_val=0.8)
     coerce_in_param("inc", min_val=50.0, max_val=140.0)
     if not _jktebop_support_negative_l3:
