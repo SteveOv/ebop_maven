@@ -38,11 +38,6 @@ from traininglib import datasets, formal_testing, jktebop, pipeline, plots
 from traininglib.tee import Tee
 
 
-# These are used if you run this module directly
-TEST_SET_SUFFIX = ""
-TEST_RESULTS_SUBDIR = f"testing{TEST_SET_SUFFIX}"
-SYNTHETIC_MIST_TEST_DS_DIR = Path(f"./datasets/synthetic-mist-tess-dataset{TEST_SET_SUFFIX}/")
-
 FORMAL_TEST_DATASET_DIR = Path("./datasets/formal-test-dataset/")
 
 DEFAULT_TESTING_SEED = 42
@@ -891,9 +886,17 @@ def force_seed_on_dropout_layers(estimator: Estimator, seed: int=DEFAULT_TESTING
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Runs formal testing on trained model files.")
+    ap.add_argument("-nf", "--no-fit", dest="do_fit", action="store_false", required=False,
+                    help="optionally suppress the fit tests")
+    ap.add_argument("-ss", "--synth-suffix", dest="synth_suffix", type=str, required=False,
+                    help="optional suffix of /synthetic-mist-test-dataset{SYNTH_SUFFIX}/ directory")
     ap.add_argument(dest="model_files", type=Path, nargs="*", help="The model file(s) to test.")
-    ap.set_defaults(model_files=[None]) # None item loads the default model under ebop_maven/data
+    # We use a None in model_files as indication to pull in the default model under ebop_maven/data
+    ap.set_defaults(do_fit=True, synth_suffix="", model_files=[None])
     args = ap.parse_args()
+
+    synth_test_ds_dir = Path(f"./datasets/synthetic-mist-tess-dataset{args.synth_suffix}/")
+    test_results_subdir = f"testing{args.synth_suffix}"
 
     # This will get the config, labels and published params for formal targets not excluded
     targets_config_file = Path("./config/formal-test-dataset.json")
@@ -906,10 +909,10 @@ if __name__ == "__main__":
 
         # Set up the estimator and the reporting directory for this model
         if model_file is None or model_file.parent.name == "estimator": # published with ebop_maven
-            result_dir = Path(f"./drop/training/published/{TEST_RESULTS_SUBDIR}")
+            result_dir = Path("./drop/training/published/" + test_results_subdir)
             model_file = Path("./ebop_maven/data/estimator/default-model.keras")
         else:
-            result_dir = model_file.parent / TEST_RESULTS_SUBDIR
+            result_dir = model_file.parent / test_results_subdir
         result_dir.mkdir(parents=True, exist_ok=True)
 
         def warnings_to_stdout(message, category, filename, lineno, file=None, line=None):
@@ -919,18 +922,19 @@ if __name__ == "__main__":
 
         labs, all_preds = None, {}
         with redirect_stdout(Tee(open(result_dir / "model_testing.log", "w", encoding="utf8"))):
-            print(f"\nStarting tests on {model_file.parent.name} tests at",
+            print(f"\nStarting tests on {model_file.parent.name} @",
                   f"{datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
-
+            print("\nEvaluation test dataset:   ", synth_test_ds_dir)
+            print("Results will be written to:", result_dir)
             print("\nRuntime environment:", sys.prefix.replace("'", ""))
             print(*(f"{lib.__name__} v{lib.__version__}" for lib in [tf, keras]), sep="\n")
             print(f"tensorflow sees {len(tf.config.list_physical_devices('GPU'))} physical GPU(s)")
 
             # Report on the basic performance of the model/Estimator predictions vs labels
             for pred_type, iters, dataset_dir, targs in [
-                    ("nonmc",   1,      SYNTHETIC_MIST_TEST_DS_DIR, None),
+                    ("nonmc",   1,      synth_test_ds_dir,          None),
                     # Resource hog & non-essential; takes ~0.5 h on i7 CPU and may not fit in GPU
-                    #("mc",      1000,   SYNTHETIC_MIST_TEST_DS_DIR, None),
+                    #("mc",      1000,   synth_mist_test_ds_dir,     None),
 
                     ("nonmc",   1,      FORMAL_TEST_DATASET_DIR,    formal_targs),
                     ("mc",      1000,   FORMAL_TEST_DATASET_DIR,    formal_targs),
@@ -940,25 +944,28 @@ if __name__ == "__main__":
                 evaluate_model_against_dataset(model_file, iters, targs,
                                                dataset_dir, result_dir / "eval")
 
-            # In depth report on fitting the formal-test-dataset based on estimator predictions.
-            # First loop uses labels as the "predictions" to yield a set of control fit results for
-            # use as the comparison baseline of the subsequent fitted values from model predictions.
-            ctrl_fit_vals = None # To be set on the first, control fit run
-            for (pred_type, is_ctrl_fit, iterations) in [
-                    ("control",     True,       0),
-                    ("nonmc",       False,      1),
-                    ("mc",          False,      1000),
-            ]:
-                print(f"\nTesting JKTEBOP fitting of {pred_type} input values\n" + "="*80)
-                fitted_vals = fit_formal_test_dataset(model_file,
-                                                      formal_targs_cfg,
-                                                      formal_targs,
-                                                      iterations,
-                                                      True,
-                                                      is_ctrl_fit,
-                                                      None if is_ctrl_fit else ctrl_fit_vals,
-                                                      result_dir / "fit")
-                if is_ctrl_fit:
-                    ctrl_fit_vals = fitted_vals
+            if args.do_fit:
+                # In depth report on fitting the formal-test-dataset based on estimator predictions.
+                # First loop uses labels as "predictions" to yield a set of control fit results for
+                # use as a comparison baseline for subsequent fitted values from model predictions.
+                ctrl_fit_vals = None # To be set on the first, control fit run
+                for (pred_type, is_ctrl_fit, iterations) in [
+                        ("control",     True,       0),
+                        ("nonmc",       False,      1),
+                        ("mc",          False,      1000),
+                ]:
+                    print(f"\nTesting JKTEBOP fitting of {pred_type} input values\n" + "="*80)
+                    fitted_vals = fit_formal_test_dataset(model_file,
+                                                        formal_targs_cfg,
+                                                        formal_targs,
+                                                        iterations,
+                                                        True,
+                                                        is_ctrl_fit,
+                                                        None if is_ctrl_fit else ctrl_fit_vals,
+                                                        result_dir / "fit")
+                    if is_ctrl_fit:
+                        ctrl_fit_vals = fitted_vals
+            else:
+                print("The fitting tests have been suppressed by command line switch")
 
-            print(f"\nCompleted tests at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
+            print(f"\nCompleted tests @ {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
