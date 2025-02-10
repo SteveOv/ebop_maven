@@ -409,12 +409,17 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
                              figsize=(cols * COL_WIDTH, rows * ROW_HEIGHT_SQUARE))
     axes = axes.flatten()
 
-    # If we have lots of data, reduce the size of the markers and reduce the base item alpha
-    (bms, balpha) = (7.0, 1.0) if inst_count < 100 else (3.0, 0.5)
-
-    # If we are highlighting certain instances reduce the base item alpha for better contrast
-    if any(hl_mask1) or any(hl_mask2):
-        balpha *= 0.66
+    # The markers, marker sizes and alpha values are different depending on small/large dataset
+    if inst_count < 100:
+        fmt = ["o", "s", "D"]
+        c = [PLOT_COLORS[0], PLOT_COLORS[3], PLOT_COLORS[3]]
+        ms = [7.0, 10.5, 10.5]
+        alpha = [(0.66 if any(hl_mask1) or any(hl_mask2) else 1.0), 1.0, 1.0]
+    else:
+        fmt = ["o", "o", "o"]
+        c = [PLOT_COLORS[0], PLOT_COLORS[3], PLOT_COLORS[3]]
+        ms = [3.0, 3.0, 3.0]
+        alpha = [0.25, 0.50, 0.75]
 
     print(f"Plotting {inst_count} instances on {rows}x{cols} grid for:", ", ".join(params.keys()))
     for (ax, param_name) in zip_longest(axes.flatten(), params.keys()):
@@ -436,31 +441,30 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
             # Plot the preds vs labels, with those with transits filled.
             if show_errorbars is None:
                 show_errorbars = max(np.abs(pred_sigmas)) > 0
-                if show_errorbars:
-                    bms *= 0.66 # Reduce marker sizes so the errorbars are easier to make out
 
             non_hl_mask = ~hl_mask1 & ~hl_mask2
-            for (mask,                          fmt,    c,              ms,         alpha,  filled) in [ # pylint: disable=line-too-long
-                (~transit_mask & non_hl_mask,   "o",    PLOT_COLORS[0], bms,        balpha, False),
-                (transit_mask & non_hl_mask,    "o",    PLOT_COLORS[0], bms,        balpha, True),
+            for (mask,                              fix,    filled) in [
+                (~transit_mask & non_hl_mask,       0,      False),
+                (transit_mask & non_hl_mask,        0,      True),
 
                 # If present, these are larger and more bold so they stand out
-                (~transit_mask & hl_mask1,      "s",    PLOT_COLORS[3], bms*1.5,    1,      False),
-                (transit_mask & hl_mask1,       "s",    PLOT_COLORS[3], bms*1.5,    1,      True),
-                (~transit_mask & hl_mask2,      "D",    PLOT_COLORS[3], bms*1.5,    1,      False),
-                (transit_mask & hl_mask2,       "D",    PLOT_COLORS[3], bms*1.5,    1,      True),
+                (~transit_mask & hl_mask1,          1,      False),
+                (transit_mask & hl_mask1,           1,      True),
+                (~transit_mask & hl_mask2,          2,      False),
+                (transit_mask & hl_mask2,           2,      True),
             ]:
                 if any(mask):
                     fs = "full" if filled else "none"
                     if show_errorbars:
+                        # Reduce marker sizes so the errorbars are easier to make out
                         ax.errorbar(x=lbl_vals[mask], y=pred_vals[mask],
-                                    xerr=lbl_sigmas[mask], yerr=pred_sigmas[mask],
-                                    c=c, lw=ms/5, markeredgewidth=ms/5, capsize=None,
-                                    fmt=fmt, ms=ms, alpha=alpha, fillstyle=fs)
+                                    xerr=lbl_sigmas[mask], yerr=pred_sigmas[mask], capsize=None,
+                                    c=c[fix], lw=ms[fix]/7, markeredgewidth=ms[fix]/7,
+                                    fmt=fmt[fix], ms=ms[fix]*0.66, alpha=alpha[fix], fillstyle=fs)
                     else:
                         ax.errorbar(x=lbl_vals[mask], y=pred_vals[mask],
-                                    c=c, lw=ms/5, markeredgewidth=ms/5,
-                                    fmt=fmt, ms=ms, alpha=alpha, fillstyle=fs)
+                                    c=c[fix], lw=ms[fix]/5, markeredgewidth=ms[fix]/5,
+                                    fmt=fmt[fix], ms=ms[fix], alpha=alpha[fix], fillstyle=fs)
 
             param_caption = params[param_name]
             format_axes(ax, xlim=diag, ylim=diag, xlabel=f"{xlabel_prefix} {param_caption}",

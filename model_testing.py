@@ -109,6 +109,12 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
     # Get the subset of the feat_vals that are required by the estimator for predictions.
     pred_feat_vals = feat_vals[...,[all_feat_names.index(k) for k in estimator.extra_feature_names]]
 
+    # Mask for picking out instances with prominent eclipses; expected to be easier to predict
+    easy_mask = feat_vals[..., all_feat_names.index("depthP")] > 0.1
+    easy_mask &= feat_vals[..., all_feat_names.index("depthS")] > 0.1
+    easy_mask &= feat_vals[..., all_feat_names.index("phiS")] > 0.1
+    easy_mask &= feat_vals[..., all_feat_names.index("phiS")] < 0.9
+
     # Sets the random seed on numpy, keras's backend library (here tensorflow) and python
     keras.utils.set_random_seed(DEFAULT_TESTING_SEED)
 
@@ -173,7 +179,7 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
                 show_fliers = "formal" in ds_name
                 m_errs = calculate_prediction_errors(m_preds[plot_params], m_lbls[plot_params])
                 plots.plot_prediction_boxplot(m_errs, show_fliers=show_fliers, ylabel="Error") \
-                    .savefig(sub_dir / f"predictions-{mc_type}-box-{ds_name}{suffix}.pdf")
+                    .savefig(sub_dir / f"predictions-{mc_type}-box{suffix}.pdf")
                 plt.close()
 
                 # If we have a very large dataset then adopt a strategy of skipping data in the plot
@@ -181,8 +187,9 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
                 # with the plot area being small. This will help keep the file size under control.
                 pick = slice(0, None, int(np.ceil(len(tflags) / 10000)))
                 plots.plot_predictions_vs_labels(m_preds[pick], m_lbls[pick], tflags[tmask][pick],
-                                                 plot_params, show_errorbars=show_error_bars) \
-                    .savefig(sub_dir / f"predictions-{mc_type}-vs-labels-{ds_name}{suffix}.pdf")
+                                                 plot_params, show_errorbars=show_error_bars,
+                                                 hl_mask1=easy_mask[tmask][pick]) \
+                    .savefig(sub_dir / f"predictions-{mc_type}-vs-labels{suffix}.pdf")
                 plt.close()
 
 
