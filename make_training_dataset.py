@@ -150,9 +150,8 @@ def is_usable_instance(rA_plus_rB: float, k: float, J: float, qphot: float, ecc:
     - is it suitable for modelling with JKTEBOP
     """
     # pylint: disable=invalid-name, too-many-arguments, unused-argument
-    # Use invalid values as defaults so that if any are missing we fail
-    # Physically plausible (qphot of -100 is a magic number to force spherical)
-    usable = k > 0 and J > 0 and (qphot > 0 or qphot == -100) and ecc < 1
+    # Physically plausible
+    usable = 0 <= ecc < 1
 
     # Will eclipse
     if usable:
@@ -162,11 +161,12 @@ def is_usable_instance(rA_plus_rB: float, k: float, J: float, qphot: float, ecc:
     if usable and MIN_ECLIPSE_DEPTH is not None:
         usable = min(depthP, depthS) >= MIN_ECLIPSE_DEPTH
 
-    # Compatible with JKTEBOP restrictions
-    # Hard restrictions of rA+rB < 0.8 (covered by MAX_FRACTIONAL_R), inc > 50, k <= 100
+    # Compatible with JKTEBOP restrictions (qphot of -100 is a magic number to force spherical)
+    # Hard restrictions of rA+rB < 0.8 (covered by MAX_FRACTIONAL_R) etc...
     if usable:
-        usable = rA <= MAX_FRACTIONAL_R and rB <= MAX_FRACTIONAL_R and inc > 50 \
-            and 0.01 <= k <= 100 and (qphot == -100 or 0.001 <= qphot <= 1000)
+        usable = rA <= MAX_FRACTIONAL_R and rB <= MAX_FRACTIONAL_R \
+            and 50 <= inc <= 140 and 0.01 <= k <= 100 and 0.001 <= J <= 1000 \
+            and (qphot == -100 or 0.001 <= qphot <= 1000)
     return usable
 
 
