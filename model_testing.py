@@ -109,7 +109,7 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
     # Get the subset of the feat_vals that are required by the estimator for predictions.
     pred_feat_vals = feat_vals[...,[all_feat_names.index(k) for k in estimator.extra_feature_names]]
 
-    # Mask for picking out instances with prominent eclipses; expected to be easier to predict
+    # Mask for picking out instances with more prominent eclipses; expected to be easier to predict
     easy_mask = feat_vals[..., all_feat_names.index("depthP")] > 0.1
     easy_mask &= feat_vals[..., all_feat_names.index("depthS")] > 0.1
     easy_mask &= feat_vals[..., all_feat_names.index("phiS")] > 0.1
@@ -120,13 +120,14 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
 
     # Make predictions, returned as a structured array of shape (#insts, #labels) and dtype=UFloat
     # Manually batch large datasets in case the model is memory constrained (i.e.: running on a GPU)
-    print(f"The Estimator is making predictions on the {len(ids)} test instances",
+    inst_count = len(ids)
+    print(f"The Estimator is making predictions on the {inst_count} test instance(s)",
           f"with {mc_iterations} iteration(s) (iterations >1 triggers MC Dropout algorithm).")
     max_batch_size = 1000
-    pred_vals = np.empty((len(mags_vals), ),
+    pred_vals = np.empty((inst_count, ),
                          dtype=[(n, np.dtype(UFloat.dtype)) for n in estimator.label_names])
     force_seed_on_dropout_layers(estimator)
-    for ix in np.arange(0, len(mags_vals), max_batch_size):
+    for ix in np.arange(0, inst_count, max_batch_size):
         pv = estimator.predict(mags_feature=mags_vals[ix : ix+max_batch_size],
                                extra_features=pred_feat_vals[ix : ix+max_batch_size],
                                iterations=mc_iterations,
@@ -145,18 +146,23 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
     # Work out which are the transiting systems so we can break down the reporting
     pnames = list(inspect.signature(will_transit).parameters)
     argvs = [lbl_vals[p] / (deb_example.labels_and_scales[p] if scaled else 1) for p in pnames]
-    tflags = will_transit(*argvs)
+    tran_mask = will_transit(*argvs)
 
     # Now report on the quality of the predictions.
     # If the labels have been read from the dataset/tfrecord then they will have no uncertainties
+    # For formal-test-dataset we skip some subsets as the ds size is too low for it to be meaningful
     plot_params = [n for n in estimator.label_names if n not in ["ecosw","esinw"]]+["ecosw","esinw"]
-    for (subset, tmask) in [("",                 [True]*lbl_vals.shape[0]),
-                            (" transiting",      tflags),
-                            (" non-transiting",  ~tflags)]:
+    for (subset,            mask,               do_frml_tbl,    do_frml_plt,    do_synth_plt) in [
+        ("",                [True]*inst_count,  True,           True,           True),
+        (" transiting",     tran_mask,          True,           False,          True),
+        (" non-transiting", ~tran_mask,         True,           False,          True),
+        (" easier",         easy_mask,          False,          False,          False),
+        (" harder",         ~easy_mask,         False,          False,          False),
+    ]:
         suffix = subset.replace(' ','-')
-        if any(tmask):
-            print(f"\nSummary of the estimator's predictions for {sum(tmask)}{subset} system(s)")
-            m_preds, m_lbls = pred_vals[tmask], lbl_vals[tmask]
+        if any(mask) and (("synth" in ds_name) or ("formal" in ds_name and do_frml_tbl)):
+            print(f"\nSummary of the estimator's predictions for {sum(mask)}{subset} system(s)")
+            m_preds, m_lbls = pred_vals[mask], lbl_vals[mask]
             show_error_bars = mc_iterations > 1
             predictions_vs_labels_to_table(m_preds, m_lbls, summary_only=True,
                                            selected_param_names=estimator.label_names,
@@ -169,28 +175,29 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
                                                error_bars=show_error_bars)
 
             # Use pdf as usually smaller file size than eps and also supports transparency/alpha.
-            # For formal-test-dataset we plot only the whole set as the size is too low to split.
-            if report_dir and (not subset or "formal" not in ds_name):
+            if report_dir and (("synth" in ds_name and do_synth_plt) \
+                                or ("formal" in ds_name and do_frml_plt)):
                 sub_dir = report_dir / ds_name / mc_type
                 sub_dir.mkdir(parents=True, exist_ok=True)
-                save_predictions_to_csv(ids, tflags, pred_vals, sub_dir / "predictions.csv")
-                save_predictions_to_csv(ids, tflags, lbl_vals, sub_dir/ "labels.csv")
+                save_predictions_to_csv(ids, tran_mask, pred_vals, sub_dir / "predictions.csv")
+                save_predictions_to_csv(ids, tran_mask, lbl_vals, sub_dir/ "labels.csv")
 
                 show_fliers = "formal" in ds_name
                 m_errs = calculate_prediction_errors(m_preds[plot_params], m_lbls[plot_params])
-                plots.plot_prediction_boxplot(m_errs, show_fliers=show_fliers, ylabel="Error") \
-                    .savefig(sub_dir / f"predictions-{mc_type}-box{suffix}.pdf")
-                plt.close()
+                fig = plots.plot_prediction_boxplot(m_errs, show_fliers=show_fliers, ylabel="Error")
+                fig.savefig(sub_dir / f"predictions-{mc_type}-box{suffix}.pdf")
+                fig.clf()
 
                 # If we have a very large dataset then adopt a strategy of skipping data in the plot
                 # as there's little point plotting every one as individual points become meaningless
                 # with the plot area being small. This will help keep the file size under control.
-                pick = slice(0, None, int(np.ceil(len(tflags) / 10000)))
-                plots.plot_predictions_vs_labels(m_preds[pick], m_lbls[pick], tflags[tmask][pick],
-                                                 plot_params, show_errorbars=show_error_bars,
-                                                 hl_mask1=easy_mask[tmask][pick]) \
-                    .savefig(sub_dir / f"predictions-{mc_type}-vs-labels{suffix}.pdf")
-                plt.close()
+                # The hl_mask used to emphasize those instances expected to be easier to predict.
+                sl = slice(0, None, int(np.ceil(inst_count / 10000)))
+                fig = plots.plot_predictions_vs_labels(m_preds[sl], m_lbls[sl], tran_mask[mask][sl],
+                                                       plot_params, show_errorbars=show_error_bars,
+                                                       hl_mask1=easy_mask[mask][sl])
+                fig.savefig(sub_dir / f"predictions-{mc_type}-vs-labels{suffix}.pdf")
+                fig.clf()
 
 
 def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
