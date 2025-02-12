@@ -278,7 +278,7 @@ def is_usable_instance(rA_plus_rB: float, k: float, J: float, qphot: float, ecc:
 
     # Will eclipse
     if usable:
-        usable = all(b is not None and b <= 0.75 + k for b in [bP, bS])
+        usable = all(b is not None and b <= 1 + k for b in [bP, bS])
 
     # Ensure the eclipses are sufficiently clear to meet our needs.
     if usable and MIN_ECLIPSE_DEPTH is not None:
