@@ -229,7 +229,9 @@ def make_dataset_file(inst_count: int,
                         _swap_instance_components(params)
                         is_usable = check_func(**params)
                         if is_usable:
-                            model_data["delta_mag"] = np.roll(model_data["delta_mag"], -ixS)
+                            # Regenerate the LC - assume it will work as params previously OK.
+                            # A faster algo is to roll mags to 2ndary but this trains better.
+                            model_data = jktebop.generate_model_light_curve(file_prefix, **params)
                             swap_count += 1
                             params["swapped"] = 1
 
