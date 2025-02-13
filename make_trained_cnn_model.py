@@ -246,7 +246,7 @@ if __name__ == "__main__":
             # Then start a browser and head to http://localhost:6006
             #callbacks.TensorBoard(log_dir="./logs", write_graph=True, write_images=True),
             callbacks.EarlyStopping("val_loss", restore_best_weights=True, min_delta=ES_MIN_DELTA,
-                                    start_from_epoch=25, patience=ES_PATIENCE, verbose=1),
+                                    start_from_epoch=50, patience=ES_PATIENCE, verbose=1),
             callbacks.CSVLogger(SAVE_DIR / "training-log.csv")
         ]
 
