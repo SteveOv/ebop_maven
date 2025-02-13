@@ -676,6 +676,13 @@ def _swap_instance_components(params: dict[str, any]):
         if keyA in params and keyB in params:
             params[keyA], params[keyB] = params[keyB], params[keyA]
 
+    # Swap over these primary/secondary eclipse params (except b(P|S) which require recalculating)
+    for pattern in ["depth{0}", "delta{0}", "ix{0}"]:
+        keyP = pattern.format("P")
+        keyS = pattern.format("S")
+        if keyP in params and keyS in params:
+            params[keyP], params[keyS] = params[keyS], params[keyP]
+
     # Recalculate the impact parameters as we have changed the primary star. It's not just a case of
     # swapping the values, as both impact params are related to the primary's fractional radius.
     params["bP"] = orbital.impact_parameter(params["rA"], params["inc"], e, params["esinw"], False)
