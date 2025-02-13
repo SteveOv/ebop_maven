@@ -59,7 +59,7 @@ all_histogram_params = {
 # Colours to use to ensure consistency across plots.
 # Attempted to select for accessibility (i.e.: contrast, consideration of colour blindness)
 #    base colour (lighter); darker for alternatives/highlights
-PLOT_COLORS = [ "tab:blue", "darkgreen", "darkred", "k" ]
+PLOT_COLORS = [ "tab:blue", "tab:orange", "darkgreen", "darkred", "k" ]
 REF_LINE_COLOR = "darkgray"
 
 # Standard width & heights for 6:4, 6:5 & square aspect ratios where plots will generally be either
@@ -136,8 +136,8 @@ def plot_formal_test_dataset_hr_diagram(targets_cfg: Dict[str, any],
     fig = plt.figure(figsize=(2 * COL_WIDTH, 2 * ROW_HEIGHT_6_4), constrained_layout=True)
     ax = fig.add_subplot(1, 1, 1)
     for (comp,  marker,     size,   color,              label) in [
-        ("A",   "x",        40,     PLOT_COLORS[1],     "primary star"),
-        ("B",   "+",        70,     PLOT_COLORS[2],     "secondary star"),
+        ("A",   "x",        40,     PLOT_COLORS[2],     "primary star"),
+        ("B",   "+",        70,     PLOT_COLORS[3],     "secondary star"),
 
     ]:
         # Don't bother with error bars as this is just an indicative distribution.
@@ -246,8 +246,8 @@ def plot_folded_lightcurves(main_mags_sets: np.ndarray[float],
         if main_mags is not None and name is not None:
             for ix, (mags,      color,              alpha,      label) in enumerate([
                 (main_mags,     PLOT_COLORS[0],     1.0,        name),
-                (extra_mags1,   PLOT_COLORS[1],     1.0,        extra_names[0]),
-                (extra_mags2,   PLOT_COLORS[2],     1.0,        extra_names[1]),
+                (extra_mags1,   PLOT_COLORS[2],     1.0,        extra_names[0]),
+                (extra_mags2,   PLOT_COLORS[3],     1.0,        extra_names[1]),
             ]):
                 if mags is not None and len(mags) > 0:
                     num_points = len(mags)
@@ -412,14 +412,14 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
     # The markers, marker sizes and alpha values are different depending on small/large dataset
     if inst_count < 100:
         fmt = ["o", "s", "D"]
-        c = [PLOT_COLORS[0], PLOT_COLORS[3], PLOT_COLORS[3]]
+        c = [PLOT_COLORS[0], PLOT_COLORS[4], PLOT_COLORS[4]]
         ms = [7.0, 10.5, 10.5]
         alpha = [(0.66 if any(hl_mask1) or any(hl_mask2) else 1.0), 1.0, 1.0]
     else:
         fmt = ["o", "o", "o"]
-        c = [PLOT_COLORS[0], PLOT_COLORS[3], PLOT_COLORS[3]]
+        c = [PLOT_COLORS[0], PLOT_COLORS[1], PLOT_COLORS[4]]
         ms = [3.0, 3.0, 3.0]
-        alpha = [0.25, 0.50, 0.75]
+        alpha = [0.25, 0.50, 0.33]
 
     print(f"Plotting {inst_count} instances on {rows}x{cols} grid for:", ", ".join(params.keys()))
     for (ax, param_name) in zip_longest(axes.flatten(), params.keys()):
@@ -438,16 +438,14 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
             diag = (dmin - dmore, dmax + dmore)
             ax.plot(diag, diag, color=REF_LINE_COLOR, linestyle="--", linewidth=1.0, zorder=-10)
 
-            # Plot the preds vs labels, with those with transits filled.
             if show_errorbars is None:
                 show_errorbars = max(np.abs(pred_sigmas)) > 0
 
+            # in order of increasing z
             non_hl_mask = ~hl_mask1 & ~hl_mask2
             for (mask,                              fix,    filled) in [
                 (~transit_mask & non_hl_mask,       0,      False),
                 (transit_mask & non_hl_mask,        0,      True),
-
-                # If present, these are larger and more bold so they stand out
                 (~transit_mask & hl_mask1,          1,      False),
                 (transit_mask & hl_mask1,           1,      True),
                 (~transit_mask & hl_mask2,          2,      False),
@@ -455,11 +453,10 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
             ]:
                 if any(mask):
                     fs = "full" if filled else "none"
-                    if show_errorbars:
-                        # Reduce marker sizes so the errorbars are easier to make out
+                    if show_errorbars: # Reduce marker sizes so the errorbars are easier to make out
                         ax.errorbar(x=lbl_vals[mask], y=pred_vals[mask],
                                     xerr=lbl_sigmas[mask], yerr=pred_sigmas[mask], capsize=None,
-                                    c=c[fix], lw=ms[fix]/7, markeredgewidth=ms[fix]/7,
+                                    c=c[fix], lw=ms[fix]/7.5, markeredgewidth=ms[fix]/7.5,
                                     fmt=fmt[fix], ms=ms[fix]*0.66, alpha=alpha[fix], fillstyle=fs)
                     else:
                         ax.errorbar(x=lbl_vals[mask], y=pred_vals[mask],

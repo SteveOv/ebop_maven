@@ -110,10 +110,15 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
     pred_feat_vals = feat_vals[...,[all_feat_names.index(k) for k in estimator.extra_feature_names]]
 
     # Mask for picking out instances with more prominent eclipses; expected to be easier to predict
-    easy_mask = feat_vals[..., all_feat_names.index("depthP")] > 0.1
-    easy_mask &= feat_vals[..., all_feat_names.index("depthS")] > 0.1
-    easy_mask &= feat_vals[..., all_feat_names.index("phiS")] > 0.1
-    easy_mask &= feat_vals[..., all_feat_names.index("phiS")] < 0.9
+    easy_mask = (feat_vals[..., all_feat_names.index("depthP")] > 0.1) \
+                & (feat_vals[..., all_feat_names.index("depthS")] > 0.1) \
+                & (feat_vals[..., all_feat_names.index("phiS")] > 0.1) \
+                & (feat_vals[..., all_feat_names.index("phiS")] < 0.9)
+    # another for those harder than the easy instances but not those expected to be the hardest
+    harder_mask = ~easy_mask & (feat_vals[..., all_feat_names.index("depthP")] > 0.05) \
+                             & (feat_vals[..., all_feat_names.index("depthS")] > 0.05) \
+                             & (feat_vals[..., all_feat_names.index("phiS")] > 0.05) \
+                             & (feat_vals[..., all_feat_names.index("phiS")] < 0.95)
 
     # Sets the random seed on numpy, keras's backend library (here tensorflow) and python
     keras.utils.set_random_seed(DEFAULT_TESTING_SEED)
@@ -156,12 +161,13 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
         ("",                [True]*inst_count,  True,           True,           True),
         (" transiting",     tran_mask,          True,           False,          True),
         (" non-transiting", ~tran_mask,         True,           False,          True),
-        (" easier",         easy_mask,          False,          False,          False),
-        (" harder",         ~easy_mask,         False,          False,          False),
+        (" easy",           easy_mask,          False,          False,          True),
+        (" harder",         harder_mask,        False,          False,          True),
+        (" hardest", ~easy_mask & ~harder_mask, False,          False,          True),
     ]:
         suffix = subset.replace(' ','-')
         if any(mask) and (("synth" in ds_name) or ("formal" in ds_name and do_frml_tbl)):
-            print(f"\nSummary of the estimator's predictions for {sum(mask)}{subset} system(s)")
+            print(f"\nSummary of the estimator's predictions for the {sum(mask)}{subset} system(s)")
             m_preds, m_lbls = pred_vals[mask], lbl_vals[mask]
             show_error_bars = mc_iterations > 1
             predictions_vs_labels_to_table(m_preds, m_lbls, summary_only=True,
@@ -191,11 +197,13 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
                 # If we have a very large dataset then adopt a strategy of skipping data in the plot
                 # as there's little point plotting every one as individual points become meaningless
                 # with the plot area being small. This will help keep the file size under control.
-                # The hl_mask used to emphasize those instances expected to be easier to predict.
+                # The hl_masks to emphasize those instances expected to be hard, but not the
+                # hardest, to predict (harder_mask) and easiest to predict (easy_mask).
                 sl = slice(0, None, int(np.ceil(inst_count / 10000)))
                 fig = plots.plot_predictions_vs_labels(m_preds[sl], m_lbls[sl], tran_mask[mask][sl],
                                                        plot_params, show_errorbars=show_error_bars,
-                                                       hl_mask1=easy_mask[mask][sl])
+                                                       hl_mask1=harder_mask[mask][sl],
+                                                       hl_mask2=easy_mask[mask][sl])
                 fig.savefig(sub_dir / f"predictions-{mc_type}-vs-labels{suffix}.pdf")
                 fig.clf()
 
