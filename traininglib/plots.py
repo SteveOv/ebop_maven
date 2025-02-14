@@ -1,6 +1,6 @@
 """ Training and testing specific plots. """
 # pylint: disable=too-many-arguments, too-many-locals, too-many-branches, too-many-statements
-from typing import List, Dict, Iterable
+from typing import List, Dict, Iterable, Union
 import math
 from pathlib import Path
 from itertools import zip_longest
@@ -546,7 +546,7 @@ def plot_binned_mae_vs_labels(residuals: np.rec.recarray[UFloat],
     return fig
 
 
-def plot_prediction_boxplot(predictions: np.rec.recarray[UFloat],
+def plot_prediction_boxplot(predictions: Union[np.ndarray[UFloat], List[np.ndarray[UFloat]]],
                             show_zero_value_line: bool=True,
                             show_fliers: bool=False,
                             **format_kwargs):
@@ -557,23 +557,44 @@ def plot_prediction_boxplot(predictions: np.rec.recarray[UFloat],
     shown with a line and a box bounding the (2nd & 3rd) interquartile range, the whiskers covering
     values within x1.5 interquartile range from the box, and fliers/outliers (if enabled) beyond.
 
-    :predictions: the predictions to plot; recarray[UFloat] of shape (#instances, #labels)
+    Multiple sets of predictions can be plotted by supplying a ragged List[ndarray[UFloat]]. In
+    this case the sets are interleaved, with the equivalent params from each grouped horizontally.
+
+    :predictions: a single or list of ndarray[UFloat], each of shape (#instances, #labels)
     :show_zero_value_line: whether to draw a horizontal line at zero
     :show_fliers: if true, outliers are plotted beyond the box_plot whiskers
     :format_kwargs: kwargs to be passed on to format_axes()
     :returns: the figure
     """
-    # We're only interested in the nominals. Get this into a format matplotlib can handle
-    xdata = unumpy.nominal_values(predictions.tolist())
-
-    # For customizations https://matplotlib.org/stable/gallery/statistics/boxplot.html
     fig, ax = plt.subplots(figsize=(2 * COL_WIDTH, 2 * ROW_HEIGHT_6_4), constrained_layout=True)
     flier_props = { "marker": "x", "alpha": 0.5 }
-    ax.boxplot(xdata, showmeans=False, meanline=True, vert=True, patch_artist=False,
-               showfliers=show_fliers, flierprops=flier_props)
 
-    pub_labels = [all_param_captions[k] for k in predictions.dtype.names]
-    ax.set_xticks(ticks=[r+1 for r in range(len(pub_labels))], labels=pub_labels)
+    if not isinstance(predictions, List):
+        predictions = [predictions]
+    elif len(predictions) > 1:
+        predictions += [None] # Effectively adds h-space between param groups when it's skipped over
+
+    # Get those params common to all sets of predictions
+    param_sets = map(set, [p.dtype.names for p in predictions if p is not None])
+    params = list(set.intersection(*param_sets))
+
+    step_size = len(predictions)
+    num_cols = (len(params) * step_size) - int(step_size > 1) # drop final empty col if multiple set
+
+    for start_col, pred_set in enumerate(predictions, start=1):
+        # We're only interested in the nominals. Get this into a format matplotlib can handle
+        xdata = unumpy.nominal_values(pred_set[params].tolist()) if pred_set is not None else []
+        if len(xdata):
+            # Interleaves the subsets so the boxes are "grouped" by param. Position is 1 based.
+            positions = np.arange(start_col, num_cols + 1, step_size)
+
+            # For customizations https://matplotlib.org/stable/gallery/statistics/boxplot.html
+            ax.boxplot(xdata, positions=positions, showmeans=False, meanline=True, vert=True,
+                       patch_artist=False, showfliers=show_fliers, flierprops=flier_props)
+
+    # Place the param labels under the middle of each param group. Position is 1 based.
+    positions = np.arange(max(1, int(np.ceil(step_size / 2))), num_cols + 1, step_size)
+    ax.set_xticks(ticks=positions, labels=[all_param_captions.get(p, p) for p in params])
 
     if show_zero_value_line:
         (xmin, xmax) = ax.get_xlim()
@@ -581,7 +602,5 @@ def plot_prediction_boxplot(predictions: np.rec.recarray[UFloat],
 
     if format_kwargs:
         format_axes(ax, **format_kwargs)
-
-    # Hide minor x-ticks as they have no meaning in this context
-    ax.tick_params(axis="x", which="minor", bottom=False, top=False)
+    ax.tick_params(axis="x", which=("both" if step_size > 1 else "minor"), bottom=False, top=False)
     return fig
