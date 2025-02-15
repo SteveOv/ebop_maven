@@ -23,8 +23,7 @@ from traininglib.mistisochrones import MistIsochrones
 from traininglib.tee import Tee
 
 # Optional filtering/processing on generated LCs before acceptance
-MIN_ECLIPSE_DEPTH = None
-SWAP_IF_DEEPER_SECONDARY = False
+SWAP_IF_DEEPER_SECONDARY = True
 
 # max fractional radius: JKTEBOP unsuited to close binaries. As a "rule of thumb" the cut-off is
 # at ~0.2. We go further so as to test a model which will be able to predict upto and beyond this.
@@ -154,16 +153,8 @@ def generate_instances_from_mist_models(label: str):
             ld_coeffs_A = limb_darkening.lookup_pow2_coefficients(loggA, T_eff_A, "TESS")
             ld_coeffs_B = limb_darkening.lookup_pow2_coefficients(loggB, T_eff_B, "TESS")
 
-            # By specifying an apparent mag (withing the TESS expected range) we indication
-            # to the conditions from which we decide the amount of noise to add.
-            # The shifts to the mags data will mimic less than perfect pre-processing.
-            noise_sigma = calculate_tess_noise_sigma(apparent_mag=rng.uniform(6, 18))
-            phase_shift = rng.normal(0, scale=0.03)
-            mag_shift = rng.normal(0, scale=0.01)
-
-            inst_id = f"{set_id}/{generated_counter:06d}"
             yield {
-                "id":           inst_id,
+                "id":           f"{set_id}/{generated_counter:06d}",
 
                 # Basic system params for generating the model light-curve
                 # The keys (& those for LD below) are those expected by make_dateset
@@ -184,10 +175,12 @@ def generate_instances_from_mist_models(label: str):
                 "LDA2":         ld_coeffs_A[1],
                 "LDB2":         ld_coeffs_B[1],
 
-                # Used to dictate noise & shifts to apply to mags_feature data being generated
-                "noise_sigma":  noise_sigma,
-                "phase_shift":  phase_shift,
-                "mag_shift":    mag_shift,
+                # By specifying an apparent mag (within the TESS mission's operating range) we
+                # indicate the conditions from which we decide the amount of noise to add.
+                # The phase and vertical shifts to the mags data mimic imperfect pre-processing.
+                "noise_sigma":  calculate_tess_noise_sigma(apparent_mag=rng.uniform(6, 18)),
+                "phase_shift":  rng.normal(0, scale=0.03),
+                "mag_shift":    rng.normal(0, scale=0.01),
 
                 # Further params for potential use as labels/features
                 "sini":         np.sin(inc_rad),
@@ -276,13 +269,10 @@ def is_usable_instance(rA_plus_rB: float, k: float, J: float, qphot: float, ecc:
     # Physically plausible
     usable = 0 <= ecc < 1
 
-    # Will eclipse
+    # Will eclipse, and that they are sufficiently prominent to be useful for testing
     if usable:
-        usable = all(b is not None and b <= 1 + k for b in [bP, bS])
-
-    # Ensure the eclipses are sufficiently clear to meet our needs.
-    if usable and MIN_ECLIPSE_DEPTH is not None:
-        usable = min(depthP, depthS) >= MIN_ECLIPSE_DEPTH
+        usable = all(b is not None and b <= 1 + k for b in [bP, bS]) \
+            and min(depthP, depthS) >= 0.010
 
     # Compatible with JKTEBOP restrictions (qphot of -100 is a magic number to force spherical)
     # Hard restrictions of rA+rB < 0.8 (covered by MAX_FRACTIONAL_R) etc...
@@ -304,6 +294,16 @@ if __name__ == "__main__":
             sys.exit()
 
     with redirect_stdout(Tee(open(dataset_dir/"dataset.log", "w", encoding="utf8"))):
+
+        code_file = dataset_dir / "parameter-distributions.txt"
+        with code_file.open("w", encoding="utf8") as of:
+            of.write(f"SWAP_IF_DEEPER_SECONDARY = {SWAP_IF_DEEPER_SECONDARY}\n")
+            of.write(f"MAX_FRACTIONAL_R = {MAX_FRACTIONAL_R}\n\n")
+            of.write(getsource(generate_instances_from_mist_models))
+            of.write("\n\n")
+            of.write(getsource(is_usable_instance))
+        print(f"Saved copies of the param distribution & constraint functions to {code_file.name}")
+
         datasets.make_dataset(instance_count=DATASET_SIZE,
                               file_count=10,
                               output_dir=dataset_dir,
@@ -330,13 +330,3 @@ if __name__ == "__main__":
         fig = plots.plot_dataset_instance_mags_features(dataset_files, cols=5, max_instances=50)
         fig.savefig(dataset_dir / "sample.png", dpi=150)
         fig.clf()
-
-        code_file = dataset_dir / "parameter-distributions.txt"
-        with code_file.open("w", encoding="utf8") as of:
-            of.write(f"MIN_ECLIPSE_DEPTH = {MIN_ECLIPSE_DEPTH}\n")
-            of.write(f"SWAP_IF_DEEPER_SECONDARY = {SWAP_IF_DEEPER_SECONDARY}\n")
-            of.write(f"MAX_FRACTIONAL_R = {MAX_FRACTIONAL_R}\n\n")
-            of.write(getsource(generate_instances_from_mist_models))
-            of.write("\n\n")
-            of.write(getsource(is_usable_instance))
-        print(f"Saved copies of the param distribution & constraint functions to {code_file.name}")
