@@ -229,15 +229,15 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
         estimator = Estimator(estimator)
     mags_bins = estimator.mags_feature_bins
     mags_wrap_phase = estimator.mags_feature_wrap_phase
-
-    targs = include_ids if len(include_ids or []) > 0 else [*targets_config.keys()]
-    targs = np.array(targs) if not isinstance(targs, np.ndarray) else targs
-    trans_flags = np.array([targets_config.get(t, {}).get("transits", False) for t in targs])
     prediction_type = "control" if do_control_fit else "mc" if mc_iterations > 1 else "nonmc"
 
-    # Highlighting with plot_predictions_vs_labels(): AI Phe (tough fit), V570 Per (tough to pred)
-    hl_mask1 = targs == "AI Phe"
-    hl_mask2 = targs == "V570 Per"
+    # Get the target ids & masks for picking out transiting systems & highlighting specific targets
+    targs = include_ids if len(include_ids or []) > 0 else [*targets_config.keys()]
+    targs = np.array(targs) if not isinstance(targs, np.ndarray) else targs
+    targ_count = len(targs)
+    trans_mask = np.array([targets_config.get(t, {}).get("transits", False) for t in targs])
+    hl_mask1 = np.array([targets_config.get(t, {}).get("hl_mask1", False) for t in targs])
+    hl_mask2 = np.array([targets_config.get(t, {}).get("hl_mask2", False) for t in targs])
 
     # To clarify: the estimator publishes a list of what it can predict via its label_names attrib
     # and fit_params may differ; they are those params required for JKTEBOP fitting and reporting.
@@ -249,17 +249,17 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
     lbl_vals = formal_testing.get_labels_for_targets(targets_config, super_params, targs)
 
     # Pre-allocate a structured arrays to hold the predictions and equivalent fit results
-    pred_vals = np.empty((len(targs), ), dtype=[(p, np.dtype(UFloat.dtype)) for p in super_params])
-    fit_vals = np.empty((len(targs), ), dtype=[(p, np.dtype(UFloat.dtype)) for p in super_params])
+    pred_vals = np.empty((targ_count, ), dtype=[(p, np.dtype(UFloat.dtype)) for p in super_params])
+    fit_vals = np.empty((targ_count, ), dtype=[(p, np.dtype(UFloat.dtype)) for p in super_params])
 
     # Pre-allocate the mags feature and equivalent LC from predicted and fitted parameters
-    mags_feats = np.empty((len(targs), mags_bins), dtype=float)
-    pred_feats = np.empty((len(targs), 1001), dtype=float)
-    fit_feats = np.empty((len(targs), 1001), dtype=float)
+    mags_feats = np.empty((targ_count, mags_bins), dtype=float)
+    pred_feats = np.empty((targ_count, 1001), dtype=float)
+    fit_feats = np.empty((targ_count, 1001), dtype=float)
 
     # Finally, we have everything in place to fit our targets and report on the results
     for ix, targ in enumerate(targs):
-        print(f"\n\nProcessing target {ix + 1} of {len(targs)}: {targ}\n" + "-"*40)
+        print(f"\n\nProcessing target {ix + 1} of {targ_count}: {targ}\n" + "-"*40)
         targ_config = targets_config[targ].copy()
         print(fill(targ_config.get("desc", "")) + "\n")
 
@@ -286,7 +286,7 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
             print(f"\nThe Estimator will make {prediction_type} predictions on {targ}",
                   f"with {mc_iterations} MC Dropout iterations" if prediction_type == "mc" else "")
             keras.utils.set_random_seed(DEFAULT_TESTING_SEED)
-            force_seed_on_dropout_layers(estimator)
+            force_seed_on_dropout_layers(estimator, DEFAULT_TESTING_SEED)
             pv = estimator.predict(np.array([mags]), None, mc_iterations)
             predictions_vs_labels_to_table(pv, lbl_vals[ix], [targ])
             pred_vals[ix] = pv if "inc" in pv.dtype.names else append_calculated_inc_predictions(pv)
@@ -318,21 +318,22 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
     if report_dir:
         sub_dir = report_dir / prediction_type
         sub_dir.mkdir(parents=True, exist_ok=True)
-        save_predictions_to_csv(targs, trans_flags, pred_vals, sub_dir / "predictions.csv")
-        save_predictions_to_csv(targs, trans_flags, fit_vals, sub_dir / "fitted-params.csv")
-        save_predictions_to_csv(targs, trans_flags, lbl_vals, sub_dir / "labels.csv")
+        save_predictions_to_csv(targs, trans_mask, pred_vals, sub_dir / "predictions.csv")
+        save_predictions_to_csv(targs, trans_mask, fit_vals, sub_dir / "fitted-params.csv")
+        save_predictions_to_csv(targs, trans_mask, lbl_vals, sub_dir / "labels.csv")
 
         comparison_type = [("labels", "label", lbl_vals)] # type, heading, values
         if comparison_vals is not None:
             comparison_type += [("control", "control", comparison_vals)]
-            save_predictions_to_csv(targs, trans_flags, comparison_vals, sub_dir / "controls.csv")
+            save_predictions_to_csv(targs, trans_mask, comparison_vals, sub_dir / "controls.csv")
+
         sub_reports = [
-            ("All targets (model labels)",          [True]*len(targs),      estimator.label_names),
-            ("\nTransiting systems only",           trans_flags,            estimator.label_names),
-            ("\nNon-transiting systems only",       ~trans_flags,           estimator.label_names),
-            ("\n\n\nAll targets (fitting params)",  [True]*len(targs),      fit_params),
-            ("\nTransiting systems only",           trans_flags,            fit_params),
-            ("\nNon-transiting systems only",       ~trans_flags,           fit_params)]
+            ("All targets (model labels)",          [True]*targ_count,      estimator.label_names),
+            ("\nTransiting systems only",           trans_mask,             estimator.label_names),
+            ("\nNon-transiting systems only",       ~trans_mask,            estimator.label_names),
+            ("\n\n\nAll targets (fitting params)",  [True]*targ_count,      fit_params),
+            ("\nTransiting systems only",           trans_mask,             fit_params),
+            ("\nNon-transiting systems only",       ~trans_mask,            fit_params)]
 
         for comp_type, comp_head, comp_vals in comparison_type:
             # Summarize this set of predictions as plots-vs-label|control and in text table
@@ -341,7 +342,7 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
                 preds_stem = f"predictions-{prediction_type}-vs-{comp_type}"
                 for (source, pnames) in [("model", estimator.label_names), ("fitting", fit_params)]:
                     pnames = [n for n in pnames if n not in ["ecosw", "esinw"]] + ["ecosw", "esinw"]
-                    fig = plots.plot_predictions_vs_labels(pred_vals, comp_vals, trans_flags,
+                    fig = plots.plot_predictions_vs_labels(pred_vals, comp_vals, trans_mask,
                                                            pnames, xlabel_prefix=comp_head,
                                                            hl_mask1=hl_mask1, hl_mask2=hl_mask2)
                     fig.savefig(sub_dir / f"{preds_stem}-{source}.pdf")
@@ -356,7 +357,7 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
             # Summarize this set of fitted params as plots pred-vs-label|control and in text tables
             results_stem = f"fitted-params-from-{prediction_type}-vs-{comp_type}"
             pnames = [n for n in fit_params if n not in ["ecosw", "esinw"]] + ["ecosw","esinw"]
-            fig = plots.plot_predictions_vs_labels(fit_vals, comp_vals, trans_flags, pnames,
+            fig = plots.plot_predictions_vs_labels(fit_vals, comp_vals, trans_mask, pnames,
                                                    xlabel_prefix=comp_head, ylabel_prefix="fitted",
                                                    hl_mask1=hl_mask1, hl_mask2=hl_mask2)
             fig.savefig(sub_dir / f"{results_stem}.pdf")
