@@ -30,7 +30,7 @@ SWAP_IF_DEEPER_SECONDARY = True
 MAX_FRACTIONAL_R = 0.23
 
 DATASET_SIZE = 20000
-FILE_PREFIX = "trainset"
+FILE_PREFIX = "testset"
 dataset_dir = Path("./datasets/synthetic-mist-tess-dataset/")
 dataset_dir.mkdir(parents=True, exist_ok=True)
 
