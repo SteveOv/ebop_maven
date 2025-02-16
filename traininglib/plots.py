@@ -574,9 +574,10 @@ def plot_prediction_boxplot(predictions: Union[np.ndarray[UFloat], List[np.ndarr
     elif len(predictions) > 1:
         predictions += [None] # Effectively adds h-space between param groups when it's skipped over
 
-    # Get those params common to all sets of predictions
-    param_sets = map(set, [p.dtype.names for p in predictions if p is not None])
-    params = list(set.intersection(*param_sets))
+    # Get those params common to all sets of predictions. The intersection will
+    # likely mess up the order so we explicitly restore it from the first set.
+    set_params = [p.dtype.names for p in predictions if p is not None]
+    params = sorted(set.intersection(*map(set, set_params)), key=set_params[0].index)
 
     step_size = len(predictions)
     num_cols = (len(params) * step_size) - int(step_size > 1) # drop final empty col if multiple set
