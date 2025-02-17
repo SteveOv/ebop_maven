@@ -7,6 +7,7 @@ from typing import Union, List, Dict
 from io import TextIOBase, StringIO
 import inspect
 import sys
+import os
 from pathlib import Path
 import re
 from contextlib import redirect_stdout
@@ -904,6 +905,9 @@ if __name__ == "__main__":
     ap.set_defaults(do_fit=True, synth_suffix="", model_files=[None])
     args = ap.parse_args()
 
+    # Ensure we don't use CUDA devices for full testing otherwise the results may not be repeatable
+    os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+
     synth_test_ds_dir = Path(f"./datasets/synthetic-mist-tess-dataset{args.synth_suffix}/")
     test_results_subdir = f"testing{args.synth_suffix}"
 
@@ -935,7 +939,7 @@ if __name__ == "__main__":
                   f"{datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
             print("\nEvaluation test dataset:   ", synth_test_ds_dir)
             print("Results will be written to:", result_dir)
-            print("\nRuntime environment:", sys.prefix.replace("'", ""))
+            print("Runtime environment:       ", sys.prefix.replace("'", ""))
             print(*(f"{lib.__name__} v{lib.__version__}" for lib in [tf, keras]), sep="\n")
             print(f"tensorflow sees {len(tf.config.list_physical_devices('GPU'))} physical GPU(s)")
 
