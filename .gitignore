@@ -173,4 +173,5 @@ cache/
 drop/
 
 # MIST isochrones which should be downloaded from source
+traininglib/data/mist/*.txz
 traininglib/data/mist/MIST*/*.iso
