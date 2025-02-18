@@ -742,6 +742,7 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
                                    selected_param_names: np.ndarray[str]=None,
                                    prediction_head: str="Prediction",
                                    label_head: str="Label",
+                                   error_head: str="Error",
                                    title: str=None,
                                    summary_only: bool=False,
                                    error_bars: bool=False,
@@ -757,6 +758,7 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
     :selected_param_names: a subset of the full list of labels/prediction names to render
     :prediction_head: the text of the prediction row headings (10 chars or less)
     :label_head: the text of the label/comparison row headings (10 chars or less)
+    :error_head: the text of the error/loss row headings (10 chars or less)
     :title: optional title text to write above the table
     :summary_only: omit the body and just report the summary
     :error_bars: include error bars in output
@@ -818,7 +820,7 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
                 in zip(block_headings, labels, predictions, errors, strict=True):
             header_block(block_head)
             horizontal_line("-")
-            for row_head, row_vals in zip([label_head, prediction_head, "Error"],
+            for row_head, row_vals in zip([label_head, prediction_head, error_head],
                                           [b_lbls, b_preds, b_errs]):
                 vals = row_vals[keys].tolist()
                 if row_head == "Error":
