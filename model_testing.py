@@ -184,7 +184,7 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
                 fig = plots.plot_prediction_boxplot([s_errs[s_easy_mask], s_errs[~s_easy_mask]],
                                                     show_fliers="formal" in ds_name, ylabel="Error")
                 fig.savefig(s_dir / f"predictions-{mc_type}-box{suffix}.pdf")
-                fig.clf()
+                plt.close(fig)
 
                 # If we have a very large dataset then adopt a strategy of skipping data in the plot
                 # as it's worthless plotting every one as individual datapoints become meaningless
@@ -194,7 +194,7 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
                                                        plot_params, show_errorbars=show_error_bars,
                                                        hl_mask2=s_easy_mask[sl])
                 fig.savefig(s_dir / f"predictions-{mc_type}-vs-labels{suffix}.pdf")
-                fig.clf()
+                plt.close(fig)
 
 
 def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
@@ -349,6 +349,7 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
                                                            pnames, xlabel_prefix=comp_head,
                                                            hl_mask1=hl_mask1, hl_mask2=hl_mask2)
                     fig.savefig(sub_dir / f"{preds_stem}-{source}.pdf")
+                    plt.close(fig)
 
                 with open(sub_dir / f"{preds_stem}.txt", mode="w", encoding="utf8") as txtf:
                     for (sub_head, mask, rep_names) in sub_reports:
@@ -364,7 +365,7 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
                                                    xlabel_prefix=comp_head, ylabel_prefix="fitted",
                                                    hl_mask1=hl_mask1, hl_mask2=hl_mask2)
             fig.savefig(sub_dir / f"{results_stem}.pdf")
-            plt.close()
+            plt.close(fig)
 
             if not do_control_fit:
                 # Plot out the input feature vs predicted fit vs actual fit for each test system.
@@ -374,7 +375,7 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
                                                         fit_feats[sl], extra_names=(None, None),
                                                         init_ymax=1., extra_yshift=0.2, cols=5)
                     fig.savefig(sub_dir / f"fold-mags-from-{prediction_type}-pt-{ix}.pdf")
-                    plt.close()
+                    plt.close(fig)
 
             with open(sub_dir / f"{results_stem}.txt", "w", encoding="utf8") as txtf:
                 for (sub_head, mask, rep_names) in sub_reports:
