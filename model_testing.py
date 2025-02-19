@@ -3,7 +3,7 @@
 Formal testing of the regression TF Model trained by train_*_estimator.py
 """
 # pylint: disable=too-many-arguments, too-many-locals, no-member, import-error, invalid-name
-from typing import Union, List, Dict
+from typing import Union, List, Dict, Iterable
 from io import TextIOBase, StringIO
 import inspect
 import sys
@@ -357,6 +357,9 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
                             predictions_vs_labels_to_table(pred_vals[mask], comp_vals[mask],
                                                     targs[mask], rep_names, title=sub_head,
                                                     error_bars=prediction_type == "mc", to=txtf)
+                    txtf.write(f"\n\nPrediction vs {comp_type} tabulars\n")
+                    predictions_vs_labels_to_tabular(pred_vals, comp_vals, targs, super_params,
+                                                     label_head=comp_head, to=txtf)
 
             # Summarize this set of fitted params as plots pred-vs-label|control and in text tables
             results_stem = f"fitted-params-from-{prediction_type}-vs-{comp_type}"
@@ -770,14 +773,8 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
     """
     # pylint: disable=too-many-arguments, too-many-locals, too-many-branches
     # We output the params common to the all labels & predictions or those requested
-    if selected_param_names is None:
-        keys = np.array([k for k in labels.dtype.names if k in predictions.dtype.names])
-    elif isinstance(selected_param_names, str):
-        keys = np.array([selected_param_names])
-    else:
-        keys = selected_param_names
-
-    errors = calculate_prediction_errors(predictions, labels, keys)
+    selected_param_names = get_common_param_names(predictions, labels, selected_param_names)
+    errors = calculate_prediction_errors(predictions, labels, selected_param_names)
 
     # Make sure these are iterable; not always the case if we're given a single row
     labels = np.expand_dims(labels, 0) if labels.shape == () else labels
@@ -788,13 +785,13 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
     if print_it:
         to = StringIO()
 
-    line_length = 13 + (11 * len(keys))-1 + 22
+    line_length = 13 + (11 * len(selected_param_names))-1 + 22
     def horizontal_line(char):
         to.write(char*line_length + "\n")
 
     def header_block(header):
         horizontal_line("-")
-        col_heads = np.concatenate([keys, ["MAE", "MSE"]])
+        col_heads = np.concatenate([selected_param_names, ["MAE", "MSE"]])
         to.write(f"{header:<10s} | " + " ".join(f"{h:>10s}" for h in col_heads) + "\n")
 
     num_fmt = f"{{:10.{format_dp:d}f}}"
@@ -825,7 +822,7 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
             horizontal_line("-")
             for row_head, row_vals in zip([label_head, prediction_head, error_head],
                                           [b_lbls, b_preds, b_errs]):
-                vals = row_vals[keys].tolist()
+                vals = row_vals[selected_param_names].tolist()
                 if row_head == "Error":
                     vals = np.concatenate([vals, [np.mean(np.abs(vals)), np.mean(np.square(vals))]])
                 row(row_head, vals)
@@ -833,18 +830,99 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
     if summary_only or len(predictions) > 1:
         # Summary rows for aggregate stats over all of the rows
         horizontal_line("=")
-        key_maes = [np.mean(np.abs(errors[k])) for k in keys]
-        key_mses = [np.mean(np.square(errors[k])) for k in keys]
-        overall_mae = np.mean(np.abs(errors[keys].tolist()))
-        overall_mse = np.mean(np.square(errors[keys].tolist()))
+        key_maes = [np.mean(np.abs(errors[k])) for k in selected_param_names]
+        key_mses = [np.mean(np.square(errors[k])) for k in selected_param_names]
+        overall_mae = np.mean(np.abs(errors[selected_param_names].tolist()))
+        overall_mse = np.mean(np.square(errors[selected_param_names].tolist()))
         row("MAE", np.concatenate([key_maes, [overall_mae]]))
         row("MSE", np.concatenate([key_mses, [None, overall_mse]]))
-
     else:
         horizontal_line("-")
 
     if print_it:
         print(to.getvalue())
+
+
+def predictions_vs_labels_to_tabular(predictions: np.ndarray[UFloat],
+                                     labels: np.ndarray[UFloat],
+                                     target_names: np.ndarray[str]=None,
+                                     selected_param_names: np.ndarray[str]=None,
+                                     prediction_head: str="prediction",
+                                     label_head: str="label",
+                                     error_head: str="error",
+                                     format_dp: int=6,
+                                     to: TextIOBase=None):
+    """
+    Will write out a series of latex tabular blocks for the requested preds/labels/targets
+    giving details of the label, predictions and errors for each of the requested params.
+    Assumes that predictions, labels and target_names are of the same length and order.
+    
+    :predictions: the predictions
+    :labels: the labels or other comparison values
+    :target_names: the names of each of the targets
+    :selected_param_names: a subset of the full list of labels/prediction names to render
+    :prediction_head: the text of the prediction row headings (10 chars or less)
+    :label_head: the text of the label/comparison row headings (10 chars or less)
+    :error_head: the text of the error/loss row headings (10 chars or less)
+    :format_dp: the number of decimal places in numeric output. Set <= 6 to maintain column widths
+    :to: the output to write the table to. Defaults to printing.
+    """
+    # pylint: disable=too-many-arguments, too-many-locals, too-many-branches
+    selected_param_names = get_common_param_names(predictions, labels, selected_param_names)
+    errs = calculate_prediction_errors(predictions, labels, selected_param_names)
+
+    # Make sure these are iterable; not always the case if we're given a single row
+    labels = np.expand_dims(labels, 0) if labels.shape == () else labels
+    predictions = np.expand_dims(predictions, 0) if predictions.shape == () else predictions
+    errs = np.expand_dims(errs, 0) if errs.shape == () else errs
+
+    print_it = not to
+    if print_it:
+        to = StringIO()
+
+    # Some params have these tex commands within the target doc
+    tex_cmd = { "rA_plus_rB": r"\rAplusrB", "bP": r"\bP", "ecosw": r"\ecosw", "esinw": r"\esinw",
+               "inc": r"$i$ (\degr)" }
+    num_fmt = f"{{:{format_dp+3:d}.{format_dp:d}f}}"
+
+    # Generate a new tabular for each target
+    for name, t_lbls, t_preds, t_errs in zip(target_names, labels, predictions, errs, strict=True):
+        to.write(f"\n\n% {prediction_head}s vs {label_head}s for {name}\n")
+        to.write("\\begin{tabular}{cr@{\\,$\\pm$\\,}lr@{\\,$\\pm$\\,}lr@{\\,$\\pm$\\,}l}\n")
+        to.write("\t\\hline\n")
+        to.writelines([f"\tparameter    & \\multicolumn{{2}}{{c}}{{{label_head}}} & ",
+                       f"\\multicolumn{{2}}{{c}}{{{prediction_head}}} & ",
+                       f"\\multicolumn{{2}}{{c}}{{{error_head}}} \\\\ \n"])
+        to.write("\t\\hline\n")
+        for param in selected_param_names:
+            to.write(f"\t{tex_cmd.get(param, f'${param}$'):<12s} ")
+            for val in [t_lbls[param], t_preds[param], t_errs[param]]:
+                nom, err = get_nom(val), get_err(val)
+                if err:
+                    to.write(f"& {num_fmt.format(nom):>12} & {num_fmt.format(err):<12} ")
+                else:
+                    to.write(f"& \\multicolumn{{2}}{{c}}{{{num_fmt.format(nom)}}} ")
+            to.write(" \\\\ \n")
+        to.write("\t\\hline\n")
+        to.write("\\end{tabular}")
+
+    if print_it:
+        print(to.getvalue())
+
+
+def get_common_param_names(predictions: np.ndarray[UFloat],
+                           labels: np.ndarray[UFloat],
+                           selected_param_names: Iterable[str]=None) -> np.ndarray[str]:
+    """ Helper to select those requested param names common to both predictions and labels. """
+    # If empty default to the label names otherwise check what we're given and maintain the order.
+    if selected_param_names is None or len(selected_param_names) == 0:
+        selected_param_names = list(labels.dtype.names)
+    else:
+        if isinstance(selected_param_names, str):
+            selected_param_names = [selected_param_names]
+        selected_param_names = [n for n in selected_param_names if n in labels.dtype.names]
+    return np.array([n for n in selected_param_names if n in predictions.dtype.names])
+
 
 def get_nom(value):
     """ Get the nominal value if the passed value is a UFloat other return value as is """
