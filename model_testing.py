@@ -141,16 +141,16 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
     # Skip some subset tables/plots for formal-test-ds as it's too small for them to be meaningful.
     plot_params = [n for n in estimator.label_names if n not in ["ecosw","esinw"]]+["ecosw","esinw"]
     show_error_bars = mc_iterations > 1
-    for (subset,            s_mask,             do_synth_plot,  do_frml_tbl,    do_frml_plot) in [
-        ("",                [True]*inst_count,          True,       True,       True), # all
-        (" transiting",     tran_mask,                  True,       True,       False),
-        (" non-transiting", ~tran_mask,                 True,       True,       False),
-        (" easier",         easy_mask,                  True,       False,      False),
-        (" harder",         ~easy_mask,                 True,       False,      False),
-        (" easy-trans",     easy_mask & tran_mask,      True,       False,      False),
-        (" easy-non-trans", easy_mask & ~tran_mask,     True,       False,      False),
-        (" hard-trans",     ~easy_mask & tran_mask,     True,       False,      False),
-        (" hard-non-trans", ~easy_mask & ~tran_mask,    True,       False,      False),
+    for (subset,                s_mask,             do_synth_plot,  do_frml_tbl,  do_frml_plot) in [
+        ("",                    [True]*inst_count,          True,       True,       True), # all
+        (" transiting",         tran_mask,                  True,       True,       False),
+        (" non-transiting",     ~tran_mask,                 True,       True,       False),
+        (" easier",             easy_mask,                  True,       False,      False),
+        (" easier transiting",  easy_mask & tran_mask,      False,      False,      False),
+        (" easier non-trans",   easy_mask & ~tran_mask,     False,      False,      False),
+        (" harder",             ~easy_mask,                 True,       False,      False),
+        (" harder transiting",  ~easy_mask & tran_mask,     False,      False,      False),
+        (" harder non-trans",   ~easy_mask & ~tran_mask,    False,      False,      False),
     ]:
         if any(s_mask):
             # Slightly fiddly; each iteration's preds/labels subset is picked out with s_mask.
