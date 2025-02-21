@@ -252,7 +252,7 @@ def write_targets_tabular_file(targets_cfg: dict, targets_tex_file: Path, cite_n
                 "{\\raggedright \\textbf{Notes.} \\\\\n",
 	            "\\emph{Flags:} indicate whether the system shows transits (T), ",
                   "has similar eclipse depths (E), has similar sized components (C) ",
-                  "or shallow eclipses of <0.1 mag \\\\\n",
+                  "or shallow eclipses of <0.1 mag (S) \\\\\n",
                 "\\emph{Reference:}",
                   *[f"{',' if i>1 else ''} ({i}) \\cite{{{r}}}" for i, r in enumerate(ref_list, 1)],
                 ".\\par\n",
