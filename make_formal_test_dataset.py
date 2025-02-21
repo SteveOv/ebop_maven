@@ -206,12 +206,11 @@ def write_targets_tabular_file(targets_cfg: dict, targets_tex_file: Path, cite_n
 
         # Start the tabular and write the header rows
         tex.writelines([
-            "\\begin{tabular}{lrrrrrrrccccl}\n",
+            "\\begin{tabular}{lrrrrrrrcccccl}\n",
             "\\hline\n",
-            " & $r_{\\rm A}+r_{\\rm B}$ & $k$ & $J$ & ",
-                "$e\\cos{\\omega}$ & $e\\sin{\\omega}$ & $i~(\\degr)$ & ",
-                "$L_{\\rm 3}$ & Spectral Type & \\multicolumn{3}{|c|}{Flags} & Reference \\\\ \n",
-            " & & & & & & & & & T & E & C & \\\\ \n",
+            " & & & & & & & & & \\multicolumn{4}{|c|}{Flags} & \\\\ \n",
+            " & $r_{\\rm A}+r_{\\rm B}$ & $k$ & $J$ & $e\\cos{\\omega}$ & $e\\sin{\\omega}$ & ",
+                "$i~(\\degr)$ & $L_{\\rm 3}$ & Spectral Type & T & E & C & S & Reference \\\\ \n",
             "\\hline\n"
         ])
 
@@ -235,6 +234,7 @@ def write_targets_tabular_file(targets_cfg: dict, targets_tex_file: Path, cite_n
                 + ("& \\checkmark " if config.get("transits", False) else "& ") \
                 + ("& \\checkmark " if config.get("eclipses_similar", False) else "& ") \
                 + ("& \\checkmark " if config.get("components_similar", False) else "& ") \
+                + ("& \\checkmark " if config.get("shallow_eclipses", False) else "& ") \
                 + f"& {cite} \\\\ % TESS sectors: {', '.join(f'{s}' for s in sectors)}\n")
 
         # All targets done. Close out the tabular before closing the tex file
@@ -246,8 +246,9 @@ def write_targets_tabular_file(targets_cfg: dict, targets_tex_file: Path, cite_n
                 "\\\\\n",
                 "\\vspace{1ex}\n",
                 "{\\raggedright \\textbf{Notes.} \\\\\n",
-	            "\\emph{Flags:} we indicate whether the system shows transits (T), ",
-                  "has similar eclipse depths (E) or has similar sized components (C) \\\\\n",
+	            "\\emph{Flags:} indicate whether the system shows transits (T), ",
+                  "has similar eclipse depths (E), has similar sized components (C) ",
+                  "or shallow eclipses of <0.1 mag \\\\\n",
                 "\\emph{Reference:}",
                   *[f"{',' if i>1 else ''} ({i}) \\cite{{{r}}}" for i, r in enumerate(ref_list, 1)],
                 ".\\par\n",
