@@ -214,7 +214,8 @@ def write_targets_tabular_file(targets_cfg: dict, targets_tex_file: Path, cite_n
             "\\hline\n"
         ])
 
-        for target, config in targets_cfg.items():
+        num_targs = len(targets_cfg.keys())
+        for ix, (target, config) in enumerate(targets_cfg.items(), start=1):
             sectors = formal_testing.list_sectors_in_target_config(config)
             label = config.get("label", None) or target
             labels = config["labels"] # Mandatory, so error if missing
@@ -235,7 +236,10 @@ def write_targets_tabular_file(targets_cfg: dict, targets_tex_file: Path, cite_n
                 + ("& \\checkmark " if config.get("eclipses_similar", False) else "& ") \
                 + ("& \\checkmark " if config.get("components_similar", False) else "& ") \
                 + ("& \\checkmark " if config.get("shallow_eclipses", False) else "& ") \
-                + f"& {cite} \\\\ % TESS sectors: {', '.join(f'{s}' for s in sectors)}\n")
+                + f"& {cite} \\\\ ")
+            if ix % 5 == 0 and ix != num_targs:
+                tex.write("[3pt] ") # horizontal space every 5th to create a block for readability
+            tex.write(f"% TESS sectors: {', '.join(f'{s}' for s in sectors)}\n")
 
         # All targets done. Close out the tabular before closing the tex file
         tex.write("\\hline\n\\end{tabular}")
