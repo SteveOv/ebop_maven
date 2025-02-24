@@ -192,7 +192,8 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
                 sl = slice(0, None, int(np.ceil(inst_count / 10000)))
                 fig = plots.plot_predictions_vs_labels(s_preds[sl], s_lbls[sl], s_tran_mask[sl],
                                                        plot_params, show_errorbars=show_error_bars,
-                                                       hl_mask2=s_easy_mask[sl])
+                                                       hl_mask2=s_easy_mask[sl],
+                                                       restricted_view=suffix == "")
                 fig.savefig(s_dir / f"predictions-{mc_type}-vs-labels{suffix}.pdf")
                 plt.close(fig)
 

@@ -358,7 +358,8 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
                                xlabel_prefix: str="label",
                                ylabel_prefix: str="predicted",
                                hl_mask1: np.ndarray[bool]=None,
-                               hl_mask2: np.ndarray[bool]=None) -> Figure:
+                               hl_mask2: np.ndarray[bool]=None,
+                               restricted_view: bool=False) -> Figure:
     """
     Will create a plot figure with a grid of axes, one per label, showing the
     predictions vs label values. It is up to calling code to show or save the figure.
@@ -374,6 +375,7 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
     :ylabel_prefix: the prefix text for the predictions/y-axis label
     :hl_mask1: optional mask for targets to be plotted with 1st alternative/highlight marker
     :hl_mask2: optional mask for targets to be plotted with 2nd alternative/highlight marker
+    :restricted_view: if True the plots for k, J & bP will be for restricted range to show detail
     :returns: the Figure
     """
     if labels.shape[0] != predictions.shape[0]:
@@ -429,14 +431,16 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
             pred_vals = unumpy.nominal_values(predictions[param_name])
             pred_sigmas = unumpy.std_devs(predictions[param_name])
 
-            # Plot a diagonal line for exact match
-            dmin, dmax = min(lbl_vals.min(), pred_vals.min()), max(lbl_vals.max(), pred_vals.max()) # pylint: disable=nested-min-max
+            # Set the "view" x & y limits over the data and draw a diagonal line for "exact" match
+            vmin, vmax = min(lbl_vals.min(), pred_vals.min()), max(lbl_vals.max(), pred_vals.max()) # pylint: disable=nested-min-max
             if param_name in ["rA_plus_rB", "k", "J", "bP"]:
-                dmin = min(0, dmin)
-            drange = dmax - dmin
-            dmore = 0.125 * drange
-            diag = (dmin - dmore, dmax + dmore)
-            ax.plot(diag, diag, color=REF_LINE_COLOR, linestyle="--", linewidth=1.0, zorder=-10)
+                vmin = min(0, vmin)
+            if restricted_view and param_name in ["k", "J", "bP"]:
+                vmax = min(vmax, 5) # may cut off extreme insts, but better view of core results
+            vpad = 0.125 * (vmax - vmin)
+            vdiag = (vmin - vpad, vmax + vpad)
+            vrange = max(vdiag) - min(vdiag)
+            ax.plot(vdiag, vdiag, color=REF_LINE_COLOR, linestyle="--", linewidth=1.0, zorder=-10)
 
             if show_errorbars is None:
                 show_errorbars = max(np.abs(pred_sigmas)) > 0
@@ -464,7 +468,7 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
                                     fmt=fmt[fix], ms=ms[fix], alpha=alpha[fix], fillstyle=fs)
 
             param_caption = params[param_name]
-            format_axes(ax, xlim=diag, ylim=diag, xlabel=f"{xlabel_prefix} {param_caption}",
+            format_axes(ax, xlim=vdiag, ylim=vdiag, xlabel=f"{xlabel_prefix} {param_caption}",
                         ylabel=f"{ylabel_prefix} {param_caption}")
 
             # Make sure the plot areas are squared and have similar label areas.
@@ -473,16 +477,17 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
 
             # We want up to 5 tick labels at suitable points across the range of values.
             if param_name == "inc":
-                maj_ticks = np.arange(50, 90.1, 5 if drange < 25 else 10)
+                maj_ticks = np.arange(50, 90.1, 5 if vrange < 25 else 10)
             elif param_name in ["ecosw", "esinw"]:
-                maj_ticks = [-0.4, -0.2, 0, 0.2, 0.4] if drange < 1 else [-0.8, -0.4, 0.0, 0.4, 0.8]
+                maj_ticks = [-0.4, -0.2, 0, 0.2, 0.4] if vrange < 1 else [-0.8, -0.4, 0.0, 0.4, 0.8]
             else:
-                lim = max(diag)
+                # Adapt to the view range and finds a step which will give 4, 5 or 6 ticks.
+                # Suspect logic; may not work universally but it's good enough for current results.
                 for tick_step in [0.1, 0.2, 0.5, 1, 2, 2.5, 5, 10]:
-                    if lim / tick_step < 5:
+                    if vrange / tick_step < 6.5:
                         break
-                maj_ticks = np.arange(0, lim, tick_step)
-            maj_ticks = [t for t in maj_ticks if diag[0] < t < diag[1]]
+                maj_ticks = np.arange(0, max(vdiag), tick_step)
+            maj_ticks = [t for t in maj_ticks if vdiag[0] < t < vdiag[1]]
             ax.set_yticks(maj_ticks, minor=False)
             ax.set_xticks(maj_ticks, minor=False)
         else:
