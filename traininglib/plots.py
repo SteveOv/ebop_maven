@@ -421,7 +421,7 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
         fmt = ["o", "o", "o"]
         c = [PLOT_COLORS[0], PLOT_COLORS[1], PLOT_COLORS[4]]
         ms = [3.0, 3.0, 3.0]
-        alpha = [0.25, 0.50, 0.33]
+        alpha = [0.25, 0.50, 0.75]
 
     print(f"Plotting {inst_count} instances on {rows}x{cols} grid for:", ", ".join(params.keys()))
     for (ax, param_name) in zip_longest(axes.flatten(), params.keys()):
@@ -434,10 +434,12 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
             # Set the "view" x & y limits over the data and draw a diagonal line for "exact" match
             vmin, vmax = min(lbl_vals.min(), pred_vals.min()), max(lbl_vals.max(), pred_vals.max()) # pylint: disable=nested-min-max
             if param_name in ["rA_plus_rB", "k", "J", "bP"]:
-                vmin = min(0, vmin)
+                vmin = min(vmin, 0)
+            if param_name in ["k", "J", "bP"]:
+                vmax = max(1.5, vmax)
             if restricted_view and param_name in ["k", "J", "bP"]:
                 vmax = min(vmax, 5) # may cut off extreme insts, but better view of core results
-            vpad = 0.125 * (vmax - vmin)
+            vpad = 0.075 * (vmax - vmin)
             vdiag = (vmin - vpad, vmax + vpad)
             vrange = max(vdiag) - min(vdiag)
             ax.plot(vdiag, vdiag, color=REF_LINE_COLOR, linestyle="--", linewidth=1.0, zorder=-10)
