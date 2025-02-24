@@ -7,6 +7,7 @@ import hashlib
 from inspect import getsource
 
 import numpy as np
+import matplotlib.pyplot as plt
 
 from deblib import orbital, limb_darkening
 
@@ -177,7 +178,7 @@ if __name__ == "__main__":
                 title=r"TESS LD coefficients v $T_{\rm eff}$ at $Z=0$ (Claret, 2018)",
                 xlabel="linear coefficient", ylabel="quadratic coefficient", legend_loc="best")
         fig.savefig(dataset_dir / "limb_darkening.png", dpi=150)
-        fig.clf()
+        plt.close(fig)
 
         code_file = dataset_dir / "parameter-distributions.txt"
         with code_file.open("w", encoding="utf8") as of:
@@ -203,14 +204,18 @@ if __name__ == "__main__":
                               simulate=False)
 
         # Histograms are generated from the CSV files as they cover params not saved to tfrecord
-        csvs = sorted(dataset_dir.glob(f"**/{FILE_PREFIX}*.csv"))
-        plots.plot_dataset_histograms(csvs, cols=5).savefig(dataset_dir/"train-histogram-full.png")
-        plots.plot_dataset_histograms(csvs, ["rA_plus_rB", "k", "J", "inc", "ecosw", "esinw"],
-                                      cols=2).savefig(dataset_dir/"train-histogram-main.pdf")
+        csv = sorted(dataset_dir.glob(f"**/{FILE_PREFIX}*.csv"))
+        fig = plots.plot_dataset_histograms(csv, cols=5)
+        fig.savefig(dataset_dir / "train-histogram-full.png", dpi=150)
+        plt.close(fig)
+        fig = plots.plot_dataset_histograms(csv, ["rA_plus_rB", "k", "J", "inc", "ecosw", "esinw"],
+                                            cols=2, ignore_outliers=True)
+        fig.savefig(dataset_dir / "train-histogram-main.pdf")
+        plt.close(fig)
 
         # Simple diagnostic plot of the mags feature of a small sample of the instances.
         print("Plotting a sample of the set's mags features")
         dataset_files = sorted(dataset_dir.glob(f"**/training/{FILE_PREFIX}000.tfrecord"))
         fig = plots.plot_dataset_instance_mags_features(dataset_files, cols=5, max_instances=50)
         fig.savefig(dataset_dir / "sample.png", dpi=150)
-        fig.clf()
+        plt.close(fig)

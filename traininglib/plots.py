@@ -74,6 +74,7 @@ def plot_dataset_histograms(csv_files: Iterable[Path],
                             params: List[str]=None,
                             cols: int=3,
                             yscale: str="log",
+                            ignore_outliers: bool=False,
                             **format_kwargs) -> Figure:
     """
     Saves histogram plots to a single figure on a grid of axes. The params will be plotted
@@ -85,6 +86,7 @@ def plot_dataset_histograms(csv_files: Iterable[Path],
     if None. In either case params will only be plotted if they are present in the csv files.
     :cols: the width of the axes grid (the rows automatically adjust)
     :yscale: set to "linear" or "log" to control the y-axis scale
+    :ignore_outliers: reduce the x limits to ignore outliers and concentrate on bulk of insts
     :format_kwargs: kwargs to be passed on to format_axes()
     :returns: the figure
     """
@@ -106,15 +108,19 @@ def plot_dataset_histograms(csv_files: Iterable[Path],
 
         for (ax, field) in zip_longest(axes.flatten(), param_specs):
             if field:
-                bins, label = param_specs[field]
+                num_bins, label = param_specs[field]
                 data = [row.get(field, None) for row in read_from_csvs(csv_files)]
+                if ignore_outliers and field in ["rA_plus_rB", "k", "J", "qphot"]:
+                    bins = np.linspace(min(data), min(max(data), 50), num_bins)
+                else:
+                    bins = np.linspace(min(data), max(data), num_bins)
 
-                print(f"Plotting histogram for {len(data):,} {field} values.")
-                ax.hist(data, bins=bins, color=PLOT_COLORS[0], label=field)
+                (counts, _, _) = ax.hist(data, bins=bins, color=PLOT_COLORS[0], label=field)
                 ax.set_xlabel(label)
                 ax.tick_params(axis="both", which="both", direction="in",
                                top=True, bottom=True, left=True, right=True)
                 ax.set_yscale(yscale)
+                print(f"Plotted histogram for {int(sum(counts)):,} {field} values.")
             else:
                 ax.axis("off") # remove the unused ax
             format_axes(ax, **format_kwargs)
