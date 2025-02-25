@@ -75,8 +75,8 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
         estimator = Estimator(estimator)
     mc_type = "mc" if mc_iterations > 1 else "nonmc"
 
-    # Need these for any filtering on extra_features; we use the names to find the Tensor indices
-    all_feat_names = deb_example.get_all_extra_feature_names()
+    # For any direct interaction with extra_features; maps the Tensor indices to the name
+    feat_ixs = { name: ix for (ix, name) in enumerate(deb_example.get_all_extra_feature_names()) }
 
     # The estimator publishes a list of what it predicts whereas fit_params are those required for
     # JKTEBOP fitting and reporting. We need to work with the superset of both for our reporting.
@@ -91,17 +91,13 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
 
     # The label values here will have zero uncertainties as we only store the nominals in the ds.
     # We request all possible feature values here as we may want them for reporting masks below.
-    ids, mags_vals, feat_vals, lbl_vals = datasets.read_dataset(tfrecord_files,
+    ids, mags_vals, all_feat_vals, lbl_vals = datasets.read_dataset(tfrecord_files,
                                                 mags_bins=estimator.mags_feature_bins,
                                                 mags_wrap_phase=estimator.mags_feature_wrap_phase,
                                                 labels=super_params,
                                                 identifiers=include_ids,
                                                 scale_labels=scaled,
                                                 filter_func=None)
-
-    # Mask for subsets of the instances we expect the model to be able to predict well.
-    easy_mask = (feat_vals[..., all_feat_names.index("depthP")] > 0.1) \
-              & (feat_vals[..., all_feat_names.index("depthS")] > 0.1)
 
     # Sets the random seed on numpy, keras's backend library (here tensorflow) and python
     keras.utils.set_random_seed(DEFAULT_TESTING_SEED)
@@ -112,13 +108,13 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
     print(f"The Estimator is making predictions on the {inst_count} test instance(s)",
           f"with {mc_iterations} iteration(s) (iterations >1 triggers MC Dropout algorithm).")
     max_batch_size = 1000
-    feat_vals = feat_vals[..., [all_feat_names.index(k) for k in estimator.extra_feature_names]]
+    ext_feat_vals = all_feat_vals[..., [feat_ixs[k] for k in estimator.extra_feature_names]]
     pred_vals = np.empty((inst_count, ),
                          dtype=[(n, np.dtype(UFloat.dtype)) for n in estimator.label_names])
     force_seed_on_dropout_layers(estimator, DEFAULT_TESTING_SEED)
     for ix in np.arange(0, inst_count, max_batch_size):
         pv = estimator.predict(mags_feature=mags_vals[ix : ix+max_batch_size],
-                               extra_features=feat_vals[ix : ix+max_batch_size],
+                               extra_features=ext_feat_vals[ix : ix+max_batch_size],
                                iterations=mc_iterations,
                                unscale=not scaled)
         pred_vals[ix : ix+len(pv)] = pv
@@ -137,29 +133,33 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
     argvs = [lbl_vals[p] / (deb_example.labels_and_scales[p] if scaled else 1) for p in pnames]
     tran_mask = will_transit(*argvs)
 
+    # Mask for those instances with shallow eclipses, which are expected to be harder to predict
+    shallow_mask = (all_feat_vals[..., feat_ixs["depthP"]] < 0.1) \
+                 | (all_feat_vals[..., feat_ixs["depthS"]] < 0.1)
+
     # Now report. If the labels are read from the dataset/tfrecord they will have no uncertainties.
     # Skip some subset tables/plots for formal-test-ds as it's too small for them to be meaningful.
     plot_params = [n for n in estimator.label_names if n not in ["ecosw","esinw"]]+["ecosw","esinw"]
     show_error_bars = mc_iterations > 1
-    for (subset,                s_mask,             do_synth_plot,  do_frml_tbl,  do_frml_plot) in [
-        ("",                    [True]*inst_count,          True,       True,       True), # all
-        (" transiting",         tran_mask,                  True,       True,       False),
-        (" non-transiting",     ~tran_mask,                 True,       True,       False),
-        (" easier",             easy_mask,                  True,       False,      False),
-        (" easier transiting",  easy_mask & tran_mask,      False,      False,      False),
-        (" easier non-trans",   easy_mask & ~tran_mask,     False,      False,      False),
-        (" harder",             ~easy_mask,                 True,       False,      False),
-        (" harder transiting",  ~easy_mask & tran_mask,     False,      False,      False),
-        (" harder non-trans",   ~easy_mask & ~tran_mask,    False,      False,      False),
+    for (subset,                s_mask,                 synth_tbl, synth_plt,  frml_tbl,  frml_plt) in [ # pylint: disable=line-too-long
+        ("",                    [True]*inst_count,          True,   True,       True,       True),
+        (" transiting",         tran_mask,                  True,   True,       True,       False),
+        (" non-transiting",     ~tran_mask,                 True,   True,       True,       False),
+        (" deeper",             ~shallow_mask,              True,   True,       False,      False),
+        (" deeper transiting",  ~shallow_mask & tran_mask,  True,   False,      False,      False),
+        (" deeper non-trans",   ~shallow_mask & ~tran_mask, True,   False,      False,      False),
+        (" shallow",            shallow_mask,               True,   True,       False,      False),
+        (" shallow transiting", shallow_mask & tran_mask,   True,   False,      False,      False),
+        (" shallow non-trans",  shallow_mask & ~tran_mask,  True,   False,      False,      False),
     ]:
         if any(s_mask):
             # Slightly fiddly; each iteration's preds/labels subset is picked out with s_mask.
-            # We may further subdivide the subset using the trans and/or easy masks and these
-            # masks will requiring masking with s_mask before they're used on the subset.
+            # We may further subdivide the subset using the trans and/or feature masks and these
+            # masks will themselves require masking with s_mask before they're used on the subset.
             s_preds, s_lbls = pred_vals[s_mask], lbl_vals[s_mask]
-            s_tran_mask, s_easy_mask = tran_mask[s_mask], easy_mask[s_mask]
+            s_tran_mask, s_shall_mask = tran_mask[s_mask], shallow_mask[s_mask]
             suffix = subset.replace(' ','-')
-            if (("synth" in ds_name) or ("formal" in ds_name and do_frml_tbl)):
+            if (("synth" in ds_name and synth_tbl) or ("formal" in ds_name and frml_tbl)):
                 print(f"\nSummary of the estimator predictions for {sum(s_mask)}{subset} system(s)")
                 predictions_vs_labels_to_table(s_preds, s_lbls, summary_only=True,
                                                selected_param_names=estimator.label_names,
@@ -172,16 +172,16 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
                                                    error_bars=show_error_bars)
 
             # Use pdf as usually smaller file size than eps and also supports transparency/alpha.
-            if report_dir and (("synth" in ds_name and do_synth_plot) \
-                                or ("formal" in ds_name and do_frml_plot)):
+            if report_dir and \
+                    (("synth" in ds_name and synth_plt) or ("formal" in ds_name and frml_plt)):
                 s_dir = report_dir / ds_name / mc_type
                 s_dir.mkdir(parents=True, exist_ok=True)
                 save_predictions_to_csv(ids, s_tran_mask, s_preds, s_dir/f"predictions{suffix}.csv")
                 save_predictions_to_csv(ids, s_tran_mask, s_lbls, s_dir/f"labels{suffix}.csv")
 
-                # Box plot of the error distributions for each predicted params
+                # Box plot of the error distributions for each predicted params as deeper & shallow
                 s_errs = calculate_prediction_errors(s_preds[plot_params], s_lbls[plot_params])
-                fig = plots.plot_prediction_boxplot([s_errs[s_easy_mask], s_errs[~s_easy_mask]],
+                fig = plots.plot_prediction_boxplot([s_errs[~s_shall_mask], s_errs[s_shall_mask]],
                                                     show_fliers="formal" in ds_name, ylabel="Error")
                 fig.savefig(s_dir / f"predictions-{mc_type}-box{suffix}.pdf")
                 plt.close(fig)
@@ -192,7 +192,7 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
                 sl = slice(0, None, int(np.ceil(inst_count / 10000)))
                 fig = plots.plot_predictions_vs_labels(s_preds[sl], s_lbls[sl], s_tran_mask[sl],
                                                        plot_params, show_errorbars=show_error_bars,
-                                                       hl_mask2=s_easy_mask[sl],
+                                                       hl_mask2=~s_shall_mask[sl],
                                                        restricted_view=suffix == "")
                 fig.savefig(s_dir / f"predictions-{mc_type}-vs-labels{suffix}.pdf")
                 plt.close(fig)
