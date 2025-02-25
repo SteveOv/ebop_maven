@@ -146,6 +146,10 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
     shallow_mask = (all_feat_vals[..., feat_ixs["depthP"]] < 0.1) \
                  | (all_feat_vals[..., feat_ixs["depthS"]] < 0.1)
 
+    # Masks for analysing other possible causes of poor predictions
+    high_ecc_mask = np.sqrt(lbl_vals["ecosw"]**2 + lbl_vals["esinw"]**2) > .75
+    column_k_mask = ~shallow_mask & (lbl_vals["k"] < 0.8) & (pred_vals["k"] > 1.5)
+
     # Now report. If the labels are read from the dataset/tfrecord they will have no uncertainties.
     # Skip some subset tables/plots for formal-test-ds as it's too small for them to be meaningful.
     plot_params = [n for n in estimator.label_names if n not in ["ecosw","esinw"]]+["ecosw","esinw"]
@@ -155,12 +159,15 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
         ("",                    [True]*inst_count,          True,   True,       False,      False,      True,       True),
         (" transiting",         tran_mask,                  True,   True,       False,      False,      True,       False),
         (" non-transiting",     ~tran_mask,                 True,   True,       False,      False,      True,       False),
-        (" deeper",             ~shallow_mask,              True,   True,       False,      False,      False,      False),
+        (" deeper",             ~shallow_mask,              True,   False,      False,      False,      False,      False),
         (" deeper transiting",  ~shallow_mask & tran_mask,  True,   False,      False,      False,      False,      False),
         (" deeper non-trans",   ~shallow_mask & ~tran_mask, True,   False,      False,      False,      False,      False),
-        (" shallow",            shallow_mask,               True,   True,       False,      False,      False,      False),
+        (" shallow",            shallow_mask,               True,   False,      False,      False,      False,      False),
         (" shallow transiting", shallow_mask & tran_mask,   True,   False,      False,      False,      False,      False),
         (" shallow non-trans",  shallow_mask & ~tran_mask,  True,   False,      False,      False,      False,      False),
+        # Diagnostics: for specific regions of poor predictions
+        (" highly eccentric",   high_ecc_mask,              True,   True,       False,      False,      False,      False),
+        (" column k preds",     column_k_mask,              False,  True,       True,       False,      False,      False),
     ]:
         if any(s_mask):
             # Slightly fiddly; each iteration's preds/labels subset is picked out with s_mask.
