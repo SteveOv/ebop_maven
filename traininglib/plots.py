@@ -429,7 +429,8 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
         ms = [3.0, 3.0, 3.0]
         alpha = [0.25, 0.50, 0.75]
 
-    print(f"Plotting {inst_count} instances on {rows}x{cols} grid for:", ", ".join(params.keys()))
+    print(f"Plotting {ylabel_prefix}-v-{xlabel_prefix} figure for {inst_count} instances",
+          f"on a {rows}x{cols} grid for:", ", ".join(params.keys()))
     for (ax, param_name) in zip_longest(axes.flatten(), params.keys()):
         if param_name:
             lbl_vals = unumpy.nominal_values(labels[param_name])
@@ -443,6 +444,8 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
                 vmin = min(vmin, 0)
             if param_name in ["k", "J", "bP"]:
                 vmax = max(1.5, vmax)
+            elif param_name in ["rA_plus_rB"]:
+                vmax = max(0.1, vmax)
             if restricted_view and param_name in ["k", "J", "bP"]:
                 vmax = min(vmax, 5) # may cut off extreme insts, but better view of core results
             vpad = 0.075 * (vmax - vmin)
