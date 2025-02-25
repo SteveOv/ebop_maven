@@ -151,6 +151,7 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
     column_k_mask = ~shallow_mask & (lbl_vals["k"] < 0.8) & (pred_vals["k"] > 1.5)
     bulge_k_mask = ~column_k_mask & (np.abs(error_vals["k"]) > 0.1) \
                     & (lbl_vals["k"] > 0.5) & (lbl_vals["k"] < 1.5)
+    drop_sumr_mask = (lbl_vals["rA_plus_rB"] > 0.4) & (np.abs(error_vals["rA_plus_rB"]) > 0.01)
 
     # Now report. If the labels are read from the dataset/tfrecord they will have no uncertainties.
     # Skip some subset tables/plots for formal-test-ds as it's too small for them to be meaningful.
@@ -172,6 +173,7 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
         (" column k preds",     column_k_mask,              False,  True,       True,       False,      False,      False),
         (" bulge k transiting", bulge_k_mask & tran_mask,   False,  True,       False,      True,       False,      False),
         (" bulge k non-trans",  bulge_k_mask & ~tran_mask,  False,  True,       False,      True,       False,      False),
+        (" droop rA plus rB",   drop_sumr_mask,             False,  True,       False,      True,       False,      False),
     ]:
         if any(s_mask):
             # Slightly fiddly; each iteration's preds/labels subset is picked out with s_mask.
