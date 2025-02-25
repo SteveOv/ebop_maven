@@ -31,28 +31,38 @@ def write_to_csv(file_name: Path,
         dw.writerows(param_sets)
 
 
-def read_from_csv(file_name: Path) -> Generator[dict, any, None]:
+def read_from_csv(file_name: Path,
+                  ids: Iterable[str]=None) -> Generator[dict, any, None]:
     """
     Reads a list of parameter set dictionaries from a csv file,
     as created by write_param_sets_to_csv()
 
     :file_name: the full name of the csv file containing the parameter sets
+    :ids: a list of ids to filter on; will return all rows in not set
     :returns: a generator for the dictionaries
     """
-    with open(file_name, mode="r", encoding="UTF8") as pf:
-        yield from csv.DictReader(pf, quotechar="'", quoting=csv.QUOTE_NONNUMERIC)
+    if ids is None or len(ids) == 0:
+        with open(file_name, mode="r", encoding="UTF8") as pf:
+            yield from csv.DictReader(pf, quotechar="'", quoting=csv.QUOTE_NONNUMERIC)
+    else:
+        with open(file_name, mode="r", encoding="UTF8") as pf:
+            for row in csv.DictReader(pf, quotechar="'", quoting=csv.QUOTE_NONNUMERIC):
+                if row["id"] in ids:
+                    yield row
 
 
-def read_from_csvs(file_names: Iterable[Path]) -> Generator[dict, any, None]:
+def read_from_csvs(file_names: Iterable[Path],
+                   ids: Iterable[str]=None) -> Generator[dict, any, None]:
     """
     Reads a list of parameter set dictionaries from across all of the csv files,
     as created by write_param_sets_to_csv()
 
     :file_names: the full names of the csv files containing the parameter sets
+    :ids: a list of ids to filter on; will return all rows in not set
     :returns: a generator for the dictionaries
     """
     for file_name in file_names:
-        yield from read_from_csv(file_name)
+        yield from read_from_csv(file_name, ids)
 
 
 def get_field_names_from_csvs(file_names: Iterable[Path]) -> List[str]:

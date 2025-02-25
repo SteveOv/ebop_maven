@@ -72,6 +72,7 @@ ROW_HEIGHT_SQUARE = COL_WIDTH
 
 def plot_dataset_histograms(csv_files: Iterable[Path],
                             params: List[str]=None,
+                            ids: List[str]=None,
                             cols: int=3,
                             yscale: str="log",
                             ignore_outliers: bool=False,
@@ -84,6 +85,7 @@ def plot_dataset_histograms(csv_files: Iterable[Path],
     :csv_files: a list of the dataset's csv files
     :params: the list of parameters to plot (in this order), or those in all_histogram_params
     if None. In either case params will only be plotted if they are present in the csv files.
+    :ids: optional list of ids to filter on
     :cols: the width of the axes grid (the rows automatically adjust)
     :yscale: set to "linear" or "log" to control the y-axis scale
     :ignore_outliers: reduce the x limits to ignore outliers and concentrate on bulk of insts
@@ -109,7 +111,7 @@ def plot_dataset_histograms(csv_files: Iterable[Path],
         for (ax, field) in zip_longest(axes.flatten(), param_specs):
             if field:
                 num_bins, label = param_specs[field]
-                data = [row.get(field, None) for row in read_from_csvs(csv_files)]
+                data = [row.get(field, None) for row in read_from_csvs(csv_files, ids)]
                 if ignore_outliers and field in ["rA_plus_rB", "k", "J", "qphot"]:
                     bins = np.linspace(min(data), min(max(data), 50), num_bins)
                 else:
