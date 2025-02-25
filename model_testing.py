@@ -220,7 +220,8 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
                 plt.close(fig)
 
             if r_dir and ("synth" in ds_name and synth_hist) and ds_csv_files:
-                fig = plots.plot_dataset_histograms(ds_csv_files, ids=s_ids, yscale="linear",cols=5)
+                prms = [p for p in plots.all_histogram_params if p not in ["MA", "MB", "RA", "RB"]]
+                fig = plots.plot_dataset_histograms(ds_csv_files, prms, s_ids, 5, "linear")
                 fig.savefig(r_dir / f"histogram-{mc_type}-vs-labels{suffix}.pdf")
                 plt.close(fig)
 
