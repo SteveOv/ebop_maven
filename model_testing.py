@@ -84,10 +84,16 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
 
     print(f"Looking for the test dataset in '{test_dataset_dir}'...", end="")
     ds_name = test_dataset_dir.name
+    ds_csv_files = sorted(test_dataset_dir.glob("**/*.csv"))
     tfrecord_files = sorted(test_dataset_dir.glob("**/*.tfrecord"))
     if len(tfrecord_files) == 0:
         raise ValueError(f"No tfrecord files under {test_dataset_dir}. Please make this dataset.")
     print(f"found {len(tfrecord_files)} file(s).")
+
+    if report_dir:
+        (r_dir := report_dir / ds_name / mc_type).mkdir(parents=True, exist_ok=True)
+    else:
+        r_dir = None
 
     # The label values here will have zero uncertainties as we only store the nominals in the ds.
     # We request all possible feature values here as we may want them for reporting masks below.
@@ -128,6 +134,9 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
         print("The predictions & labels are scaled with the following values:\n\t" +
             ", ".join(f"{k} = {deb_example.labels_and_scales.get(k, 1):.3f}" for k in super_params))
 
+    print(f"Calculating the prediction errors on {inst_count} instances")
+    error_vals = calculate_prediction_errors(pred_vals, lbl_vals, super_params)
+
     # Work out which are the transiting systems so we can break down the reporting
     pnames = list(inspect.signature(will_transit).parameters)
     argvs = [lbl_vals[p] / (deb_example.labels_and_scales[p] if scaled else 1) for p in pnames]
@@ -141,23 +150,24 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
     # Skip some subset tables/plots for formal-test-ds as it's too small for them to be meaningful.
     plot_params = [n for n in estimator.label_names if n not in ["ecosw","esinw"]]+["ecosw","esinw"]
     show_error_bars = mc_iterations > 1
-    for (subset,                s_mask,                 synth_tbl, synth_plt,  frml_tbl,  frml_plt) in [ # pylint: disable=line-too-long
-        ("",                    [True]*inst_count,          True,   True,       True,       True),
-        (" transiting",         tran_mask,                  True,   True,       True,       False),
-        (" non-transiting",     ~tran_mask,                 True,   True,       True,       False),
-        (" deeper",             ~shallow_mask,              True,   True,       False,      False),
-        (" deeper transiting",  ~shallow_mask & tran_mask,  True,   False,      False,      False),
-        (" deeper non-trans",   ~shallow_mask & ~tran_mask, True,   False,      False,      False),
-        (" shallow",            shallow_mask,               True,   True,       False,      False),
-        (" shallow transiting", shallow_mask & tran_mask,   True,   False,      False,      False),
-        (" shallow non-trans",  shallow_mask & ~tran_mask,  True,   False,      False,      False),
+    # pylint: disable=line-too-long
+    for (subset,                s_mask,                 synth_tbl, synth_plt, synth_sample, synth_hist, frml_tbl, frml_plt) in [
+        ("",                    [True]*inst_count,          True,   True,       False,      False,      True,       True),
+        (" transiting",         tran_mask,                  True,   True,       False,      False,      True,       False),
+        (" non-transiting",     ~tran_mask,                 True,   True,       False,      False,      True,       False),
+        (" deeper",             ~shallow_mask,              True,   True,       False,      False,      False,      False),
+        (" deeper transiting",  ~shallow_mask & tran_mask,  True,   False,      False,      False,      False,      False),
+        (" deeper non-trans",   ~shallow_mask & ~tran_mask, True,   False,      False,      False,      False,      False),
+        (" shallow",            shallow_mask,               True,   True,       False,      False,      False,      False),
+        (" shallow transiting", shallow_mask & tran_mask,   True,   False,      False,      False,      False,      False),
+        (" shallow non-trans",  shallow_mask & ~tran_mask,  True,   False,      False,      False,      False,      False),
     ]:
         if any(s_mask):
             # Slightly fiddly; each iteration's preds/labels subset is picked out with s_mask.
             # We may further subdivide the subset using the trans and/or feature masks and these
             # masks will themselves require masking with s_mask before they're used on the subset.
-            s_preds, s_lbls = pred_vals[s_mask], lbl_vals[s_mask]
-            s_tran_mask, s_shall_mask = tran_mask[s_mask], shallow_mask[s_mask]
+            s_preds, s_lbls, s_errs = pred_vals[s_mask], lbl_vals[s_mask], error_vals[s_mask]
+            s_ids, s_tran_mask, s_shall_mask = ids[s_mask], tran_mask[s_mask], shallow_mask[s_mask]
             suffix = subset.replace(' ','-')
             if (("synth" in ds_name and synth_tbl) or ("formal" in ds_name and frml_tbl)):
                 print(f"\nSummary of the estimator predictions for {sum(s_mask)}{subset} system(s)")
@@ -172,18 +182,16 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
                                                    error_bars=show_error_bars)
 
             # Use pdf as usually smaller file size than eps and also supports transparency/alpha.
-            if report_dir and \
-                    (("synth" in ds_name and synth_plt) or ("formal" in ds_name and frml_plt)):
-                s_dir = report_dir / ds_name / mc_type
-                s_dir.mkdir(parents=True, exist_ok=True)
-                save_predictions_to_csv(ids, s_tran_mask, s_preds, s_dir/f"predictions{suffix}.csv")
-                save_predictions_to_csv(ids, s_tran_mask, s_lbls, s_dir/f"labels{suffix}.csv")
+            if r_dir and (("synth" in ds_name and synth_plt) or ("formal" in ds_name and frml_plt)):
+                save_predictions_to_csv(ids, s_tran_mask, s_preds, r_dir/f"predictions{suffix}.csv")
+                save_predictions_to_csv(ids, s_tran_mask, s_lbls, r_dir/f"labels{suffix}.csv")
+                save_predictions_to_csv(ids, s_tran_mask, s_errs, r_dir/f"errors{suffix}.csv")
 
-                # Box plot of the error distributions for each predicted params as deeper & shallow
-                s_errs = calculate_prediction_errors(s_preds[plot_params], s_lbls[plot_params])
-                fig = plots.plot_prediction_boxplot([s_errs[~s_shall_mask], s_errs[s_shall_mask]],
-                                                    show_fliers="formal" in ds_name, ylabel="Error")
-                fig.savefig(s_dir / f"predictions-{mc_type}-box{suffix}.pdf")
+                # Box plot of error distributions for each predicted params as deeper & shallow sets
+                errs_list = [s_errs[~s_shall_mask][plot_params], s_errs[s_shall_mask][plot_params]]
+                fig = plots.plot_prediction_boxplot(errs_list, show_fliers="formal" in ds_name,
+                                                    ylabel="Error")
+                fig.savefig(r_dir / f"predictions-{mc_type}-box{suffix}.pdf")
                 plt.close(fig)
 
                 # If we have a very large dataset then adopt a strategy of skipping data in the plot
@@ -194,7 +202,19 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
                                                        plot_params, show_errorbars=show_error_bars,
                                                        hl_mask2=~s_shall_mask[sl],
                                                        restricted_view=suffix == "")
-                fig.savefig(s_dir / f"predictions-{mc_type}-vs-labels{suffix}.pdf")
+                fig.savefig(r_dir / f"predictions-{mc_type}-vs-labels{suffix}.pdf")
+                plt.close(fig)
+
+            if r_dir and ("synth" in ds_name and synth_sample):
+                names = [i+(" (T)" if s_tran_mask[ix] else "") for ix, i in enumerate(s_ids[:50])]
+                fig = plots.plot_folded_lightcurves(mags_vals[s_mask][:50], names,
+                                                    mags_wrap_phase=1.0, cols=5)
+                fig.savefig(r_dir / f"samples-{mc_type}-vs-labels{suffix}.pdf")
+                plt.close(fig)
+
+            if r_dir and ("synth" in ds_name and synth_hist) and ds_csv_files:
+                fig = plots.plot_dataset_histograms(ds_csv_files, ids=s_ids, yscale="linear",cols=5)
+                fig.savefig(r_dir / f"histogram-{mc_type}-vs-labels{suffix}.pdf")
                 plt.close(fig)
 
 
