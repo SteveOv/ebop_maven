@@ -183,9 +183,9 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
 
             # Use pdf as usually smaller file size than eps and also supports transparency/alpha.
             if r_dir and (("synth" in ds_name and synth_plt) or ("formal" in ds_name and frml_plt)):
-                save_predictions_to_csv(ids, s_tran_mask, s_preds, r_dir/f"predictions{suffix}.csv")
-                save_predictions_to_csv(ids, s_tran_mask, s_lbls, r_dir/f"labels{suffix}.csv")
-                save_predictions_to_csv(ids, s_tran_mask, s_errs, r_dir/f"errors{suffix}.csv")
+                save_predictions_to_csv(ids, s_tran_mask, s_preds, r_dir / f"preds{suffix}.csv")
+                save_predictions_to_csv(ids, s_tran_mask, s_lbls, r_dir / f"labels{suffix}.csv")
+                save_predictions_to_csv(ids, s_tran_mask, s_errs, r_dir / f"errors{suffix}.csv")
 
                 # Box plot of error distributions for each predicted params as deeper & shallow sets
                 errs_list = [s_errs[~s_shall_mask][plot_params], s_errs[s_shall_mask][plot_params]]
