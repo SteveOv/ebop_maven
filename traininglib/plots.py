@@ -122,7 +122,11 @@ def plot_dataset_histograms(csv_files: Iterable[Path],
                 ax.tick_params(axis="both", which="both", direction="in",
                                top=True, bottom=True, left=True, right=True)
                 ax.set_yscale(yscale)
-                print(f"Plotted histogram for {int(sum(counts)):,} {field} values.")
+
+                inst_count, hist_count = len(data), sum(counts)
+                if inst_count != hist_count:
+                    print(f"Histogram for {field} shows {hist_count} or {inst_count} instances",
+                          "with some ouliers ignored" if ignore_outliers else "")
             else:
                 ax.axis("off") # remove the unused ax
             format_axes(ax, **format_kwargs)

@@ -158,17 +158,17 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
     show_error_bars = mc_iterations > 1
     # pylint: disable=line-too-long
     for (subset,                s_mask,                 synth_tbl, synth_plt, synth_sample, synth_hist, frml_tbl, frml_plt) in [
-        ("",                    [True]*inst_count,          True,   True,       False,      False,      True,       True),
-        (" transiting",         tran_mask,                  True,   True,       False,      False,      True,       False),
-        (" non-transiting",     ~tran_mask,                 True,   True,       False,      False,      True,       False),
-        (" deeper",             ~shallow_mask,              True,   False,      False,      False,      False,      False),
-        (" deeper transiting",  ~shallow_mask & tran_mask,  True,   False,      False,      False,      False,      False),
-        (" deeper non-trans",   ~shallow_mask & ~tran_mask, True,   False,      False,      False,      False,      False),
-        (" shallow",            shallow_mask,               True,   False,      False,      False,      False,      False),
-        (" shallow transiting", shallow_mask & tran_mask,   True,   False,      False,      False,      False,      False),
-        (" shallow non-trans",  shallow_mask & ~tran_mask,  True,   False,      False,      False,      False,      False),
+        ("",                    [True]*inst_count,          True,   True,       False,      True,       True,       True),
+        (" transiting",         tran_mask,                  True,   True,       False,      True,       True,       False),
+        (" non-transiting",     ~tran_mask,                 True,   True,       False,      True,       True,       False),
+        (" deeper",             ~shallow_mask,              True,   False,      False,      True,       False,      False),
+        (" deeper transiting",  ~shallow_mask & tran_mask,  True,   False,      False,      True,       False,      False),
+        (" deeper non-trans",   ~shallow_mask & ~tran_mask, True,   False,      False,      True,       False,      False),
+        (" shallow",            shallow_mask,               True,   False,      False,      True,       False,      False),
+        (" shallow transiting", shallow_mask & tran_mask,   True,   False,      False,      True,       False,      False),
+        (" shallow non-trans",  shallow_mask & ~tran_mask,  True,   False,      False,      True,       False,      False),
         # Diagnostics: for specific regions of poor predictions
-        (" highly eccentric",   high_ecc_mask,              True,   True,       False,      False,      False,      False),
+        (" highly eccentric",   high_ecc_mask,              True,   True,       False,      True,       False,      False),
         (" column k preds",     column_k_mask,              False,  True,       True,       False,      False,      False),
         (" bulge k transiting", bulge_k_mask & tran_mask,   False,  True,       False,      True,       False,      False),
         (" bulge k non-trans",  bulge_k_mask & ~tran_mask,  False,  True,       False,      True,       False,      False),
@@ -226,7 +226,9 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
 
             if r_dir and ("synth" in ds_name and synth_hist) and ds_csv_files:
                 prms = [p for p in plots.all_histogram_params if p not in ["MA", "MB", "RA", "RB"]]
-                fig = plots.plot_dataset_histograms(ds_csv_files, prms, s_ids, 5, "linear")
+                fig = plots.plot_dataset_histograms(ds_csv_files, prms, cols=5,
+                                                    yscale="log" if s_count > 1000 else "linear",
+                                                    ids=None if s_count == inst_count else s_ids)
                 fig.savefig(r_dir / f"histogram-{mc_type}-vs-labels{suffix}.pdf")
                 plt.close(fig)
 
