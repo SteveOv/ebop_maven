@@ -82,7 +82,7 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
     # JKTEBOP fitting and reporting. We need to work with the superset of both for our reporting.
     super_params = estimator.label_names + [n for n in fit_params if n not in estimator.label_names]
 
-    print(f"Looking for the test dataset in '{test_dataset_dir}'...", end="")
+    print(f"\nLooking for the test dataset in '{test_dataset_dir}'...", end="")
     ds_name = test_dataset_dir.name
     ds_csv_files = sorted(test_dataset_dir.glob("**/*.csv"))
     tfrecord_files = sorted(test_dataset_dir.glob("**/*.tfrecord"))
@@ -111,7 +111,7 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
     # Make all predictions, returned as a structured array of shape (#insts, #labels) & dtype=UFloat
     # Manually batch large datasets in case the model is memory constrained (i.e.: running on a GPU)
     inst_count = len(ids)
-    print(f"The Estimator is making predictions on the {inst_count} test instance(s)",
+    print(f"\nThe Estimator is making predictions on the {inst_count} test instance(s)",
           f"with {mc_iterations} iteration(s) (iterations >1 triggers MC Dropout algorithm).")
     max_batch_size = 1000
     ext_feat_vals = all_feat_vals[..., [feat_ixs[k] for k in estimator.extra_feature_names]]
@@ -134,7 +134,7 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
         print("The predictions & labels are scaled with the following values:\n\t" +
             ", ".join(f"{k} = {deb_example.labels_and_scales.get(k, 1):.3f}" for k in super_params))
 
-    print(f"Calculating the prediction errors on {inst_count} instances")
+    print(f"\nCalculating the prediction errors on {inst_count} instances")
     error_vals = calculate_prediction_errors(pred_vals, lbl_vals, super_params)
 
     # Work out which are the transiting systems so we can break down the reporting
@@ -153,8 +153,7 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
                     & (lbl_vals["k"] > 0.5) & (lbl_vals["k"] < 1.5)
     drop_sumr_mask = (lbl_vals["rA_plus_rB"] > 0.4) & (np.abs(error_vals["rA_plus_rB"]) > 0.01)
 
-    # Now report. If the labels are read from the dataset/tfrecord they will have no uncertainties.
-    # Skip some subset tables/plots for formal-test-ds as it's too small for them to be meaningful.
+    # Skip some reports/plots if ds is formal-test-ds which is too small for them to be meaningful.
     plot_params = [n for n in estimator.label_names if n not in ["ecosw","esinw"]]+["ecosw","esinw"]
     show_error_bars = mc_iterations > 1
     # pylint: disable=line-too-long
@@ -176,14 +175,15 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
         (" droop rA plus rB",   drop_sumr_mask,             False,  True,       False,      True,       False,      False),
     ]:
         if any(s_mask):
-            # Slightly fiddly; each iteration's preds/labels subset is picked out with s_mask.
-            # We may further subdivide the subset using the trans and/or feature masks and these
-            # masks will themselves require masking with s_mask before they're used on the subset.
+            # Each subset's preds/labels is picked out with s_mask. We may further subdivide it with
+            # trans and/or "feature" masks which will also require masking with s_mask before use.
             s_preds, s_lbls, s_errs = pred_vals[s_mask], lbl_vals[s_mask], error_vals[s_mask]
             s_ids, s_tran_mask, s_shall_mask = ids[s_mask], tran_mask[s_mask], shallow_mask[s_mask]
-            suffix = subset.replace(' ','-')
+            s_count, suffix = len(s_ids), subset.replace(' ','-')
+            print(f"\nEvaluating {mc_type} predictions for {s_count}{subset} instance(s)")
+
             if (("synth" in ds_name and synth_tbl) or ("formal" in ds_name and frml_tbl)):
-                print(f"\nSummary of the estimator predictions for {sum(s_mask)}{subset} system(s)")
+                print("Summary of the estimator predictions for model params")
                 predictions_vs_labels_to_table(s_preds, s_lbls, summary_only=True,
                                                selected_param_names=estimator.label_names,
                                                error_bars=show_error_bars)
@@ -207,10 +207,9 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
                 fig.savefig(r_dir / f"predictions-{mc_type}-box{suffix}.pdf")
                 plt.close(fig)
 
-                # If we have a very large dataset then adopt a strategy of skipping data in the plot
-                # as it's worthless plotting every one as individual datapoints become meaningless
-                # with the plot area being small. This will help keep the file size under control.
-                sl = slice(0, None, int(np.ceil(inst_count / 10000)))
+                # If ds is v. large use a strategy of skipping datapoints as it's not worth plotting
+                # every one, as they become meaningless in small plot area. Helps reduce file size.
+                sl = slice(0, None, int(np.ceil(s_count / 10000)))
                 fig = plots.plot_predictions_vs_labels(s_preds[sl], s_lbls[sl], s_tran_mask[sl],
                                                        plot_params, show_errorbars=show_error_bars,
                                                        hl_mask2=~s_shall_mask[sl],
