@@ -118,7 +118,9 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
     pred_vals = np.empty((inst_count, ),
                          dtype=[(n, np.dtype(UFloat.dtype)) for n in estimator.label_names])
     force_seed_on_dropout_layers(estimator, DEFAULT_TESTING_SEED)
-    for ix in np.arange(0, inst_count, max_batch_size):
+    for batch, ix in enumerate(np.arange(0, inst_count, max_batch_size), start=1):
+        if max_batch_size < inst_count:
+            print(f"Predicting batch {batch} of {int(np.ceil(inst_count / max_batch_size))}")
         pv = estimator.predict(mags_feature=mags_vals[ix : ix+max_batch_size],
                                extra_features=ext_feat_vals[ix : ix+max_batch_size],
                                iterations=mc_iterations,
