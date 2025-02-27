@@ -53,7 +53,9 @@ all_histogram_params = {
     "MA":           (100, r"$M_{\rm A}~(\text{M}_{\odot})$"),
     "MB":           (100, r"$M_{\rm B}~(\text{M}_{\odot})$"),
     "snr":          (100, r"$S/N$"),
-    "apparent_mag": (100, r"apparent magnitude (mag)")
+    "apparent_mag": (100, r"apparent magnitude (mag)"),
+    "depthP":       (100, r"primary eclipse depth (mag)"),
+    "depthS":       (100, r"secondary eclipse depth (mag)"),
 }
 
 # Colours to use to ensure consistency across plots.
