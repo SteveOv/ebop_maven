@@ -1019,11 +1019,13 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Runs formal testing on trained model files.")
     ap.add_argument("-nf", "--no-fit", dest="do_fit", action="store_false", required=False,
                     help="optionally suppress the fit tests")
+    ap.add_argument("-mc", "--mc-synth", dest="do_mc_synth", action="store_true", required=False,
+                    help="optionally perform an MC Dropout evaluation on the synth-test-ds")
     ap.add_argument("-ss", "--synth-suffix", dest="synth_suffix", type=str, required=False,
                     help="optional suffix of /synthetic-mist-test-dataset{SYNTH_SUFFIX}/ directory")
     ap.add_argument(dest="model_files", type=Path, nargs="*", help="The model file(s) to test.")
     # We use a None in model_files as indication to pull in the default model under ebop_maven/data
-    ap.set_defaults(do_fit=True, synth_suffix="", model_files=[None])
+    ap.set_defaults(do_fit=True, do_mc_synth=False, synth_suffix="", model_files=[None])
     args = ap.parse_args()
 
     # Ensure we don't use CUDA devices for full testing otherwise the results may not be repeatable
@@ -1065,14 +1067,15 @@ if __name__ == "__main__":
             print(f"tensorflow sees {len(tf.config.list_physical_devices('GPU'))} physical GPU(s)")
 
             # Report on the basic performance of the model/Estimator predictions vs labels
-            for pred_type, iters, dataset_dir, targs in [
+            eval_reports = [
                     ("nonmc",   1,      synth_test_ds_dir,          None),
-                    # Resource hog & non-essential; takes ~0.5 h on i7 CPU and may not fit in GPU
-                    #("mc",      1000,   synth_mist_test_ds_dir,     None),
-
                     ("nonmc",   1,      FORMAL_TEST_DATASET_DIR,    formal_targs),
                     ("mc",      1000,   FORMAL_TEST_DATASET_DIR,    formal_targs),
-            ]:
+            ]
+            if args.do_mc_synth:
+                # Resource hog & non-essential; predictions take ~0.5 h on CPU & may not fit in GPU
+                eval_reports.insert(1, ("mc", 1000, synth_test_ds_dir, None))
+            for pred_type, iters, dataset_dir, targs in eval_reports:
                 print(f"\nEvaluating the model's {pred_type} estimates (iters={iters})",
                       f"on {dataset_dir.name}\n" + "="*80)
                 evaluate_model_against_dataset(model_file, iters, targs,
