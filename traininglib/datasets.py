@@ -247,8 +247,16 @@ def make_dataset_file(inst_count: int,
                     # Optionally roll the phase folded mags based on the indicated phase shift
                     phase_shift = params.get("phase_shift", None)
                     if phase_shift:
-                        shift = int(len(model_data) * phase_shift)
-                        model_data["delta_mag"] = np.roll(model_data["delta_mag"], shift)
+                        # Restrict any shift to prevent it moving either eclipse into a no-go zone,
+                        # (phase <0.05 or >0.95) when LC is centred on midpoint. Cannot fix extreme
+                        # cases where eclipses already there (phiS > 0.9) but don't create more.
+                        max_abs_phase_shift = max(0, (1.0 - phiS) / 2 - 0.05)
+                        if abs(phase_shift) >= max_abs_phase_shift:
+                            phase_shift *= max_abs_phase_shift / abs(phase_shift)
+                            params["phase_shift"] = phase_shift
+                        if phase_shift:
+                            shift = int(len(model_data) * phase_shift)
+                            model_data["delta_mag"] = np.roll(model_data["delta_mag"], shift)
 
                     # Optionally add a y-shift up/down to offset the mags' zero point
                     mag_shift = params.get("mag_shift", None)
