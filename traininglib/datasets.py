@@ -218,8 +218,8 @@ def make_dataset_file(inst_count: int,
                     ixS = np.round(len(model_data) * phiS).astype(int)
                     ixS_range = slice(max(0, ixS-25), min(ixS+25, len(model_data)-1,))
                     ixS = ixS_range.start + np.argmax(model_data["delta_mag"][ixS_range])
-                    depthS = params.setdefault("depthS", model_data[ixS]["delta_mag"])
                     depthP = params.setdefault("depthP", model_data[0]["delta_mag"])
+                    depthS = params.setdefault("depthS", model_data[ixS]["delta_mag"])
 
                     # Give the caller the option to reject now we have more eclipse information
                     is_usable = check_func(**params)
