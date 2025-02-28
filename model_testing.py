@@ -150,7 +150,7 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
 
     # Masks for analysing other possible causes of poor predictions
     high_ecc_mask = np.sqrt(lbl_vals["ecosw"]**2 + lbl_vals["esinw"]**2) > .75
-    column_k_mask = ~shallow_mask & (lbl_vals["k"] < 0.8) & (pred_vals["k"] > 1.5)
+    column_k_mask = (lbl_vals["k"] < 0.8) & (pred_vals["k"] > 1.5)
     very_low_k_mask = (lbl_vals["k"] > 2.5) & ((pred_vals["k"] < 2.0) | (error_vals["k"] > 1.5))
     bulge_k_mask = ~column_k_mask & (np.abs(error_vals["k"]) > 0.1) \
                     & (lbl_vals["k"] > 0.5) & (lbl_vals["k"] < 1.5)
