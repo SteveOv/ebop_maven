@@ -173,7 +173,7 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
         # Diagnostics: for specific regions of poor predictions
         (" highly eccentric",   high_ecc_mask,              True,   True,       False,      True,       False,      False),
         (" column k preds",     column_k_mask,              False,  False,      True,       False,      False,      False),
-        (" very low k preds",   very_low_k_mask,            False,  False,      False,      True,       False,      False),
+        (" very low k preds",   very_low_k_mask,            False,  True,       False,      True,       False,      False),
         (" bulge k transiting", bulge_k_mask & tran_mask,   False,  False,      True,       True,       False,      False),
         (" bulge k non-trans",  bulge_k_mask & ~tran_mask,  False,  False,      True,       True,       False,      False),
         (" droop rA plus rB",   drop_sumr_mask,             False,  False,      False,      True,       False,      False),
