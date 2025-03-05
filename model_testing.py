@@ -148,14 +148,18 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
     shallow_mask = (all_feat_vals[..., feat_ixs["depthP"]] < 0.1) \
                  | (all_feat_vals[..., feat_ixs["depthS"]] < 0.1)
 
+    v_deep_mask = (all_feat_vals[..., feat_ixs["depthP"]] >= 0.25) \
+                   & (all_feat_vals[..., feat_ixs["depthS"]] >= 0.25)
+
     # Masks for analysing other possible causes of poor predictions
     high_ecc_mask = np.sqrt(lbl_vals["ecosw"]**2 + lbl_vals["esinw"]**2) > .75
     esinw_below_zero = lbl_vals["esinw"] < 0
     column_k_mask = (lbl_vals["k"] < 0.8) & (pred_vals["k"] > 1.8)
     very_low_k_mask = (lbl_vals["k"] > 2.5) & ((pred_vals["k"] < 2.0) | (error_vals["k"] > 1.5))
-    bulge_k_mask = ~column_k_mask & (np.abs(error_vals["k"]) > 0.1) \
-                    & (lbl_vals["k"] > 0.5) & (lbl_vals["k"] < 1.5)
-    drop_sumr_mask = (lbl_vals["rA_plus_rB"] > 0.4) & (np.abs(error_vals["rA_plus_rB"]) > 0.01)
+    bulge_k_mask = ~column_k_mask & (np.abs(error_vals["k"]) > 0.25) \
+                    & (lbl_vals["k"] > 0.3) & (lbl_vals["k"] < 1.8) \
+                    & (pred_vals["k"] > 0.5) & (pred_vals["k"] < 1.5)
+    droop_sumr_mask = (lbl_vals["rA_plus_rB"] > 0.4) & (np.abs(error_vals["rA_plus_rB"]) > 0.01)
 
     # Skip some reports/plots if ds is formal-test-ds which is too small for them to be meaningful.
     plot_params = [n for n in estimator.label_names if n not in ["ecosw","esinw"]]+["ecosw","esinw"]
@@ -177,9 +181,12 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
         (" esinw < zero",       esinw_below_zero,           False,  False,      False,      True,       False,      False),
         (" esinw >= zero",      ~esinw_below_zero,          False,  False,      False,      True,       False,      False),
         # Diagnostics: problem regions of poor predictions
-        (" droop rA plus rB",   drop_sumr_mask,             False,  False,      False,      True,       False,      False),
-        (" bulge k transiting", bulge_k_mask & tran_mask,   False,  False,      True,       True,       False,      False),
+        (" droop rA plus rB",   droop_sumr_mask,            False,  False,      True,       True,       False,      False),
+        (" bulge k transiting", bulge_k_mask & tran_mask,   False,  True,       True,       True,       False,      False),
         (" bulge k non-trans",  bulge_k_mask & ~tran_mask,  False,  False,      True,       True,       False,      False),
+        (" bulge k shallow",    bulge_k_mask & shallow_mask,False,  True,       False,      False,      False,      False),
+        (" bulge k deep",       bulge_k_mask &~shallow_mask,False,  False,      False,      True,       False,      False),
+        (" bulge k very deep",  bulge_k_mask& v_deep_mask,  False,  True,       True,       False,      False,      False),
         (" column k preds",     column_k_mask,              False,  False,      True,       False,      False,      False),
         (" very low k preds",   very_low_k_mask,            False,  True,       False,      True,       False,      False),
     ]:
