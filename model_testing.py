@@ -159,6 +159,7 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
     # Skip some reports/plots if ds is formal-test-ds which is too small for them to be meaningful.
     plot_params = [n for n in estimator.label_names if n not in ["ecosw","esinw"]]+["ecosw","esinw"]
     show_error_bars = mc_iterations > 1
+    table_ix = 0
     # pylint: disable=line-too-long
     for (subset,                s_mask,                 synth_tbl, synth_plt, synth_sample, synth_hist, frml_tbl, frml_plt) in [
         ("",                    [True]*inst_count,          True,   True,       False,      True,       True,       True),
@@ -187,13 +188,15 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
             print(f"\nEvaluating {mc_type} predictions for {s_count}{subset} instance(s)")
 
             if (("synth" in ds_name and synth_tbl) or ("formal" in ds_name and frml_tbl)):
-                print("Summary of the estimator predictions for model params")
+                table_ix += 1
+                print(f"Table {table_ix}: Summary of the estimator predictions for model params")
                 predictions_vs_labels_to_table(s_preds, s_lbls, summary_only=True,
                                                selected_param_names=estimator.label_names,
                                                error_bars=show_error_bars)
 
                 if set(fit_params) != set(estimator.label_names):
-                    print("...and of the corresponding fitting input params derived from them")
+                    table_ix += 1
+                    print(f"Table {table_ix}: ...and of the fitting input params derived from them")
                     predictions_vs_labels_to_table(s_preds, s_lbls, summary_only=True,
                                                    selected_param_names=fit_params,
                                                    error_bars=show_error_bars)
