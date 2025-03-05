@@ -225,7 +225,8 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
                 plt.close(fig)
 
             if r_dir and ("synth" in ds_name and synth_sample):
-                names = [i+(" (T)" if s_tran_mask[ix] else "") for ix, i in enumerate(s_ids[:50])]
+                names = [i + " (" + ("Sh" if s else "Dp") + (";Tr" if t else "") + ")"
+                         for i, s, t in zip(s_ids[:50], s_shall_mask[:50], s_tran_mask[:50])]
                 fig = plots.plot_folded_lightcurves(mags_vals[s_mask][:50], names,
                                                     mags_wrap_phase=1.0, cols=5)
                 fig.savefig(r_dir / f"samples-{mc_type}-vs-labels{suffix}.pdf")
