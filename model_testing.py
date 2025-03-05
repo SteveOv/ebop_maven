@@ -177,11 +177,11 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
         (" esinw < zero",       esinw_below_zero,           False,  False,      False,      True,       False,      False),
         (" esinw >= zero",      ~esinw_below_zero,          False,  False,      False,      True,       False,      False),
         # Diagnostics: problem regions of poor predictions
-        (" column k preds",     column_k_mask,              False,  False,      True,       False,      False,      False),
-        (" very low k preds",   very_low_k_mask,            False,  True,       False,      True,       False,      False),
+        (" droop rA plus rB",   drop_sumr_mask,             False,  False,      False,      True,       False,      False),
         (" bulge k transiting", bulge_k_mask & tran_mask,   False,  False,      True,       True,       False,      False),
         (" bulge k non-trans",  bulge_k_mask & ~tran_mask,  False,  False,      True,       True,       False,      False),
-        (" droop rA plus rB",   drop_sumr_mask,             False,  False,      False,      True,       False,      False),
+        (" column k preds",     column_k_mask,              False,  False,      True,       False,      False,      False),
+        (" very low k preds",   very_low_k_mask,            False,  True,       False,      True,       False,      False),
     ]:
         if any(s_mask):
             # Each subset's preds/labels is picked out with s_mask. We may further subdivide it with
