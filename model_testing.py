@@ -150,7 +150,8 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
 
     # Masks for analysing other possible causes of poor predictions
     high_ecc_mask = np.sqrt(lbl_vals["ecosw"]**2 + lbl_vals["esinw"]**2) > .75
-    column_k_mask = (lbl_vals["k"] < 0.8) & (pred_vals["k"] > 1.5)
+    esinw_below_zero = lbl_vals["esinw"] < 0
+    column_k_mask = (lbl_vals["k"] < 0.8) & (pred_vals["k"] > 1.8)
     very_low_k_mask = (lbl_vals["k"] > 2.5) & ((pred_vals["k"] < 2.0) | (error_vals["k"] > 1.5))
     bulge_k_mask = ~column_k_mask & (np.abs(error_vals["k"]) > 0.1) \
                     & (lbl_vals["k"] > 0.5) & (lbl_vals["k"] < 1.5)
@@ -171,8 +172,11 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
         (" shallow",            shallow_mask,               True,   True,       False,      True,       False,      False),
         (" shallow transiting", shallow_mask & tran_mask,   True,   False,      False,      True,       False,      False),
         (" shallow non-trans",  shallow_mask & ~tran_mask,  True,   False,      False,      True,       False,      False),
-        # Diagnostics: for specific regions of poor predictions
+        # Diagnostics: for specific regions or params of interest
         (" highly eccentric",   high_ecc_mask,              True,   True,       False,      True,       False,      False),
+        (" esinw < zero",       esinw_below_zero,           False,  False,      False,      True,       False,      False),
+        (" esinw >= zero",      ~esinw_below_zero,          False,  False,      False,      True,       False,      False),
+        # Diagnostics: problem regions of poor predictions
         (" column k preds",     column_k_mask,              False,  False,      True,       False,      False,      False),
         (" very low k preds",   very_low_k_mask,            False,  True,       False,      True,       False,      False),
         (" bulge k transiting", bulge_k_mask & tran_mask,   False,  False,      True,       True,       False,      False),
