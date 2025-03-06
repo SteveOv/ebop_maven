@@ -373,7 +373,7 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
                                ylabel_prefix: str="predicted",
                                hl_mask1: np.ndarray[bool]=None,
                                hl_mask2: np.ndarray[bool]=None,
-                               restricted_view: bool=False) -> Figure:
+                               fixed_viewport: bool=False) -> Figure:
     """
     Will create a plot figure with a grid of axes, one per label, showing the
     predictions vs label values. It is up to calling code to show or save the figure.
@@ -389,7 +389,7 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
     :ylabel_prefix: the prefix text for the predictions/y-axis label
     :hl_mask1: optional mask for targets to be plotted with 1st alternative/highlight marker
     :hl_mask2: optional mask for targets to be plotted with 2nd alternative/highlight marker
-    :restricted_view: if True the plots for k, J & bP will be for restricted range to show detail
+    :fixed_viewport: if True the plots for k, J & bP will have a fixed view to show detail
     :returns: the Figure
     """
     if labels.shape[0] != predictions.shape[0]:
@@ -448,13 +448,13 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
 
             # Set the "view" x & y limits over the data and draw a diagonal line for "exact" match
             vmin, vmax = min(lbl_vals.min(), pred_vals.min()), max(lbl_vals.max(), pred_vals.max()) # pylint: disable=nested-min-max
-            if param_name in ["rA_plus_rB", "k", "J", "bP"]:
+            if fixed_viewport and param_name in ["rA_plus_rB", "k", "J", "bP"]:
                 vmin = min(vmin, 0)
             if param_name in ["k", "J", "bP"]:
                 vmax = max(1.5, vmax)
             elif param_name in ["rA_plus_rB"]:
                 vmax = max(0.1, vmax)
-            if restricted_view and param_name in ["k", "J", "bP"]:
+            if fixed_viewport and param_name in ["k", "J", "bP"]:
                 vmax = min(vmax, 5) # may cut off extreme insts, but better view of core results
             vpad = 0.075 * (vmax - vmin)
             vdiag = (vmin - vpad, vmax + vpad)

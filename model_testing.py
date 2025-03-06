@@ -231,7 +231,7 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
                 fig = plots.plot_predictions_vs_labels(s_preds[sl], s_lbls[sl], s_tran_mask[sl],
                                                        plot_params, show_errorbars=show_error_bars,
                                                        hl_mask2=~s_shall_mask[sl],
-                                                       restricted_view=suffix == "")
+                                                       fixed_viewport=subset == "")
                 fig.savefig(r_dir / f"predictions-{mc_type}-vs-labels{suffix}.pdf")
                 plt.close(fig)
 
