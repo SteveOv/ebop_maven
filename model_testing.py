@@ -201,7 +201,7 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
             # trans and/or "feature" masks which will also require masking with s_mask before use.
             s_preds, s_lbls, s_errs = pred_vals[s_mask], lbl_vals[s_mask], error_vals[s_mask]
             s_ids, s_tran_mask, s_shall_mask = ids[s_mask], tran_mask[s_mask], shallow_mask[s_mask]
-            s_count, suffix = len(s_ids), subset.lower().replace(' ','-')
+            s_count, suffix = len(s_ids), re.sub(r'[^\w\d]', '-', subset.lower())
             print(f"\nEvaluating {mc_type} predictions for {s_count}{subset} instance(s)")
 
             if (("synth" in ds_name and synth_tbl) or ("formal" in ds_name and frml_tbl)):
