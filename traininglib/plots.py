@@ -448,14 +448,18 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
 
             # Set the "view" x & y limits over the data and draw a diagonal line for "exact" match
             vmin, vmax = min(lbl_vals.min(), pred_vals.min()), max(lbl_vals.max(), pred_vals.max()) # pylint: disable=nested-min-max
-            if fixed_viewport and param_name in ["rA_plus_rB", "k", "J", "bP"]:
-                vmin = min(vmin, 0)
-            if param_name in ["k", "J", "bP"]:
-                vmax = max(1.5, vmax)
-            elif param_name in ["rA_plus_rB"]:
-                vmax = max(0.1, vmax)
-            if fixed_viewport and param_name in ["k", "J", "bP"]:
-                vmax = min(vmax, 5) # may cut off extreme insts, but better view of core results
+            if fixed_viewport: # may cut off extreme insts, but better view of core results
+                if param_name in ["rA_plus_rB", "k", "J", "bP"]:
+                    vmin = 0
+                if param_name in ["k", "J", "bP"]:
+                    vmax = 5
+                elif param_name in ["rA_plus_rB"]:
+                    vmax = 0.45
+            else:
+                if param_name in ["k", "J", "bP"]:
+                    vmax = max(1.5, vmax)
+                elif param_name in ["rA_plus_rB"]:
+                    vmax = max(0.1, vmax)
             vpad = 0.075 * (vmax - vmin)
             vdiag = (vmin - vpad, vmax + vpad)
             vrange = max(vdiag) - min(vdiag)
