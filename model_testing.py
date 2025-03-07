@@ -151,20 +151,19 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
 
     # Mask for those instances with shallow eclipses, which are expected to be harder to predict
     shallow_mask = np.min([feat_vals["depthP"], feat_vals["depthS"]], axis=0) < 0.1
-    v_deep_mask = np.min([feat_vals["depthP"], feat_vals["depthS"]], axis=0) >= 0.25
 
     # Masks for analysing predictions on specific types
     high_ecc_mask = np.sqrt(lbl_vals["ecosw"]**2 + lbl_vals["esinw"]**2) > 0.75
     sim_eclipse_mask = (np.abs(feat_vals["depthP"] - feat_vals["depthS"]) < 0.05) \
                         & (np.abs(1.0 - feat_vals["dS_over_dP"]) < 0.1)
     esinw_neg_mask = lbl_vals["esinw"] < 0
+    v_deep_mask = np.min([feat_vals["depthP"], feat_vals["depthS"]], axis=0) >= 0.25
 
     # Specific problem areas
     column_k_mask = (lbl_vals["k"] < 0.8) & (pred_vals["k"] > 1.8)
     very_low_k_mask = (lbl_vals["k"] > 2.5) & ((pred_vals["k"] < 2.0) | (error_vals["k"] > 1.5))
-    bulge_k_mask = ~column_k_mask & (np.abs(error_vals["k"]) > 0.25) \
-                    & (lbl_vals["k"] > 0.3) & (lbl_vals["k"] < 1.8) \
-                    & (pred_vals["k"] > 0.5) & (pred_vals["k"] < 1.5)
+    bulge_k_mask = ~column_k_mask & (lbl_vals["k"] > 0.3) & (lbl_vals["k"] < 2.0) \
+                & (pred_vals["k"] > 0.3) & (pred_vals["k"] < 1.5) & (np.abs(error_vals["k"]) > 0.25)
     droop_sumr_mask = (lbl_vals["rA_plus_rB"] > 0.4) & (np.abs(error_vals["rA_plus_rB"]) > 0.01)
 
     # Skip some reports/plots if ds is formal-test-ds which is too small for them to be meaningful.
@@ -185,14 +184,14 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
         # Diagnostics: for specific regions or params of interest
         (" highly eccentric",   high_ecc_mask,              True,   True,       False,      True,       False,      False),
         (" similar eclipses",   sim_eclipse_mask,           True,   True,       False,      False,      False,      False),
+        (" very deep",          v_deep_mask,                True,   True,       False,      False,      False,      False),
         (" esinw < zero",       esinw_neg_mask,             False,  False,      False,      True,       False,      False),
         # Diagnostics: problem regions of poor predictions
         (" droop rA plus rB",   droop_sumr_mask,            False,  False,      True,       True,       False,      False),
-        (" bulge k transiting", bulge_k_mask & tran_mask,   False,  True,       True,       True,       False,      False),
-        (" bulge k non-trans",  bulge_k_mask & ~tran_mask,  False,  False,      True,       True,       False,      False),
+        (" bulge k",            bulge_k_mask,               True,   True,       False,      True,       False,      False),
+        (" bulge k non-trans",  bulge_k_mask & ~tran_mask,  False,  False,      False,      False,      False,      False),
         (" bulge k shallow",    bulge_k_mask & shallow_mask,False,  True,       False,      False,      False,      False),
-        (" bulge k deep",       bulge_k_mask &~shallow_mask,False,  False,      False,      True,       False,      False),
-        (" bulge k very deep",  bulge_k_mask& v_deep_mask,  False,  True,       True,       False,      False,      False),
+        (" bulge k mod shallow",bulge_k_mask & ~v_deep_mask,True,   True,       False,      False,      False,      False),
         (" column k preds",     column_k_mask,              False,  False,      True,       False,      False,      False),
         (" very low k preds",   very_low_k_mask,            False,  True,       False,      True,       False,      False),
     ]:
@@ -234,7 +233,7 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
                 # If ds is v. large use a strategy of skipping datapoints as it's not worth plotting
                 # every one, as they become meaningless in small plot area. Helps reduce file size.
                 sl = slice(0, None, int(np.ceil(s_count / 10000)))
-                fixed_viewport = subset == "" or "similar eclipses" in subset
+                fixed_viewport = not any(term in subset for term in ["droop", "column k", "low k"])
                 fig = plots.plot_predictions_vs_labels(s_preds[sl], s_lbls[sl], s_tran_mask[sl],
                                                        plot_params, show_errorbars=show_error_bars,
                                                        hl_mask2=~s_shall_mask[sl],
