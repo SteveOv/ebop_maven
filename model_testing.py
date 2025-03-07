@@ -75,9 +75,6 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
         estimator = Estimator(estimator)
     mc_type = "mc" if mc_iterations > 1 else "nonmc"
 
-    # For any direct interaction with extra_features; maps the Tensor indices to the name
-    feat_ixs = { name: ix for (ix, name) in enumerate(deb_example.get_all_extra_feature_names()) }
-
     # The estimator publishes a list of what it predicts whereas fit_params are those required for
     # JKTEBOP fitting and reporting. We need to work with the superset of both for our reporting.
     super_params = estimator.label_names + [n for n in fit_params if n not in estimator.label_names]
@@ -96,14 +93,18 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
         r_dir = None
 
     # The label values here will have zero uncertainties as we only store the nominals in the ds.
-    # We request all possible feature values here as we may want them for reporting masks below.
-    ids, mags_vals, all_feat_vals, lbl_vals = datasets.read_dataset(tfrecord_files,
+    # The labels returned as structured array, the rest are simple arrays as expected by predict().
+    # We request all possible feature values as we may want them for filter masks below (for which
+    # we convert to a structured array) and for predict() we extract just the expected field values.
+    ids, mags_vals, feat_vals, lbl_vals = datasets.read_dataset(tfrecord_files,
                                                 mags_bins=estimator.mags_feature_bins,
                                                 mags_wrap_phase=estimator.mags_feature_wrap_phase,
                                                 labels=super_params,
                                                 identifiers=include_ids,
                                                 scale_labels=scaled,
                                                 filter_func=None)
+    feat_vals = np.squeeze(feat_vals.view([(n, np.float32)
+                                          for n in deb_example.get_all_extra_feature_names()]))
 
     # Sets the random seed on numpy, keras's backend library (here tensorflow) and python
     keras.utils.set_random_seed(DEFAULT_TESTING_SEED)
@@ -114,7 +115,11 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
     print(f"\nThe Estimator is making predictions on the {inst_count} test instance(s)",
           f"with {mc_iterations} iteration(s) (iterations >1 triggers MC Dropout algorithm).")
     max_batch_size = 1000
-    ext_feat_vals = all_feat_vals[..., [feat_ixs[k] for k in estimator.extra_feature_names]]
+    if len(estimator.extra_feature_names or []): # Extract the extra features the estimator expects
+        ext_feat_vals = np.swapaxes(np.array([feat_vals[n] for n in estimator.extra_feature_names],
+                                             np.float32), 0, 1)
+    else:
+        ext_feat_vals = np.empty(shape=(inst_count, 0), dtype=np.float32)
     pred_vals = np.empty((inst_count, ),
                          dtype=[(n, np.dtype(UFloat.dtype)) for n in estimator.label_names])
     force_seed_on_dropout_layers(estimator, DEFAULT_TESTING_SEED)
@@ -145,15 +150,14 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
     tran_mask = will_transit(*argvs)
 
     # Mask for those instances with shallow eclipses, which are expected to be harder to predict
-    shallow_mask = (all_feat_vals[..., feat_ixs["depthP"]] < 0.1) \
-                 | (all_feat_vals[..., feat_ixs["depthS"]] < 0.1)
+    shallow_mask = np.min([feat_vals["depthP"], feat_vals["depthS"]], axis=0) < 0.1
+    v_deep_mask = np.min([feat_vals["depthP"], feat_vals["depthS"]], axis=0) >= 0.25
 
-    v_deep_mask = (all_feat_vals[..., feat_ixs["depthP"]] >= 0.25) \
-                   & (all_feat_vals[..., feat_ixs["depthS"]] >= 0.25)
-
-    # Masks for analysing other possible causes of poor predictions
-    high_ecc_mask = np.sqrt(lbl_vals["ecosw"]**2 + lbl_vals["esinw"]**2) > .75
+    # Masks for analysing predictions on specific types
+    high_ecc_mask = np.sqrt(lbl_vals["ecosw"]**2 + lbl_vals["esinw"]**2) > 0.75
     esinw_below_zero = lbl_vals["esinw"] < 0
+
+    # Specific problem areas
     column_k_mask = (lbl_vals["k"] < 0.8) & (pred_vals["k"] > 1.8)
     very_low_k_mask = (lbl_vals["k"] > 2.5) & ((pred_vals["k"] < 2.0) | (error_vals["k"] > 1.5))
     bulge_k_mask = ~column_k_mask & (np.abs(error_vals["k"]) > 0.25) \
@@ -195,7 +199,7 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
             # trans and/or "feature" masks which will also require masking with s_mask before use.
             s_preds, s_lbls, s_errs = pred_vals[s_mask], lbl_vals[s_mask], error_vals[s_mask]
             s_ids, s_tran_mask, s_shall_mask = ids[s_mask], tran_mask[s_mask], shallow_mask[s_mask]
-            s_count, suffix = len(s_ids), subset.replace(' ','-')
+            s_count, suffix = len(s_ids), subset.lower().replace(' ','-')
             print(f"\nEvaluating {mc_type} predictions for {s_count}{subset} instance(s)")
 
             if (("synth" in ds_name and synth_tbl) or ("formal" in ds_name and frml_tbl)):
