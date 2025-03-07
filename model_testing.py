@@ -155,7 +155,9 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
 
     # Masks for analysing predictions on specific types
     high_ecc_mask = np.sqrt(lbl_vals["ecosw"]**2 + lbl_vals["esinw"]**2) > 0.75
-    esinw_below_zero = lbl_vals["esinw"] < 0
+    sim_eclipse_mask = (np.abs(feat_vals["depthP"] - feat_vals["depthS"]) < 0.05) \
+                        & (np.abs(1.0 - feat_vals["dS_over_dP"]) < 0.1)
+    esinw_neg_mask = lbl_vals["esinw"] < 0
 
     # Specific problem areas
     column_k_mask = (lbl_vals["k"] < 0.8) & (pred_vals["k"] > 1.8)
@@ -182,8 +184,8 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
         (" shallow non-trans",  shallow_mask & ~tran_mask,  True,   False,      False,      True,       False,      False),
         # Diagnostics: for specific regions or params of interest
         (" highly eccentric",   high_ecc_mask,              True,   True,       False,      True,       False,      False),
-        (" esinw < zero",       esinw_below_zero,           False,  False,      False,      True,       False,      False),
-        (" esinw >= zero",      ~esinw_below_zero,          False,  False,      False,      True,       False,      False),
+        (" similar eclipses",   sim_eclipse_mask,           True,   True,       False,      False,      False,      False),
+        (" esinw < zero",       esinw_neg_mask,             False,  False,      False,      True,       False,      False),
         # Diagnostics: problem regions of poor predictions
         (" droop rA plus rB",   droop_sumr_mask,            False,  False,      True,       True,       False,      False),
         (" bulge k transiting", bulge_k_mask & tran_mask,   False,  True,       True,       True,       False,      False),
@@ -232,10 +234,11 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
                 # If ds is v. large use a strategy of skipping datapoints as it's not worth plotting
                 # every one, as they become meaningless in small plot area. Helps reduce file size.
                 sl = slice(0, None, int(np.ceil(s_count / 10000)))
+                fixed_viewport = subset == "" or "similar eclipses" in subset
                 fig = plots.plot_predictions_vs_labels(s_preds[sl], s_lbls[sl], s_tran_mask[sl],
                                                        plot_params, show_errorbars=show_error_bars,
                                                        hl_mask2=~s_shall_mask[sl],
-                                                       fixed_viewport=subset == "")
+                                                       fixed_viewport=fixed_viewport)
                 fig.savefig(r_dir / f"predictions-{mc_type}-vs-labels{suffix}.pdf")
                 plt.close(fig)
 
