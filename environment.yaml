@@ -3,7 +3,7 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - python>=3.9
+  - python >=3.9,<=3.12
 
   # support for keras.utils.plot_model()
   - pydot=1.4
