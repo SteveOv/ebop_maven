@@ -8,9 +8,9 @@ dependencies = [
     "numpy<2.0",
     "pathlib",
     "uncertainties",
-    "tensorflow[and-cuda]",
+    "tensorflow==2.17.*",
     "tensorflow-estimator",
-    "keras",
+    "keras==3.4.*",
     "keras-preprocessing"
 ]
 
