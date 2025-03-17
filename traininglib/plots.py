@@ -149,16 +149,15 @@ def plot_formal_test_dataset_hr_diagram(targets_cfg: Dict[str, any],
 
     fig = plt.figure(figsize=(2 * COL_WIDTH, 2 * ROW_HEIGHT_6_4), constrained_layout=True)
     ax = fig.add_subplot(1, 1, 1)
-    for (comp,  marker,     size,   color,              label) in [
-        ("A",   "x",        40,     PLOT_COLORS[2],     "primary star"),
-        ("B",   "+",        70,     PLOT_COLORS[3],     "secondary star"),
-
+    for (comp,  fmt,        size,   color,              fs,         label) in [
+        ("A",   "o",        8,      PLOT_COLORS[0],     "full",     "primary star"),
+        ("B",   "o",        8,      PLOT_COLORS[1],     "none",     "secondary star"),
     ]:
         # Don't bother with error bars as this is just an indicative distribution.
         x = np.log10([cfg.get(f"Teff{comp}", None) or 0 for _, cfg in targets_cfg.items()])
         y = [cfg.get(f"logL{comp}", None) or 0 for _, cfg in targets_cfg.items()]
 
-        ax.scatter(x, y, marker=marker, s=size, lw=1.0, c=color, label=label)
+        ax.errorbar(x, y, fmt=fmt, ms=size, markeredgewidth=1.5, c=color, fillstyle=fs, label=label)
 
         print(f"Star {comp}: log(x) range [{min(x):.3f}, {max(x):.3f}],",
                            f"log(y) range [{min(y):.3f}, {max(y):.3f}]")
@@ -168,7 +167,7 @@ def plot_formal_test_dataset_hr_diagram(targets_cfg: Dict[str, any],
 
     mist_isos = MistIsochrones(metallicities=[0.0])
     zams = mist_isos.lookup_zams_params(feh=0.0, cols=["log_Teff", "log_L"])
-    ax.plot(zams[0], zams[1], c=REF_LINE_COLOR, ls="--", linewidth=1, label="ZAMS", zorder=-10)
+    ax.plot(zams[0], zams[1], c=REF_LINE_COLOR, ls="--", linewidth=1.0, label="ZAMS", zorder=-10)
 
     format_axes(ax, xlim=(4.45, 3.35), ylim=(-2.6, 4.5),
                 xlabel= r"$\log{(T_{\rm eff}\,/\,{\rm K})}$",
