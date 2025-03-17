@@ -187,7 +187,7 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
         (" very deep",          v_deep_mask,                True,   True,       False,      False,      False,      False),
         (" esinw < zero",       esinw_neg_mask,             False,  False,      False,      True,       False,      False),
         # Diagnostics: problem regions of poor predictions
-        (" droop rA plus rB",   droop_sumr_mask,            False,  False,      True,       True,       False,      False),
+        (" droop rA plus rB",   droop_sumr_mask,            True,   False,      False,      True,       False,      False),
         (" bulge k",            bulge_k_mask,               True,   True,       False,      True,       False,      False),
         (" bulge k non-trans",  bulge_k_mask & ~tran_mask,  False,  False,      False,      False,      False,      False),
         (" bulge k shallow",    bulge_k_mask & shallow_mask,False,  True,       False,      False,      False,      False),
