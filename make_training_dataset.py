@@ -131,7 +131,7 @@ def generate_instances_from_distributions(label: str):
 
 
 def is_usable_instance(rA_plus_rB: float, k: float, J: float, qphot: float, ecc: float,
-                       bP: float, bS: float, rA: float, rB: float, inc: float,
+                       L3: float, bP: float, bS: float, rA: float, rB: float, inc: float,
                        phiP: float=0, phiS: float=0.5, depthP: float=100, depthS: float=100,
                        **_ # Used to ignore any unexpected **params
                        ) -> bool:
@@ -144,7 +144,7 @@ def is_usable_instance(rA_plus_rB: float, k: float, J: float, qphot: float, ecc:
     """
     # pylint: disable=invalid-name, too-many-arguments, unused-argument
     # Physically plausible
-    usable = 0 <= ecc < 1
+    usable = 0 <= ecc < 1 and -1 < L3 < 1
 
     # Will eclipse, and that they are sufficiently prominent to be useful for training
     if usable:

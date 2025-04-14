@@ -39,7 +39,7 @@ all_histogram_params = {
     "qphot":        (100, r"$q_{\rm phot}$"),
     "ecosw":        (100, r"$e\,\cos{\omega}$"),
     "esinw":        (100, r"$e\,\sin{\omega}$"),
-    #"L3":           (100, r"$L_3$"), # currently always zero
+    "L3":           (100, r"$L_3$"),
     "bP":           (100, r"$b_{\rm P}$"),
     "bS":           (100, r"$b_{\rm S}$"),
     "ecc":          (100, r"$e$"),
@@ -104,6 +104,12 @@ def plot_dataset_histograms(csv_files: Iterable[Path],
 
     fig = None
     if param_specs and csv_files:
+        # Discard L3 if it has been fixed at zero. Checking the 1st csv should be sufficient.
+        if "L3" in param_specs:
+            if np.var([row.get("L3", 0) for row in read_from_csvs([csv_files[0]])]) == 0:
+                print("Discarding L3 from plot as there is no variance in the first csv.")
+                param_specs.pop("L3")
+
         rows = math.ceil(len(param_specs) / cols)
         fig, axes = plt.subplots(rows, cols, sharey="all", constrained_layout=True,
                                  figsize=(cols * COL_WIDTH, rows * ROW_HEIGHT_6_5))
@@ -127,8 +133,8 @@ def plot_dataset_histograms(csv_files: Iterable[Path],
 
                 inst_count, hist_count = len(data), sum(counts)
                 if inst_count != hist_count:
-                    print(f"Histogram for {field} shows {hist_count} or {inst_count} instances",
-                          "with some ouliers ignored" if ignore_outliers else "")
+                    print(f"Histogram for {field} shows {hist_count} of {inst_count} instances",
+                          "with some outliers ignored" if ignore_outliers else "")
             else:
                 ax.axis("off") # remove the unused ax
             format_axes(ax, **format_kwargs)
@@ -500,8 +506,13 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
             # We want up to 5 tick labels at suitable points across the range of values.
             if param_name == "inc":
                 maj_ticks = np.arange(50, 90.1, 5 if vrange < 25 else 10)
-            elif param_name in ["ecosw", "esinw"]:
-                maj_ticks = [-0.4, -0.2, 0, 0.2, 0.4] if vrange < 1 else [-0.8, -0.4, 0.0, 0.4, 0.8]
+            elif param_name in ["ecosw", "esinw", "L3"]:
+                if vrange < 0.6:
+                    maj_ticks = [-.4, -.3, -.2, -.1, 0, .1, .2, .3, .4]
+                elif vrange < 1.3:
+                    maj_ticks = [-.8, -.6, -.4, -.2, 0, .2, .4, .6, .8]
+                else:
+                    maj_ticks = [-.8, -.4, 0, .4, .8]
             else:
                 # Adapt to the view range and finds a step which will give 4, 5 or 6 ticks.
                 # Suspect logic; may not work universally but it's good enough for current results.

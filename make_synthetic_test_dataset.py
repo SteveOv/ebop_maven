@@ -144,7 +144,7 @@ def generate_instances_from_mist_models(label: str):
 
         # Check usability before calculating J & LD params to avoid expensive calls if unnecessary.
         generated_counter += 1
-        if is_usable_instance(rA+rB, rB/rA, 1., q, ecc, imp_prm[0], imp_prm[1], rA, rB, inc):
+        if is_usable_instance(rA+rB, rB/rA, 1., q, ecc, L3, imp_prm[0], imp_prm[1], rA, rB, inc):
             # Central surface brightness ratio (i.e. in absence of LD) within the mission's bandpass
             J = mission.expected_brightness_ratio(T_eff_A, T_eff_B)
 
@@ -254,7 +254,7 @@ def calculate_tess_noise_sigma(apparent_mag: float) -> float:
     return noise_sigma_ppm_hr * (2/60)**0.5 / 10**6
 
 def is_usable_instance(rA_plus_rB: float, k: float, J: float, qphot: float, ecc: float,
-                       bP: float, bS: float, rA: float, rB: float, inc: float,
+                       L3: float, bP: float, bS: float, rA: float, rB: float, inc: float,
                        phiP: float=0, phiS: float=0.5, depthP: float=100, depthS: float=100,
                        **_ # Used to ignore any unexpected **params
                        ) -> bool:
@@ -267,7 +267,7 @@ def is_usable_instance(rA_plus_rB: float, k: float, J: float, qphot: float, ecc:
     """
     # pylint: disable=invalid-name, too-many-arguments, unused-argument
     # Physically plausible
-    usable = 0 <= ecc < 1
+    usable = 0 <= ecc < 1 and -1 < L3 < 1
 
     # Will eclipse, and that they are sufficiently prominent to be useful for testing
     if usable:

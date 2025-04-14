@@ -38,13 +38,9 @@ from ebop_maven import deb_example
 from traininglib import datasets, formal_testing, jktebop, pipeline, plots
 from traininglib.tee import Tee
 
-
 FORMAL_TEST_DATASET_DIR = Path("./datasets/formal-test-dataset/")
 
 DEFAULT_TESTING_SEED = 42
-
-# Those params resulting from predictions that we need to pass to JKTEBOP
-fit_params = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "inc"]
 
 # Superset of all of the potentially fitted parameters
 all_fitted_params = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "inc",
@@ -77,6 +73,7 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
 
     # The estimator publishes a list of what it predicts whereas fit_params are those required for
     # JKTEBOP fitting and reporting. We need to work with the superset of both for our reporting.
+    fit_params = ["inc" if n == "bP" else n for n in estimator.label_names]
     super_params = estimator.label_names + [n for n in fit_params if n not in estimator.label_names]
 
     print(f"\nLooking for the test dataset in '{test_dataset_dir}'...", end="")
@@ -166,8 +163,11 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
                 & (pred_vals["k"] > 0.3) & (pred_vals["k"] < 1.5) & (np.abs(error_vals["k"]) > 0.25)
     droop_sumr_mask = (lbl_vals["rA_plus_rB"] > 0.4) & (np.abs(error_vals["rA_plus_rB"]) > 0.01)
 
+    plot_params = estimator.label_names
+    if len(plot_params) % 2 == 0: # Move ecosw & esinw so they are on same row on plots 2 axes wide
+        plot_params = [n for n in plot_params if n not in ["ecosw","esinw"]] + ["ecosw", "esinw"]
+
     # Skip some reports/plots if ds is formal-test-ds which is too small for them to be meaningful.
-    plot_params = [n for n in estimator.label_names if n not in ["ecosw","esinw"]]+["ecosw","esinw"]
     show_error_bars = mc_iterations > 1
     table_ix = 0
     # pylint: disable=line-too-long
@@ -306,6 +306,7 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
     # To clarify: the estimator publishes a list of what it can predict via its label_names attrib
     # and fit_params may differ; they are those params required for JKTEBOP fitting and reporting.
     # super_params is the set of both and is used, for example, to get the superset of label values
+    fit_params = ["inc" if n == "bP" else n for n in estimator.label_names]
     super_params = estimator.label_names + [n for n in fit_params if n not in estimator.label_names]
 
     # For this "deep dive" test we report on labels with uncertainties, so we ignore the label
@@ -406,7 +407,8 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
             if not do_control_fit:
                 preds_stem = f"predictions-{prediction_type}-vs-{comp_type}"
                 for (source, pnames) in [("model", estimator.label_names), ("fitting", fit_params)]:
-                    pnames = [n for n in pnames if n not in ["ecosw", "esinw"]] + ["ecosw", "esinw"]
+                    if len(pnames) % 2 == 0: # Move ecosw+esinw to the same row on plots 2 axes wide
+                        pnames = [n for n in pnames if n not in ["ecosw","esinw"]]+["ecosw","esinw"]
                     fig = plots.plot_predictions_vs_labels(pred_vals, comp_vals, trans_mask,
                                                            pnames, xlabel_prefix=comp_head,
                                                            hl_mask1=hl_mask1, hl_mask2=hl_mask2)
@@ -425,7 +427,9 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
 
             # Summarize this set of fitted params as plots pred-vs-label|control and in text tables
             results_stem = f"fitted-params-from-{prediction_type}-vs-{comp_type}"
-            pnames = [n for n in fit_params if n not in ["ecosw", "esinw"]] + ["ecosw","esinw"]
+            pnames = fit_params
+            if len(pnames) % 2 == 0: # Move ecosw+esinw to the same row on plots 2 axes wide
+                pnames = [n for n in pnames if n not in ["ecosw", "esinw"]] + ["ecosw", "esinw"]
             fig = plots.plot_predictions_vs_labels(fit_vals, comp_vals, trans_mask, pnames,
                                                    xlabel_prefix=comp_head, ylabel_prefix="fitted",
                                                    hl_mask1=hl_mask1, hl_mask2=hl_mask2)
