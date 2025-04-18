@@ -155,6 +155,7 @@ def make_dataset_file(inst_count: int,
     # pylint: disable=too-many-branches, too-many-statements
     interp_kind = "cubic"
     file_stem = f"{file_prefix}{file_ix:03d}"
+    report_params = ["rA_plus_rB", "k", "J", "L3", "ecosw", "esinw", "bP", "inc"]
 
     # Don't use the built-in hash() function; it's not consistent across processes!!!
     seed = int.from_bytes(hashlib.shake_128(file_stem.encode("utf8")).digest(8))
@@ -207,9 +208,9 @@ def make_dataset_file(inst_count: int,
                     # JKTEBOP will output NaNs for model LC if it doesn't like the params; skip
                     nans = np.isnan(model_data["delta_mag"])
                     if any(nans):
-                        num = sum(nans)
-                        print(f"{file_stem}[{inst_id}]: Dropping inst as jktebop generated",
-                              f"{num} of {len(model_data)} mags as NaN in model LC.")
+                        print(f"{file_stem}[{inst_id}]: Dropping inst as jktebop generated NaN for",
+                              f"{sum(nans)} of {len(model_data)} mags in model LC from params",
+                              ", ".join(f"{k}={params.get(k, 0):.6f}" for k in report_params))
                         is_usable = False
 
                 if is_usable:
