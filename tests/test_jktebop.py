@@ -204,13 +204,23 @@ class Testjktebop(unittest.TestCase):
         file_name = th.TEST_DATA_DIR / "any_old_file_will_do.dat"
         self.assertRaises(KeyError, write_in_file, file_name, task=3, k=0.5)
 
-    def test_write_in_file_rA_plus_rB_validation_warnings(self):
-        """ Testwrite_in_file(some out of range param values) raises Warning """
+    def test_write_in_file_param_validation_warnings(self):
+        """ Testwrite_in_file(some out of range LD param values) raises Warning """
         file_name = th.TEST_DATA_DIR / "any_old_file_will_do.dat"
-        for param, value, expected_value in [("rA_plus_rB", 0.9, 0.8)]:
+        for param,              value,      coerced_value in [
+            ("rA_plus_rB",      0.99,       0.8),
+            ("k",               0.0099,     0.01),
+            ("k",               100.1,      100),
+            ("J",               0.00099,    0.001),
+            ("J",               1000.1,     1000),
+            ("inc",             49,         50),
+            ("inc",             141,        140),
+            ("L3",              -2,         -1 if jktebop._jktebop_support_negative_l3 else 0),
+            ("L3",              10.01,      10),
+        ]:
             params = self._task3_params.copy()
             params[param] = value
-            match = f"set to {expected_value}"
+            match = f"{param}(?:.*)coerced to(?:.*){coerced_value}"
             with self.assertWarnsRegex(JktebopParameterWarning, match,
                                        msg=f"Expected a {JktebopParameterWarning} to be raised"):
                 write_in_file(file_name, 3, None, **params)
@@ -230,26 +240,10 @@ class Testjktebop(unittest.TestCase):
                         params = self._task3_params.copy()
                         params[f"LD{star}"] = algo
                         params[f"LD{star}{coeff_ix}"] = value
-                        match = f"set to {exp_value}"
+                        match = f"LD{star}{coeff_ix}(?:.*)coerced to(?:.*){exp_value}"
                         with self.assertWarnsRegex(JktebopParameterWarning, match,
                                             msg=f"Expected {JktebopParameterWarning} to be raised"):
                             write_in_file(file_name, 3, None, **params)
-
-    def test_write_in_file_L3_configurable_validation_rules(self):
-        """ Testwrite_in_file(some invalid param values) raises ValueError """
-        file_name = th.TEST_DATA_DIR / "any_old_file_will_do.dat"
-        params = self._task3_params.copy()
-        params["L3"] = -0.1
-
-        # Off - we expect an warning as negative not supported
-        jktebop._jktebop_support_negative_l3 = False
-        with self.assertWarnsRegex(JktebopParameterWarning, "set to 0.0",
-                                   msg="Expected a warning to be raised"):
-            write_in_file(file_name, 3, None, **params)
-
-        # On - no warning
-        jktebop._jktebop_support_negative_l3 = True
-        write_in_file(file_name, 3, None, **params)
 
     def test_write_in_file_full_set_of_task2_params(self):
         """ Test write_in_file(full set of task2 template params) asserts file is written """
