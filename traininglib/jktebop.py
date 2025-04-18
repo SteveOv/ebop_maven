@@ -213,6 +213,7 @@ def write_in_file(file_name: Path,
 
     # Pre-process the params/tokens to be applied to the .in file.
     in_params = _prepare_params_for_task(task, params)
+    in_params.setdefault("file_name_stem", file_name.stem)
 
     def coerce_in_param(key: str, min_val: float=None, max_val: float=None,
                         warn_if_outside_range: bool=True, warn_if_missing: bool=False):
@@ -253,9 +254,6 @@ def write_in_file(file_name: Path,
         (ld_min, ld_max, exp_num_coeffs) = (-9.0, 9.0, 4) if algo == "4par" else (-1.0, 2.0, 2)
         for coeff_key in (f"LD{star}{i}" for i in range(1, exp_num_coeffs+1)):
             coerce_in_param(coeff_key, min_val=ld_min, max_val=ld_max)
-
-    if "file_name_stem" not in in_params:
-        in_params["file_name_stem"] = file_name.stem
 
     with open(file_name, mode="w", encoding="utf8") as wf:
         with open(_template_files[task], "r", encoding="utf8") as tpf:
