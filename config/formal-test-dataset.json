@@ -449,6 +449,58 @@
             "lrat": ["2774.10 0.98 0.06"]
         }
     },
+    "V596 Pup": {
+        "source": "DEBCAT and Southworth (2025) Tables II and III. Used SAP flux from TESS sectors 34 and 61 separately characterized with JKTEBOP v43.",
+        "reference": "Southworth25obsR24",
+        "exclude": true,
+        "why_exclude": "chacterisation published after submitting this work",
+        "aka": "TIC 144085463, HD 71581",
+        "SpT": "A1 V + A1 V",
+        "MA": 2.098,            "MA_err": 0.021,
+        "MB": 2.091,            "MB_err": 0.018,
+        "RA": 2.1785,           "RA_err": 0.0072,
+        "RB": 2.1387,           "RB_err": 0.0070,
+        "TeffA": 9500,          "TeffA_err": 200,
+        "TeffB": 9500,          "TeffB_err": 200,
+        "logLA": 1.542,         "logLA_err": 0.037,
+        "logLB": 1.526,         "logLB_err": 0.037,
+        "rA": 0.11614,          "rA_err": 0.00017,
+        "rB": 0.11404,          "rB_err": 0.00016,
+        "desc": "An eccentric 4.596 day orbit with the secondary eclipse near phase 0.475. Both eclipse types have depths of ~0.4 mag. The published work found evidence of delta-Scut pulsations and apsidal motion. With similar components & eclipse depths, and significant third light (~0.2), predictions for k, J and bP may be challanging. We fit sector 34 with labels taken from the corresponding column of table II.",
+        "transits": false,
+        "eclipses_similar": true,
+        "components_similar": true,
+        "shallow_eclipses": false,
+        "hl_mask1": false,
+        "hl_mask2": false,
+        "notes": "bP derived from rA, inc, e & esinw; best control fit with pow2 LD law on sector 34 SAP flux yields MAE~0.0013;",
+        "primary_epoch": 2236.4944615,
+        "period": 4.5961598,
+        "ecc": 0.09680,         "ecc_err": 0.00019,
+        "omega": 112.533,       "omega_err": 0.048,
+        "labels": { 
+            "rA_plus_rB": 0.23018,  "rA_plus_rB_err": 0.00012,
+            "k": 0.9820,            "k_err": 0.0027,
+            "J": 0.99906,           "J_err": 0.00035,
+            "qphot": 0.9966,        "qphot_err": 0.0059,
+            "bP": 0.2556,           "bP_err": 0.0008,
+            "inc": 88.1294,         "inc_err": 0.0055,
+            "ecosw": -0.0370930,    "ecosw_err": 0.0000089,
+            "esinw": 0.08941,       "esinw_err": 0.00021,
+            "L3": 0.2026,           "L3_err": 0.0010
+        },
+        "sectors": {
+            "34": {
+                "quality_bitmask": "hard",
+                "detrend_order": 2,
+                "detrend_gap_threshold": 2.0
+            }
+        },
+        "fit_overrides": {
+            "LDA": "pow2",
+            "LDB": "pow2"
+        }
+    },
     "WW Aur": {
         "source": "DEBCat and Southworth et al. (2005) who use EBOP (with mods to fit rA+rB & k and to use MRQMIN) for fitting of observations from the 1970s. We use V-band fitting results (Table 10). Available TESS sectors 20, 43-45, 60 & 71-73 at 120 s cadence.",
         "reference": "SouthworthSmalley+05mnras",
@@ -969,6 +1021,64 @@
             "LDB": "quad",
             "LDB1": 0.246,
             "LDB2": 0.22
+        }
+    },
+    "RZ Cha": {
+        "source": "DEBCat and Rediscussion XXIII, Tables II & III. TESS sectors 65 & 66 SAP photometry analysed with JKTEBOP version 43.",
+        "reference": "Southworth25obsR23",
+        "aka": "TIC 394730113, HD 93486",
+        "exclude": true,
+        "why_exclude": "chacterisation published after submitting this work",
+        "SpT": "F5 IV-V + F5 IV-V",
+        "MA": 1.488,            "MA_err": 0.011,
+        "MB": 1.482,            "MB_err": 0.011,
+        "RA": 2.1499,            "RA_err": 0.0058,
+        "RB": 2.2708,            "RB_err": 0.0058,
+        "TeffA": 6596,          "TeffA_err": 150,
+        "TeffB": 6564,          "TeffB_err": 150,
+        "logLA": 0.897,         "logLA_err": 0.040,
+        "logLB": 0.936,         "logLB_err": 0.040,
+        "rA": 0.17755,          "rA_err": 0.00023,
+        "rB": 0.18753,          "rB_err": 0.00019,
+        "desc": "An inclined circular orbit with similar partial eclipses at approximately 0.4 mag each. The stars having similar components and eclipses so predicting k, J and bP is expected to be a challenge.",
+        "transits": false,
+        "eclipses_similar": true,
+        "components_similar": true,
+        "shallow_eclipses": false,
+        "notes": "bP derived from rA, inc, e & esinw; control fit uses quality flags and LD params from source article giving an MAE~0.0045;",
+        "primary_epoch": 3096.389351,
+        "period": 2.8320896,
+        "labels": { 
+            "rA_plus_rB": 0.36509,  "rA_plus_rB_err": 0.00012,
+            "k": 1.0562,            "k_err": 0.0025,
+            "J": 0.98075,           "J_err": 0.00008,
+            "qphot": 0.9963,        "qphot_err": 0.0047,
+            "bP": 0.658,            "bP_err": 0.001,
+            "inc": 83.2920,         "inc_err": 0.0060,
+            "ecosw": 0.0,           "ecosw_err": null,
+            "esinw": 0.0,           "esinw_err": null,
+            "L3": 0.01641,          "L3_err": 0.00075
+        },
+        "sectors": {
+            "65": {
+                "quality_bitmask": "hard",
+                "detrend_gap_threshold": 5.0,
+                "detrend_order": 1
+            },
+            "66": {
+                "quality_bitmask": "hard",
+                "quality_masks": [[3110.25, 3112.00], [3117.25, 3119.10]],
+                "detrend_gap_threshold": 5.0,
+                "detrend_order": 1
+            }
+        },
+        "fit_overrides": {
+            "LDA": "pow2",
+            "LDA1": 0.5901,
+            "LDA2": 0.4898,
+            "LDB": "same",
+            "LDB1": 0.5901,
+            "LDB2": 0.4898
         }
     },
     "V570 Per": {
