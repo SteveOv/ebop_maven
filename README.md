@@ -23,13 +23,13 @@ which accepts phase-folded light curves of detached eclipsing binary (dEB) syste
 input features in order to predict the input parameters for subsequent formal analysis by
 [JKTEBOP](https://www.astro.keele.ac.uk/jkt/codes/jktebop.html). The predicted parameters are:
 
-- the sum ($r_A+r_B$) and ratio ($k \equiv r_B/r_A$) of the stars' fractional radii
+- the sum ($r_{\rm A}+r_{\rm B}$) and ratio ($k \equiv r_{\rm B}/r_{\rm A}$) of the stars' fractional radii
   - named `rA_plus_rB` and `k`
 - the stars' central brightness ratio ($J$)
   - named `J`
 - the orbital eccentricity and argument of periastron through the Poincaré elements ($e\cos{\omega}$ and $e\sin{\omega}$)
   - named `ecosw` and `esinw`
-- the orbital inclination through the primary impact parameter ($b_P$)
+- the orbital inclination through the primary impact parameter ($b_{\rm P}$)
   - named `bP`
 
 CNN models are widely used in computer vision scenarios. They are often used for classification
@@ -143,7 +143,7 @@ MAE    |   0.000305  0.001932  0.026397  0.000909  0.007463  0.064821  0.437997 
 MSE    |   0.000000  0.000004  0.000697  0.000001  0.000056  0.004202  0.191842            0.028114
 ```
  
-The predicted values for $r_A+r_B$, $k$, $J$, $e\cos{\omega}$ and $e\sin{\omega}$ and the derived
+The predicted values for $r_{\rm A}+r_{\rm B}$, $k$, $J$, $e\cos{\omega}$ and $e\sin{\omega}$ and the derived
 value for $inc$ can now be used as input parameters for analysis with JKTEBOP. The following shows
 the results of analysing the ZZ Boo sector 50 light curve data with task 3, which finds the best
 fit to the observations with formal error bars. The fitted params are written to a .par file,
