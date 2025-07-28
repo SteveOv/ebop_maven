@@ -822,7 +822,7 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
                                    to: TextIOBase=None):
     """
     Will write a text table of the predicted nominal values vs the label values
-    with individual error, MAE and MSE metrics, to the requested output.
+    with individual error, MAE, MSE and |(val-pred)/pred| metrics, to the requested output.
 
     :predictions: the predictions
     :labels: the labels or other comparison values
@@ -851,13 +851,15 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
     if print_it:
         to = StringIO()
 
-    line_length = 13 + (11 * len(selected_param_names))-1 + 22
+    # The third error type will be equivalent to |(val-pred)/pred| given how errors are calculated
+    err_labels = ["MAE", "MSE", f"|err/{'fit' if prediction_head.startswith('Fit') else 'prd'}|"]
+    line_length = 12 + (11 * len(selected_param_names)) + (11 * len(err_labels))
     def horizontal_line(char):
         to.write(char*line_length + "\n")
 
     def header_block(header):
         horizontal_line("-")
-        col_heads = np.concatenate([selected_param_names, ["MAE", "MSE"]])
+        col_heads = np.concatenate([selected_param_names, err_labels])
         to.write(f"{header:<10s} | " + " ".join(f"{h:>10s}" for h in col_heads) + "\n")
 
     num_fmt = f"{{:10.{format_dp:d}f}}"
@@ -889,19 +891,31 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
             for row_head, row_vals in zip([label_head, prediction_head, error_head],
                                           [b_lbls, b_preds, b_errs]):
                 vals = row_vals[selected_param_names].tolist()
+                errs = [None, None, None]
                 if row_head == "Error":
-                    vals = np.concatenate([vals, [np.mean(np.abs(vals)), np.mean(np.square(vals))]])
-                row(row_head, vals)
+                    prds = np.add(b_preds[selected_param_names].tolist(), 1e-30) # avoid div0 error
+                    errs = [np.mean(np.abs(vals)),
+                            np.mean(np.square(vals)),
+                            np.mean(np.abs(np.divide(vals, prds)))]
+                row(row_head, np.concatenate([vals, errs]))
 
     if summary_only or len(predictions) > 1:
         # Summary rows for aggregate stats over all of the rows
         horizontal_line("=")
         key_maes = [np.mean(np.abs(errors[k])) for k in selected_param_names]
         key_mses = [np.mean(np.square(errors[k])) for k in selected_param_names]
+        key_perc = [np.mean(np.abs(np.divide(errors[k], np.add(predictions[k], 1e-30))))
+                                                    for k in selected_param_names]
+
         overall_mae = np.mean(np.abs(errors[selected_param_names].tolist()))
         overall_mse = np.mean(np.square(errors[selected_param_names].tolist()))
-        row("MAE", np.concatenate([key_maes, [overall_mae]]))
-        row("MSE", np.concatenate([key_mses, [None, overall_mse]]))
+        overall_per = np.mean(np.abs(np.divide(errors[selected_param_names].tolist(),
+                                        np.add(predictions[selected_param_names].tolist(), 1e-30))))
+
+        row(err_labels[0], np.concatenate([key_maes, [overall_mae, None, None]]))
+        row(err_labels[1], np.concatenate([key_mses, [None, overall_mse, None]]))
+        row(err_labels[2], np.concatenate([key_perc, [None, None, overall_per]]))
+
     else:
         horizontal_line("-")
 
