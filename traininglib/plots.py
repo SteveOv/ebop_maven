@@ -42,6 +42,7 @@ all_histogram_params = {
     "L3":           (100, r"$L_3$"),
     "bP":           (100, r"$b_{\rm P}$"),
     "bS":           (100, r"$b_{\rm S}$"),
+    "cosi":         (100, r"$\cos{i}$"),
     "ecc":          (100, r"$e$"),
     "omega":        (100, r"$\omega~(^{\circ})$"),
     "rA":           (100, r"$r_{\rm A}$"),
