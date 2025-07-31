@@ -80,17 +80,21 @@ def generate_instances_from_mist_models(label: str):
             if len(init_Ms):
                 break
 
-        # First choose the primary mass based on an IMF and multiplicity probability function
+        # First choose the primary mass based on an IMF and multiplicity probabilities
         # Choose our stars and then get the basic physical params from the isochrones
-        probs = chabrier_imf(init_Ms)
-        probs *= wells_prsa_multiplicity_function(init_Ms)
+        probs = chabrier_imf_pmf(init_Ms)
+        probs *= wells_prsa_multiplicity_pmf(init_Ms)
         probs = np.divide(probs, np.sum(probs))         # Scaled to get a pmf() == 1
         init_MA = rng.choice(init_Ms, p=probs)          # in units of M_sun
 
+        # Now choose the secondary based on probs from the Moe & di Stefano mass ratio distributions
         init_MB_mask = (init_Ms >= min_mass) & (init_Ms <= init_MA)
         if any(init_MB_mask):
-            init_MB = rng.choice(init_Ms[init_MB_mask])
-        else:
+            candidates_MB = init_Ms[init_MB_mask]
+            candidates_q = np.divide(candidates_MB, init_MA)
+            init_MB = rng.choice(candidates_q, p=md_mass_ratio_pmf(candidates_q, init_MA)) * init_MA
+            init_MB = candidates_MB[np.abs(candidates_MB - init_MB).argmin()] # Handle if rounded
+        else: # Edge case, where we are at the minimum supported mass
             init_MB = init_MA
 
         results = _mist_isochones.lookup_stellar_params(feh, age, init_MA, cols)
@@ -112,10 +116,12 @@ def generate_instances_from_mist_models(label: str):
         min_per = orbital.orbital_period(MA * M_sun, MB * M_sun, min_a * R_sun).nominal_value # s
         min_per /= 86400                                # d
 
-        # We generate period, inc, and omega (argument of periastron) from uniform distributions
+        # We generate period, cos(i), and omega (argument of periastron) from uniform distributions
         per         = rng.uniform(low=min_per, high=max(min_per, 25))   # d
-        inc         = rng.uniform(low=50., high=90.00001)               # deg
-        omega       = rng.uniform(low=0., high=360.)                    # deg
+        cosi        = rng.uniform(high=0.643, low=0.)   # uniform in cosi between ~50 & 90 deg
+        inc_rad     = np.arccos(cosi)
+        inc         = np.degrees(inc_rad)               # deg
+        omega       = rng.uniform(low=0., high=360.)    # deg
 
         # Eccentricity from uniform distribution, subject to a maximum value which depends on
         # orbital period/seperation (again, based on Wells & Prsa (eqn 6); Moe & Di Stefano)
@@ -133,7 +139,6 @@ def generate_instances_from_mist_models(label: str):
         q = MB / MA
         rA = RA / a
         rB = RB / a
-        inc_rad = np.radians(inc)
         omega_rad = np.radians(omega)
         esinw = ecc * np.sin(omega_rad)
         ecosw = ecc * np.cos(omega_rad)
@@ -184,7 +189,7 @@ def generate_instances_from_mist_models(label: str):
 
                 # Further params for potential use as labels/features
                 "sini":         np.sin(inc_rad),
-                "cosi":         np.cos(inc_rad),
+                "cosi":         cosi,
                 "rA":           rA,
                 "rB":           rB,
                 "ecc":          ecc,
@@ -204,13 +209,13 @@ def generate_instances_from_mist_models(label: str):
                 "MB":           MB
             }
 
-def salpeter_imf(masses):
+def salpeter_imf_pmf(masses):
     """ Salpeter IMF as a simple power law. """
     # Ignore the normalization constant as this will be normalized later
     imf = np.power(masses, -2.35)
-    return imf
+    return imf / np.sum(imf)
 
-def chabrier_imf(masses):
+def chabrier_imf_pmf(masses):
     """ 
     Chabrier (2003PASP..115..763C) two part IMF (Table I)
     as summarized by Maschberger (2013MNRAS.429.1725M)
@@ -227,11 +232,56 @@ def chabrier_imf(masses):
     coeffs = np.divide(0.158, masses[mask])
     exponent = np.square(np.divide(np.subtract(np.log10(masses[mask]), np.log10(0.079)), 0.69))
     imf[mask] = np.multiply(coeffs, np.exp(np.multiply(-0.5, exponent)))
-    return imf
+    return imf / np.sum(imf)
 
-def wells_prsa_multiplicity_function(masses):
-    """ Wells & Prša (2021ApJS..253...32W) eqn. 2 with coeffs given in following paragraph """
-    return np.tanh(np.add(np.multiply(0.31, masses), 0.18))
+def wells_prsa_multiplicity_pmf(masses):
+    """
+    Wells & Prša (2021ApJS..253...32W) eqn. 2 with coeff noms as given in the following paragraph
+    (to fit data from Duchêne & Kraus [2013ARA&A..51..269D] & Raghavan+ [2010ApJS..190....1R]).
+    Based on Arenou (2011AIPC.1346..107A) eqn. 1 with modified coefficients.
+    """
+    pmf = np.tanh(np.add(np.multiply(0.31, masses), 0.18))
+    return pmf / np.sum(pmf)
+
+def md_mass_ratio_pmf(q, mass_prim):
+    """
+    A q probability distribution, based on the Moe & Di Stefano (2017ApJS..230...15M)
+    mass-ratio probability distribution with parameters from Table 13 within the log(P) = 1 regime.
+    """
+    if isinstance(q, float|int):
+        q = np.array([q], float)
+    num_probs = len(q)
+
+    if num_probs == 1:
+        return np.array([1])
+
+    probs = np.zeros(shape=(num_probs, ), dtype=float)
+    (gamma_smallq, gamma_largeq, f_twin) = (0.3, -0.5, 0.30) if mass_prim <= 1.2 \
+                                      else (0.2, -0.5, 0.22) if mass_prim <= 5.0 \
+                                      else (0.1, -0.5, 0.17) if mass_prim <= 9.0 \
+                                      else (0.1, -0.5, 0.14) if mass_prim <= 16.0 \
+                                      else (0.1, -0.5, 0.08)
+
+    smallq_mask = q <= 0.3
+    probs[smallq_mask] = np.power(q[smallq_mask], gamma_smallq)
+
+    largeq_mask = ~smallq_mask
+    probs[largeq_mask] = np.power(q[largeq_mask], gamma_largeq)
+
+    if f_twin:
+        f_twin_mask = q > 0.95
+        if any(f_twin_mask):
+            # Uniformly trim the f_twin excess fraction across the whole large q range
+            auc_excess = np.sum(probs[largeq_mask]) * f_twin
+            probs[largeq_mask] -= auc_excess / (num_probs * 0.7)
+
+            # Now uniformly boost the f_twin range by the previously trimmed excess fraction
+            probs[f_twin_mask] += auc_excess / (num_probs * 0.05)
+
+    # Ensure the pdf is continuous from smallq to largeq regimes
+    if any(smallq_mask):
+        probs[smallq_mask] /= probs[smallq_mask][-1] / probs[largeq_mask][0]
+    return probs / np.sum(probs)
 
 def calculate_tess_noise_sigma(apparent_mag: float) -> float:
     """
