@@ -6,6 +6,7 @@ from typing import Union, List, Iterable, Tuple, Generator
 from pathlib import Path
 
 import numpy as np
+from uncertainties import unumpy
 from scipy import interpolate
 import astropy.units as u
 from astropy.io import fits
@@ -394,6 +395,10 @@ def get_sampled_phase_mags_data(flc: FoldedLightCurve,
     extend over a complete phase, rows are copied over from opposite ends of the phase space data
     to extend the coverage.  The number of rows copied is controlled by the flc_rollover argument.
 
+    This is the original function for extracting an phase folded input feature for EBOP MAVEN
+    estimation. It has been retained for consistency with previous test results, but the following
+    get_binned_phase_mags_data() function is a better approach - especially with noisy data.
+
     :flc: the source FoldedLightCurve
     :num_bins: the number of equally spaced bins to return
     :phase_pivot: the pivot point about which the fold phase was wrapped to < 0.
@@ -433,34 +438,32 @@ def get_sampled_phase_mags_data(flc: FoldedLightCurve,
 def get_binned_phase_mags_data(flc: FoldedLightCurve,
                                num_bins: int = 1024,
                                phase_pivot: Union[u.Quantity, float]=0.75,
-                               flc_rollover: int = 200) \
+                               rollover: int = 200) \
                                     -> Tuple[np.ndarray, np.ndarray]:
     """
-    A data reduction function which gets a binned set of phase and delta magnitude data,
-    via binning, in the requested number of equal size bins. This is an newer alternative to
-    get_sampled_phase_mags_data(), with binning often better able to handle a noisy source.
+    Get a binned copy of the phase and delta_mags (nominal values) from the passed FoldedLightCurve.
     
-    The data is sourced by binning fluxes in the passed FoldedLightCurve.  In case this does not
-    extend over a complete phase, rows are copied over from opposite ends of the phase space data to
-    extend the coverage.  The number of rows copied is controlled by the flc_rollover argument.
+    In case the FoldedLightCurve does not cover a complete phase, prior to binning rows are copied
+    over from opposite ends of the phase space to extend the coverage.  The number of rows copied
+    is controlled by the rollover argument.
+
+    This is a replacement for the get_sampled_phase_mags_data() func, with binning better able to
+    cope with noisy source data.
 
     :flc: the source FoldedLightCurve
     :num_bins: the number of equally spaced bins to return
     :phase_pivot: the pivot point about which the fold phase was wrapped to < 0.
-    :flc_rollover: the number of row to extend the ends of the source phases by
-    :returns: a tuple with requested number or phases and delta magnitudes
+    :rollover: the number of row to extend the ends of the source phases by
+    :returns: a tuple of two np.ndarrays with requested binned phase and delta magnitude raw values
     """
-    source_phases = np.concatenate([
-        flc.phase[-flc_rollover:] -1.,
-        flc.phase,
-        flc.phase[:flc_rollover] +1.
-    ]).value
-
-    source_delta_mags = np.concatenate([
-        flc["delta_mag"][-flc_rollover:],
-        flc["delta_mag"],
-        flc["delta_mag"][:flc_rollover]
-    ]).value
+    # Careful with the FoldedLightCurve! The phase column is a Quantity but the flc "delta_mag" and
+    # "delta_mag_err" columns are a MaskedQuantity which will need unmasking to get to the np.array.
+    src_phase = np.concatenate([flc.phase[-rollover:]-1., flc.phase, flc.phase[:rollover]+1.]).value
+    src_mags = unumpy.uarray(
+        # pylint: disable=line-too-long
+        np.concatenate([flc["delta_mag"][-rollover:], flc["delta_mag"], flc["delta_mag"][:rollover]]).value,
+        np.concatenate([flc["delta_mag_err"][-rollover:], flc["delta_mag_err"], flc["delta_mag_err"][:rollover]]).value
+    ).unmasked
 
     # If there is a phase wrap then phases above the pivot will have been
     # wrapped around to <0. Work out what the expected minimum phase should be.
@@ -468,23 +471,22 @@ def get_binned_phase_mags_data(flc: FoldedLightCurve,
         min_phase = (phase_pivot.value if isinstance(phase_pivot, u.Quantity) else phase_pivot) - 1
     else:
         min_phase = 0
-    min_phase = max(min_phase, source_phases.min())
+    min_phase = max(min_phase, src_phase.min())
 
-    # Can't use lightkurve's bin() on a FoldedLightCurve (unhappy with the time as "phase" Quantity)
+    # Can't use lightkurve's bin() on a FoldedLightCurve: unhappy with phase Quantity as time col.
+    # By using unumpy/ufloats we're aware of the mags' errors in the mean calculation for each bin.
     bin_phase = np.linspace(min_phase, min_phase + 1., num_bins + 1)[:-1]
-    b_ix = np.digitize(x=source_phases, bins=bin_phase)
+    bin_ix = np.digitize(x=src_phase, bins=bin_phase)
+    bin_mags = np.array(
+       [src_mags[bin_ix == ix].mean().n if any(bin_ix == ix) else np.nan for ix in range(num_bins)])
 
-    # Use fluxes derived from the delta_mags which will already be detrended & rectified to zero
-    flux = 10**np.array(list(source_delta_mags[~source_delta_mags.mask].data))
-    bin_flux = np.array([flux[b_ix==i].mean() if any(b_ix==i) else np.nan for i in range(num_bins)])
-
-    # Fill any gaps; there will be np.nan where there were no source fluxes within the bin
-    if any(missing := np.isnan(bin_flux)):
+    # Fill any gaps; there will be a np.nan where there were no source mags within a bin
+    if any(missing := np.isnan(bin_mags)):
         def equiv_ix(ix):
             return ix.nonzero()[0]
-        bin_flux[missing] = np.interp(equiv_ix(missing), equiv_ix(~missing), bin_flux[~missing])
+        bin_mags[missing] = np.interp(equiv_ix(missing), equiv_ix(~missing), bin_mags[~missing])
 
-    return (bin_phase, np.log10(bin_flux)) # Back to delta_mags
+    return (bin_phase, bin_mags)
 
 
 def find_lightcurve_segments(lc: LightCurve,
