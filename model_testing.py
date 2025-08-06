@@ -684,19 +684,23 @@ def append_calculated_inc_predictions(preds: np.ndarray[UFloat]) -> np.ndarray[U
     :preds: the predictions recarray to which inc should be appended
     :returns: the predictions with inc added if necessary
     """
+    def nom_clip(vals, a_min, a_max):
+        return unumpy.uarray(np.clip(unumpy.nominal_values(vals), a_min, a_max),
+                             unumpy.std_devs(vals))
+
     names = list(preds.dtype.names)
     if "bP" in names:
         # From primary impact param:  i = arccos(bP * r1 * (1+esinw)/(1-e^2))
         r1 = preds["rA_plus_rB"] / (1+preds["k"])
         e_squared = preds["ecosw"]**2 + preds["esinw"]**2
-        cosi = np.clip(preds["bP"] * r1 * (1+preds["esinw"]) / (1-e_squared),
-                       ufloat(-1, 0), ufloat(1, 0))
+        cosi = nom_clip(preds["bP"] * r1 * (1+preds["esinw"]) / (1-e_squared),
+                        -0.999999999, 0.999999999)
         inc = degrees(arccos(cosi))
     elif "cosi" in names:
-        cosi = np.clip(preds["cosi"], ufloat(-1, 0), ufloat(1, 0))
+        cosi = nom_clip(preds["cosi"], -0.999999999, 0.999999999)
         inc = degrees(arccos(cosi))
     elif "sini" in names:
-        sini = np.clip(preds["sini"], ufloat(-1, 0), ufloat(1, 0))
+        sini = nom_clip(preds["sini"], -0.999999999, 0.999999999)
         inc = degrees(arcsin(sini))
     else:
         raise KeyError("Missing bP, cosi or sini in predictions required to calc inc.")
