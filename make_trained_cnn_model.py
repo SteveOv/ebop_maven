@@ -173,9 +173,17 @@ def make_best_model(chosen_features: list[str]=CHOSEN_FEATURES,
 
 
 if __name__ == "__main__":
+    print()
+    log_file = SAVE_DIR / "make_trained_cnn_model.log"
+    if log_file.exists():
+        resp = input(f"Training output for model exists in {SAVE_DIR}. Continue & overwrite y/N? ")
+        if resp.strip().lower() not in ["y", "yes"]:
+            sys.exit()
+
+    print(f"Trained model and logs will be saved to {SAVE_DIR}\n")
     SAVE_DIR.mkdir(parents=True, exist_ok=True)
-    with redirect_stdout(Tee(open(SAVE_DIR / "make_trained_cnn_model.log", "w", encoding="utf8"))):
-        print(f"\nStarted at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}\n")
+    with redirect_stdout(Tee(open(log_file, "w", encoding="utf8"))):
+        print(f"Started at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}\n")
 
         # CUDA_VISIBLE_DEVICES is set for the ebop_maven conda env. A value of "-1" suppresses GPUs,
         # useful for repeatable results (Keras advises that out of order processing within GPU/CUDA
