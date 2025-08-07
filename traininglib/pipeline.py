@@ -476,9 +476,13 @@ def get_binned_phase_mags_data(flc: FoldedLightCurve,
     # Can't use lightkurve's bin() on a FoldedLightCurve: unhappy with phase Quantity as time col.
     # By using unumpy/ufloats we're aware of the mags' errors in the mean calculation for each bin.
     bin_phase = np.linspace(min_phase, min_phase + 1., num_bins + 1)[:-1]
-    bin_ix = np.digitize(x=src_phase, bins=bin_phase)
-    bin_mags = np.array(
-       [src_mags[bin_ix == ix].mean().n if any(bin_ix == ix) else np.nan for ix in range(num_bins)])
+    phase_bin_ix = np.searchsorted(bin_phase, src_phase)
+    bin_mags = np.empty_like(bin_phase, float)
+    for bin_ix in range(num_bins):
+        if any(bin_mask := phase_bin_ix == bin_ix):
+            bin_mags[bin_ix] = src_mags[bin_mask].mean().n
+        else:
+            bin_mags[bin_ix] = np.nan
 
     # Fill any gaps; there will be a np.nan where there were no source mags within a bin
     if any(missing := np.isnan(bin_mags)):
