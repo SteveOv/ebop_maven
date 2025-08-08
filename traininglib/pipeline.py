@@ -479,8 +479,9 @@ def get_binned_phase_mags_data(flc: FoldedLightCurve,
     phase_bin_ix = np.searchsorted(bin_phase, src_phase)
     bin_mags = np.empty_like(bin_phase, float)
     for bin_ix in range(num_bins):
-        if any(bin_mask := phase_bin_ix == bin_ix):
-            bin_mags[bin_ix] = src_mags[bin_mask].mean().n
+        phase_ix = np.where(phase_bin_ix == bin_ix)[0] # np.where() indices are quicker than masking
+        if len(phase_ix) > 0:
+            bin_mags[bin_ix] = src_mags[phase_ix].mean().n
         else:
             bin_mags[bin_ix] = np.nan
 
