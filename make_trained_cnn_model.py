@@ -125,6 +125,7 @@ def make_best_model(chosen_features: list[str]=CHOSEN_FEATURES,
                     dnn_dropout_rate: float=DNN_DROPOUT_RATE,
                     dnn_num_taper_units: int=DNN_NUM_TAPER_UNITS,
                     model_name: str=MODEL_NAME,
+                    output_activations: list[str]=OUTPUT_ACTIVATIONS,
                     verbose: bool=False):
     """
     Helper function for building the current best performing model. 
@@ -162,7 +163,7 @@ def make_best_model(chosen_features: list[str]=CHOSEN_FEATURES,
             modelling.hidden_layers(1, int(dnn_num_taper_units), dnn_initializer, dnn_activation,
                                     0, ("Taper-",), verbose) if dnn_num_taper_units else None
         ],
-        output=modelling.output_layer(metadata, dnn_initializer, OUTPUT_ACTIVATIONS, verbose),
+        output=modelling.output_layer(metadata, dnn_initializer, output_activations, verbose),
         post_build_step=None,
         name=model_name,
         verbose=verbose
