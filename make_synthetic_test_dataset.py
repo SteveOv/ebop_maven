@@ -375,8 +375,9 @@ if __name__ == "__main__":
                                       cols=2).savefig(dataset_dir/"synth-histogram-main.pdf")
 
         # Simple diagnostic plot of the mags feature of a small sample of the instances.
-        print("Plotting a sample of the set's mags features")
-        dataset_files = sorted(dataset_dir.glob(f"**/{FILE_PREFIX}000.tfrecord"))
-        fig = plots.plot_dataset_instance_mags_features(dataset_files, cols=5, max_instances=50)
-        fig.savefig(dataset_dir / "sample.png", dpi=150)
-        fig.clf()
+        for dataset_file in sorted(dataset_dir.glob(f"**/{FILE_PREFIX}000.tfrecord")):
+            print(f"Plotting a sample of the {dataset_file.parent.name} subset's mags features")
+            fig = plots.plot_dataset_instance_mags_features([dataset_file], mags_wrap_phase=0.5,
+                                                            cols=5, max_instances=50)
+            fig.savefig(dataset_dir / f"sample-{dataset_file.parent.name}.png", dpi=150)
+            fig.clf()

@@ -216,6 +216,7 @@ if __name__ == "__main__":
         # Simple diagnostic plot of the mags feature of a small sample of the instances.
         for dataset_file in sorted(dataset_dir.glob(f"**/{FILE_PREFIX}000.tfrecord")):
             print(f"Plotting a sample of the {dataset_file.parent.name} subset's mags features")
-            fig = plots.plot_dataset_instance_mags_features([dataset_file], cols=5,max_instances=50)
+            fig = plots.plot_dataset_instance_mags_features([dataset_file], mags_wrap_phase=0.5,
+                                                            cols=5, max_instances=50)
             fig.savefig(dataset_dir / f"sample-{dataset_file.parent.name}.png", dpi=150)
-            plt.close(fig)
+            fig.clf()
