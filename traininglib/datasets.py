@@ -38,6 +38,7 @@ def make_dataset(instance_count: int,
                  file_prefix: str="dataset",
                  max_workers: int=1,
                  swap_if_deeper_secondary: bool=False,
+                 ignore_augs_on_train: bool=False,
                  save_param_csvs: bool=True,
                  verbose: bool=False,
                  simulate: bool=False) -> None:
@@ -57,6 +58,8 @@ def make_dataset(instance_count: int,
     :file_prefix: naming prefix for each of the dataset files
     :max_workers: maximum number of files to process concurrently
     :swap_if_deeper_secondary: whether the components are swapped if the secondary eclipse is deeper
+    :ignore_augs_on_train: if True then no augmentations will applied to training subset
+    as the noise/shift params will be ignored
     :save_param_csvs: whether to save csv files with full params in addition to the dataset files.
     :verbose: whether to print verbose progress/diagnostic messages
     :simulate: whether to simulate the process, skipping only file/directory actions
@@ -98,8 +101,9 @@ The maximum concurrent workers:         {max_workers}\n""")
     # args for each make_dataset_file call as required by process_pool starmap
     file_inst_counts = list(_calculate_file_splits(instance_count, file_count))
     iter_params = (
-        (count, file_ix, output_dir, generator_func, check_func, valid_ratio, test_ratio,
-         file_prefix, swap_if_deeper_secondary, save_param_csvs, verbose, simulate)
+        (count, file_ix, output_dir, generator_func, check_func,
+         valid_ratio, test_ratio, file_prefix,
+         swap_if_deeper_secondary, ignore_augs_on_train, save_param_csvs, verbose, simulate)
             for (file_ix, count) in enumerate(file_inst_counts)
     )
 
@@ -126,6 +130,7 @@ def make_dataset_file(inst_count: int,
                       test_ratio: float=0,
                       file_prefix: str="dataset",
                       swap_if_deeper_secondary: bool=False,
+                      ignore_augs_on_train: bool=False,
                       save_param_csvs: bool=True,
                       verbose: bool=False,
                       simulate: bool=False):
@@ -135,8 +140,11 @@ def make_dataset_file(inst_count: int,
     validation and testing subdirectories, with the ratios of instances sent to each dictated by
     the valid_ratio and test_ratio arguments (with train_ratio implied).
 
-    Adds Gaussian noise to the LC/mags feature if a "snr" param is specified.
-    
+    Agmentations are applied to the instances if the noise_sigma, phase_shift and/or mag_shift
+    params are specified. However, these augmentations may be omitted on training instances by
+    setting the ignore_augs_on_train argument to True. This option supports the use case where
+    any training set augmentations will be applied during training as part of the dataset pipeline.
+
     :inst_count: the number of training instances to create
     :file_ix: the index number of this file. Is appended to file_prefix to make the file stem.
     :output_dir: the directory to write the files to
@@ -148,6 +156,8 @@ def make_dataset_file(inst_count: int,
     :test_ratio: proportion of rows to be written to the testing files
     :file_prefix: naming prefix for each of the dataset files
     :swap_if_deeper_secondary: whether the components are swapped if the secondary eclipse is deeper
+    :ignore_augs_on_train: if True then no augmentations will applied to training subset
+    as the noise/shift params will be ignored
     :save_param_csvs: whether to save csv files with full params in addition to the dataset files.
     :verbose: whether to print verbose progress/diagnostic messages
     :simulate: whether to simulate the process, skipping only file/directory actions
@@ -190,6 +200,7 @@ def make_dataset_file(inst_count: int,
         # This will continue to generate new instances until we have enough (==inst_count)
         while inst_ix < inst_count:
             inst_id = inst_ix
+            inst_file_ix = inst_file_ixs[inst_ix]
             try:
                 params = next(generator)
                 generated_count += 1
@@ -231,7 +242,6 @@ def make_dataset_file(inst_count: int,
                         is_usable = check_func(**params)
                         if is_usable:
                             # Regenerate the LC - assume it will work as params previously OK.
-                            # A faster algo is to roll mags to 2ndary but this trains better.
                             model_data = jktebop.generate_model_light_curve(file_prefix, **params)
                             swap_count += 1
                             params["swapped"] = 1
@@ -239,15 +249,16 @@ def make_dataset_file(inst_count: int,
                 if is_usable:
                     # Optionally add Gaussian noise to the mags
                     noise_sigma = params.get("noise_sigma", None)
-                    if noise_sigma:
+                    if noise_sigma and (inst_file_ix > 0 or not ignore_augs_on_train):
                         # We apply the noise to fluxes, so revert delta mags to normalized flux
-                        fluxes = np.power(10, np.divide(model_data["delta_mag"], -2.5))
-                        noise = rng.normal(0., scale=noise_sigma, size=len(fluxes))
-                        model_data["delta_mag"] = np.multiply(-2.5, np.log10(fluxes + noise))
+                        flux = np.power(10, np.divide(model_data["delta_mag"], -2.5))
+                        noise = rng.normal(0., scale=noise_sigma, size=len(flux))
+                        model_data["delta_mag"] = np.multiply(-2.5,
+                                                        np.log10((flux + noise).clip(1e-30, None)))
 
                     # Optionally roll the phase folded mags based on the indicated phase shift
                     phase_shift = params.get("phase_shift", None)
-                    if phase_shift:
+                    if phase_shift and (inst_file_ix > 0 or not ignore_augs_on_train):
                         # Restrict any shift to prevent it moving either eclipse into a no-go zone,
                         # (phase <0.05 or >0.95) when LC is centred on midpoint. Cannot fix extreme
                         # cases where eclipses already there (phiS > 0.9) but don't create more.
@@ -261,7 +272,7 @@ def make_dataset_file(inst_count: int,
 
                     # Optionally add a y-shift up/down to offset the mags' zero point
                     mag_shift = params.get("mag_shift", None)
-                    if mag_shift:
+                    if mag_shift and (inst_file_ix > 0 or not ignore_augs_on_train):
                         model_data["delta_mag"] += mag_shift
 
                     # We store mags_features for various supported bins values
@@ -276,7 +287,7 @@ def make_dataset_file(inst_count: int,
                     # Write the appropriate dataset train/val/test file based on inst/file indices
                     # Use the params dict for labels & extra_features as it's now a superset of both
                     row = deb_example.serialize(inst_id, params, mags_features, params)
-                    ds_writers[inst_file_ixs[inst_ix]].write(row)
+                    ds_writers[inst_file_ix].write(row)
 
                     if csv_file:
                         param_sets.write_to_csv(csv_file, [params], append=True)
