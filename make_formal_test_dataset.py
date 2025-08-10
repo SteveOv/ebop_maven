@@ -124,11 +124,11 @@ Selected targets are:               {', '.join(target_names) if target_names els
                         f"{pe.format} {pe} & {period}.")
             mags_features = {}
             for mag_name, mags_bins in deb_example.stored_mags_features.items():
-                # Phase folding the light-curve, then interpolate for the mags features
+                # Phase folding the light-curve, then bin the mags features
                 # Make sure the normalized fold has the primary/phase-zero at index 0 (like JKTEBOP)
                 wrap_phase = u.Quantity(1.0)
                 fold_lc = lc.fold(period, pe, wrap_phase=wrap_phase, normalize_phase=True)
-                _, mags = pipeline.get_sampled_phase_mags_data(fold_lc, mags_bins, wrap_phase)
+                _, mags = pipeline.get_binned_phase_mags_data(fold_lc, mags_bins, wrap_phase)
                 mags_features[mag_name] = mags
 
             # ecc is not used as a label but is needed to calculate phiS and impact params

@@ -15,7 +15,6 @@ from multiprocessing import Pool
 import hashlib
 
 import numpy as np
-from scipy.interpolate import interp1d
 import tensorflow as tf
 
 from deblib import orbital
@@ -163,7 +162,6 @@ def make_dataset_file(inst_count: int,
     :simulate: whether to simulate the process, skipping only file/directory actions
     """
     # pylint: disable=too-many-branches, too-many-statements
-    interp_kind = "cubic"
     file_stem = f"{file_prefix}{file_ix:03d}"
     report_params = ["rA_plus_rB", "k", "J", "L3", "ecosw", "esinw", "bP", "inc"]
 
@@ -277,12 +275,17 @@ def make_dataset_file(inst_count: int,
 
                     # We store mags_features for various supported bins values
                     mags_features = {}
-                    interp = interp1d(model_data["phase"], model_data["delta_mag"], interp_kind)
-                    for mag_name, mags_bins in deb_example.stored_mags_features.items():
-                        # Ensure we don't waste a bin repeating the value for phase 0.0 & 1.0
-                        new_phases = np.linspace(0., 1., mags_bins + 1)[:-1]
-                        bin_model_data = np.array([new_phases, interp(new_phases)], dtype=np.double)
-                        mags_features[mag_name] = bin_model_data[1]
+                    min_phase, max_phase = model_data["phase"].min(), model_data["phase"].max()
+                    src_mags = model_data["delta_mag"]
+                    for mag_name, n_bins in deb_example.stored_mags_features.items():
+                        # Working with searchsorted side="left" arg, which allocates indices with
+                        # bin_phase[i-1] < src_phase <= bin_phase[i], map all source mags to a bin.
+                        bin_phase = np.flip(np.linspace(max_phase, min_phase, n_bins, False))
+                        phs_bin_ix = np.searchsorted(bin_phase, model_data["phase"])
+                        binned_mags = np.empty((n_bins), dtype=src_mags.dtype)
+                        for bin_ix in range(n_bins): # np.where() -> indices is quicker than masking
+                            binned_mags[bin_ix] = src_mags[np.where(phs_bin_ix == bin_ix)[0]].mean()
+                        mags_features[mag_name] = binned_mags
 
                     # Write the appropriate dataset train/val/test file based on inst/file indices
                     # Use the params dict for labels & extra_features as it's now a superset of both

@@ -343,7 +343,7 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
         print(f"Creating a folded & phase-normalized light curve about {pe.format} {pe} & {period}",
               f"wrapped beyond phase {wrap_phase}" if wrap_phase not in [0.0, 1.0] else "")
         fold_lc = lc.fold(period, pe, wrap_phase=u.Quantity(wrap_phase), normalize_phase=True)
-        _, mags = pipeline.get_sampled_phase_mags_data(fold_lc, mags_bins, wrap_phase)
+        _, mags = pipeline.get_binned_phase_mags_data(fold_lc, mags_bins, wrap_phase)
 
         if do_control_fit:
             pred_vals[ix] = copy.deepcopy(lbl_vals[ix])
