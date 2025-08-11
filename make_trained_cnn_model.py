@@ -224,7 +224,7 @@ if __name__ == "__main__":
             ("training", TRAINSET_DIR, TRAINSET_PIPELINE_AUGS),
             ("validation", VALIDSET_DIR, VALIDSET_PIPELINE_AUGS)
         ]):
-            files = list(set_dir.glob(TRAINSET_GLOB_TERM))
+            files = sorted(set_dir.glob(TRAINSET_GLOB_TERM))
             aug_func = augmentation_callback if requires_augs else None
             if aug_func is not None:
                 print(f"\nThe {label} set pipeline will apply augmentations based on",
