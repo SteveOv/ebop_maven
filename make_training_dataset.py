@@ -31,6 +31,11 @@ dataset_dir.mkdir(parents=True, exist_ok=True)
 # Optional filtering/processing on generated LCs before acceptance
 SWAP_IF_DEEPER_SECONDARY = True
 
+# Control whether static augmentations (noise, roll & y-shift) are applied to mags features when the
+# dataset is created. They will never be applied to train instances if IGNORE_AUGS_ON_TRAIN is True.
+APPLY_STATIC_AUGS = False
+IGNORE_AUGS_ON_TRAIN = True
+
 # max fractional radius: JKTEBOP unsuited to close binaries. As a "rule of thumb" the cut-off is
 # at ~0.2. We go further so as to train a model which will be able to predict upto and beyond this.
 MAX_FRACTIONAL_R = 0.23
@@ -59,6 +64,7 @@ def generate_instances_from_distributions(label: str):
     # Don't use the built-in hash() function; it's not consistent across processes!!!
     seed = int.from_bytes(hashlib.shake_128(label.encode("utf8")).digest(8))
     rng = np.random.default_rng(seed)
+    rng_aug = np.random.default_rng(seed) # Separate so augs on/off doesn't affect other params
 
     while True: # infinite loop; we will continue to yield new instances until generator is closed
         # The "label" params are rA_plus_rB, k, J, ecosw, esinw and bP (or inc, depending on model)
@@ -127,6 +133,12 @@ def generate_instances_from_distributions(label: str):
                 "bS":           orbital.impact_parameter(rA, inc, ecc, esinw, True),
                 "phiS":         orbital.phase_of_secondary_eclipse(ecosw, ecc),
                 "dS_over_dP":   orbital.ratio_of_eclipse_duration(esinw),
+
+                # Optional static augmentations applied to the mags_features generated. Even if set,
+                # they won't be applied to training instances if IGNORE_AUGS_ON_TRAIN is True.
+                "noise_sigma":  abs(rng_aug.normal(loc=0,scale=.03)) if APPLY_STATIC_AUGS else None,
+                "phase_shift":  rng_aug.normal(loc=0, scale=.03) if APPLY_STATIC_AUGS else None,
+                "mag_shift":    rng_aug.normal(loc=0, scale=.03) if APPLY_STATIC_AUGS else None,
             }
 
 
@@ -183,6 +195,8 @@ if __name__ == "__main__":
         code_file = dataset_dir / "parameter-distributions.txt"
         with code_file.open("w", encoding="utf8") as of:
             of.write(f"SWAP_IF_DEEPER_SECONDARY = {SWAP_IF_DEEPER_SECONDARY}\n")
+            of.write(f"APPLY_STATIC_AUGS = {APPLY_STATIC_AUGS}\n")
+            of.write(f"IGNORE_AUGS_ON_TRAIN = {IGNORE_AUGS_ON_TRAIN}\n")
             of.write(f"MAX_FRACTIONAL_R = {MAX_FRACTIONAL_R}\n\n")
             of.write(getsource(generate_instances_from_distributions))
             of.write("\n\n")
@@ -195,6 +209,7 @@ if __name__ == "__main__":
                               generator_func=generate_instances_from_distributions,
                               check_func=is_usable_instance,
                               swap_if_deeper_secondary=SWAP_IF_DEEPER_SECONDARY,
+                              ignore_augs_on_train=IGNORE_AUGS_ON_TRAIN,
                               file_prefix=FILE_PREFIX,
                               valid_ratio=0.2,
                               test_ratio=0,
