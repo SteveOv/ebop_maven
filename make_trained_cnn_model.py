@@ -44,7 +44,9 @@ PLOTS_DIR = SAVE_DIR / "plots"
 TRAINSET_NAME = "formal-training-dataset-" + TRAINSET_SUFFIX
 TRAINSET_GLOB_TERM = "trainset*.tfrecord"
 TRAINSET_DIR = Path(".") / "datasets" / TRAINSET_NAME / "training"
+TRAINSET_PIPELINE_AUGS = True
 VALIDSET_DIR = Path(".") / "datasets" / TRAINSET_NAME / "validation"
+VALIDSET_PIPELINE_AUGS = True
 TESTSET_DIR = Path(".") / "datasets" / "synthetic-mist-tess-dataset"
 
 TRAINING_EPOCHS = 250           # Set high if we're using early stopping
@@ -217,18 +219,20 @@ if __name__ == "__main__":
             print("The mags features will be centred on the midpoint between eclipses.")
         else:
             print(f"The mags features will be wrapped beyond phase {MAGS_WRAP_PHASE}.")
-        print("Augmentations based on:",
-              f"NOISE_MAX_SIGMA={NOISE_MAX}, ROLL_SIGMA={ROLL_SIGMA}, YSHIFT_SIGMA={YSHIFT_SIGMA}:",
-              f"\n{getsource(augmentation_callback)}")
-
-        datasets = [tf.data.TFRecordDataset] * 2
-        counts = [int] * 2
-        map_func = create_map_func(mags_bins=MAGS_BINS, mags_wrap_phase=MAGS_WRAP_PHASE,
-                                   ext_features=CHOSEN_FEATURES, labels=CHOSEN_LABELS,
-                                   augmentation_callback=augmentation_callback)
-        for ix, (label, set_dir) in enumerate([("training", TRAINSET_DIR),
-                                                ("valiation", VALIDSET_DIR)]):
+        datasets, counts = [tf.data.TFRecordDataset] * 2, [int] * 2
+        for ix, (label, set_dir, requires_augs) in enumerate([
+            ("training", TRAINSET_DIR, TRAINSET_PIPELINE_AUGS),
+            ("validation", VALIDSET_DIR, VALIDSET_PIPELINE_AUGS)
+        ]):
             files = list(set_dir.glob(TRAINSET_GLOB_TERM))
+            aug_func = augmentation_callback if requires_augs else None
+            if aug_func is not None:
+                print(f"\nThe {label} set pipeline will apply augmentations based on",
+                      f"NOISE_MAX_SIGMA={NOISE_MAX}, ROLL_SIGMA={ROLL_SIGMA},",
+                      f"YSHIFT_SIGMA={YSHIFT_SIGMA} with:\n{getsource(aug_func)}")
+            map_func = create_map_func(mags_bins=MAGS_BINS, mags_wrap_phase=MAGS_WRAP_PHASE,
+                                       ext_features=CHOSEN_FEATURES, labels=CHOSEN_LABELS,
+                                       augmentation_callback=aug_func)
             if ix == 0:
                 datasets[ix], counts[ix] = create_dataset_pipeline(files, BATCH_FRACTION, map_func,
                                                                    shuffle=True,
