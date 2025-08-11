@@ -511,12 +511,15 @@ def fit_target(lc: LightCurve,
     ld_params = pop_and_complete_ld_config(fit_overrides, target_cfg) # leaves LD*_fit items
 
     attempts = 1 + max(0, retries)
+    if input_params.shape == (1,):
+        input_params = input_params[0]
+    attempt_params = input_params
     best_attempt = 0
     fitted_params = np.empty(shape=(attempts, ),
                              dtype=[(k, np.dtype(UFloat.dtype)) for k in all_fitted_params])
     for attempt in range(attempts):
-        if input_params.shape == (1,):
-            input_params = input_params[0]
+        if attempt_params.shape == (1,):
+            attempt_params = attempt_params[0]
 
         all_in_params = {
             "task": task,
@@ -543,7 +546,7 @@ def fit_target(lc: LightCurve,
             "data_file_name": dat_fname.name,
             "file_name_stem": file_stem,
 
-            **{ n: input_params[n] for n in input_params.dtype.names },
+            **{ n: attempt_params[n] for n in attempt_params.dtype.names },
             **fit_overrides,
             **ld_params,
         }
@@ -559,8 +562,26 @@ def fit_target(lc: LightCurve,
         # JKTEBOP will fail if it finds files from a previous fitting
         for file in fit_dir.glob(f"{file_stem}.*"):
             file.unlink()
-        jktebop.write_in_file(in_fname, append_lines=append_lines, **all_in_params)
         jktebop.write_light_curve_to_dat_file(lc, dat_fname)
+
+        did_revert = False
+        with warnings.catch_warnings(action="always", record=True,
+                                     category=jktebop.JktebopParameterWarning) as wl:
+            # Handle warnings that any params had to be coerced to valid values. Where possible,
+            # revert to initial values as these are more likely usable, then write the file again.
+            jktebop.write_in_file(in_fname, append_lines=append_lines, **all_in_params)
+            for warn in wl:
+                msg = str(warn.message)
+                print("Warning", msg)
+                if "coerced" in msg:
+                    param = msg.split("=", maxsplit=1)[0].strip()
+                    if param in input_params.dtype.names:
+                        print(f"Instead reverting {param} to its initial input value")
+                        all_in_params[param] = input_params[param]
+                        did_revert = True
+
+        if did_revert:
+            jktebop.write_in_file(in_fname, append_lines=append_lines, **all_in_params)
 
         # Warnings are a mess! I haven't found a way to capture a specific type of warning with
         # specified text and leave everything else to behave normally. This is the nearest I can
@@ -580,7 +601,7 @@ def fit_target(lc: LightCurve,
                 if attempt+1 < attempts: # Further attempts available
                     print(f"Attempt {attempt+1} didn't fully converge on a good fit. {attempts}",
                         "attempt(s) allowed so will retry from the final position of this attempt.")
-                    input_params = fitted_params[attempt].copy()
+                    attempt_params = fitted_params[attempt].copy()
                 else:
                     print(f"Failed to fully converge on a good fit after {attempt+1} attempts.",
                           f"Reverting to the results from attempt {best_attempt+1}.")
