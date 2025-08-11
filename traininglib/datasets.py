@@ -46,7 +46,7 @@ def make_dataset(instance_count: int,
     splitting a request into multiple files and calling make_dataset_file() for each within a pool.
     
     :instance_count: the number of training instances to create
-    :file_count: the number of files to spread them over
+    :file_count: the number of files to spread them over - will always write at least 1 file
     :output_dir: the directory to write the files to
     :generator_func: the function to call to infinitely generate systems, until closed,
     which must have arguments (file_stem: str) and return a Generator[dict[str, any]]
@@ -63,9 +63,9 @@ def make_dataset(instance_count: int,
     :verbose: whether to print verbose progress/diagnostic messages
     :simulate: whether to simulate the process, skipping only file/directory actions
     """
+    file_count = max(1, int(file_count))
     if valid_ratio + test_ratio > 1:
         raise ValueError("valid_ratio + test_ratio > 1")
-
     train_ratio = 1 - valid_ratio - test_ratio
 
     if verbose:
