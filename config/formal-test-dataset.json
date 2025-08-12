@@ -1076,8 +1076,8 @@
         "source": "DEBCat and Rediscussion XXIII, Tables II & III. TESS sectors 65 & 66 SAP photometry analysed with JKTEBOP version 43.",
         "reference": "Southworth25obsR23",
         "aka": "TIC 394730113, HD 93486",
-        "exclude": true,
-        "why_exclude": "chacterisation published after submitting this work",
+        "exclude": false,
+        "why_exclude": "",
         "SpT": "F5 IV-V + F5 IV-V",
         "MA": 1.488,            "MA_err": 0.011,
         "MB": 1.482,            "MB_err": 0.011,
@@ -1089,12 +1089,12 @@
         "logLB": 0.936,         "logLB_err": 0.040,
         "rA": 0.17755,          "rA_err": 0.00023,
         "rB": 0.18753,          "rB_err": 0.00019,
-        "desc": "An inclined circular orbit with similar partial eclipses at approximately 0.4 mag each. The stars having similar components and eclipses so predicting k, J and bP is expected to be a challenge.",
+        "desc": "A pair of F5 stars in a 2.83 d circular orbit. The primary and secondary eclipses are partial with similar depths of ~0.4 mag. The primary star (star A) is slightly hotter but smaller than the secondary star. This, along with the similarity of the the eclipses, presents a challenge when predicting k, J and bP.",
         "transits": false,
         "eclipses_similar": true,
         "components_similar": true,
         "shallow_eclipses": false,
-        "notes": "bP derived from rA, inc, e & esinw; control fit uses quality flags and LD params from source article giving an MAE~0.0045;",
+        "notes": "bP derived from rA, inc, e & esinw; control fit uses quality flags, quality mask, power-2 LD law (with 'same' coefficients) from reference giving an MAE~0.0039; this general purpose pipeline and cannot replicate the 8x quadratic normalization functions of the reference analysis, but this is close enough without them;",
         "primary_epoch": 3096.389351,
         "period": 2.8320896,
         "labels": { 
@@ -1111,23 +1111,17 @@
         "sectors": {
             "65": {
                 "quality_bitmask": "hard",
-                "detrend_gap_threshold": 5.0,
                 "detrend_order": 1
             },
             "66": {
                 "quality_bitmask": "hard",
                 "quality_masks": [[3110.25, 3112.00], [3117.25, 3119.10]],
-                "detrend_gap_threshold": 5.0,
                 "detrend_order": 1
             }
         },
         "fit_overrides": {
             "LDA": "pow2",
-            "LDA1": 0.5901,
-            "LDA2": 0.4898,
-            "LDB": "same",
-            "LDB1": 0.5901,
-            "LDB2": 0.4898
+            "LDB": "same"
         }
     },
     "V570 Per": {
