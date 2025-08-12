@@ -1458,10 +1458,10 @@
         "flux_column": "sap_flux"
     },
     "HP Dra": {
-        "source": "DEBCat and Rediscussion XXVI, Tables II and IV. The 120 s SAP photometry from 14 TESS sectors (14, 15, 26, 40, 41, 53-55, 59, 74, 75, 80, 82, 86) analysed with JKTEBOP.",
+        "source": "Rediscussion XXVI, Tables II and IV. The 120 s SAP photometry from 14 TESS sectors (14, 15, 26, 40, 41, 53-55, 59, 74, 75, 80, 82, 86) analysed with JKTEBOP.",
         "reference": "Southworth25obsR26",
-        "exclude": false,
-        "why_exclude": "",
+        "exclude": true,
+        "why_exclude": "Not yet published",
         "aka": "TTIC 48356677, HD 175900",
         "SpT": "F9 V + F9 V",
         "MA": 1.1354,           "MA_err": 0.0023,
