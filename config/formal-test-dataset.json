@@ -1301,6 +1301,53 @@
             "LDB2": 0.50
         }
     },
+    "UZ Dra": {
+        "source": "Rediscussion XXVII, Tables II and V. A total of 41 TESS sectors with 120 s cadence SAP photometry analysed with JKTEBOP version 44.",
+        "reference": "Southworth25obsR27",
+        "exclude": true,
+        "why_exclude": "Not yet in pre-print",
+        "aka": "TIC 48356677",
+        "SpT": "F6 + F8",
+        "MA": 1.291,            "MA_err": 0.012,
+        "MB": 1.193,            "MB_err": 0.009,
+        "RA": 1.2783,           "RA_err": 0.0036,
+        "RB": 1.1224,           "RB_err": 0.0032,
+        "TeffA": 6450,          "TeffA_err": 120,
+        "TeffB": 6170,          "TeffB_err": 120,
+        "logLA": 0.406,         "logLA_err": 0.032,
+        "logLB": 0.216,         "logLB_err": 0.033,
+        "rA": 0.10199,          "rA_err": 0.00007,
+        "rB": 0.08955,          "rB_err": 0.00006,
+        "desc": "A pair of late-F stars in a circular 3.26 d orbit. The light curves show total primary and secondary eclipses (occultations) with depths of ~0.7 and ~0.55 mag. 41 sectors of high cadence photometry are available from TESS due to the system's position within the northern continuous viewing zone. We fit sector 84 as this was the subject of figures 1 & 2 in published source.",
+        "transits": true,
+        "eclipses_similar": true,
+        "components_similar": false,
+        "shallow_eclipses": false,
+        "notes": "bP derived from rA & inc; control fit of sector 84 SAP flux, with hard quality mask and power-2 LD law, gives MAE~0.0042;",
+        "primary_epoch": 3590.203203,
+        "period": 3.261303037,
+        "labels": { 
+            "rA_plus_rB": 0.19154,  "rA_plus_rB_err": 0.00023,
+            "k": 0.87795,           "k_err": 0.00076,
+            "J": 0.8582,            "J_err": 0.0051,
+            "qphot": 0.9244,        "qphot_err": 0.0050,
+            "bP": 0.050,            "bP_err": 0.0041,
+            "inc": 89.708,          "inc_err": 0.024,
+            "ecosw": 0.0,           "ecosw_err": null,
+            "esinw": 0.0,           "esinw_err": null,
+            "L3": 0.0104,           "L3_err": 0.0045
+        },
+        "sectors": {
+            "84": {
+                "quality_bitmask": "hard",
+                "detrend_order": 1
+            }
+        },
+        "fit_overrides": {
+            "LDA": "pow2",
+            "LDB": "pow2"
+        }
+    },
     "V455 Aur": {
         "source": "DEBCat and Rediscussion V, Table II. TESS sector 20 SAP photometry analysed with JKTEBOP version 41. TESS sectors 60 and 73 released subsequent to publication.",
         "reference": "Southworth21obsR5",
