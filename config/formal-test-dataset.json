@@ -1457,6 +1457,55 @@
         },
         "flux_column": "sap_flux"
     },
+    "HP Dra": {
+        "source": "DEBCat and Rediscussion XXVI, Tables II and IV. The 120 s SAP photometry from 14 TESS sectors (14, 15, 26, 40, 41, 53-55, 59, 74, 75, 80, 82, 86) analysed with JKTEBOP.",
+        "reference": "Southworth25obsR26",
+        "exclude": false,
+        "why_exclude": "",
+        "aka": "TTIC 48356677, HD 175900",
+        "SpT": "F9 V + F9 V",
+        "MA": 1.1354,           "MA_err": 0.0023,
+        "MB": 1.0984,           "MB_err": 0.0022,
+        "RA": 1.2474,           "RA_err": 0.0046,
+        "RB": 1.1498,           "RB_err": 0.0049,
+        "TeffA": 6000,          "TeffA_err": 150,
+        "TeffB": 5935,          "TeffB_err": 150,
+        "logLA": 0.259,         "logLA_err": 0.044,
+        "logLB": 0.170,         "logLB_err": 0.033,
+        "rA": 0.04652,          "rA_err": 0.00017,
+        "rB": 0.04288,          "rB_err": 0.00018,
+        "desc": "A pair of late-F stars in a 10.76 d orbit. The light curves show primary and secondary eclipses of approximately 0.28 and 0.24 mag. The variability in the light curves is likely instrumental.",
+        "transits": false,
+        "eclipses_similar": false,
+        "components_similar": false,
+        "shallow_eclipses": false,
+        "notes": "bP derived from rA, inc, e & esinw; best control fit with sector S55 SAP flux, pow2 LD law and hard quality filter (matching the published work) gives MAE~0.007;",
+        "primary_epoch": 2801.376568,
+        "period": 10.76154354,
+        "ecc": 0.03647,         "ecc_err": 0.00011,
+        "omega": 41.38,         "omega_err": 0.19,
+        "labels": { 
+            "rA_plus_rB": 0.08940,  "rA_plus_rB_err": 0.00006,
+            "k": 0.9220,            "k_err": 0.0071,
+            "J": 0.95684,           "J_err": 0.00084,
+            "qphot": 0.9673,        "qphot_err": 0.0013,
+            "bP": 0.8941,           "bP_err": 0.0039,
+            "inc": 87.5554,         "inc_err": 0.0060,
+            "ecosw": 0.027355,      "ecosw_err": 0.000005,
+            "esinw": 0.02411,       "esinw_err": 0.00016,
+            "L3": 0.0049,           "L3_err": 0.0020
+        },
+        "sectors": {
+            "55": {
+                "quality_bitmask": "hard",
+                "detrend_order": 1
+            }
+        },
+        "fit_overrides": {
+            "LDA": "pow2",
+            "LDB": "pow2"
+        }
+    },
     "ZZ UMa": {
         "source": "DEBCat and Rediscussion XI, Table II. TESS sectors 14, 21, 41, 47 and 48 SAP photometry analysed with JKTEBOP version 42.",
         "reference": "Southworth22obsR11",
