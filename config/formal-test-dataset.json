@@ -452,8 +452,8 @@
     "V596 Pup": {
         "source": "DEBCAT and Southworth (2025) Tables II and III. Used SAP flux from TESS sectors 34 and 61 separately characterized with JKTEBOP v43.",
         "reference": "Southworth25obsR24",
-        "exclude": true,
-        "why_exclude": "chacterisation published after submitting this work",
+        "exclude": false,
+        "why_exclude": "",
         "aka": "TIC 144085463, HD 71581",
         "SpT": "A1 V + A1 V",
         "MA": 2.098,            "MA_err": 0.021,
