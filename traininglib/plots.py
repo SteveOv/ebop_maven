@@ -372,7 +372,7 @@ def plot_limb_darkening_coeffs(lookup_table: np.ndarray[float],
 
 def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
                                labels: np.ndarray[UFloat],
-                               transit_mask: np.ndarray[bool],
+                               total_eclipse_mask: np.ndarray[bool],
                                selected_params: List[str]=None,
                                show_errorbars: bool=None,
                                xlabel_prefix: str="label",
@@ -386,8 +386,8 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
 
     :predictions: the prediction values
     :labels: the label values
-    :transit_mask: the associated transit mask; points where the mask is True
-    are plotted as a filled marker otherwise as an empty marker
+    :total_eclipse_mask: the associated mask for systems with total eclipses; points where the mask
+    is True are plotted as a filled marker otherwise as an empty marker
     :selected_params: a subset of the full list of prediction/label params to render
     :show_errorbars: whether to plot errorbars for predictions and labels - if not set the function
     will plot errorbars if there are non-zero error/sigma values in the predictions
@@ -400,16 +400,16 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
     """
     if labels.shape[0] != predictions.shape[0]:
         raise ValueError("labels are of a different length to predictions")
-    if transit_mask is not None and transit_mask.shape[0] != predictions.shape[0]:
-        raise ValueError("transit_mask are of a different length to predictions")
+    if total_eclipse_mask is not None and total_eclipse_mask.shape[0] != predictions.shape[0]:
+        raise ValueError("total_eclipse_mask are of a different length to predictions")
     if hl_mask1 is not None and hl_mask1.shape[0] != predictions.shape[0]:
         raise ValueError("hl_mask1 are given with a different length to predictions")
     if hl_mask2 is not None and hl_mask2.shape[0] != predictions.shape[0]:
         raise ValueError("hl_mask2 are given with a different length to predictions")
     inst_count = predictions.shape[0]
 
-    if transit_mask is None:
-        transit_mask = np.zeros((inst_count), dtype=bool)
+    if total_eclipse_mask is None:
+        total_eclipse_mask = np.zeros((inst_count), dtype=bool)
     if hl_mask1 is None:
         hl_mask1 = np.zeros((inst_count), dtype=bool)
     if hl_mask2 is None:
@@ -477,12 +477,12 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
             # in order of increasing z
             non_hl_mask = ~hl_mask1 & ~hl_mask2
             for (mask,                              fix,    filled) in [
-                (~transit_mask & non_hl_mask,       0,      False),
-                (transit_mask & non_hl_mask,        0,      True),
-                (~transit_mask & hl_mask1,          1,      False),
-                (transit_mask & hl_mask1,           1,      True),
-                (~transit_mask & hl_mask2,          2,      False),
-                (transit_mask & hl_mask2,           2,      True),
+                (~total_eclipse_mask & non_hl_mask, 0,      False),
+                (total_eclipse_mask & non_hl_mask,  0,      True),
+                (~total_eclipse_mask & hl_mask1,    1,      False),
+                (total_eclipse_mask & hl_mask1,     1,      True),
+                (~total_eclipse_mask & hl_mask2,    2,      False),
+                (total_eclipse_mask & hl_mask2,     2,      True),
             ]:
                 if any(mask):
                     fs = "full" if filled else "none"

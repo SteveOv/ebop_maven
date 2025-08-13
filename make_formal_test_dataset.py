@@ -232,7 +232,7 @@ def write_targets_tabular_file(targets_cfg: dict, targets_tex_file: Path, cite_n
                 + f"& {labels['inc']:#.3g} " \
                 + f"& {labels['L3']:#.2g} " \
                 + f"& {config['SpT']} " \
-                + ("& \\checkmark " if config.get("transits", False) else "& ") \
+                + ("& \\checkmark " if config.get("total_eclipses", False) else "& ") \
                 + ("& \\checkmark " if config.get("eclipses_similar", False) else "& ") \
                 + ("& \\checkmark " if config.get("components_similar", False) else "& ") \
                 + ("& \\checkmark " if config.get("shallow_eclipses", False) else "& ") \
@@ -250,7 +250,7 @@ def write_targets_tabular_file(targets_cfg: dict, targets_tex_file: Path, cite_n
                 "\\\\\n",
                 "\\vspace{1ex}\n",
                 "{\\raggedright \\textbf{Notes.} \\\\\n",
-	            "\\emph{Flags:} indicate whether the system shows transits (T), ",
+	            "\\emph{Flags:} indicate whether the system has total eclipses (T), ",
                   "has similar eclipse depths (E), has similar sized components (C) ",
                   "or has shallow eclipses of <0.1 mag (S) \\\\\n",
                 "\\emph{Reference:}",

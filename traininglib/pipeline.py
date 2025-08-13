@@ -365,12 +365,12 @@ def flatten_lightcurve(lc: LightCurve,
     if mask_time_ranges and period is not None:
         # This will be used to set the mask kwargs item, so will override it if already present.
         if verbose:
-            print(f"Creating a flatten transit mask from {len(mask_time_ranges)}",
-                  f"transit time range(s) and the orbital period of {period}.")
-        transit_times = [to_lc_time(np.mean(t), lc) for t in mask_time_ranges]
+            print(f"Creating a flatten eclipse mask from {len(mask_time_ranges)}",
+                  f"eclipse time range(s) and the orbital period of {period}.")
+        eclipse_times = [to_lc_time(np.mean(t), lc) for t in mask_time_ranges]
         durations = [max(t)-min(t) for t in mask_time_ranges]
-        period = [period] * len(transit_times)
-        kwargs["mask"] = lc.create_transit_mask(period, transit_times, durations)
+        period = [period] * len(eclipse_times)
+        kwargs["mask"] = lc.create_transit_mask(period, eclipse_times, durations)
     if "mask" in kwargs:
         pass
     else:

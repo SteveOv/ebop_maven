@@ -141,10 +141,10 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
     print(f"\nCalculating the prediction errors on {inst_count} instances")
     error_vals = calculate_prediction_errors(pred_vals, lbl_vals, super_params)
 
-    # Work out which are the transiting systems so we can break down the reporting
-    pnames = list(inspect.signature(will_transit).parameters)
+    # Work out which systems have any total eclipses so we can break down the reporting
+    pnames = list(inspect.signature(will_total_exclipse).parameters)
     argvs = [lbl_vals[p] / (deb_example.labels_and_scales[p] if scaled else 1) for p in pnames]
-    tran_mask = will_transit(*argvs)
+    total_mask = will_total_exclipse(*argvs)
 
     # Mask for those instances with shallow eclipses, which are expected to be harder to predict
     shallow_mask = np.min([feat_vals["depthP"], feat_vals["depthS"]], axis=0) < 0.1
@@ -171,35 +171,36 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
     show_error_bars = mc_iterations > 1
     table_ix = 0
     # pylint: disable=line-too-long
-    for (subset,                s_mask,                 synth_tbl, synth_plt, synth_sample, synth_hist, frml_tbl, frml_plt) in [
-        ("",                    [True]*inst_count,          True,   True,       False,      True,       True,       True),
-        (" transiting",         tran_mask,                  True,   True,       False,      True,       True,       False),
-        (" non-transiting",     ~tran_mask,                 True,   True,       False,      True,       True,       False),
-        (" deep",               ~shallow_mask,              True,   True,       False,      False,      False,      False),
-        (" deep transiting",    ~shallow_mask & tran_mask,  True,   False,      False,      False,      False,      False),
-        (" deep non-trans",     ~shallow_mask & ~tran_mask, True,   False,      False,      False,      False,      False),
-        (" shallow",            shallow_mask,               True,   True,       False,      False,      False,      False),
-        (" shallow transiting", shallow_mask & tran_mask,   True,   False,      False,      False,      False,      False),
-        (" shallow non-trans",  shallow_mask & ~tran_mask,  True,   False,      False,      False,      False,      False),
+    for (subset,                    s_mask,                 synth_tbl, synth_plt, synth_sample, synth_hist, frml_tbl, frml_plt) in [
+        ("",                        [True]*inst_count,          True,   True,       False,      True,       True,       True),
+        (" total eclipsing",        total_mask,                 True,   True,       False,      True,       True,       False),
+        (" partial eclipsing",      ~total_mask,                True,   True,       False,      True,       True,       False),
+        (" deep",                   ~shallow_mask,              True,   True,       False,      False,      False,      False),
+        (" deep total eclipsing",   ~shallow_mask & total_mask, True,   False,      False,      False,      False,      False),
+        (" deep partial eclipsing", ~shallow_mask & ~total_mask,True,   False,      False,      False,      False,      False),
+        (" shallow",                shallow_mask,               True,   True,       False,      False,      False,      False),
+        (" shallow total eclipsing",shallow_mask & total_mask,  True,   False,      False,      False,      False,      False),
+        (" shallow partial ecl'ing",shallow_mask & ~total_mask, True,   False,      False,      False,      False,      False),
         # Diagnostics: for specific regions or params of interest
-        (" highly eccentric",   high_ecc_mask,              True,   True,       False,      True,       False,      False),
-        (" similar eclipses",   sim_eclipse_mask,           True,   True,       False,      False,      False,      False),
-        (" very deep",          v_deep_mask,                True,   True,       False,      False,      False,      False),
-        (" esinw < zero",       esinw_neg_mask,             False,  False,      False,      True,       False,      False),
+        (" highly eccentric",       high_ecc_mask,              True,   True,       False,      True,       False,      False),
+        (" similar eclipses",       sim_eclipse_mask,           True,   True,       False,      False,      False,      False),
+        (" very deep",              v_deep_mask,                True,   True,       False,      False,      False,      False),
+        (" esinw < zero",           esinw_neg_mask,             False,  False,      False,      True,       False,      False),
         # Diagnostics: problem regions of poor predictions
-        (" droop rA plus rB",   droop_sumr_mask,            True,   False,      False,      True,       False,      False),
-        (" bulge k",            bulge_k_mask,               True,   True,       False,      True,       False,      False),
-        (" bulge k non-trans",  bulge_k_mask & ~tran_mask,  False,  False,      False,      False,      False,      False),
-        (" bulge k shallow",    bulge_k_mask & shallow_mask,False,  True,       False,      False,      False,      False),
-        (" bulge k mod shallow",bulge_k_mask & ~v_deep_mask,True,   True,       False,      False,      False,      False),
-        (" column k preds",     column_k_mask,              False,  False,      True,       False,      False,      False),
-        (" very low k preds",   very_low_k_mask,            False,  True,       False,      True,       False,      False),
+        (" droop rA plus rB",       droop_sumr_mask,            True,   False,      False,      True,       False,      False),
+        (" bulge k",                bulge_k_mask,               True,   True,       False,      True,       False,      False),
+        (" bulge k non-total",      bulge_k_mask & ~total_mask, False,  False,      False,      False,      False,      False),
+        (" bulge k shallow",        bulge_k_mask & shallow_mask,False,  True,       False,      False,      False,      False),
+        (" bulge k mod shallow",    bulge_k_mask & ~v_deep_mask,True,   True,       False,      False,      False,      False),
+        (" column k preds",         column_k_mask,              False,  False,      True,       False,      False,      False),
+        (" very low k preds",       very_low_k_mask,            False,  True,       False,      True,       False,      False),
     ]:
         if any(s_mask):
             # Each subset's preds/labels is picked out with s_mask. We may further subdivide it with
-            # trans and/or "feature" masks which will also require masking with s_mask before use.
+            # total eclipse and/or "feature" masks which also require masking with s_mask before use
             s_preds, s_lbls, s_errs = pred_vals[s_mask], lbl_vals[s_mask], error_vals[s_mask]
-            s_ids, s_tran_mask, s_shall_mask = ids[s_mask], tran_mask[s_mask], shallow_mask[s_mask]
+            s_total_mask, s_shall_mask = total_mask[s_mask], shallow_mask[s_mask]
+            s_ids = ids[s_mask]
             s_count, suffix = len(s_ids), re.sub(r'[^\w\d]', '-', subset.lower())
             print(f"\nEvaluating {mc_type} predictions for {s_count}{subset} instance(s)")
 
@@ -219,9 +220,9 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
 
             # Use pdf as usually smaller file size than eps and also supports transparency/alpha.
             if r_dir and (("synth" in ds_name and synth_plt) or ("formal" in ds_name and frml_plt)):
-                save_predictions_to_csv(ids, s_tran_mask, s_preds, r_dir / f"preds{suffix}.csv")
-                save_predictions_to_csv(ids, s_tran_mask, s_lbls, r_dir / f"labels{suffix}.csv")
-                save_predictions_to_csv(ids, s_tran_mask, s_errs, r_dir / f"errors{suffix}.csv")
+                save_predictions_to_csv(ids, s_total_mask, s_preds, r_dir / f"preds{suffix}.csv")
+                save_predictions_to_csv(ids, s_total_mask, s_lbls, r_dir / f"labels{suffix}.csv")
+                save_predictions_to_csv(ids, s_total_mask, s_errs, r_dir / f"errors{suffix}.csv")
 
                 # Box plot of error distributions for each predicted params as deeper & shallow sets
                 errs_list = [s_errs[~s_shall_mask][plot_params], s_errs[s_shall_mask][plot_params]]
@@ -234,7 +235,7 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
                 # every one, as they become meaningless in small plot area. Helps reduce file size.
                 sl = slice(0, None, int(np.ceil(s_count / 10000)))
                 fixed_viewport = not any(term in subset for term in ["droop", "column k", "low k"])
-                fig = plots.plot_predictions_vs_labels(s_preds[sl], s_lbls[sl], s_tran_mask[sl],
+                fig = plots.plot_predictions_vs_labels(s_preds[sl], s_lbls[sl], s_total_mask[sl],
                                                        plot_params, show_errorbars=show_error_bars,
                                                        hl_mask2=~s_shall_mask[sl],
                                                        fixed_viewport=fixed_viewport)
@@ -243,7 +244,7 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
 
             if r_dir and ("synth" in ds_name and synth_sample):
                 names = [i + " (" + ("Sh" if s else "Dp") + (";Tr" if t else "") + ")"
-                         for i, s, t in zip(s_ids[:50], s_shall_mask[:50], s_tran_mask[:50])]
+                         for i, s, t in zip(s_ids[:50], s_shall_mask[:50], s_total_mask[:50])]
                 fig = plots.plot_folded_lightcurves(mags_vals[s_mask][:50], names,
                                                     mags_wrap_phase=1.0, cols=5)
                 fig.savefig(r_dir / f"samples-{mc_type}-vs-labels{suffix}.pdf")
@@ -295,11 +296,11 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
     mags_wrap_phase = estimator.mags_feature_wrap_phase
     prediction_type = "control" if do_control_fit else "mc" if mc_iterations > 1 else "nonmc"
 
-    # Get the target ids & masks for picking out transiting systems & highlighting specific targets
+    # Get the target ids & masks for picking totally eclipsing systems & highlighting key targets
     targs = include_ids if len(include_ids or []) > 0 else [*targets_config.keys()]
     targs = np.array(targs) if not isinstance(targs, np.ndarray) else targs
     targ_count = len(targs)
-    trans_mask = np.array([targets_config.get(t, {}).get("transits", False) for t in targs])
+    total_mask = np.array([targets_config.get(t, {}).get("total_eclipses", False) for t in targs])
     hl_mask1 = np.array([targets_config.get(t, {}).get("hl_mask1", False) for t in targs])
     hl_mask2 = np.array([targets_config.get(t, {}).get("hl_mask2", False) for t in targs])
 
@@ -384,22 +385,22 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
     if report_dir:
         sub_dir = report_dir / prediction_type
         sub_dir.mkdir(parents=True, exist_ok=True)
-        save_predictions_to_csv(targs, trans_mask, pred_vals, sub_dir / "predictions.csv")
-        save_predictions_to_csv(targs, trans_mask, fit_vals, sub_dir / "fitted-params.csv")
-        save_predictions_to_csv(targs, trans_mask, lbl_vals, sub_dir / "labels.csv")
+        save_predictions_to_csv(targs, total_mask, pred_vals, sub_dir / "predictions.csv")
+        save_predictions_to_csv(targs, total_mask, fit_vals, sub_dir / "fitted-params.csv")
+        save_predictions_to_csv(targs, total_mask, lbl_vals, sub_dir / "labels.csv")
 
         comparison_type = [("labels", "label", lbl_vals)] # type, heading, values
         if comparison_vals is not None:
             comparison_type += [("control", "control", comparison_vals)]
-            save_predictions_to_csv(targs, trans_mask, comparison_vals, sub_dir / "controls.csv")
+            save_predictions_to_csv(targs, total_mask, comparison_vals, sub_dir / "controls.csv")
 
         sub_reports = [
             ("All targets (model labels)",          [True]*targ_count,      estimator.label_names),
-            ("\nTransiting systems only",           trans_mask,             estimator.label_names),
-            ("\nNon-transiting systems only",       ~trans_mask,            estimator.label_names),
+            ("\nTargets with total eclipses",       total_mask,             estimator.label_names),
+            ("\nTargets with only partial eclipses",~total_mask,            estimator.label_names),
             ("\n\n\nAll targets (fitting params)",  [True]*targ_count,      fit_params),
-            ("\nTransiting systems only",           trans_mask,             fit_params),
-            ("\nNon-transiting systems only",       ~trans_mask,            fit_params)]
+            ("\nTargets with total eclipses",       total_mask,             fit_params),
+            ("\nTargets with only partial eclipses",~total_mask,            fit_params)]
 
         for comp_type, comp_head, comp_vals in comparison_type:
             # Summarize this set of predictions as plots-vs-label|control and in text table
@@ -409,7 +410,7 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
                 for (source, pnames) in [("model", estimator.label_names), ("fitting", fit_params)]:
                     if len(pnames) % 2 == 0: # Move ecosw+esinw to the same row on plots 2 axes wide
                         pnames = [n for n in pnames if n not in ["ecosw","esinw"]]+["ecosw","esinw"]
-                    fig = plots.plot_predictions_vs_labels(pred_vals, comp_vals, trans_mask,
+                    fig = plots.plot_predictions_vs_labels(pred_vals, comp_vals, total_mask,
                                                            pnames, xlabel_prefix=comp_head,
                                                            hl_mask1=hl_mask1, hl_mask2=hl_mask2)
                     fig.savefig(sub_dir / f"{preds_stem}-{source}.pdf")
@@ -430,7 +431,7 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
             pnames = fit_params
             if len(pnames) % 2 == 0: # Move ecosw+esinw to the same row on plots 2 axes wide
                 pnames = [n for n in pnames if n not in ["ecosw", "esinw"]] + ["ecosw", "esinw"]
-            fig = plots.plot_predictions_vs_labels(fit_vals, comp_vals, trans_mask, pnames,
+            fig = plots.plot_predictions_vs_labels(fit_vals, comp_vals, total_mask, pnames,
                                                    xlabel_prefix=comp_head, ylabel_prefix="fitted",
                                                    hl_mask1=hl_mask1, hl_mask2=hl_mask2)
             fig.savefig(sub_dir / f"{results_stem}.pdf")
@@ -763,24 +764,24 @@ def primary_impact_param(rA_plus_rB: Union[np.ndarray[float], np.ndarray[UFloat]
     return one_over_rA * cosi * (1 - e**2) / (1 + esinw)
 
 
-def will_transit(rA_plus_rB: Union[np.ndarray[float], np.ndarray[UFloat]],
-                 k: Union[np.ndarray[float], np.ndarray[UFloat]],
-                 inc: Union[np.ndarray[float], np.ndarray[UFloat]],
-                 ecosw: Union[np.ndarray[float], np.ndarray[UFloat]],
-                 esinw: Union[np.ndarray[float], np.ndarray[UFloat]]) \
-                        -> np.ndarray[bool]:
+def will_total_exclipse(rA_plus_rB: Union[np.ndarray[float], np.ndarray[UFloat]],
+                        k: Union[np.ndarray[float], np.ndarray[UFloat]],
+                        inc: Union[np.ndarray[float], np.ndarray[UFloat]],
+                        ecosw: Union[np.ndarray[float], np.ndarray[UFloat]],
+                        esinw: Union[np.ndarray[float], np.ndarray[UFloat]]) \
+                                -> np.ndarray[bool]:
     """
     From the values given over 1 or more systems, this will indicate which will
-    exhibit at least one type of transit.
+    exhibit a total eclipse of at least one of the primary or secondary eclipses.
 
     :rA_plus_rB: the systems' sum of the radii
     :k: the systems' ratio of the radii
     :inc: the orbital inclinations in degrees
     :ecosw: the e*cos(omega) Poincare elements
     :esinw: the e*sin(omega) Poincare elements
-    :returns: flags indicating which systems will transit
+    :returns: flags indicating which systems will exhibit total eclipses
     """
-    # Stop numpy choking on uncertainties; we only need the nominals to estimate a transit
+    # Stop numpy choking on uncertainties; we only need the nominals to estimate an eclipse
     rA_plus_rB = unumpy.nominal_values(rA_plus_rB)
     k = unumpy.nominal_values(k)
     inc = unumpy.nominal_values(inc)
@@ -798,9 +799,9 @@ def will_transit(rA_plus_rB: Union[np.ndarray[float], np.ndarray[UFloat]],
     # Primary:      cos(inc) < rA-rB * (1+esinw) / (1-e^2)
     # Secondary:    cos(inc) < rA-rB * (1-esinw) / (1-e^2)
     pt1 = np.divide(rA_diff_rB, np.subtract(1, np.square(e)))
-    primary_trans = cosi < np.multiply(pt1, np.add(1, esinw))
-    secondary_trans = cosi < np.multiply(pt1, np.subtract(1, esinw))
-    return np.bitwise_or(primary_trans, secondary_trans)
+    primary_total = cosi < np.multiply(pt1, np.add(1, esinw))
+    secondary_total = cosi < np.multiply(pt1, np.subtract(1, esinw))
+    return np.bitwise_or(primary_total, secondary_total)
 
 
 def save_predictions_to_csv(target_names: np.ndarray[str],

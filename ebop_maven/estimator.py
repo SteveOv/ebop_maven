@@ -150,7 +150,7 @@ class Estimator(ABC):
         ratio_radii = preds[0]['k'].nominal_value
 
         # Using masked rows
-        transiting = preds[transit_flags]
+        preds_with_larger_secondary = preds[preds['k'] > 1.0]
 
         # Support for raw_preds
         (preds, raw_preds) = estimator.predict(mags, ext_features, 1000, include_raw_preds=True)
