@@ -1515,13 +1515,13 @@
         "logLB": 0.170,         "logLB_err": 0.033,
         "rA": 0.04652,          "rA_err": 0.00017,
         "rB": 0.04288,          "rB_err": 0.00018,
-        "desc": "A pair of late-F stars in a 10.76 d orbit. The light curves show primary and secondary eclipses of approximately 0.28 and 0.24 mag. The variability in the light curves is likely instrumental.",
+        "desc": "A pair of late-F stars in a 10.76 d orbit. The light curves show primary and secondary eclipses of approximately 0.28 and 0.24 mag. The slow variability in the light curves is likely instrumental in origin.",
         "total_eclipses": false,
         "eclipses_similar": false,
         "components_similar": false,
         "shallow_eclipses": false,
-        "notes": "bP derived from rA, inc, e & esinw; best control fit with sector S55 SAP flux, pow2 LD law and hard quality filter (matching the published work) gives MAE~0.007;",
-        "primary_epoch": 2801.376568,
+        "notes": "bP derived from rA, inc, e & esinw; best control fit with sector S55 using SAP flux, pow2 LD law, hard quality filter (as per the source analysis) and quadratic detrending (to address the variability) to give MAE~0.005; fitting outcomes appear especially sensitive to the value of k;",
+        "primary_epoch": 2801.376551,
         "period": 10.76154354,
         "ecc": 0.03647,         "ecc_err": 0.00011,
         "omega": 41.38,         "omega_err": 0.19,
@@ -1539,7 +1539,8 @@
         "sectors": {
             "55": {
                 "quality_bitmask": "hard",
-                "detrend_order": 1
+                "detrend_order": 2,
+                "detrend_gap_threshold": 0.5
             }
         },
         "fit_overrides": {
