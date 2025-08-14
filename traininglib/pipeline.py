@@ -6,7 +6,6 @@ from typing import Union, List, Iterable, Tuple, Generator
 from pathlib import Path
 
 import numpy as np
-from uncertainties import unumpy
 from scipy import interpolate
 import astropy.units as u
 from astropy.io import fits
@@ -14,6 +13,7 @@ from astropy.time import Time, TimeDelta
 
 import lightkurve as lk
 from lightkurve import LightCurve, FoldedLightCurve, LightCurveCollection
+from ebop_maven import deb_example
 
 
 def find_lightcurves(search_term: any,
@@ -436,7 +436,7 @@ def get_sampled_phase_mags_data(flc: FoldedLightCurve,
 
 
 def get_binned_phase_mags_data(flc: FoldedLightCurve,
-                               num_bins: int = 1024,
+                               num_bins: int = deb_example.default_mags_bins,
                                phase_pivot: Union[u.Quantity, float]=None) \
                                     -> Tuple[np.ndarray, np.ndarray]:
     """
@@ -450,43 +450,12 @@ def get_binned_phase_mags_data(flc: FoldedLightCurve,
     :phase_pivot: the pivot point about which the fold phase was wrapped to < 0; inferred if omitted
     :returns: a tuple with requested number of binned phases and delta magnitudes
     """
-    # Can't use lightkurve's bin() on a FoldedLightCurve: unhappy with phase Quantity as time col.
-    # By using unumpy/ufloats we're aware of the mags' errors in the mean calculation for each bin.
-    src_phase = flc.phase.value
-    src_mags = unumpy.uarray(flc["delta_mag"].value, flc["delta_mag_err"].value).unmasked
-
-    # If there is a phase wrap then phases above the pivot will have been
-    # wrapped around to <0. Work out what the expected minimum phase should be.
-    if phase_pivot is not None:
-        max_phase = phase_pivot.value if isinstance(phase_pivot, u.Quantity) else phase_pivot
-    else:
-        max_phase = src_phase.max()
-    max_phase = max(max_phase, src_phase.max())
-    min_phase = min(max_phase - 1, src_phase.min())
-
-    # Because we will likely know the exact max phase but the min will be infered we make sure the
-    # phases end at the pivot/max_phase but start just "above" the expected min phase (logically
-    # equiv to startpoint=False). Working with the searchsorted side="left" arg, which allocates
-    # indices where bin_phase[i-1] < src_phase <= bin_phase[i], we map all source data to a bin.
-    bin_phase = np.flip(np.linspace(max_phase, min_phase, num_bins, endpoint=False))
-    phase_bin_ix = np.searchsorted(bin_phase, src_phase, "left")
-
-    # Perform the "mean" binning
-    bin_mags = np.empty_like(bin_phase, dtype=float)
-    for bin_ix in range(num_bins):
-        phase_ix = np.where(phase_bin_ix == bin_ix)[0] # np.where() indices are quicker than masking
-        if len(phase_ix) > 0:
-            bin_mags[bin_ix] = src_mags[phase_ix].mean().n
-        else:
-            bin_mags[bin_ix] = np.nan
-
-    # Fill any gaps by interpolation; we have a np.nan where there were no source data within a bin
-    if any(missing := np.isnan(bin_mags)):
-        def equiv_ix(ix):
-            return ix.nonzero()[0]
-        bin_mags[missing] = np.interp(equiv_ix(missing), equiv_ix(~missing), bin_mags[~missing])
-
-    return (bin_phase, bin_mags)
+    if phase_pivot is not None and isinstance(phase_pivot, u.Quantity):
+        phase_pivot = phase_pivot.value
+    return deb_example.create_mags_feature(flc.phase.value,
+                                           flc["delta_mag"].unmasked.value,
+                                           flc["delta_mag_err"].unmasked.value,
+                                           num_bins, phase_pivot, include_phases=True)
 
 
 def find_lightcurve_segments(lc: LightCurve,

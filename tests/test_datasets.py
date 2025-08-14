@@ -29,20 +29,25 @@ class Test_datasets(unittest.TestCase):
         with self.__class__.lock:
             # Set up a feature (light-curve) amd labels and with tracable values
             input_labels = { k: v for v, k in enumerate(deb_example.labels_and_scales) }
-            input_lc_feature =  { deb_example.default_mags_key: np.arange(deb_example.default_mags_bins) }
+
+            # The mags_feature source is a folded-lc twice the length of the resulting feature with
+            # alternate mags values of 0 and 2. We expect each output bin should avg (0+2)/2 = 1.
+            input_phases = np.flip(np.linspace(1.0, 0.0, deb_example.default_mags_bins * 2))
+            input_mags = np.array([0.0, 2.0] * deb_example.default_mags_bins, dtype=float)
+            exp_mag_feature = np.ones((deb_example.default_mags_bins), dtype=float)
+
             input_ext_features = { "phiS": 0.6, "dS_over_dP": 0.96 }
-            deb = deb_example.serialize("t1", input_labels, input_lc_feature, input_ext_features)
+            deb = deb_example.serialize("t1", input_labels, input_phases, input_mags, None, input_ext_features)
 
             # Execute a graph instance of the map_func to mimic a Dateset pipeline.
             # map_parse_fn = create_map_func()
             map_parse_fn = tf.function(create_map_func())
             ((lc_feature, ext_features), labels) = map_parse_fn(deb)
 
-            # lc output should be a Tensor of shape (len, 1) with content unchanged from the input
-            self.assertEqual(lc_feature.shape, (len(input_lc_feature[deb_example.default_mags_key]), 1))
-            for lb_bin, input_lc_bin in zip(lc_feature.numpy()[:, 0],
-                                            input_lc_feature[deb_example.default_mags_key]):
-                self.assertEqual(lb_bin, input_lc_bin)
+            # lc output should be a Tensor of shape (default_mags_bins, 1)
+            # with content the mean of bins taken from the input
+            self.assertEqual(lc_feature.shape, (deb_example.default_mags_bins, 1))
+            self.assertListEqual(lc_feature.numpy()[..., 0].tolist(), exp_mag_feature.tolist())
 
             # features output should be a Tensor of the shape (#features, 1)
             self.assertEqual(ext_features.shape, (len(deb_example.extra_features_and_defaults), 1))
@@ -61,12 +66,10 @@ class Test_datasets(unittest.TestCase):
     def test_create_map_func_wrap_phase(self):
         """ Tests the created map_func's wrap_phase functionality """
         with self.__class__.lock:
-            # Set up a feature (light-curve) amd labels and with tracable values
-            # so the contents of each mags_bin matches its initial index with phase 0 at ix [0]
+            # Phases/mags with each bin's value equal to its phase; makes tracking wrap easier.
             input_labels = { k: v for v, k in enumerate(deb_example.labels_and_scales) }
             mags_bins = deb_example.default_mags_bins
-            input_lc_feature = { deb_example.default_mags_key: np.arange(mags_bins) }
-            deb = deb_example.serialize("t1", input_labels, input_lc_feature, {})
+            input_phases = input_mags = np.flip(np.linspace(1.0, 0.0, mags_bins))
 
             # With wrap_phase we're specifying the last phase in the output; any input phased after
             # this value will "wrapped" round to a negative phase (unless it is zero, when it is
@@ -82,6 +85,8 @@ class Test_datasets(unittest.TestCase):
                 # pylint: disable=cell-var-from-loop
                 # Execute a graph instance of the map_func, with wrap, to mimic a Dateset pipeline.
                 map_parse_fn = tf.function(create_map_func(mags_wrap_phase=wrap_phase))
+
+                deb = deb_example.serialize("t1", input_labels, input_phases, input_mags)
                 ((lc_feature, _), _) = map_parse_fn(deb)
 
                 # Asserting the phase zero (originally zeroth bin) is where we expect
@@ -92,45 +97,38 @@ class Test_datasets(unittest.TestCase):
     def test_create_map_func_adaptive_wrap_phase(self):
         """ Tests the created map_func's adaptive wrap_phase functionality """
         with self.__class__.lock:
+            # Phases/mags with each bin's value equal to its phase; makes tracking wrap easier.
             input_labels = { k: v for v, k in enumerate(deb_example.labels_and_scales) }
+            mags_bins = deb_example.default_mags_bins
+            input_phases = input_mags = np.flip(np.linspace(1.0, 0.0, mags_bins))
 
-            # We test that the map_func uses phiS, which is the phase of the secondary based on the
-            # primary being at phase 0, to work out the phase of the midpoint between the eclipses.
-            # It should then roll the mags to centre them on this midpoint.
-            for _, mags_bins in deb_example.stored_mags_features.items():
-                # A graph instance of the map_func, with wrap==None to enforce adaptive wrap.
-                map_fn = tf.function(create_map_func(mags_bins, mags_wrap_phase=None))
+            # A graph instance of the map_func, with wrap==None to enforce adaptive wrap.
+            map_fn = tf.function(create_map_func(mags_bins, mags_wrap_phase=None))
 
-                # Set up a mags feature with each bin's value equal to its index with the primary
-                # eclipse at phase/index of zero. This allows us to see any wrap that's been applied
-                input_mags = np.arange(mags_bins)
-                mags_feature = { deb_example.create_mags_key(mags_bins): input_mags }
+            for phiS in [0.5, 0.2, 0.33, 0.66, 0.8]:
+                deb = deb_example.serialize("t1", input_labels, input_phases, input_mags, None,
+                                            extra_features={ "phiS": phiS })
+                ((lc_feature, _), _) = map_fn(deb)
 
-                # Serialize checks for the presence of the "default" mags even when not being tested
-                mags_feature.setdefault(deb_example.default_mags_key, np.arange(deb_example.default_mags_bins))
+                # Work out where we expect the parsed mags to be centred; the midpoint between
+                # the primary (at phase 0) and secondary (at phase phiS).
+                eclipse_midpoint_phase = phiS / 2
+                eclipse_midpoint_value = input_mags[int(mags_bins * eclipse_midpoint_phase)]
 
-                for phiS in [0.5, 0.2, 0.33, 0.66, 0.8]:
-                    deb = deb_example.serialize("t1", input_labels, mags_feature, { "phiS": phiS })
-                    ((lc_feature, _), _) = map_fn(deb)
-
-                    # Work out where we expect the parsed mags to be centred; the midpoint between
-                    # the primary (at phase 0) and secondary (at phase phiS).
-                    eclipse_midpoint_phase = phiS / 2
-                    eclipse_midpoint_value = input_mags[int(mags_bins * eclipse_midpoint_phase)]
-
-                    # We expect the mags to now be centred on the midpoint between eclipses.
-                    centre_bin_value = lc_feature.numpy()[mags_bins // 2, 0]
-                    self.assertTrue(abs(eclipse_midpoint_value - centre_bin_value) <= 1)
+                # We expect the mags to now be centred on the midpoint between eclipses.
+                centre_bin_value = lc_feature.numpy()[mags_bins // 2, 0]
+                self.assertTrue(abs(eclipse_midpoint_value - centre_bin_value) <= 1)
 
     def test_create_map_func_with_selected_ext_features(self):
         """ Test that the resulting map_func deserializes a deb_example with subset of ext_features """
         with self.__class__.lock:
-            # Set up a feature (light-curve) amd labels and with tracable values
+            # Set up a mags feature and labels and with tracable values
             input_labels_and_scales = deb_example.labels_and_scales.copy()
             input_labels = { k: v for v, k in enumerate(input_labels_and_scales) }
-            input_mags_feature =  { deb_example.default_mags_key: np.arange(deb_example.default_mags_bins) }
+            input_phases = input_mags = np.flip(np.linspace(1., 0., deb_example.default_mags_bins))
             input_ext_features = { "phiS": 0.6, "dS_over_dP": 0.96 }
-            deb = deb_example.serialize("t1", input_labels, input_mags_feature, input_ext_features)
+            deb = deb_example.serialize("t1", input_labels,
+                                        input_mags, input_phases, None, input_ext_features)
 
             # We're going to request a shuffled subset of the ext_features
             request_features = [f for f in input_ext_features if f not in ["phiS"]]
@@ -156,9 +154,10 @@ class Test_datasets(unittest.TestCase):
             # Set up a feature (light-curve) amd labels and with tracable values
             input_labels_and_scales = deb_example.labels_and_scales.copy()
             input_labels = { k: v for v, k in enumerate(input_labels_and_scales) }
-            input_lc_feature =  { deb_example.default_mags_key: np.arange(deb_example.default_mags_bins) }
+            input_phases = input_mags = np.flip(np.linspace(1., 0., deb_example.default_mags_bins))
             input_ext_features = { "phiS": 0.6, "dS_over_dP": 0.96 }
-            deb = deb_example.serialize("t1", input_labels, input_lc_feature, input_ext_features)
+            deb = deb_example.serialize("t1", input_labels,
+                                        input_mags, input_phases, None, input_ext_features)
 
             # We're going to request a shuffled subset - we should only get these and in this order
             request_labels = [k for k in input_labels_and_scales if k not in ["J"]]
@@ -183,8 +182,9 @@ class Test_datasets(unittest.TestCase):
         with self.__class__.lock:
             # Set up a feature (light-curve) amd labels and with tracable values
             input_labels = { k: v for v, k in enumerate(deb_example.labels_and_scales) }
-            input_lc_feature = { deb_example.default_mags_key: np.arange(deb_example.default_mags_bins) }
-            deb = deb_example.serialize("t1", input_labels, input_lc_feature, {})
+            input_phases = np.flip(np.linspace(1., 0., deb_example.default_mags_bins))
+            input_mags = np.arange(deb_example.default_mags_bins, dtype=float)
+            deb = deb_example.serialize("t1", input_labels, input_phases, input_mags)
 
             for roll_steps in [-5, 0, 5]:
                 def aug_callback(mags_feature):
@@ -198,8 +198,7 @@ class Test_datasets(unittest.TestCase):
                 # Assert that these bins match the input values where they should have been rolled from
                 lc_feature = lc_feature.numpy()[:, 0]
                 for lb_ix in np.arange(500, 600, 1):
-                    self.assertEqual(lc_feature[lb_ix + roll_steps],
-                                     input_lc_feature[deb_example.default_mags_key][lb_ix])
+                    self.assertEqual(lc_feature[lb_ix + roll_steps], input_mags[lb_ix])
 
     def test_create_map_func_with_mags_wrap_and_roll_augmentation(self):
         """ Tests the created map_func's mags_wrap and roll augmentations combine as expected """
@@ -208,8 +207,9 @@ class Test_datasets(unittest.TestCase):
             # so the contents of each mags_bin matches its initial index with phase 0 at ix [0]
             input_labels = { k: v for v, k in enumerate(deb_example.labels_and_scales) }
             mags_bins = deb_example.default_mags_bins
-            input_lc_feature = { deb_example.default_mags_key: np.arange(mags_bins) }
-            deb = deb_example.serialize("t1", input_labels, input_lc_feature, {})
+            input_phases = np.flip(np.linspace(1., 0., mags_bins))
+            input_mags = np.arange(mags_bins, dtype=float)
+            deb = deb_example.serialize("t1", input_labels, input_phases, input_mags)
 
             # We expect the wrap_phase and roll_steps to be additive.
             # Wrap phase specifies the last phase of the output, with any input data phased beyond
@@ -245,8 +245,9 @@ class Test_datasets(unittest.TestCase):
         with self.__class__.lock:
             # Set up a feature (light-curve) amd labels and with tracable values
             input_labels = { k: v for v, k in enumerate(deb_example.labels_and_scales) }
-            input_lc_feature = { deb_example.default_mags_key: [1] * deb_example.default_mags_bins } # all the same, so stddev==0
-            deb = deb_example.serialize("t1", input_labels, input_lc_feature, {})
+            input_phases = np.flip(np.linspace(1., 0., deb_example.default_mags_bins))
+            input_mags = np.ones_like(input_phases, dtype=float)
+            deb = deb_example.serialize("t1", input_labels, input_phases, input_mags)
 
             apply_stddev = 0.01
             def aug_callback(mags_feature):
@@ -265,8 +266,9 @@ class Test_datasets(unittest.TestCase):
         with self.__class__.lock:
             # Set up a feature (light-curve) amd labels and with tracable values
             input_labels = { k: v for v, k in enumerate(deb_example.labels_and_scales) }
-            input_lc_feature = { deb_example.default_mags_key: np.arange(deb_example.default_mags_bins) }
-            deb = deb_example.serialize("t1", input_labels, input_lc_feature, {})
+            input_phases = np.flip(np.linspace(1., 0., deb_example.default_mags_bins))
+            input_mags = np.arange(deb_example.default_mags_bins, dtype=float)
+            deb = deb_example.serialize("t1", input_labels, input_phases, input_mags)
 
             # Augmentation callback with random roll
             def aug_callback(mags_feature):

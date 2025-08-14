@@ -273,23 +273,11 @@ def make_dataset_file(inst_count: int,
                     if mag_shift and (inst_file_ix > 0 or not ignore_augs_on_train):
                         model_data["delta_mag"] += mag_shift
 
-                    # We store mags_features for various supported bins values
-                    mags_features = {}
-                    min_phase, max_phase = model_data["phase"].min(), model_data["phase"].max()
-                    src_mags = model_data["delta_mag"]
-                    for mag_name, n_bins in deb_example.stored_mags_features.items():
-                        # Working with searchsorted side="left" arg, which allocates indices with
-                        # bin_phase[i-1] < src_phase <= bin_phase[i], map all source mags to a bin.
-                        bin_phase = np.flip(np.linspace(max_phase, min_phase, n_bins, False))
-                        phs_bin_ix = np.searchsorted(bin_phase, model_data["phase"])
-                        binned_mags = np.empty((n_bins), dtype=src_mags.dtype)
-                        for bin_ix in range(n_bins): # np.where() -> indices is quicker than masking
-                            binned_mags[bin_ix] = src_mags[np.where(phs_bin_ix == bin_ix)[0]].mean()
-                        mags_features[mag_name] = binned_mags
-
                     # Write the appropriate dataset train/val/test file based on inst/file indices
                     # Use the params dict for labels & extra_features as it's now a superset of both
-                    row = deb_example.serialize(inst_id, params, mags_features, params)
+                    row = deb_example.serialize(inst_id, params,
+                                                model_data["phase"], model_data["delta_mag"],
+                                                extra_features=params)
                     ds_writers[inst_file_ix].write(row)
 
                     if csv_file:
