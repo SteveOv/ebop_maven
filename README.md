@@ -15,6 +15,10 @@ An earlier release of this code and model was presented at the
 held in Litomyšl, Czech Republic during September 2024. The
 [kopal2024](https://github.com/SteveOv/ebop_maven/tree/kopal2024) branch supports this.
 
+**This branch** 
+Investigation into moving to a mulitple input CNN model.
+
+
 Ongoing development continues in main.
 
 ## Overview
