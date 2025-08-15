@@ -251,8 +251,7 @@ def make_dataset_file(inst_count: int,
                         # We apply the noise to fluxes, so revert delta mags to normalized flux
                         flux = np.power(10, np.divide(model_data["delta_mag"], -2.5))
                         noise = rng.normal(0., scale=noise_sigma, size=len(flux))
-                        model_data["delta_mag"] = np.multiply(-2.5,
-                                                        np.log10((flux + noise).clip(1e-30, None)))
+                        model_data["delta_mag"] = np.multiply(-2.5, np.log10((flux + noise)))
 
                     # Optionally roll the phase folded mags based on the indicated phase shift
                     phase_shift = params.get("phase_shift", None)
