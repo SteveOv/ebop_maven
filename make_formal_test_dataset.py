@@ -118,18 +118,13 @@ Selected targets are:               {', '.join(target_names) if target_names els
             pe = pipeline.to_lc_time(target_cfg["primary_epoch"], lc)
             period = target_cfg["period"] * u.d
 
-            # Produce multiple mags set (varying #bins) available for serialization
+            # Phase-fold the light curve with primary/phase(0) at index 0 (like JKTEBOP does for
+            # synth sets). Any rolling of the mags feature will be carried out in the ds pipeline.
+            wrap_phase = u.Quantity(1.0)
             if verbose:
-                print(f"{target}: Creating phase normalized, folded lightcurves about",
-                        f"{pe.format} {pe} & {period}.")
-            mags_features = {}
-            for mag_name, mags_bins in deb_example.stored_mags_features.items():
-                # Phase folding the light-curve, then bin the mags features
-                # Make sure the normalized fold has the primary/phase-zero at index 0 (like JKTEBOP)
-                wrap_phase = u.Quantity(1.0)
-                fold_lc = lc.fold(period, pe, wrap_phase=wrap_phase, normalize_phase=True)
-                _, mags = pipeline.get_binned_phase_mags_data(fold_lc, mags_bins, wrap_phase)
-                mags_features[mag_name] = mags
+                print(f"{target}: Creating phase-normalized folded light curve about",
+                        f"{pe.format} {pe} & {period}, wrapped above phase {wrap_phase}.")
+            fold_lc = lc.fold(period, pe, wrap_phase=wrap_phase, normalize_phase=True)
 
             # ecc is not used as a label but is needed to calculate phiS and impact params
             ecosw, esinw = labels["ecosw"], labels["esinw"]
@@ -159,7 +154,12 @@ Selected targets are:               {', '.join(target_names) if target_names els
             if not simulate:
                 if verbose:
                     print(f"{target}: Saving serialized instance to dataset:", out_file)
-                ds.write(deb_example.serialize(target, labels, mags_features, extra_features))
+                ds.write(deb_example.serialize(target,
+                                               labels,
+                                               fold_lc.phase.value,
+                                               fold_lc["delta_mag"].unmasked.value,
+                                               fold_lc["delta_mag_err"].unmasked.value,
+                                               extra_features))
             elif verbose:
                 print(f"{target}: Simulated saving serialized instance to dataset:", out_file)
             inst_counter += 1

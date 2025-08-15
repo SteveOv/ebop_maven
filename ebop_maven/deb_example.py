@@ -125,7 +125,7 @@ def create_mags_feature(phases: np.ndarray[float],
             bin_mags[bin_ix] = np.nan
 
     # We only need the nominal value for the mags feature
-    if delta_mags_err is not None:
+    if bin_mags.dtype == np.dtype(object): # UFloat
         bin_mags = unumpy.nominal_values(bin_mags)
 
     # Fill any gaps by interpolation; we have a np.nan where there were no source data within a bin
