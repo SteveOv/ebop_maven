@@ -184,7 +184,9 @@ def generate_instances_from_mist_models(label: str):
                 # indicate the conditions from which we decide the amount of noise to add.
                 # The phase and vertical shifts to the mags data mimic imperfect pre-processing.
                 "noise_sigma":  calculate_tess_noise_sigma(apparent_mag=rng.uniform(6, 18)),
-                "phase_shift":  rng.normal(0, scale=0.03),
+                # Can't currently do a phase shift as all three views share the same input feature
+                # "phase_shift":  rng.normal(0, scale=0.03),
+                "phase_shift":  None,
                 "mag_shift":    rng.normal(0, scale=0.01),
 
                 # Further params for potential use as labels/features
@@ -377,7 +379,7 @@ if __name__ == "__main__":
         # Simple diagnostic plot of the mags feature of a small sample of the instances.
         for dataset_file in sorted(dataset_dir.glob(f"**/{FILE_PREFIX}000.tfrecord")):
             print(f"Plotting a sample of the {dataset_file.parent.name} subset's mags features")
-            fig = plots.plot_dataset_instance_mags_features([dataset_file], mags_wrap_phase=0.5,
+            fig = plots.plot_dataset_instance_mags_features([dataset_file], mags_wrap_phase=1.0,
                                                             cols=5, max_instances=50)
             fig.savefig(dataset_dir / f"sample-{dataset_file.parent.name}.png", dpi=150)
             fig.clf()

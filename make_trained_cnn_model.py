@@ -28,11 +28,15 @@ import model_testing
 
 # Configure the inputs and outputs of the model
 CHOSEN_FEATURES = []
-MAGS_BINS = 4096
-MAGS_WRAP_PHASE = None # None indicates wrap to centre on midpoint between eclipses
+
+# Cannot use adaptive positioning with the current share mags feature
+# None indicates wrap to centre on midpoint between eclipses
+MAGS_BINS = deb_example.default_mags_bins
+MAGS_WRAP_PHASE = deb_example.default_mags_wrap_phase
+
 CHOSEN_LABELS = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "bP"]
 OUTPUT_ACTIVATIONS = ["softplus"]*3 + ["linear"]*3
-TRAINSET_SUFFIX = "500k"
+TRAINSET_SUFFIX = "100k"
 
 MODEL_NAME = f"CNN-New-Ext{len(CHOSEN_FEATURES)}-{'-'.join(CHOSEN_LABELS[5:])}-" \
                             + f"{MAGS_BINS}-{MAGS_WRAP_PHASE}-{TRAINSET_SUFFIX}"
@@ -46,7 +50,7 @@ TRAINSET_GLOB_TERM = "trainset*.tfrecord"
 TRAINSET_DIR = Path(".") / "datasets" / TRAINSET_NAME / "training"
 TRAINSET_PIPELINE_AUGS = True
 VALIDSET_DIR = Path(".") / "datasets" / TRAINSET_NAME / "validation"
-VALIDSET_PIPELINE_AUGS = True
+VALIDSET_PIPELINE_AUGS = False # Static augs already applied to validation set 
 TESTSET_DIR = Path(".") / "datasets" / "synthetic-mist-tess-dataset"
 
 TRAINING_EPOCHS = 250           # Set high if we're using early stopping
@@ -102,10 +106,11 @@ def augmentation_callback(mags_feature: tf.Tensor) -> tf.Tensor:
     """
     noise_stddev = tf.random.uniform([], 0.001, NOISE_MAX, tf.float32)
     if noise_stddev != 0:
-        mags_feature += tf.random.normal(mags_feature.shape, stddev=noise_stddev)
-    roll_by = int(MAGS_BINS * tf.random.normal([], stddev=ROLL_SIGMA))
-    if roll_by != 0:
-        mags_feature = tf.roll(mags_feature, [roll_by], axis=[0])
+        mags_feature += tf.random.normal(mags_feature.shape, stddev=noise_stddev)    
+    # Can't currently do a phase shift/roll as all three views share the same input feature
+    # roll_by = int(MAGS_BINS * tf.random.normal([], stddev=ROLL_SIGMA))
+    # if roll_by != 0:
+    #     mags_feature = tf.roll(mags_feature, [roll_by], axis=[0])
     y_shift = tf.random.normal([], stddev=YSHIFT_SIGMA)
     if y_shift != 0:
         mags_feature += y_shift

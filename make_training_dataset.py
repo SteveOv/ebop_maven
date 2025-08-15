@@ -22,7 +22,7 @@ from traininglib.tee import Tee
 
 # By splitting the dataset over multiple files we have the option of using a subset of the dataset
 # using a wildcard match, for example "trainset00?.tfrecord" picks up the first 10 files only.
-DATASET_SIZE = 500000
+DATASET_SIZE = 100000
 FILE_COUNT = DATASET_SIZE // 10000
 FILE_PREFIX = "trainset"
 dataset_dir = Path(f"./datasets/formal-training-dataset-{DATASET_SIZE // 1000}k/")
@@ -33,7 +33,7 @@ SWAP_IF_DEEPER_SECONDARY = True
 
 # Control whether static augmentations (noise, roll & y-shift) are applied to mags features when the
 # dataset is created. They will never be applied to train instances if IGNORE_AUGS_ON_TRAIN is True.
-APPLY_STATIC_AUGS = False
+APPLY_STATIC_AUGS = True
 IGNORE_AUGS_ON_TRAIN = True
 
 # max fractional radius: JKTEBOP unsuited to close binaries. As a "rule of thumb" the cut-off is
@@ -137,7 +137,9 @@ def generate_instances_from_distributions(label: str):
                 # Optional static augmentations applied to the mags_features generated. Even if set,
                 # they won't be applied to training instances if IGNORE_AUGS_ON_TRAIN is True.
                 "noise_sigma":  abs(rng_aug.normal(loc=0,scale=.03)) if APPLY_STATIC_AUGS else None,
-                "phase_shift":  rng_aug.normal(loc=0, scale=.03) if APPLY_STATIC_AUGS else None,
+                # Can't currently do a phase shift as all three views share the same input feature
+                # "phase_shift":  rng_aug.normal(loc=0, scale=.03) if APPLY_STATIC_AUGS else None,
+                "phase_shift":  None,
                 "mag_shift":    rng_aug.normal(loc=0, scale=.03) if APPLY_STATIC_AUGS else None,
             }
 
@@ -231,7 +233,7 @@ if __name__ == "__main__":
         # Simple diagnostic plot of the mags feature of a small sample of the instances.
         for dataset_file in sorted(dataset_dir.glob(f"**/{FILE_PREFIX}000.tfrecord")):
             print(f"Plotting a sample of the {dataset_file.parent.name} subset's mags features")
-            fig = plots.plot_dataset_instance_mags_features([dataset_file], mags_wrap_phase=0.5,
+            fig = plots.plot_dataset_instance_mags_features([dataset_file], mags_wrap_phase=1.0,
                                                             cols=5, max_instances=50)
             fig.savefig(dataset_dir / f"sample-{dataset_file.parent.name}.png", dpi=150)
             fig.clf()

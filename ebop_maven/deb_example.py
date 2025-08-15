@@ -78,7 +78,8 @@ def create_mags_feature(phases: np.ndarray[float],
                         delta_mags_err: np.ndarray[float]=None,
                         num_bins: int=default_mags_bins,
                         phase_pivot: float=None,
-                        include_phases: bool=False) \
+                        include_phases: bool=False,
+                        phase_secondary: float=0.5) \
                            -> Union[np.ndarray[float], Tuple[np.ndarray[float], np.ndarray[float]]]:
     """
     Create a binned copy of the passed light curve delta mags data for use as a mags feature.
@@ -93,6 +94,7 @@ def create_mags_feature(phases: np.ndarray[float],
     :phase_pivot: the pivot point about which the fold phase was wrapped to < 0;
     inferred from the maximum phase value if omitted
     :include_phases: whether to return a tuple of (phases, mags) or just the mags
+    :phase_secondary: the phase of the secondary eclipse, relative to the primary
     :returns: a tuple with requested number of binned phases and delta magnitudes
     """
     # pylint: disable=too-many-arguments, too-many-positional-arguments
@@ -107,32 +109,74 @@ def create_mags_feature(phases: np.ndarray[float],
         max_phase = phases.max()
     min_phase = min(max_phase - 1, phases.min())
 
-    # Because we will likely know the exact max phase but the min will be infered we make sure the
-    # phases end at the pivot/max_phase but start just "above" the expected min phase (logically
-    # equiv to startpoint=False). Working with the searchsorted side="left" arg, which allocates
-    # indices where bin_phase[i-1] < src_phase <= bin_phase[i], we map all source data to a bin.
-    bin_phases = np.flip(np.linspace(max_phase, min_phase, num_bins, endpoint=False))
-    phase_bin_ix = np.searchsorted(bin_phases, phases, "left")
+    bin_phases = np.empty(shape=(num_bins, ), dtype=float)
+    bin_mags = np.empty(shape=(num_bins, ), dtype=float)
+    src_num_bins = len(phases)
 
-    # Perform the "mean" binning
-    bin_mags = np.empty_like(bin_phases, dtype=delta_mags.dtype)
-    for bin_ix in range(num_bins):
-        # np.where() indices are quicker than masking
-        phase_ix = np.where(phase_bin_ix == bin_ix)[0]
-        if len(phase_ix) > 0:
-            bin_mags[bin_ix] = delta_mags[phase_ix].mean()
+    # 3 copies of the binned LC
+    #   1 - full LC over 1024 bins
+    #   2 - "close-up" of primary (0.25 phase centred on 0) over 1536 bins
+    #   3 - "close-up" of secondary (0.25 phase centred on phiS) of 1536 bins
+    # total 4096 bins
+    # Just assume input runs from phase 0 to 1 for now (it should always do this)
+    for (sub_ix,    sub_num_bins, win_mid_phase,    win_phase_width) in [
+        (0,         1024,         0.5,              1.0),
+        (1024,      1536,         0,                0.25),
+        (2560,      1536,         phase_secondary,             0.25)
+    ]:
+        # Extract the requested source data
+        if win_phase_width == 1.0 \
+            and win_mid_phase - win_phase_width / 2 <= phases.min() \
+            and win_mid_phase + win_phase_width / 2 >= phases.max():
+            # We want to bin the whole thing as it is
+            win_phases = phases
+            win_mags = delta_mags
         else:
-            bin_mags[bin_ix] = np.nan
+            win_num_bins = int(win_phase_width * src_num_bins)
+            mid_ix = int(np.argmin(abs(phases - win_mid_phase)))
+            to_ix = int((mid_ix + win_num_bins // 2) % src_num_bins)
+            from_ix = int((to_ix - win_num_bins) % src_num_bins)
 
-    # We only need the nominal value for the mags feature
-    if bin_mags.dtype == np.dtype(object): # UFloat
-        bin_mags = unumpy.nominal_values(bin_mags)
+            if from_ix > to_ix: # Rolls over the end of the phases
+                win_phases = np.concatenate([phases[from_ix:] - 1, phases[:to_ix]])
+                win_mags = np.concatenate([delta_mags[from_ix:], delta_mags[:to_ix]])
+            else:
+                win_phases = phases[from_ix:to_ix]
+                win_mags = delta_mags[from_ix:to_ix]
 
-    # Fill any gaps by interpolation; we have a np.nan where there were no source data within a bin
-    if any(missing := np.isnan(bin_mags)):
-        def equiv_ix(ix):
-            return ix.nonzero()[0]
-        bin_mags[missing] = np.interp(equiv_ix(missing), equiv_ix(~missing), bin_mags[~missing])
+        max_phase = max(win_mid_phase + win_phase_width / 2, win_phases.max())
+        min_phase = min(max_phase - win_phase_width, win_phases.min())
+
+        # Because we'll likely know the exact max phase but the min will be infered we make sure the
+        # phases end at the pivot/max_phase but start just "above" the expected min phase (logically
+        # equiv to startpoint=False). Working with the searchsorted side="left" arg, which allocates
+        # indices where bin_phase[i-1] < src_phase <= bin_phase[i], we map all source data to a bin.
+        sub_bin_phases = np.flip(np.linspace(max_phase, min_phase, sub_num_bins, endpoint=False))
+        phase_bin_ix = np.searchsorted(sub_bin_phases, win_phases, "left")
+
+        # Perform the "mean" binning on this subset
+        sub_bin_mags = np.empty(shape=(sub_num_bins, ), dtype=win_mags.dtype)
+        for bin_ix in range(sub_num_bins):
+            # np.where() indices are quicker than masking
+            phase_ix = np.where(phase_bin_ix == bin_ix)[0]
+            if len(phase_ix) > 0:
+                sub_bin_mags[bin_ix] = win_mags[phase_ix].mean()
+            else:
+                sub_bin_mags[bin_ix] = np.nan
+
+        # We only need the nominal value for the mags feature
+        if sub_bin_mags.dtype == np.dtype(object): # UFloat
+            sub_bin_mags = unumpy.nominal_values(sub_bin_mags)
+
+        # Fill gaps by interpolation; we have np.nan where there were no source data within a bin
+        if any(missing := np.isnan(sub_bin_mags)):
+            def equiv_ix(ix):
+                return ix.nonzero()[0]
+            sub_bin_mags[missing] = \
+                            np.interp(equiv_ix(missing), equiv_ix(~missing), sub_bin_mags[~missing])
+
+        bin_mags[sub_ix:sub_ix+sub_num_bins] = sub_bin_mags
+        bin_phases[sub_ix:sub_ix+sub_num_bins] = sub_bin_phases
 
     if include_phases:
         return bin_phases, bin_mags
@@ -162,6 +206,7 @@ def serialize(identifier: str,
 
     if extra_features is None:
         extra_features = {}
+    phase_2nd = extra_features.get("phiS", extra_features_and_defaults["phiS"])
 
     features = {
         "id": _to_bytes_feature(identifier),
@@ -171,8 +216,8 @@ def serialize(identifier: str,
 
         # Any supported configurations of the magnitudes feature derived from the
         # phase-folded light curve data passed in (ignore the binned phase output)
-        **{ k : _to_float_feature(create_mags_feature(phases, delta_mags, None,
-                                                      num_bins, phase_pivot, False))
+        **{ k : _to_float_feature(create_mags_feature(phases, delta_mags, None, num_bins,
+                                                      phase_pivot, False, phase_2nd))
                     for k, num_bins in stored_mags_features.items() },
 
         # Extra features, will fall back on default value where not given
