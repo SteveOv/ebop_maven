@@ -379,6 +379,84 @@ def build_mags_ext_model(
     return model
 
 
+def build_tri_view_model(
+        name: str="Tri-View-Model",
+        full_fold_input: KerasTensor=mags_input_layer((1024, 1), name="Full-Mags", verbose=False),
+        full_fold_layers: List[Callable[[KerasTensor], KerasTensor]]=None,
+        prim_ecl_input: KerasTensor=mags_input_layer((1024, 1), name="Prim-Ecl", verbose=False),
+        prim_ecl_layers: List[Callable[[KerasTensor], KerasTensor]]=None,
+        sec_ecl_input: KerasTensor=mags_input_layer((1024, 1), name="Sec-Ecl", verbose=False),
+        sec_ecl_layers: List[Callable[[KerasTensor], KerasTensor]]=None,
+        ext_input: KerasTensor=ext_input_layer(verbose=False),
+        dnn_layers: List[Callable[[KerasTensor], KerasTensor]]=None,
+        output: Callable[[KerasTensor], KerasTensor]=output_layer(verbose=False),
+        post_build_step: Callable[[models.Model], None]=None,
+        verbose: bool=False
+    ) -> models.Model:
+    """
+    Builds a multiple input model with separate Full-Mags, Prim-Ecl and Sec-Ecl feature inputs.
+    These are concatenated and a Deep Neural Network is appended. Finally an output layer
+    is appended before the final Model is returned.
+
+    :name: the name of the new model
+    :full_fold_input: the phase-folded lightcurve magnitudes feature input
+    :full_fold_layers: list of layers which process the full folded LC mags input tensor
+    :prim_ecl_input: the primary eclipse magnitudes feature input
+    :prim_ecl_layers: list of layers which process the primary eclipse mags input tensor
+    :sec_ecl_input: the secondary eclipse magnitudes feature input
+    :sec_ecl_layers: list of layers which process the secondary eclipse mags input tensor
+    :ext_input: the extra features input
+    :dnn_layers: list of neural network layers for processing the concatenated
+    outputs of the mags and ext layers
+    :output: the output layer for publishing the output of the dnn_layers
+    :post_build_step: optional hook to interact with the newly built model
+    :verbose: print out info of what's happening
+    :returns: the new model
+    """
+    # pylint: disable=too-many-arguments
+
+    # Build up the model by building the two input branches, concatenating them, passing their
+    # combined output to a DNN and then passing the DNN output to a set of output neurons.
+    cnn_output_tensors = [full_fold_input, prim_ecl_input, sec_ecl_input]
+    input_names = [i.name for i in cnn_output_tensors]
+    for input_ix, cnn_layers in enumerate([full_fold_layers, prim_ecl_layers, sec_ecl_layers]):
+        if cnn_layers:
+            if not isinstance(cnn_layers, List):
+                cnn_layers = [cnn_layers]
+            for buildit in cnn_layers:
+                if buildit:
+                    cnn_output_tensors[input_ix] = buildit(cnn_output_tensors[input_ix])
+
+    output_tensor = layers.Concatenate(axis=1, name="DNN-Input")([
+        layers.Flatten(name=f"{n}-Reshape")(t) for n, t in zip(input_names, cnn_output_tensors)
+    ] + [layers.Flatten(name="Ext-Reshape")(ext_input)])
+
+    # if verbose:
+    #     print( "Creating Concatenate('DNN-Input', axis=1)",
+    #           f"([Flatten('Mags-Reshape')({mags_tensor.shape}),",
+    #           f" Flatten('Prim-Reshape')({prim_tensor.shape}),",
+    #           f" Flatten('Sec-Reshape')({sec_tensor.shape})]) -> {output_tensor.shape}")
+
+    if dnn_layers:
+        if not isinstance(dnn_layers, List):
+            dnn_layers = [dnn_layers]
+        for buildit in dnn_layers:
+            if buildit:
+                output_tensor = buildit(output_tensor)
+
+    output_tensor = output(output_tensor)
+    model = models.Model(inputs=[full_fold_input, prim_ecl_input, sec_ecl_input, ext_input],
+                         outputs=output_tensor, name=name)
+
+    if post_build_step:
+        if verbose:
+            print(f"Calling out to the post_build_step: {post_build_step}")
+        post_build_step(model)
+
+    return model
+
+
+
 def save_model(file_name: Path,
                model: models.Model):
     """

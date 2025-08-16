@@ -9,6 +9,7 @@ from inspect import getsource
 from datetime import datetime, timezone
 from contextlib import redirect_stdout
 from warnings import filterwarnings
+from numbers import Number
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -22,35 +23,36 @@ from keras.src.layers.pooling.base_pooling import BasePooling
 from ebop_maven import modelling, deb_example
 from traininglib.keras_custom.metrics import MeanAbsoluteErrorForLabel
 from traininglib import plotting
-from traininglib.datasets import create_map_func, create_dataset_pipeline
+from traininglib.datasets import create_map_func, create_tri_view_map_func, create_dataset_pipeline
 from traininglib.tee import Tee
 import model_testing
 
 # Configure the inputs and outputs of the model
 CHOSEN_FEATURES = []
 
-# Cannot use adaptive positioning with the current share mags feature
-# None indicates wrap to centre on midpoint between eclipses
-MAGS_BINS = deb_example.default_mags_bins
+# The size of each of the mags input views of the tri-view model
+MAGS_BINS = (1024, 1024, 1024)
 MAGS_WRAP_PHASE = deb_example.default_mags_wrap_phase
 
 CHOSEN_LABELS = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "bP"]
 OUTPUT_ACTIVATIONS = ["softplus"]*3 + ["linear"]*3
-TRAINSET_SUFFIX = "100k"
+TRAINSET_SUFFIX = "100k-control-augs-norm-0.03"
 
-MODEL_NAME = f"CNN-New-Ext{len(CHOSEN_FEATURES)}-{'-'.join(CHOSEN_LABELS[5:])}-" \
-                            + f"{MAGS_BINS}-{MAGS_WRAP_PHASE}-{TRAINSET_SUFFIX}"
+MODEL_NAME = f"CNN-Tri-View-{'-'.join(f'{b}' for b in MAGS_BINS)}-{MAGS_WRAP_PHASE}-" \
+                    + f"{'-'.join(CHOSEN_LABELS[5:])}-{TRAINSET_SUFFIX}"
 MODEL_FILE_NAME = "default-model"
 SAVE_DIR = Path("./drop/training") / MODEL_NAME.lower()
 PLOTS_DIR = SAVE_DIR / "plots"
 
 # We can now specify paths to train/val/test datasets separately for greater flexibility.
+# The tri-view model can train on the previous datasets created with a single mag_4096 feature,
+# without the zoom1 modifications, using a revised map func which generates the 3x input features.
 TRAINSET_NAME = "formal-training-dataset-" + TRAINSET_SUFFIX
 TRAINSET_GLOB_TERM = "trainset*.tfrecord"
 TRAINSET_DIR = Path(".") / "datasets" / TRAINSET_NAME / "training"
 TRAINSET_PIPELINE_AUGS = True
 VALIDSET_DIR = Path(".") / "datasets" / TRAINSET_NAME / "validation"
-VALIDSET_PIPELINE_AUGS = False # Static augs already applied to validation set 
+VALIDSET_PIPELINE_AUGS = False # Static augs already applied to validation set
 TESTSET_DIR = Path(".") / "datasets" / "synthetic-mist-tess-dataset"
 
 TRAINING_EPOCHS = 250           # Set high if we're using early stopping
@@ -88,7 +90,7 @@ CNN_POOLING_TYPE = layers.MaxPool1D # pylint: disable=invalid-name
 # For the dense layers: "glorot_uniform" (def) "he_normal", "he_uniform" (he_ goes well with ReLU)
 DNN_INITIALIZER = "he_uniform"
 DNN_ACTIVATE = "leaky_relu"
-DNN_NUM_UNITS = 256
+DNN_NUM_UNITS = 384
 DNN_NUM_FULL_LAYERS = 2
 DNN_DROPOUT_RATE = 0.5
 DNN_NUM_TAPER_UNITS = 64
@@ -106,11 +108,10 @@ def augmentation_callback(mags_feature: tf.Tensor) -> tf.Tensor:
     """
     noise_stddev = tf.random.uniform([], 0.001, NOISE_MAX, tf.float32)
     if noise_stddev != 0:
-        mags_feature += tf.random.normal(mags_feature.shape, stddev=noise_stddev)    
-    # Can't currently do a phase shift/roll as all three views share the same input feature
-    # roll_by = int(MAGS_BINS * tf.random.normal([], stddev=ROLL_SIGMA))
-    # if roll_by != 0:
-    #     mags_feature = tf.roll(mags_feature, [roll_by], axis=[0])
+        mags_feature += tf.random.normal(mags_feature.shape, stddev=noise_stddev)
+    roll_by = int(mags_feature.shape[0] * tf.random.normal([], stddev=ROLL_SIGMA))
+    if roll_by != 0:
+        mags_feature = tf.roll(mags_feature, [roll_by], axis=[0])
     y_shift = tf.random.normal([], stddev=YSHIFT_SIGMA)
     if y_shift != 0:
         mags_feature += y_shift
@@ -140,6 +141,9 @@ def make_best_model(chosen_features: list[str]=CHOSEN_FEATURES,
     """
     # pylint: disable=too-many-arguments, too-many-locals, dangerous-default-value
     print("\nBuilding the best known CNN model for predicting:", ", ".join(chosen_labels))
+    if isinstance(mags_bins, Number):
+        mags_bins = (mags_bins, mags_bins, mags_bins)
+
     metadata = { # This will augment the model, giving an Estimator context information
         "extra_features_and_defaults": 
                     {f: deb_example.extra_features_and_defaults[f] for f in chosen_features },
@@ -149,18 +153,38 @@ def make_best_model(chosen_features: list[str]=CHOSEN_FEATURES,
         "trainset_name": trainset_name,
         "created_timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
-    best_model = modelling.build_mags_ext_model(
-        mags_input=modelling.mags_input_layer(shape=(mags_bins, 1), verbose=verbose),
-        ext_input=modelling.ext_input_layer(shape=(len(chosen_features), 1), verbose=verbose),
-        mags_layers=[
-            modelling.conv1d_layers(2, 16, 32, 2, cnn_padding, cnn_activation, "Conv-1-", verbose),
-            modelling.pooling_layer(cnn_pooling, 2, 2, "Pool-1", verbose),
-            modelling.conv1d_layers(2, 32, 16, 2, cnn_padding, cnn_activation, "Conv-2-", verbose),
-            modelling.pooling_layer(cnn_pooling, 2, 2, "Pool-2", verbose),
-            modelling.conv1d_layers(2, 64, 8, 2, cnn_padding, cnn_activation, "Conv-3-", verbose),
-            modelling.pooling_layer(cnn_pooling, 2, 2, "Pool-3", verbose),
-            modelling.conv1d_layers(2, 128, 4, 2, cnn_padding, cnn_activation, "Conv-4-", verbose),
+    best_model = modelling.build_tri_view_model(
+        full_fold_input=modelling.mags_input_layer(shape=(mags_bins[0], 1), name="Full-Input", verbose=verbose),
+        full_fold_layers=[
+            modelling.conv1d_layers(2, 16, 32, 2, cnn_padding, cnn_activation, "Full-Conv-1-", verbose),
+            modelling.pooling_layer(cnn_pooling, 2, 2, "Full-Pool-1", verbose),
+            modelling.conv1d_layers(2, 32, 16, 2, cnn_padding, cnn_activation, "Full-Conv-2-", verbose),
+            modelling.pooling_layer(cnn_pooling, 2, 2, "Full-Pool-2", verbose),
+            modelling.conv1d_layers(2, 64, 8, 2, cnn_padding, cnn_activation, "Full-Conv-3-", verbose),
+            modelling.pooling_layer(cnn_pooling, 2, 2, "Full-Pool-3", verbose),
+            modelling.conv1d_layers(1, 128, 4, 2, cnn_padding, cnn_activation, "Full-Conv-4-", verbose),
         ],
+        prim_ecl_input=modelling.mags_input_layer(shape=(mags_bins[1], 1), name="Prim-Input", verbose=True),
+        prim_ecl_layers=[
+            modelling.conv1d_layers(2, 16, 32, 2, cnn_padding, cnn_activation, "Prim-Conv-1-", verbose),
+            modelling.pooling_layer(cnn_pooling, 2, 2, "Prim-Pool-1", verbose),
+            modelling.conv1d_layers(2, 32, 16, 2, cnn_padding, cnn_activation, "Prim-Conv-2-", verbose),
+            modelling.pooling_layer(cnn_pooling, 2, 2, "Prim-Pool-2", verbose),
+            modelling.conv1d_layers(2, 64, 8, 2, cnn_padding, cnn_activation, "Prim-Conv-3-", verbose),
+            modelling.pooling_layer(cnn_pooling, 2, 2, "Prim-Pool-3", verbose),
+            modelling.conv1d_layers(1, 128, 4, 2, cnn_padding, cnn_activation, "Prim-Conv-4-", verbose),
+        ],
+        sec_ecl_input=modelling.mags_input_layer(shape=(mags_bins[2], 1), name="Sec-Input", verbose=True),
+        sec_ecl_layers=[
+            modelling.conv1d_layers(2, 16, 32, 2, cnn_padding, cnn_activation, "Sec-Conv-1-", verbose),
+            modelling.pooling_layer(cnn_pooling, 2, 2, "Sec-Pool-1", verbose),
+            modelling.conv1d_layers(2, 32, 16, 2, cnn_padding, cnn_activation, "Sec-Conv-2-", verbose),
+            modelling.pooling_layer(cnn_pooling, 2, 2, "Sec-Pool-2", verbose),
+            modelling.conv1d_layers(2, 64, 8, 2, cnn_padding, cnn_activation, "Sec-Conv-3-", verbose),
+            modelling.pooling_layer(cnn_pooling, 2, 2, "Sec-Pool-3", verbose),
+            modelling.conv1d_layers(1, 128, 4, 2, cnn_padding, cnn_activation, "Sec-Conv-4-", verbose),
+        ],
+        ext_input=modelling.ext_input_layer(shape=(len(chosen_features), 1), verbose=verbose),
         dnn_layers=[
             modelling.hidden_layers(int(dnn_num_layers), int(dnn_num_units),
                                     dnn_initializer, dnn_activation,
@@ -235,9 +259,9 @@ if __name__ == "__main__":
                 print(f"\nThe {label} set pipeline will apply augmentations based on",
                       f"NOISE_MAX_SIGMA={NOISE_MAX}, ROLL_SIGMA={ROLL_SIGMA},",
                       f"YSHIFT_SIGMA={YSHIFT_SIGMA} with:\n{getsource(aug_func)}")
-            map_func = create_map_func(mags_bins=MAGS_BINS, mags_wrap_phase=MAGS_WRAP_PHASE,
-                                       ext_features=CHOSEN_FEATURES, labels=CHOSEN_LABELS,
-                                       augmentation_callback=aug_func)
+            map_func = create_tri_view_map_func(mags_bins=MAGS_BINS,
+                                                ext_features=CHOSEN_FEATURES, labels=CHOSEN_LABELS,
+                                                augmentation_callback=aug_func)
             if ix == 0:
                 datasets[ix], counts[ix] = create_dataset_pipeline(files, BATCH_FRACTION, map_func,
                                                                    shuffle=True,

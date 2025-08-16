@@ -3,7 +3,7 @@ Functions for generating binary system instances and for writing/reading dataset
 """
 # Use ucase variable names where they match the equivalent symbol and pylint can't find units alias
 # pylint: disable=invalid-name, no-member, too-many-arguments, too-many-locals
-from typing import Callable, Generator, List, Tuple, Iterable
+from typing import Callable, Generator, List, Tuple, Iterable, Union
 import os
 import errno
 import sys
@@ -13,6 +13,7 @@ from datetime import timedelta, datetime
 import traceback
 from multiprocessing import Pool
 import hashlib
+from numbers import Number
 
 import numpy as np
 import tensorflow as tf
@@ -410,6 +411,100 @@ def create_map_func(mags_bins: int = deb_example.default_mags_bins,
         if include_id:
             return (example["id"], (mags_feature, ext_features), labels)
         return ((mags_feature, ext_features), labels)
+    return map_func
+
+
+def create_tri_view_map_func(mags_bins: Union[int, Tuple[int, int, int]] = 1024,
+                             ext_features: List[str] = None,
+                             labels: List[str] = None,
+                             augmentation_callback: Callable[[tf.Tensor], tf.Tensor] = None,
+                             scale_labels: bool=True,
+                             include_id: bool=False) -> Callable:
+    """
+    Configures and returns a dataset map function for deb_examples for use with a Tri-View, 3 mags
+    input model. The map function is used by TFRecordDataset().map() to deserialize each raw 
+    tfrecord row into the corresponding features and labels required for model training or testing.
+    The three views are generated from the single mags features stored in a deb_example.
+        
+    In addition to deserializing the rows, the map function supports the option of augmenting the
+    mags_feature data by supplying a reference to an augmentation_callback function. This callback
+    will be called from a graphed function so must be compatible with tf.function.
+    A simple example to augment the mags_feature with additive Gaussian noise:
+    ```Python
+    @tf.function
+    def sample_aug_callback(mags_feature: tf.Tensor) -> tf.Tensor:
+        return mags_feature + tf.random.normal(mags_feature.shape, stddev=0.005)
+    ```
+
+    :mags_bins: the width of each of the mags views to publish
+    :ext_features: chosen subset of available ext_features, in the requested order, or all if None
+    :labels: chosen subset of available labels, in requested order, or all if None
+    :augmentation_callback: optional function with which client code can augment mags_feature data.
+    :scale_labels: whether to apply scaling to the map function's returned labels
+    :include_id: whether to include the id in the function's returned tuple. If true, it returns
+    (id, (mags_feature, ext_features), labels) per inst else ((mags_feature, ext_features), labels)
+    :returns: the newly generated map function
+    """
+    # pylint: disable=too-many-arguments
+    deb_mags_bins = deb_example.default_mags_bins
+    if isinstance(mags_bins, Number):
+        mags_bins = (mags_bins, mags_bins, mags_bins)
+
+    if ext_features is not None:
+        chosen_ext_feat_and_defs = \
+            { ef: deb_example.extra_features_and_defaults[ef] for ef in ext_features}
+    else:
+        chosen_ext_feat_and_defs = deb_example.extra_features_and_defaults
+
+    if labels is not None:
+        chosen_lab_and_scl = { l: deb_example.labels_and_scales[l] for l in labels }
+    else:
+        chosen_lab_and_scl = deb_example.labels_and_scales
+
+    def map_func(record_bytes):
+        example = tf.io.parse_single_example(record_bytes, deb_example.description)
+
+        # Get the full phase-folded LC as stored in the DS
+        # Assume mags will have been stored with phase implied by index and primary eclipse at zero
+        mags_feature = tf.reshape(example[deb_example.default_mags_key], shape=(deb_mags_bins, 1))
+
+        # Augmentations: not all potential augmentations have in-place updates (i.e. tf.roll) so we
+        # endure the overhead of send/return rather than using "byref" behaviour of a mutable arg.
+        if augmentation_callback:
+            mags_feature = augmentation_callback(mags_feature)
+
+        # Once the augs have been applied, we can split the feature into the 3 views needed
+        # First the Full-Input.
+        mags_full_step = deb_mags_bins // mags_bins[0]
+        mags_full_input = tf.reshape(mags_feature[::mags_full_step], shape=(mags_bins[0], 1))
+
+        # View for the Prim-Input
+        mags_prim_input = tf.concat([mags_feature[-mags_bins[1] // 2:],
+                                     mags_feature[:mags_bins[1] // 2]], axis=0)
+
+        # View for the Sec-Input
+        mid_ix = deb_mags_bins // example.get("phiS", 0.5)
+        to_ix = int((mid_ix + mags_bins[2] // 2) % deb_mags_bins)
+        from_ix = int((to_ix - mags_bins[2]) % deb_mags_bins)
+        if from_ix > to_ix: # Roll over the end of the phases
+            mags_sec_input = tf.concat([mags_feature[from_ix:], mags_feature[:to_ix]], axis=0)
+        else:
+            mags_sec_input = mags_feature[from_ix:to_ix]
+
+        # The Extra features: ignore unknown fields and use default if not found
+        ext_features = [example.get(k, d) for (k, d) in chosen_ext_feat_and_defs.items()]
+        ext_features = tf.reshape(ext_features, shape=(len(ext_features), 1))
+
+        # Copy labels in the expected order & optionally apply any scaling
+        if scale_labels:
+            labels = [example[k] * s for k, s in chosen_lab_and_scl.items()]
+        else:
+            labels = [example[k] for k in chosen_lab_and_scl]
+
+        features = (mags_full_input, mags_prim_input, mags_sec_input, ext_features)
+        if include_id:
+            return (example["id"], features, labels)
+        return (features, labels)
     return map_func
 
 
