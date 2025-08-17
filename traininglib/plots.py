@@ -184,7 +184,6 @@ def plot_formal_test_dataset_hr_diagram(targets_cfg: Dict[str, any],
 
 def plot_dataset_instance_mags_features(dataset_files: Iterable[Path],
                                         chosen_targets: List[str]=None,
-                                        mags_bins: int=4096,
                                         mags_wrap_phase: float=0.75,
                                         cols: int=3,
                                         max_instances: int=np.inf,
@@ -194,7 +193,6 @@ def plot_dataset_instance_mags_features(dataset_files: Iterable[Path],
 
     :dataset_files: the set of dataset files to parse
     :chosen_targets: a list of ids to find and plot, or all as yielded (up to max_instances) if None
-    :mags_bins: the width of the mags to publish
     :mags_wrap_phase: the wrap phase of the mags to publish
     :max_instances: the maximum number of instances to plot
     :format_kwargs: kwargs to be passed on to format_axes()
@@ -203,12 +201,10 @@ def plot_dataset_instance_mags_features(dataset_files: Iterable[Path],
     # Get the instances for each matching target.
     # We don't wrap the mags data here as the wrapping is handled in plot_folded_lightcurves()
     # which infers the actual phase from the data index
-    (names, mags_features, _, _) = read_dataset(dataset_files,
-                                                mags_bins=mags_bins,
-                                                mags_wrap_phase=1.0,
-                                                identifiers=chosen_targets,
-                                                max_instances=max_instances)
-    return plot_folded_lightcurves(mags_features, names,
+    (names, full_mags_feats, _, _, _, _) = read_dataset(dataset_files,
+                                                        identifiers=chosen_targets,
+                                                        max_instances=max_instances)
+    return plot_folded_lightcurves(full_mags_feats, names,
                                    mags_wrap_phase=mags_wrap_phase, cols=cols, **format_kwargs)
 
 
