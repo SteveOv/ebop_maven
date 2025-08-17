@@ -93,7 +93,7 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
     # The labels returned as structured array, the rest are simple arrays as expected by predict().
     # We request all possible feature values as we may want them for filter masks below (for which
     # we convert to a structured array) and for predict() we extract just the expected field values.
-    ids, mags_vals, feat_vals, lbl_vals = datasets.read_dataset(tfrecord_files,
+    ids, full_mags, prim_mags, sec_mags, feat_vals, lbl_vals = datasets.read_dataset(tfrecord_files,
                                                 mags_bins=estimator.mags_feature_bins,
                                                 mags_wrap_phase=estimator.mags_feature_wrap_phase,
                                                 labels=super_params,
@@ -123,10 +123,12 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
     for batch, ix in enumerate(np.arange(0, inst_count, max_batch_size), start=1):
         if max_batch_size < inst_count:
             print(f"Predicting batch {batch} of {int(np.ceil(inst_count / max_batch_size))}")
-        pv = estimator.predict(mags_feature=mags_vals[ix : ix+max_batch_size],
-                               extra_features=ext_feat_vals[ix : ix+max_batch_size],
-                               iterations=mc_iterations,
-                               unscale=not scaled)
+        pv = estimator.predict_tri(full_feature=full_mags[ix : ix+max_batch_size],
+                                   prim_feature=prim_mags[ix : ix+max_batch_size],
+                                   sec_feature=sec_mags[ix : ix+max_batch_size],
+                                   extra_features=ext_feat_vals[ix : ix+max_batch_size],
+                                   iterations=mc_iterations,
+                                   unscale=not scaled)
         pred_vals[ix : ix+len(pv)] = pv
 
     if "inc" not in estimator.label_names:
@@ -245,7 +247,7 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
             if r_dir and ("synth" in ds_name and synth_sample):
                 names = [i + " (" + ("Sh" if s else "Dp") + (";Tr" if t else "") + ")"
                          for i, s, t in zip(s_ids[:50], s_shall_mask[:50], s_total_mask[:50])]
-                fig = plots.plot_folded_lightcurves(mags_vals[s_mask][:50], names,
+                fig = plots.plot_folded_lightcurves(full_mags[s_mask][:50], names,
                                                     mags_wrap_phase=1.0, cols=5)
                 fig.savefig(r_dir / f"samples-{mc_type}-vs-labels{suffix}.pdf")
                 plt.close(fig)

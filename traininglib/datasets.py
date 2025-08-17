@@ -633,18 +633,18 @@ def iterate_dataset(dataset_files: Iterable[str],
     if identifiers is not None and len(identifiers) < max_instances:
         max_instances = len(identifiers)
 
-    map_func = create_map_func(mags_bins, mags_wrap_phase, ext_features, labels,
-                               augmentation_callback, scale_labels, include_id=True)
+    map_func = create_tri_view_map_func(mags_bins, ext_features, labels,
+                                        augmentation_callback, scale_labels, include_id=True)
     (ds, _) = create_dataset_pipeline(dataset_files, 0, map_func, filter_func)
 
     yield_count = 0
-    for id_val, (mags_val, feat_vals), lab_vals in ds.as_numpy_iterator():
+    for id_val, (full_mags, prim_mags, sec_mags, feat_vals), lab_vals in ds.as_numpy_iterator():
         id_val = id_val.decode(encoding="utf8")
         if identifiers is None or id_val in identifiers:
             # Primarily, create_map_func supports a pipeline for training an ML model where the mags
             # and ext_features for each inst is required to be shaped as (#bins, 1) and (#feats, 1).
-            # Here our client code expects shapes of (#bins,) and (#feats,).
-            yield id_val, mags_val[:, 0], feat_vals[:, 0], lab_vals
+            # Here our client code expects shapes of 3 times (#bins,) and (#feats,).
+            yield id_val, full_mags[:,0], prim_mags[:,0], sec_mags[:,0], feat_vals[:,0], lab_vals
             yield_count += 1
             if yield_count >= max_instances:
                 break
@@ -659,7 +659,9 @@ def read_dataset(dataset_files: Iterable[str],
                  filter_func: Callable=None,
                  augmentation_callback: Callable[[tf.Tensor], tf.Tensor] = None,
                  max_instances: int = np.inf) \
-            -> Tuple[np.ndarray, np.ndarray[float], np.ndarray[float], np.ndarray[float]]:
+            -> Tuple[np.ndarray,
+                     np.ndarray[float], np.ndarray[float], np.ndarray[float],
+                     np.ndarray[float], np.ndarray[float]]:
     """
     Wrapper around iterate_dataset() which handles the iteration and returns separate
     np ndarrays for the dataset ids, mags values, feature values and label values.
@@ -694,27 +696,31 @@ def read_dataset(dataset_files: Iterable[str],
     else:
         labels = list(deb_example.labels_and_scales.keys())
 
-    ids, mags_vals, feature_vals, label_vals = [], [], [], []
+    ids, full_mags, prim_mags, sec_mags, feature_vals, label_vals = [], [], [], [], [], []
     for row in iterate_dataset(dataset_files, mags_bins, mags_wrap_phase,
                                ext_features, labels, identifiers, scale_labels,
                                filter_func, augmentation_callback, max_instances):
         ids += [row[0]]
-        mags_vals += [row[1]]
-        feature_vals += [row[2]]
-        label_vals += [tuple(row[3])]
+        full_mags += [row[1]]
+        prim_mags += [row[2]]
+        sec_mags += [row[3]]
+        feature_vals += [row[4]]
+        label_vals += [tuple(row[5])]
 
     # Need to sort the data in the order of the requested ids (if given).
     # Not hugely performant, but we only ever expect short lists of indices.
     if identifiers is not None and len(identifiers) > 0:
         indices = [ids.index(i) for i in identifiers if i in ids]
         ids = [ids[ix] for ix in indices]
-        mags_vals = [mags_vals[ix] for ix in indices]
+        full_mags = [full_mags[ix] for ix in indices]
         feature_vals = [feature_vals[ix] for ix in indices]
         label_vals = [label_vals[ix] for ix in indices]
 
     # Turn label vals into a structured array
     dtype = [(name, np.dtype(float)) for name in labels]
-    return np.array(ids), np.array(mags_vals), np.array(feature_vals), np.array(label_vals, dtype)
+    return np.array(ids), \
+            np.array(full_mags), np.array(prim_mags), np.array(sec_mags), \
+            np.array(feature_vals), np.array(label_vals, dtype)
 
 
 def _calculate_file_splits(instance_count: int, file_count: int) -> list[int]:

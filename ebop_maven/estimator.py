@@ -95,9 +95,9 @@ class Estimator(ABC):
         return self._model.name
 
     @property
-    def mags_feature_bins(self) -> int:
+    def mags_feature_bins(self) -> Union[int, List[int]]:
         """ The expected number of bins in each phase folded input mags feature """
-        return self._model.input_shape[0][1]
+        return self.metadata.get("mags_bins", self._model.input_shape[0][1])
 
     @property
     def mags_feature_wrap_phase(self) -> float:
@@ -203,6 +203,113 @@ class Estimator(ABC):
         # algorithm. These raw predictions will be in the shape (#iterations, #insts, #labels)
         raw_preds = np.stack([
             self._model((mags_feature, extra_features), training=is_mc)
+            for _ in range(iterations)
+        ])
+
+        if unscale and self._scaling_applied:
+            # Undo any scaling applied to the labels (e.g. the model may predict inc/100).
+            # The scales list matches the size of the final labels dimension of the raw preds and
+            # it is broadcast over the other, iterations and instances, dimensions when re-scaling.
+            raw_preds /= self._scale_values
+
+        preds = np.empty(shape=(insts, ), dtype=self._dtypes) # pre-allocate the results
+        if is_mc:
+            # We have multiple predictions per input. Summarize over the iterations axis
+            for inst, (noms, errs) in enumerate(zip(np.mean(raw_preds, axis=0),
+                                                    np.std(raw_preds, axis=0))):
+                preds[inst] = tuple(unumpy.uarray(noms, errs))
+        else:
+            # Not MC; only 1 set of predictions per instance so ignore #iters and assume zero std
+            for inst in range(insts):
+                preds[inst] = tuple(unumpy.uarray(raw_preds[0, inst, ...], 0))
+
+        if not include_raw_preds:
+            return preds
+        return preds, raw_preds.transpose([1, 2, 0])
+
+
+    def predict_tri(self,
+                    full_feature: np.ndarray[float],
+                    prim_feature: np.ndarray[float],
+                    sec_feature: np.ndarray[float],
+                    extra_features: np.ndarray[float]=None,
+                    iterations: int=None,
+                    unscale: bool=True,
+                    include_raw_preds: bool=False) \
+                -> Union[np.ndarray[UFloat], Tuple[np.ndarray[UFloat], np.ndarray[float]]]:
+        """
+        Make predictions on one or more instances' features. The instances are
+        in the form of two NDArrays, one for the instances' mags data in the shape
+        (#insts, #mags_bins, 1) or (#insts, #mags_bins) and another for
+        extra features in the shape (#insts, #features, 1) or (#insts, #features).
+        The predictions are returned as a structured NDArray of UFloats of shape (#insts, #labels),
+        with the labels accessible by the names given in self.label_names, and if include_raw_preds
+        is set, an NDArray of the raw predictions in the shape (#insts, #labels, #iterations)
+
+        Examples:
+        ```Python
+        # Using named columns
+        preds = estimator.predict(mags_full, mags_prim, mags_sec, ext_features, 1000)
+        ratio_radii = preds[0]['k'].nominal_value
+
+        # Using masked rows
+        preds_with_larger_secondary = preds[preds['k'] > 1.0]
+
+        # Support for raw_preds
+        (preds, raw_preds) = estimator.predict(mags, ext_features, 1000, include_raw_preds=True)
+        ```
+        
+        :mags_feature: numpy NDArray of shape (#insts, #bins, 1)
+        :extra_features: numpy NDArray of shape (#insts, #features, 1)
+        :iterations: the number of MC Dropout iterations (overriding the instance default)
+        :unscale: indicates whether to undo the scaling of the predicted values. For example,
+        the model may predict inc*0.01 and unscale would undo this returning inc as prediction/0.01
+        :include_raw_preds: if True the raw preds will also be returned as the 2nd item of a tuple
+        :returns: a structured NDarray[UFloat] with the predictions in the shape (#insts, #labels)
+        and optionally an NDArray of the raw predictions in the shape (#insts, #labels, #iterations)
+        """
+        # pylint: disable=too-many-arguments, too-many-branches
+        iterations = self._iterations if iterations is None else iterations
+        is_mc = iterations > 1
+
+        if not isinstance(full_feature, np.ndarray):
+            raise TypeError("Expect mags_feature to be an numpy ndarray")
+        if extra_features is not None and not isinstance(extra_features, np.ndarray):
+            raise TypeError("Expect extra_features to be a numpy ndarray")
+
+        # Check the mags features are in the expected shape; (#insts, #bins) or (#insts, #bins, 1)
+        for (fname, mags_feature), exp_bins in zip([("full_feature", full_feature),
+                                                    ("prim_feature", prim_feature),
+                                                    ("sec_feature", sec_feature)],
+                                                    self.mags_feature_bins):
+            insts = mags_feature.shape[0]
+            if len(mags_feature.shape) > 1 and mags_feature.shape[1] == exp_bins:
+                if len(mags_feature.shape) == 2:
+                    mags_feature = mags_feature[:, :, np.newaxis]
+            else:
+                raise ValueError(f"Expected {fname} of shape (#insts, {exp_bins})"+
+                                f" or (#insts, {exp_bins}, 1) but got {mags_feature.shape}")
+
+        # For extra features, we allow it to be None if there are no expected features
+        # otherwise we expect it to be in the shape (#insts, #features) or (#insts, #features, 1)
+        num_ext_features = len(self.extra_feature_names)
+        if num_ext_features or extra_features is not None:
+            if len(extra_features.shape) > 1 and extra_features.shape[0] == insts and \
+                                                extra_features.shape[1] == num_ext_features:
+                if len(extra_features.shape) == 2:
+                    extra_features = extra_features[:, :, np.newaxis]
+            else:
+                raise ValueError(f"Expected extra features of shape ({insts}, {num_ext_features}) "+
+                            f"or ({insts}, {num_ext_features}, 1) but got {extra_features.shape}")
+        else:
+            # No extra features required, and None supplied. Make sure we don't choke the model.
+            extra_features = np.empty(shape=(insts, 0, 1))
+
+        # If dropout, we make multiple predictions for each inst with training switched on so that
+        # each prediction is with a statistically unique subset of the model's net: the MC Dropout
+        # algorithm. These raw predictions will be in the shape (#iterations, #insts, #labels)
+        raw_preds = np.stack([
+            self._model((full_feature, prim_feature, sec_feature, extra_features), training=is_mc)
             for _ in range(iterations)
         ])
 
