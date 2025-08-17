@@ -36,7 +36,7 @@ MAGS_WRAP_PHASE = deb_example.default_mags_wrap_phase
 
 CHOSEN_LABELS = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "bP"]
 OUTPUT_ACTIVATIONS = ["softplus"]*3 + ["linear"]*3
-TRAINSET_SUFFIX = "100k-control-augs-norm-0.03"
+TRAINSET_SUFFIX = "100k"
 
 MODEL_NAME = f"CNN-Tri-View-{'-'.join(f'{b}' for b in MAGS_BINS)}-{MAGS_WRAP_PHASE}-" \
                     + f"{'-'.join(CHOSEN_LABELS[5:])}-{TRAINSET_SUFFIX}"

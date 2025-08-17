@@ -185,9 +185,7 @@ def generate_instances_from_mist_models(label: str):
                 # indicate the conditions from which we decide the amount of noise to add.
                 # The phase and vertical shifts to the mags data mimic imperfect pre-processing.
                 "noise_sigma":  calculate_tess_noise_sigma(apparent_mag=rng_aug.uniform(6, 18)),
-                # Can't currently do a phase shift as all three views share the same input feature
-                # "phase_shift":  rng_aug.normal(0, scale=0.03),
-                "phase_shift":  None,
+                "phase_shift":  rng_aug.normal(0, scale=0.03),
                 "mag_shift":    rng_aug.normal(0, scale=0.01),
 
                 # Further params for potential use as labels/features
