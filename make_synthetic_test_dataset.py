@@ -62,6 +62,7 @@ def generate_instances_from_mist_models(label: str):
     # Don't use the built-in hash() function; it's not consistent across processes!!!
     seed = int.from_bytes(hashlib.shake_128(label.encode("utf8")).digest(8))
     rng = np.random.default_rng(seed)
+    rng_aug = np.random.default_rng(seed) # Separate so augs on/off doesn't affect other params
 
     mission = Mission.get_instance("TESS")
 
@@ -183,9 +184,9 @@ def generate_instances_from_mist_models(label: str):
                 # By specifying an apparent mag (within the TESS mission's operating range) we
                 # indicate the conditions from which we decide the amount of noise to add.
                 # The phase and vertical shifts to the mags data mimic imperfect pre-processing.
-                "noise_sigma":  calculate_tess_noise_sigma(apparent_mag=rng.uniform(6, 18)),
-                "phase_shift":  rng.normal(0, scale=0.03),
-                "mag_shift":    rng.normal(0, scale=0.01),
+                "noise_sigma":  calculate_tess_noise_sigma(apparent_mag=rng_aug.uniform(6, 18)),
+                "phase_shift":  rng_aug.normal(0, scale=0.03),
+                "mag_shift":    rng_aug.normal(0, scale=0.01),
 
                 # Further params for potential use as labels/features
                 "sini":         np.sin(inc_rad),
