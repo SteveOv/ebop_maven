@@ -136,7 +136,7 @@ def generate_instances_from_distributions(label: str):
 
                 # Optional static augmentations applied to the mags_features generated. Even if set,
                 # they won't be applied to training instances if IGNORE_AUGS_ON_TRAIN is True.
-                "noise_sigma":  abs(rng_aug.normal(loc=0,scale=.03)) if APPLY_STATIC_AUGS else None,
+                "noise_sigma":  rng_aug.uniform(low=1e-4, high=3e-2) if APPLY_STATIC_AUGS else None,
                 "phase_shift":  rng_aug.normal(loc=0, scale=.03) if APPLY_STATIC_AUGS else None,
                 "mag_shift":    rng_aug.normal(loc=0, scale=.03) if APPLY_STATIC_AUGS else None,
             }
