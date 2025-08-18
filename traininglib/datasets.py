@@ -483,7 +483,7 @@ def create_tri_view_map_func(mags_bins: Union[int, Tuple[int, int, int]] = 1024,
                                      mags_feature[:mags_bins[1] // 2]], axis=0)
 
         # View for the Sec-Input
-        mid_ix = deb_mags_bins // example.get("phiS", 0.5)
+        mid_ix = int(deb_mags_bins * example.get("phiS", 0.5))
         to_ix = int((mid_ix + mags_bins[2] // 2) % deb_mags_bins)
         from_ix = int((to_ix - mags_bins[2]) % deb_mags_bins)
         if from_ix > to_ix: # Roll over the end of the phases
