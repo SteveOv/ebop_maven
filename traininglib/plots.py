@@ -453,7 +453,8 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
             pred_sigmas = unumpy.std_devs(predictions[param_name])
 
             # Set the "view" x & y limits over the data and draw a diagonal line for "exact" match
-            vmin, vmax = min(lbl_vals.min(), pred_vals.min()), max(lbl_vals.max(), pred_vals.max()) # pylint: disable=nested-min-max
+            vmin = np.nan_to_num(min(lbl_vals.min(), pred_vals.min())) # pylint: disable=nested-min-max
+            vmax = np.nan_to_num(max(lbl_vals.max(), pred_vals.max())) # pylint: disable=nested-min-max
             if fixed_viewport: # may cut off extreme insts, but better view of core results
                 if param_name in ["rA_plus_rB", "k", "J", "bP"]:
                     vmin = 0

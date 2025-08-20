@@ -16,6 +16,7 @@ import copy
 import argparse
 from datetime import datetime
 import warnings
+from subprocess import TimeoutExpired
 
 import matplotlib.pylab as plt
 
@@ -290,6 +291,7 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
     :returns: a structured NDArray[UFloat] containing the fitted parameters for each target
     """
     # pylint: disable=too-many-statements, too-many-branches
+    FIT_TIMEOUT = 600
     if not isinstance(estimator, Estimator):
         estimator = Estimator(estimator)
     mags_bins = estimator.mags_feature_bins
@@ -297,7 +299,10 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
     prediction_type = "control" if do_control_fit else "mc" if mc_iterations > 1 else "nonmc"
 
     # Get the target ids & masks for picking totally eclipsing systems & highlighting key targets
-    targs = include_ids if len(include_ids or []) > 0 else [*targets_config.keys()]
+    if include_ids is not None and len(include_ids) > 0:
+        targs = include_ids
+    else:
+        targs = [*targets_config.keys()]
     targs = np.array(targs) if not isinstance(targs, np.ndarray) else targs
     targ_count = len(targs)
     total_mask = np.array([targets_config.get(t, {}).get("total_eclipses", False) for t in targs])
@@ -360,25 +365,33 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
         print(f"\nThe {prediction_type} sourced input params for fitting {targ}")
         predictions_vs_labels_to_table(pred_vals[ix], lbl_vals[ix], [targ], fit_params)
 
-        # Perform the task3 fit taking the preds or control as input params and supplementing
-        # them with parameter values and fitting instructions from the target's config.
-        fit_stem = "model-testing-" + re.sub(r"[^\w\d-]", "-", targ.lower())
-        fit_vals[ix] = fit_target(lc, targ, pred_vals[ix], targ_config, super_params, fit_stem,
-                                  task=3, apply_fit_overrides=apply_fit_overrides)
-
-        print(f"\nHave fitted {targ} resulting in the following fitted params")
-        predictions_vs_labels_to_table(fit_vals[ix], lbl_vals[ix], [targ], fit_params,
-                                       prediction_head="Fitted")
-
-        # Get the phase-folded mags data for the mags feature, predicted and actual fit.
-        # We need to undo the wrap of the mags_feature as the plot will apply its own fixed wrap.
+        # Get the phase-folded mags data for the mags feature and predicted fit. We
+        # need to undo the wrap of the mags_feature as the plot will apply its own fixed wrap.
         mags_feats[ix] = np.roll(mags, -int((1-wrap_phase) * len(mags)), axis=0)
         pred_lc = generate_predicted_fit(pred_vals[ix], targ_config, apply_fit_overrides, 1001)
         pred_feats[ix] = pred_lc["delta_mag"]
-        with open(jktebop.get_jktebop_dir() /f"{fit_stem}.fit", mode="r", encoding="utf8") as ff:
-            # Non-numeric values will be parsed as nan (loadtxt will throw ValueError)
-            fit = np.genfromtxt(ff, usecols=[1], comments="#", dtype=float)
-            fit_feats[ix] = fit[np.round(np.linspace(0, fit.shape[0]-1, 1001)).astype(int)]
+
+        try:
+            # Perform the task3 fit taking the preds or control as input params and supplementing
+            # them with parameter values and fitting instructions from the target's config.
+            fit_stem = "model-testing-" + re.sub(r"[^\w\d-]", "-", targ.lower())
+            fit_vals[ix] = fit_target(lc, targ, pred_vals[ix], targ_config, super_params, fit_stem,
+                                      task=3, apply_fit_overrides=apply_fit_overrides,
+                                      timeout=FIT_TIMEOUT, retries=1)
+
+            print(f"\nHave fitted {targ} resulting in the following fitted params")
+            predictions_vs_labels_to_table(fit_vals[ix], lbl_vals[ix], [targ], fit_params,
+                                           prediction_head="Fitted")
+
+            with open(jktebop.get_jktebop_dir()/f"{fit_stem}.fit", mode="r", encoding="utf8") as ff:
+                # Get the phase-folded mags data for the actual fit.
+                # Non-numeric values will be parsed as nan (loadtxt will throw ValueError)
+                fit = np.genfromtxt(ff, usecols=[1], comments="#", dtype=float)
+                fit_feats[ix] = fit[np.round(np.linspace(0, fit.shape[0]-1, 1001)).astype(int)]
+        except TimeoutExpired:
+            print(f"\n*** The fitting of {targ} has been timed out after {FIT_TIMEOUT:,} s ***\n")
+            fit_vals[ix].fill(np.nan)
+            fit_feats[ix].fill(np.nan)
 
     # Save reports on how the predictions and fitting has gone over all of the selected targets
     # Publication plots use pdf as this usually gives smaller file sizes than eps & supports alpha.
@@ -465,6 +478,7 @@ def fit_target(lc: LightCurve,
                task: int=3,
                simulations: int=100,
                apply_fit_overrides: bool=True,
+               timeout: int=None,
                retries: int=1) -> np.ndarray[UFloat]:
     """
     Perform a JKTEBOP fitting on the passed light-curve based on the input_params and target config
@@ -493,6 +507,7 @@ def fit_target(lc: LightCurve,
     :task: the JKTEBOP task to execute; 3, 8 or 9
     :simulations: the number of simulations to run when task 8 or 9 (ignored for task 3)
     :apply_fit_overrides: whether to apply any fit_overrides from the target config
+    :timeout: optional seconds after which fit is terminated if not complete, raising TimeoutExpired
     :retries: number of times to retry on failure to converge on a good fit
     :returns: a structured NDArray[UFloat] of those return_keys found in the fitted par file
     """
@@ -593,7 +608,8 @@ def fit_target(lc: LightCurve,
 
             # Blocks on the JKTEBOP task until we can parse the newly written par file contents
             # to read out the revised values for the superset of potentially fitted parameters.
-            pgen = jktebop.run_jktebop_task(in_fname, par_fname, stdout_to=sys.stdout)
+            pgen = jktebop.run_jktebop_task(in_filename=in_fname, out_filename=par_fname,
+                                            stdout_to=sys.stdout, timeout=timeout)
             for k, v in jktebop.read_fitted_params_from_par_lines(pgen, all_fitted_params).items():
                 fitted_params[attempt][k] = ufloat(v[0], v[1])
 

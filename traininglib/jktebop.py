@@ -89,7 +89,8 @@ def get_jktebop_support_neg_l3() -> bool:
 def run_jktebop_task(in_filename: Path,
                      out_filename: Path=None,
                      delete_files_pattern: str=None,
-                     stdout_to: TextIOBase=None):
+                     stdout_to: TextIOBase=None,
+                     timeout: int=None):
     """
     Will run JKTEBOP against the passed in file, waiting for the production of the
     expected out file. The contents of the outfile will be returned line by line.
@@ -117,11 +118,18 @@ def run_jktebop_task(in_filename: Path,
     :delete_files_pattern: optional glob pattern of files to be deleted after
     successful processing. The files will not be deleted if there is a failure.
     :stdout_to: if given, the JKTEBOP stdout/stderr will be redirected here
+    :timeout: optional seconds after which task is terminated if not complete raising TimeoutExpired
     :returns: yields the content of the primary output file, line by line.
     """
     # Call out to jktebop to process the in file and generate the requested output file
     return_code = None
     cmd = ["./jktebop", f"{in_filename.name}"]
+
+    # Potentially issue with Popen, PIPE and wait(); specifically a potential deadlock if
+    # excessive output to stdout/PIPE. See https://docs.python.org/3/library/subprocess.html
+    # However, I've not had a problem with JKTEBOP and the async approach allows for its output
+    # to be echoed to the screen and/log file as it happens. If it becomes a problem we'll have
+    # to move to a synch call with either subprocess run() or replacing wait with communicate().
     with subprocess.Popen(cmd,
                           cwd=get_jktebop_dir(),
                           stdout=subprocess.PIPE,
@@ -131,18 +139,32 @@ def run_jktebop_task(in_filename: Path,
         stdout_thread = None
         if stdout_to is not None:
             def redirect_process_stdout():
-                while True:
-                    line = proc.stdout.readline()
-                    if not line:
-                        break
-                    stdout_to.write(line)
-                    if "warning" in line.casefold():
-                        warnings.warn(message=line, category=JktebopTaskWarning)
+                try:
+                    while True:
+                        line = proc.stdout.readline()
+                        if not line:
+                            break
+                        stdout_to.write(line)
+                        if "warning" in line.casefold():
+                            warnings.warn(message=line, category=JktebopTaskWarning)
+                except ValueError: # Unable to readline - probably timeout
+                    if stdout_to is not None:
+                        stdout_to.write("The process stdout has been closed\n")
             stdout_thread = threading.Thread(target=redirect_process_stdout)
             stdout_thread.start()
-        return_code = proc.wait() # Seem to have to do this get the return_code
-        if stdout_thread:
-            stdout_thread.join()
+
+        try:
+            return_code = proc.wait(timeout=timeout)
+        except subprocess.TimeoutExpired as err:
+            # Didn't finish in time; kill it with fire and capture any final output
+            proc.kill()
+            (stdout, _) = proc.communicate()
+            if stdout is not None and stdout_to is not None:
+                stdout_to.write(stdout)
+            raise err
+        finally:
+            if stdout_thread is not None:
+                stdout_thread.join()
 
     # JKTEBOP (v43) doesn't appear to set the response code on failures so
     # we'll check if there has been a problem by trying to pick up the out file.

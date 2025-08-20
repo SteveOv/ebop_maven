@@ -3,7 +3,7 @@ import os
 import io
 import unittest
 from pathlib import Path
-from subprocess import CalledProcessError
+from subprocess import CalledProcessError, TimeoutExpired
 
 from uncertainties import ufloat, UFloat
 import numpy as np
@@ -131,6 +131,18 @@ class Testjktebop(unittest.TestCase):
         capture = io.StringIO()
         list(jktebop.run_jktebop_task(in_filename, out_filename, f"{in_filename.stem}.*", capture))
         self.assertIn("JKTEBOP", capture.getvalue())
+
+    def test_run_jktebop_task_timeout(self):
+        """ Test run_jktebop_task(with timeout set) assert timeout invoked """
+        # Need to create the in file first
+        in_filename = get_jktebop_dir() / "test_run_jktebop_task_ext_valid.2.in"
+        out_filename = get_jktebop_dir() / f"{in_filename.stem}.out"
+        params = { **self._task2_params.copy(), "out_filename": f"{out_filename.name}" }
+        write_in_file(in_filename, 2, None, **params)
+
+        with self.assertRaises(expected_exception=TimeoutExpired):
+            list(jktebop.run_jktebop_task(in_filename, out_filename, f"{in_filename.stem}.*",
+                                          timeout=0.001))
 
 
     #

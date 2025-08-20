@@ -56,9 +56,9 @@ def format_axes(ax: Axes, title: str=None,
         ax.invert_xaxis()
     if inverty:
         ax.invert_yaxis()
-    if xlim:
+    if xlim and not any(np.isnan(xlim)):
         ax.set_xlim(xlim)
-    if ylim:
+    if ylim and not any(np.isnan(ylim)):
         ax.set_ylim(ylim)
     if minor_ticks:
         ax.minorticks_on()
