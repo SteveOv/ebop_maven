@@ -108,7 +108,7 @@ def conv1d_layers(num_layers: int=1,
     :verbose: print out info of what's happening
     :returns: the output tensor of the last new layer
     """
-    # pylint: disable=too-many-arguments
+    # pylint: disable=too-many-arguments, too-many-positional-arguments
     if not isinstance(filters, List):
         filters = [filters] * num_layers
     if not isinstance(kernel_size, List):
@@ -120,16 +120,20 @@ def conv1d_layers(num_layers: int=1,
     if not isinstance(activation, List):
         activation = [activation] * num_layers
 
+    filters = list(map(int, filters))
+    kernel_size = list(map(int, kernel_size))
+    strides = list(map(int, strides))
+
     def layers_func(input_tensor: KerasTensor) -> KerasTensor:
         # Expected failure if any list isn't num_layers long
         for ix in range(num_layers):
             name = f"{name_prefix}{ix+1}"
             output_tensor = layers.Conv1D(filters=filters[ix],
-                                         kernel_size=kernel_size[ix],
-                                         strides=strides[ix],
-                                         padding=padding[ix],
-                                         activation=activation[ix],
-                                         name=name)(input_tensor)
+                                          kernel_size=kernel_size[ix],
+                                          strides=strides[ix],
+                                          padding=padding[ix],
+                                          activation=activation[ix],
+                                          name=name)(input_tensor)
             if verbose:
                 print(f"Creating Conv1D('{name}', filters={filters[ix]},",
                       f"kernel_size={kernel_size[ix]}, strides={strides[ix]},",
@@ -157,6 +161,9 @@ def pooling_layer(pool_type: BasePooling,
     :verbose: print out info of what's happening
     :returns: the output tensor of the new layer
     """
+    pool_size = int(pool_size)
+    strides = int(strides)
+
     def layer_func(input_tensor: KerasTensor) -> KerasTensor:
         output_tensor = pool_type(pool_size=pool_size, strides=strides,
                                   padding=padding, name=name)(input_tensor)
@@ -199,6 +206,9 @@ def hidden_layers(num_layers: int=1,
         activation = [activation] * num_layers
     if not isinstance(dropout_rate, List):
         dropout_rate = [dropout_rate] * num_layers
+
+    num_layers = int(num_layers)
+    units = list(map(int, units))
 
     def layers_func(input_tensor: KerasTensor) -> KerasTensor:
         # Expected failure if any list isn't num_layers long

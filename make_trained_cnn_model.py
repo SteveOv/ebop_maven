@@ -77,9 +77,13 @@ CLASS_WEIGHTS = { CHOSEN_LABELS.index(l): 1 for l in CHOSEN_LABELS } # Currently
 # ReLU is widely used default for CNN/DNNs.
 # Otherwise, may need to specify each layer separately as dims different.
 # LeakyReLU addresses issue of dead neurons & PReLU similar but trains alpha param
+CNN_STRIDES = 2
 CNN_PADDING = "same"
 CNN_ACTIVATE = "relu"
 CNN_POOLING_TYPE = layers.MaxPool1D # pylint: disable=invalid-name
+CNN_POOL_SIZE = 2
+CNN_POOL_STRIDES = 2
+CNN_POOL_PADDING = "same"
 
 # For the dense layers: "glorot_uniform" (def) "he_normal", "he_uniform" (he_ goes well with ReLU)
 DNN_INITIALIZER = "he_uniform"
@@ -117,9 +121,13 @@ def make_best_model(chosen_features: list[str]=CHOSEN_FEATURES,
                     mags_wrap_phase: float=MAGS_WRAP_PHASE,
                     chosen_labels: list[str]=CHOSEN_LABELS,
                     trainset_name: str=TRAINSET_NAME,
+                    cnn_strides: int=CNN_STRIDES,
                     cnn_padding: str=CNN_PADDING,
                     cnn_activation: str=CNN_ACTIVATE,
                     cnn_pooling: BasePooling=CNN_POOLING_TYPE,
+                    cnn_pool_size: int=CNN_POOL_SIZE,
+                    cnn_pool_strides: int=CNN_POOL_STRIDES,
+                    cnn_pool_padding: str=CNN_POOL_PADDING,
                     dnn_num_layers: int=DNN_NUM_FULL_LAYERS,
                     dnn_num_units: int=DNN_NUM_UNITS,
                     dnn_initializer: str=DNN_INITIALIZER,
@@ -133,7 +141,7 @@ def make_best_model(chosen_features: list[str]=CHOSEN_FEATURES,
     Helper function for building the current best performing model. 
     Publish model from a function, rather than inline, so it can be shared with model_search.
     """
-    # pylint: disable=too-many-arguments, too-many-locals, dangerous-default-value
+    # pylint: disable=too-many-arguments, too-many-positional-arguments, too-many-locals, dangerous-default-value
     print("\nBuilding the best known CNN model for predicting:", ", ".join(chosen_labels))
     metadata = { # This will augment the model, giving an Estimator context information
         "extra_features_and_defaults": 
@@ -148,21 +156,27 @@ def make_best_model(chosen_features: list[str]=CHOSEN_FEATURES,
         mags_input=modelling.mags_input_layer(shape=(mags_bins, 1), verbose=verbose),
         ext_input=modelling.ext_input_layer(shape=(len(chosen_features), 1), verbose=verbose),
         mags_layers=[
-            modelling.conv1d_layers(2, 16, 32, 2, cnn_padding, cnn_activation, "Conv-1-", verbose),
-            modelling.pooling_layer(cnn_pooling, 2, 2, cnn_padding, "Pool-1", verbose),
-            modelling.conv1d_layers(2, 32, 16, 2, cnn_padding, cnn_activation, "Conv-2-", verbose),
-            modelling.pooling_layer(cnn_pooling, 2, 2, cnn_padding, "Pool-2", verbose),
-            modelling.conv1d_layers(2, 64, 8, 2, cnn_padding, cnn_activation, "Conv-3-", verbose),
-            modelling.pooling_layer(cnn_pooling, 2, 2, cnn_padding, "Pool-3", verbose),
-            modelling.conv1d_layers(2, 128, 4, 2, cnn_padding, cnn_activation, "Conv-4-", verbose),
+            modelling.conv1d_layers(2, 16, 32, cnn_strides, cnn_padding, cnn_activation,
+                                    "Conv-1-", verbose),
+            modelling.pooling_layer(cnn_pooling, cnn_pool_size, cnn_pool_strides, cnn_pool_padding,
+                                    "Pool-1", verbose),
+            modelling.conv1d_layers(2, 32, 16, cnn_strides, cnn_padding, cnn_activation,
+                                    "Conv-2-", verbose),
+            modelling.pooling_layer(cnn_pooling, cnn_pool_size, cnn_pool_strides, cnn_pool_padding,
+                                    "Pool-2", verbose),
+            modelling.conv1d_layers(2, 64, 8, cnn_strides, cnn_padding, cnn_activation,
+                                    "Conv-3-", verbose),
+            modelling.pooling_layer(cnn_pooling, cnn_pool_size, cnn_pool_strides, cnn_pool_padding,
+                                    "Pool-3", verbose),
+            modelling.conv1d_layers(2, 128, 4, cnn_strides, cnn_padding, cnn_activation,
+                                    "Conv-4-", verbose),
         ],
         dnn_layers=[
-            modelling.hidden_layers(int(dnn_num_layers), int(dnn_num_units),
-                                    dnn_initializer, dnn_activation,
+            modelling.hidden_layers(dnn_num_layers, dnn_num_units, dnn_initializer, dnn_activation,
                                     dnn_dropout_rate, ("Hidden-", "Dropout-"), verbose),
             # "Buffer" between the DNN+Dropout and the output layer; this non-dropout NN layer
             # consistently gives a small, but significant improvement to the trained loss.
-            modelling.hidden_layers(1, int(dnn_num_taper_units), dnn_initializer, dnn_activation,
+            modelling.hidden_layers(1, dnn_num_taper_units, dnn_initializer, dnn_activation,
                                     0, ("Taper-",), verbose) if dnn_num_taper_units else None
         ],
         output=modelling.output_layer(metadata, dnn_initializer, output_activations, verbose),
