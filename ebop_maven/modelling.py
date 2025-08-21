@@ -143,6 +143,7 @@ def conv1d_layers(num_layers: int=1,
 def pooling_layer(pool_type: BasePooling,
                   pool_size: int=2,
                   strides: int=2,
+                  padding: str="same",
                   name: str=None,
                   verbose: bool=False) -> KerasTensor:
     """
@@ -151,6 +152,7 @@ def pooling_layer(pool_type: BasePooling,
     :pool_type: the type of layer
     :pool_size: the pool_size of the layer
     :strides: the strides value of the layer
+    :padding: the padding value of the layer
     :name: the name of the layer
     :verbose: print out info of what's happening
     :returns: the output tensor of the new layer
@@ -159,7 +161,7 @@ def pooling_layer(pool_type: BasePooling,
         output_tensor = pool_type(pool_size=pool_size, strides=strides, name=name)(input_tensor)
         if verbose:
             print(f"Creating {pool_type.__name__}('{name}',"
-                  f"pool_size={pool_size}, strides={strides})",
+                  f"pool_size={pool_size}, strides={strides}, padding={padding})",
                   f"({input_tensor.shape}) -> {output_tensor.shape}")
         return output_tensor
     return layer_func
