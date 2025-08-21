@@ -461,39 +461,43 @@ def create_tri_view_map_func(mags_bins: Union[int, Tuple[int, int, int]] = 1024,
     else:
         chosen_lab_and_scl = deb_example.labels_and_scales
 
+    # Reduction code depends on the deb_feature bins being fully divisible by mags_bins[0].
+    # We also assume the eclipse features are the same size.
+    full_step = deb_mags_bins // mags_bins[0]
+    half_eclipse_bins = mags_bins[1] // 2
+
     def map_func(record_bytes):
         example = tf.io.parse_single_example(record_bytes, deb_example.description)
 
         # Get the full phase-folded LC as stored in the DS
         # Assume mags will have been stored with phase implied by index and primary eclipse at zero
-        mags_feature = tf.reshape(example[deb_example.default_mags_key], shape=(deb_mags_bins, 1))
+        deb_mags = example[deb_example.default_mags_key]
 
         # Augmentations: not all potential augmentations have in-place updates (i.e. tf.roll) so we
         # endure the overhead of send/return rather than using "byref" behaviour of a mutable arg.
         if augmentation_callback:
-            mags_feature = augmentation_callback(mags_feature)
+            deb_mags = augmentation_callback(deb_mags)
 
         # Once the augs have been applied, we can split the feature into the 3 views needed
-        # First the Full-Input.
-        mags_full_step = deb_mags_bins // mags_bins[0]
-        mags_full_input = tf.reshape(mags_feature[::mags_full_step], shape=(mags_bins[0], 1))
+        # First the Full-Input binned from full folded LC in the example (assume int scaling)
+        mags_full_feat = \
+            tf.math.reduce_mean(tf.reshape(deb_mags, shape=(mags_bins[0], full_step)), axis=1)
 
         # View for the Prim-Input
-        mags_prim_input = tf.concat([mags_feature[-mags_bins[1] // 2:],
-                                     mags_feature[:mags_bins[1] // 2]], axis=0)
+        mags_prim_feat = tf.concat([deb_mags[-half_eclipse_bins:],
+                                    deb_mags[:half_eclipse_bins]], axis=0)
 
         # View for the Sec-Input
         mid_ix = int(deb_mags_bins * example.get("phiS", 0.5))
-        to_ix = int((mid_ix + mags_bins[2] // 2) % deb_mags_bins)
+        to_ix = int((mid_ix + half_eclipse_bins) % deb_mags_bins)
         from_ix = int((to_ix - mags_bins[2]) % deb_mags_bins)
         if from_ix > to_ix: # Roll over the end of the phases
-            mags_sec_input = tf.concat([mags_feature[from_ix:], mags_feature[:to_ix]], axis=0)
+            mags_sec_feat = tf.concat([deb_mags[from_ix:], deb_mags[:to_ix]], axis=0)
         else:
-            mags_sec_input = mags_feature[from_ix:to_ix]
+            mags_sec_feat = deb_mags[from_ix:to_ix]
 
         # The Extra features: ignore unknown fields and use default if not found
         ext_features = [example.get(k, d) for (k, d) in chosen_ext_feat_and_defs.items()]
-        ext_features = tf.reshape(ext_features, shape=(len(ext_features), 1))
 
         # Copy labels in the expected order & optionally apply any scaling
         if scale_labels:
@@ -501,7 +505,11 @@ def create_tri_view_map_func(mags_bins: Union[int, Tuple[int, int, int]] = 1024,
         else:
             labels = [example[k] for k in chosen_lab_and_scl]
 
-        features = (mags_full_input, mags_prim_input, mags_sec_input, ext_features)
+        # The tf model expects the feature to be in shape (x, 1) rather than (x, )
+        features = (tf.expand_dims(mags_full_feat, -1),
+                    tf.expand_dims(mags_prim_feat, -1),
+                    tf.expand_dims(mags_sec_feat, -1),
+                    tf.expand_dims(ext_features, -1))
         if include_id:
             return (example["id"], features, labels)
         return (features, labels)
