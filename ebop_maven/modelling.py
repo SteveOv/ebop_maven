@@ -158,7 +158,8 @@ def pooling_layer(pool_type: BasePooling,
     :returns: the output tensor of the new layer
     """
     def layer_func(input_tensor: KerasTensor) -> KerasTensor:
-        output_tensor = pool_type(pool_size=pool_size, strides=strides, name=name)(input_tensor)
+        output_tensor = pool_type(pool_size=pool_size, strides=strides,
+                                  padding=padding, name=name)(input_tensor)
         if verbose:
             print(f"Creating {pool_type.__name__}('{name}',"
                   f"pool_size={pool_size}, strides={strides}, padding={padding})",
