@@ -54,6 +54,7 @@ BATCH_FRACTION = 0.001          # larger -> quicker training per epoch but more 
 MAX_BUFFER_SIZE = 20000000      # Size of Dataset shuffle buffer (in instances)
 ES_PATIENCE = 5                 # Number of epochs w/o val_loss improvement before stopping
 ES_MIN_DELTA = 0.0001           # Minimum val_loss delta to be considered an improvment
+ES_START = 50                   # The epoch that the early stopping algorithm kicks in
 SEED = 42                       # Standard random seed ensures repeatable randomization
 
 # Sets the random seed on python, numpy and keras's backend library (in this case tensorflow)
@@ -273,7 +274,7 @@ if __name__ == "__main__":
             # Then start a browser and head to http://localhost:6006
             #callbacks.TensorBoard(log_dir="./logs", write_graph=True, write_images=True),
             callbacks.EarlyStopping("val_loss", restore_best_weights=True, min_delta=ES_MIN_DELTA,
-                                    start_from_epoch=50, patience=ES_PATIENCE, verbose=1),
+                                    start_from_epoch=ES_START, patience=ES_PATIENCE, verbose=1),
             callbacks.CSVLogger(SAVE_DIR / "training-log.csv")
         ]
 
