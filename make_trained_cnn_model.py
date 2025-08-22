@@ -262,11 +262,12 @@ if __name__ == "__main__":
         # -----------------------------------------------------------
         # Train the model
         # -----------------------------------------------------------
-        print("\nTraining:",
-              f"epochs={TRAINING_EPOCHS}, patience={ES_PATIENCE}, min_delta={ES_MIN_DELTA}")
-        print(f"Optimizer: {OPTIMIZER.name} where LR is",
-              LR if isinstance(LR, (int, float)) else f"{LR.name}({vars(LR)})")
+        print(f"\nTraining: max epochs={TRAINING_EPOCHS}")
+        print(f"Early stopping: patience={ES_PATIENCE}, min_delta={ES_MIN_DELTA}, start={ES_START}")
+        print(f"Optimizer: {OPTIMIZER.name} where LR is", f"{LR.name}({vars(LR)})" \
+                        if isinstance(LR, optimizers.schedules.LearningRateSchedule) else f"{LR}")
         print(f"Loss function {LOSS} and metrics are {METRICS}")
+        print(f"Class weights: {CLASS_WEIGHTS}")
 
         CALLBACKS = [
             # To use tensorboard make sure the containing conda env is active then run
