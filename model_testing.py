@@ -291,7 +291,7 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
     :returns: a structured NDArray[UFloat] containing the fitted parameters for each target
     """
     # pylint: disable=too-many-statements, too-many-branches
-    FIT_TIMEOUT = 600
+    FIT_TIMEOUT = 1800 # seconds
     if not isinstance(estimator, Estimator):
         estimator = Estimator(estimator)
     mags_bins = estimator.mags_feature_bins
