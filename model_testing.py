@@ -896,7 +896,7 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
     # The third error type will be equivalent to |(val-pred)/pred| given how errors are calculated
     # These are params we don't divide for the above error calcs as they're centred on zero
     dont_div = ["ecosw", "esinw"]
-    err_labels = ["MAE", "MSE", "Error*"]
+    err_labels = ["MAE", "MSE", "Error"]
     line_length = 12 + (11 * len(selected_param_names)) + (11 * len(err_labels))
     def horizontal_line(char):
         to.write(char*line_length + "\n")
@@ -937,10 +937,10 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
                 vals = row_vals[selected_param_names].tolist()
                 errs = [None, None, None]
                 if row_head == "Error": # on the error row we summarise the errors for this target
-                    par_err = [np.abs(np.divide(vals[k],
+                    par_errs = [np.abs(np.divide(b_errs[k],
                                                 1 if k in dont_div else np.add(b_preds[k], 1e-30)))
                                                                     for k in selected_param_names]
-                    errs = [np.mean(np.abs(vals)), np.mean(np.square(vals)), np.mean(par_err)]
+                    errs = [np.mean(np.abs(vals)), np.mean(np.square(vals)), np.mean(par_errs)]
 
                 row(row_head, np.concatenate([vals, errs]))
 
