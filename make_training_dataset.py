@@ -71,15 +71,17 @@ def generate_instances_from_distributions(label: str):
 
         # Extending range of rA_plus_rB beyond 0.2+0.2 we need to be able to predict systems where
         # JKTEBOP may not be suitable (we may not know this unless the predictions are reliable).
-        rA_plus_rB  = rng.uniform(low=0.001, high=0.45)
+        rA          = rng.uniform(low=0.001, high=MAX_FRACTIONAL_R)
+        rB          = rng.uniform(low=0.001, high=MAX_FRACTIONAL_R)
+        k           = rB / rA
+        rA_plus_rB  = rA + rB
 
-        # The distributions for k and J are chosen through testing, being those which yield a
-        # model capable of making good predictions over the various testing datasets.
-        k           = rng.normal(loc=0.5, scale=0.8)
-        J           = rng.normal(loc=0.5, scale=0.8)
+        J           = rng.uniform(low=0.001, high=1.0) / rng.uniform(low=0.001, high=1.0)
 
-        # Simple uniform dist for inc (JKTEBOP bottoms out at 50 deg)
-        inc         = rng.uniform(low=50., high=90.00001)   # deg
+        # Simple uniform dist for cos(inc) (JKTEBOP bottoms out at 50 deg)
+        cosi        = rng.uniform(high=0.643, low=0.) # uniform in cosi between ~50 & 90 deg
+        inc_rad     = np.arccos(cosi)
+        inc         = np.degrees(inc_rad)   # deg
 
         # We need a version of JKTEBOP which supports negative L3 input values
         # (not so for version <= 43) in order to train a model to predict L3.
@@ -91,21 +93,16 @@ def generate_instances_from_distributions(label: str):
         # their approximate single rule is k=q^0.715 which we use here (tests find this works best).
         qphot       = k**1.4
 
-        # We generate ecc and omega (argument of periastron) from simple distributions. They're not
-        # used directly as labels, but they make up ecosw & esinw which are. We find it easier to
-        # get an even distribution and good training result than by generating ecosw/esinw directly.
-        # The half-normal distribution for eccentricity gives good coverage between 0 and 1; using a
-        # uniform dist' tends to favour highly eccentric systems as they're more likely to eclipse.
-        ecc         = abs(rng.normal(loc=0, scale=0.4))
+        # We generate ecc and omega (argument of periastron) from simple distributions.
+        # They're not used directly as labels, but they make up ecosw & esinw which are.
+        ecc         = abs(rng.normal(loc=0, scale=0.5))
         omega       = rng.uniform(low=0., high=360.)        # deg
 
         generated_counter += 1
         if 0 <= ecc < 1: # Skip inst if ecc invalid as it may break some downstream calculations
-            inc_rad     = np.radians(inc)
             omega_rad   = np.radians(omega)
             esinw       = ecc * np.sin(omega_rad)
             ecosw       = ecc * np.cos(omega_rad)
-            rA          = rA_plus_rB / (1 + k)
 
             yield {
                 "id":           f"{set_id}/{generated_counter:06d}",
@@ -124,9 +121,9 @@ def generate_instances_from_distributions(label: str):
 
                 # Further params for potential use as labels/features
                 "sini":         np.sin(inc_rad),
-                "cosi":         np.cos(inc_rad),
+                "cosi":         cosi,
                 "rA":           rA,
-                "rB":           rA_plus_rB - rA,
+                "rB":           rB,
                 "ecc":          ecc,
                 "omega":        omega,
                 "bP":           orbital.impact_parameter(rA, inc, ecc, esinw, False),
@@ -231,7 +228,7 @@ if __name__ == "__main__":
         # Simple diagnostic plot of the mags feature of a small sample of the instances.
         for dataset_file in sorted(dataset_dir.glob(f"**/{FILE_PREFIX}000.tfrecord")):
             print(f"Plotting a sample of the {dataset_file.parent.name} subset's mags features")
-            fig = plots.plot_dataset_instance_mags_features([dataset_file], mags_wrap_phase=0.5,
+            fig = plots.plot_dataset_instance_mags_features([dataset_file], mags_wrap_phase=1,
                                                             cols=5, max_instances=50)
             fig.savefig(dataset_dir / f"sample-{dataset_file.parent.name}.png", dpi=150)
             fig.clf()

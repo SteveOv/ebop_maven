@@ -287,7 +287,7 @@ if __name__ == "__main__":
     fig.clf()
 
     # The mags features of these targets not marked as excluded from testing
-    fig = plots.plot_dataset_instance_mags_features([ds_file], inc_targs, cols=5)
+    fig = plots.plot_dataset_instance_mags_features([ds_file], inc_targs, cols=5, mags_wrap_phase=1)
     fig.savefig(dataset_dir / "formal-test-mags-features.pdf")
     fig.savefig(dataset_dir / "formal-test-mags-features.png", dpi=150)
     fig.clf()
