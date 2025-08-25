@@ -33,7 +33,7 @@ SWAP_IF_DEEPER_SECONDARY = True
 
 # Control whether static augmentations (noise, roll & y-shift) are applied to mags features when the
 # dataset is created. They will never be applied to train instances if IGNORE_AUGS_ON_TRAIN is True.
-APPLY_STATIC_AUGS = False
+APPLY_STATIC_AUGS = True
 IGNORE_AUGS_ON_TRAIN = True
 
 # max fractional radius: JKTEBOP unsuited to close binaries. As a "rule of thumb" the cut-off is

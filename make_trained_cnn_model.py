@@ -34,7 +34,7 @@ CHOSEN_LABELS = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "bP"]
 OUTPUT_ACTIVATIONS = ["softplus"]*3 + ["linear"]*3
 TRAINSET_SUFFIX = "500k"
 
-MODEL_NAME = f"CNN-New-Ext{len(CHOSEN_FEATURES)}-{'-'.join(CHOSEN_LABELS[5:])}-" \
+MODEL_NAME = f"CNN-Rev1-Ext{len(CHOSEN_FEATURES)}-{'-'.join(CHOSEN_LABELS[5:])}-" \
                             + f"{MAGS_BINS}-{MAGS_WRAP_PHASE}-{TRAINSET_SUFFIX}"
 MODEL_FILE_NAME = "default-model"
 SAVE_DIR = Path("./drop/training") / MODEL_NAME.lower()
@@ -46,7 +46,7 @@ TRAINSET_GLOB_TERM = "trainset*.tfrecord"
 TRAINSET_DIR = Path(".") / "datasets" / TRAINSET_NAME / "training"
 TRAINSET_PIPELINE_AUGS = True
 VALIDSET_DIR = Path(".") / "datasets" / TRAINSET_NAME / "validation"
-VALIDSET_PIPELINE_AUGS = True
+VALIDSET_PIPELINE_AUGS = False
 TESTSET_DIR = Path(".") / "datasets" / "synthetic-mist-tess-dataset"
 
 TRAINING_EPOCHS = 250           # Set high if we're using early stopping
@@ -78,12 +78,12 @@ CLASS_WEIGHTS = { CHOSEN_LABELS.index(l): 1 for l in CHOSEN_LABELS } # Currently
 # ReLU is widely used default for CNN/DNNs.
 # Otherwise, may need to specify each layer separately as dims different.
 # LeakyReLU addresses issue of dead neurons & PReLU similar but trains alpha param
-CNN_STRIDES = 2
+CNN_STRIDES = 1
 CNN_PADDING = "same"
 CNN_ACTIVATE = "relu"
 CNN_POOLING_TYPE = layers.MaxPool1D # pylint: disable=invalid-name
-CNN_POOL_SIZE = 2
-CNN_POOL_STRIDES = 2
+CNN_POOL_SIZE = 6
+CNN_POOL_STRIDES = 4
 CNN_POOL_PADDING = "same"
 
 # For the dense layers: "glorot_uniform" (def) "he_normal", "he_uniform" (he_ goes well with ReLU)
@@ -157,20 +157,30 @@ def make_best_model(chosen_features: list[str]=CHOSEN_FEATURES,
         mags_input=modelling.mags_input_layer(shape=(mags_bins, 1), verbose=verbose),
         ext_input=modelling.ext_input_layer(shape=(len(chosen_features), 1), verbose=verbose),
         mags_layers=[
-            modelling.conv1d_layers(2, 16, 32, cnn_strides, cnn_padding, cnn_activation,
+            modelling.conv1d_layers(2, 8, 8, cnn_strides, cnn_padding, cnn_activation,
                                     "Conv-1-", verbose),
             modelling.pooling_layer(cnn_pooling, cnn_pool_size, cnn_pool_strides, cnn_pool_padding,
                                     "Pool-1", verbose),
-            modelling.conv1d_layers(2, 32, 16, cnn_strides, cnn_padding, cnn_activation,
+            modelling.conv1d_layers(2, 16, 8, cnn_strides, cnn_padding, cnn_activation,
                                     "Conv-2-", verbose),
             modelling.pooling_layer(cnn_pooling, cnn_pool_size, cnn_pool_strides, cnn_pool_padding,
                                     "Pool-2", verbose),
-            modelling.conv1d_layers(2, 64, 8, cnn_strides, cnn_padding, cnn_activation,
+            modelling.conv1d_layers(2, 32, 8, cnn_strides, cnn_padding, cnn_activation,
                                     "Conv-3-", verbose),
             modelling.pooling_layer(cnn_pooling, cnn_pool_size, cnn_pool_strides, cnn_pool_padding,
                                     "Pool-3", verbose),
-            modelling.conv1d_layers(2, 128, 4, cnn_strides, cnn_padding, cnn_activation,
+            modelling.conv1d_layers(2, 64, 8, cnn_strides, cnn_padding, cnn_activation,
                                     "Conv-4-", verbose),
+            modelling.pooling_layer(cnn_pooling, cnn_pool_size, cnn_pool_strides, cnn_pool_padding,
+                                    "Pool-4", verbose),
+            modelling.conv1d_layers(2, 128, 8, cnn_strides, cnn_padding, cnn_activation,
+                                    "Conv-5-", verbose),
+            modelling.pooling_layer(cnn_pooling, cnn_pool_size, cnn_pool_strides, cnn_pool_padding,
+                                    "Pool-5", verbose),
+            modelling.conv1d_layers(2, 256, 8, cnn_strides, cnn_padding, cnn_activation,
+                                    "Conv-6-", verbose),
+            modelling.pooling_layer(cnn_pooling, cnn_pool_size, cnn_pool_strides, cnn_pool_padding,
+                                    "Pool-6", verbose),
         ],
         dnn_layers=[
             modelling.hidden_layers(dnn_num_layers, dnn_num_units, dnn_initializer, dnn_activation,
