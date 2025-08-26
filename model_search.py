@@ -50,7 +50,7 @@ TESTSET_PIPELINE_AUGS = False
 
 MODEL_FILE_NAME = "search-model"
 
-MAX_HYPEROPT_EVALS = 200            # Maximum number of distinct Hyperopt evals to run
+MAX_HYPEROPT_EVALS = 100            # Maximum number of distinct Hyperopt evals to run
 HYPEROPT_LOSS_TH = 0.01             # Will stop search in the unlikely event we get below this loss
 TRAINING_EPOCHS = 250               # Set high if we're using early stopping
 BATCH_FRACTION = 0.001              # larger -> quicker training per epoch but more to converge
@@ -125,7 +125,7 @@ trials_pspace = hp.pchoice("train_and_test_model", [
             "cnn_activation":           hp.choice("best_cnn_activation", cnn_activation_choices),
             "cnn_pooling":              hp.choice("best_cnn_pooling", [layers.AvgPool1D, layers.MaxPool1D]),
             "cnn_pool_size":            hp.choice("best_cnn_pool_size", [4, 5, 6]),
-            "cnn_pool_padding":         hp.choice("best_cnn_pool_padding", cnn_padding_choices),
+            "cnn_pool_padding":         hp.choice("best_cnn_pool_padding", ["same"]),
             "dnn_num_layers":           hp.uniformint("best_dnn_num_layers", low=1, high=4),
             "dnn_num_units":            hp.quniform("best_dnn_num_units", low=128, high=512, q=64),
             "dnn_initializer":          hp.choice("best_dnn_initializer", dnn_initializer_choices),
@@ -203,7 +203,15 @@ trials_pspace = hp.pchoice("train_and_test_model", [
             "trainset_name":            TRAINSET_NAME,
             "verbose":                  True,
         },
-        "optimizer":                    make_trained_cnn_model.OPTIMIZER,
+        "optimizer": {
+            "class":                    optimizers.Nadam,
+            "learning_rate":            {
+                "class":                optimizers.schedules.ExponentialDecay,
+                "initial_learning_rate":1e-3,
+                "decay_steps":          1000,
+                "decay_rate":           0.94,
+            },
+        },
         "loss_function":                make_trained_cnn_model.LOSS, 
     }),
     (0.01, {
