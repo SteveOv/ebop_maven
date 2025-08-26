@@ -38,14 +38,11 @@ CHOSEN_LABELS = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "bP"]
 TRAINSET_NAME = "formal-training-dataset-500k"
 TRAINSET_DIR = Path(".") / "datasets" / TRAINSET_NAME / "training"
 VALIDSET_DIR = Path(".") / "datasets" / TRAINSET_NAME / "validation"
-TRAINSET_GLOB_TERM = "trainset00?.tfrecord" # First 10 files of training (80k) & validation (20k)
+TESTSET_DIR = Path(".") / "datasets" / TRAINSET_NAME / "testing"
+TRAINSET_GLOB_TERM = "trainset*.tfrecord"
+TRAINSET_SLICE = slice(10) # First 10 files of each type. Use slice(None) for all.
 TRAINSET_PIPELINE_AUGS = True
 VALIDSET_PIPELINE_AUGS = False
-
-# For the test we use a held back subset of the training set to prevent leakage
-# from the formal testing datasets, which will be used to evaluate the published model.
-TESTSET_DIR = Path(".") / "datasets" / TRAINSET_NAME / "validation"
-TESTSET_GLOB_TERM = "trainset01?.tfrecord" # Second 10 files from validation (20k)
 TESTSET_PIPELINE_AUGS = False
 
 MODEL_FILE_NAME = "search-model"
@@ -386,9 +383,9 @@ def train_and_test_model(trial_kwargs):
     for ix, (ds_name, ds_dir, ds_glob_term, requires_augs) in enumerate([
         ("training",    TRAINSET_DIR,   TRAINSET_GLOB_TERM,     TRAINSET_PIPELINE_AUGS),
         ("validation",  VALIDSET_DIR,   TRAINSET_GLOB_TERM,     VALIDSET_PIPELINE_AUGS),
-        ("trial",       TESTSET_DIR,    TESTSET_GLOB_TERM,      TESTSET_PIPELINE_AUGS),
+        ("testing",     TESTSET_DIR,    TRAINSET_GLOB_TERM,     TESTSET_PIPELINE_AUGS),
     ]):
-        files = sorted(ds_dir.glob(ds_glob_term))
+        files = sorted(ds_dir.glob(ds_glob_term))[TRAINSET_SLICE]
         aug_func = make_trained_cnn_model.augmentation_callback if requires_augs else None
         map_func = create_map_func(mags_bins=MAGS_BINS, mags_wrap_phase=MAGS_WRAP_PHASE,
                                    ext_features=CHOSEN_FEATURES, labels=CHOSEN_LABELS,
@@ -399,8 +396,8 @@ def train_and_test_model(trial_kwargs):
                                                         max_buffer_size=MAX_BUFFER_SIZE, seed=ix)
         else:
             dataset[ix], ds_ct[ix] = create_dataset_pipeline(files, BATCH_FRACTION, map_func)
-        print(f"Found {ds_ct[ix]:,} {ds_name} instances over {len(files)}",
-              f"tfrecord file(s) matching glob '{ds_glob_term}' within", ds_dir)
+        print(f"Found {ds_ct[ix]:,} {ds_name} instances over {len(files)} tfrecord file(s)",
+              f"matching glob('{ds_glob_term}')[{TRAINSET_SLICE}] within", ds_dir)
 
     # Set up the training optimizer, loss and metrics
     optimizer = model_search_helpers.get_trial_value(trial_kwargs, "optimizer")

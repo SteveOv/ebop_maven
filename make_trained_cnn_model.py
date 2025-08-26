@@ -9,6 +9,7 @@ from inspect import getsource
 from datetime import datetime, timezone
 from contextlib import redirect_stdout
 from warnings import filterwarnings
+from itertools import chain
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -42,10 +43,12 @@ PLOTS_DIR = SAVE_DIR / "plots"
 
 # We can now specify paths to train/val/test datasets separately for greater flexibility.
 TRAINSET_NAME = "formal-training-dataset-" + TRAINSET_SUFFIX
-TRAINSET_GLOB_TERM = "trainset*.tfrecord"
-TRAINSET_DIR = Path(".") / "datasets" / TRAINSET_NAME / "training"
+TRAINSET_DIR = Path(".") / "datasets" / TRAINSET_NAME
+TRAINSET_GLOB_TERMS = ["training/trainset*.tfrecord"]
 TRAINSET_PIPELINE_AUGS = True
-VALIDSET_DIR = Path(".") / "datasets" / TRAINSET_NAME / "validation"
+# As we have the synth-test-ds for formal testing we can validate with everything not training
+VALIDSET_DIR = Path(".") / "datasets" / TRAINSET_NAME
+VALIDSET_GLOB_TERMS = ["validation/trainset*.tfrecord", "testing/trainset*.tfrecord"]
 VALIDSET_PIPELINE_AUGS = False
 TESTSET_DIR = Path(".") / "datasets" / "synthetic-mist-tess-dataset"
 
@@ -245,11 +248,11 @@ if __name__ == "__main__":
         else:
             print(f"The mags features will be wrapped beyond phase {MAGS_WRAP_PHASE}.")
         datasets, counts = [tf.data.TFRecordDataset] * 2, [int] * 2
-        for ix, (label, set_dir, requires_augs) in enumerate([
-            ("training", TRAINSET_DIR, TRAINSET_PIPELINE_AUGS),
-            ("validation", VALIDSET_DIR, VALIDSET_PIPELINE_AUGS)
+        for ix, (label, set_dir, glob_terms, requires_augs) in enumerate([
+            ("training", TRAINSET_DIR, TRAINSET_GLOB_TERMS, TRAINSET_PIPELINE_AUGS),
+            ("validation", VALIDSET_DIR, VALIDSET_GLOB_TERMS, VALIDSET_PIPELINE_AUGS)
         ]):
-            files = sorted(set_dir.glob(TRAINSET_GLOB_TERM))
+            files = list(chain.from_iterable(sorted(set_dir.glob(g)) for g in glob_terms))
             aug_func = augmentation_callback if requires_augs else None
             if aug_func is not None:
                 print(f"\nThe {label} set pipeline will apply augmentations based on",
@@ -267,7 +270,7 @@ if __name__ == "__main__":
             else:
                 datasets[ix], counts[ix] = create_dataset_pipeline(files, BATCH_FRACTION, map_func)
             print(f"Found {counts[ix]:,} {label} insts over {len(files)}",
-                  f"tfrecords matching glob '{TRAINSET_GLOB_TERM}' within", set_dir)
+                  f"tfrecords matching globs {glob_terms} within", set_dir)
 
         # -----------------------------------------------------------
         # Train the model
