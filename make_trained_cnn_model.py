@@ -32,7 +32,7 @@ CHOSEN_FEATURES = []
 MAGS_BINS = 4096
 MAGS_WRAP_PHASE = None # None indicates wrap to centre on midpoint between eclipses
 CHOSEN_LABELS = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "bP"]
-OUTPUT_ACTIVATIONS = ["softplus"]*3 + ["linear"]*3
+OUTPUT_ACTIVATIONS = ["linear"]*6
 TRAINSET_SUFFIX = "500k"
 
 MODEL_NAME = f"CNN-Rev1-Ext{len(CHOSEN_FEATURES)}-{'-'.join(CHOSEN_LABELS[5:])}-" \
@@ -69,9 +69,9 @@ keras.utils.set_random_seed(SEED)
 # are fine. Even with this setting, GPUs are seen only if CUDA_VISIBLE_DEVICES isn't set to -1.
 #tf.config.experimental.enable_op_determinism()
 
-# This schedule is effectively init_rate * 0.94^epoch (so is reduced by ~10 in 37 epochs)
-LR = optimizers.schedules.ExponentialDecay(1e-3, decay_steps=1000, decay_rate=0.94)
-OPTIMIZER = optimizers.Nadam(learning_rate=LR)
+LR = optimizers.schedules.CosineDecay(initial_learning_rate=0.0, decay_steps=60000.0, alpha=0.01,
+                                      warmup_target=0.0008, warmup_steps=2000.0)
+OPTIMIZER = optimizers.Adam(learning_rate=LR)
 LOSS = ["mae"]
 METRICS = ["mse"] #+ [MeanAbsoluteErrorForLabel(CHOSEN_LABELS.index(l), l) for l in CHOSEN_LABELS]
 
@@ -79,22 +79,21 @@ METRICS = ["mse"] #+ [MeanAbsoluteErrorForLabel(CHOSEN_LABELS.index(l), l) for l
 CLASS_WEIGHTS = { CHOSEN_LABELS.index(l): 1 for l in CHOSEN_LABELS } # Currently all the same
 
 # ReLU is widely used default for CNN/DNNs.
-# Otherwise, may need to specify each layer separately as dims different.
 # LeakyReLU addresses issue of dead neurons & PReLU similar but trains alpha param
 CNN_STRIDES = 1
 CNN_PADDING = "same"
 CNN_ACTIVATE = "relu"
-CNN_POOLING_TYPE = layers.MaxPool1D # pylint: disable=invalid-name
-CNN_POOL_SIZE = 6
+CNN_POOLING_TYPE = layers.AvgPool1D # pylint: disable=invalid-name
+CNN_POOL_SIZE = 5
 CNN_POOL_STRIDES = 4
 CNN_POOL_PADDING = "same"
 
 # For the dense layers: "glorot_uniform" (def) "he_normal", "he_uniform" (he_ goes well with ReLU)
-DNN_INITIALIZER = "he_uniform"
+DNN_INITIALIZER = "he_normal"
 DNN_ACTIVATE = "leaky_relu"
-DNN_NUM_UNITS = 256
+DNN_NUM_UNITS = 384
 DNN_NUM_FULL_LAYERS = 2
-DNN_DROPOUT_RATE = 0.5
+DNN_DROPOUT_RATE = 0.3
 DNN_NUM_TAPER_UNITS = 64
 
 # Control dataset pipeline augmentations applied to each mags_feature
