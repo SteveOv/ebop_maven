@@ -450,15 +450,16 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
             fig.savefig(sub_dir / f"{results_stem}.pdf")
             plt.close(fig)
 
-            if not do_control_fit:
-                # Plot out the input feature vs predicted fit vs actual fit for each test system.
-                # This can get very large, so we can split it into multiple plots with slices.
-                for ix, sl in enumerate([slice(0, 25)], start=1):
-                    fig = plots.plot_folded_lightcurves(mags_feats[sl], targs[sl], pred_feats[sl],
-                                                        fit_feats[sl], extra_names=(None, None),
-                                                        init_ymax=1., extra_yshift=0.2, cols=5)
-                    fig.savefig(sub_dir / f"fold-mags-from-{prediction_type}-pt-{ix}.pdf")
-                    plt.close(fig)
+            # Plot out grid of input feature vs predicted fit vs actual fit, one per target.
+            # This could get very long so we split it into multiple parts.
+            part_rows, part_cols = 6, 5
+            for part, from_targ_ix in enumerate(np.arange(len(targs), step=part_rows*part_cols), 1):
+                sl = slice(from_targ_ix, from_targ_ix + part_rows*part_cols)
+                fig = plots.plot_folded_lightcurves(mags_feats[sl], targs[sl], pred_feats[sl],
+                                                    fit_feats[sl], extra_names=(None, None),
+                                                    init_ymax=1.0, extra_yshift=0.2, cols=part_cols)
+                fig.savefig(sub_dir / f"fold-mags-from-{prediction_type}-pt-{part}.pdf")
+                plt.close(fig)
 
             with open(sub_dir / f"{results_stem}.txt", "w", encoding="utf8") as txtf:
                 for (sub_head, mask, rep_names) in sub_reports:

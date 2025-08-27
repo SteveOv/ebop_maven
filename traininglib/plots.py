@@ -248,9 +248,11 @@ def plot_folded_lightcurves(main_mags_sets: np.ndarray[float],
     plot_count = max(len(main_mags_sets), len(names), len(extra_mags_sets1), len(extra_mags_sets2))
 
     height_factor = 1 + (0.2 if len(extra_mags_sets2) else 0.1 if len(extra_mags_sets1) else 0.0)
-    row_height = ROW_HEIGHT_SQUARE * height_factor
+    row_height = ROW_HEIGHT_6_5 * height_factor
     rows = math.ceil(plot_count / cols)
-    fig, axes = plt.subplots(rows, cols, sharex="all", sharey="all", constrained_layout=True,
+
+    # Specifically don't sharex so we can better control when xtick_labels appear
+    fig, axes = plt.subplots(rows, cols, sharex="none", sharey="all", constrained_layout=True,
                              figsize=(cols * COL_WIDTH, rows * row_height))
 
     # Shared over all axes
@@ -260,7 +262,7 @@ def plot_folded_lightcurves(main_mags_sets: np.ndarray[float],
     ymin, ymax = 0, init_ymax
 
     for ax, main_mags, name, extra_mags1, extra_mags2 in \
-            zip_longest(axes.flatten(), main_mags_sets, names, extra_mags_sets1, extra_mags_sets2):
+            zip_longest(axes.flat, main_mags_sets, names, extra_mags_sets1, extra_mags_sets2):
         # We expect to "run out" of features before we run out of axes in the grid.
         # The predicted and actual fits are optional, so may not exist.
         if main_mags is not None and name is not None:
@@ -289,22 +291,25 @@ def plot_folded_lightcurves(main_mags_sets: np.ndarray[float],
                     ymax = max(ymax, max(ylim)) # pylint: disable=nested-min-max
 
             ax.set_xticks(major_xticks, minor=False)
-            ax.set_xticklabels(major_xticks)
             ax.set_xticks(minor_xticks, minor=True)
 
             # We'll rely on the caller to config the output if it's an Axes
-            format_axes(ax, legend_loc="lower right", **format_kwargs)
+            format_axes(ax, legend_loc="lower center", **format_kwargs)
         else:
             # We've reached the end of the mags features, so removed the unsed axes
             ax.axis("off")
 
-    # Now we have the maximum extent of the potentially vshifted mags
-    # go back through setting the common ylims and phase vlines.
     ymax += 0.1 # extend the y-axis so there is always space for the legend
-    for ix, ax in enumerate(axes.flatten()):
-        if ix < plot_count:
+    for ax_ix, ax in enumerate(axes.flat):
+        # Now we have the maximum extent of the potentially vshifted mags
+        # go back through setting the common ylims and phase vlines.
+        if ax_ix < plot_count:
             ax.set_ylim((ymax, ymin)) # Has side effect of inverting the y-axis
             ax.vlines(major_xticks, ymin, ymax, ls="--", color=REF_LINE_COLOR, lw=.5, zorder=-10)
+
+        # Handle ragged bottom; xtick labels only on the last ax of each col. Use spaces for the
+        # other axes so the gaps between rows are consistent. Depends on sharex="none".
+        plt.setp(ax, xticklabels=[" "]*len(major_xticks) if ax_ix<plot_count-cols else major_xticks)
 
     # Common x- and y-axis labels
     fig.supxlabel("Orbital Phase")
