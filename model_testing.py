@@ -325,8 +325,8 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
 
     # Pre-allocate the mags feature and equivalent LC from predicted and fitted parameters
     mags_feats = np.empty((targ_count, mags_bins), dtype=float)
-    pred_feats = np.empty((targ_count, 1001), dtype=float)
-    fit_feats = np.empty((targ_count, 1001), dtype=float)
+    pred_feats = np.empty((targ_count, mags_bins), dtype=float)
+    fit_feats = np.empty((targ_count, mags_bins), dtype=float)
 
     # Finally, we have everything in place to fit our targets and report on the results
     for ix, targ in enumerate(targs):
@@ -368,8 +368,8 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
         # Get the phase-folded mags data for the mags feature and predicted fit. We
         # need to undo the wrap of the mags_feature as the plot will apply its own fixed wrap.
         mags_feats[ix] = np.roll(mags, -int((1-wrap_phase) * len(mags)), axis=0)
-        pred_lc = generate_predicted_fit(pred_vals[ix], targ_config, apply_fit_overrides, 1001)
-        pred_feats[ix] = pred_lc["delta_mag"]
+        pred_feats[ix] = generate_predicted_fit(pred_vals[ix], targ_config,
+                                                apply_fit_overrides, pred_feats.shape[1])
 
         try:
             # Perform the task3 fit taking the preds or control as input params and supplementing
@@ -386,8 +386,9 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
             with open(jktebop.get_jktebop_dir()/f"{fit_stem}.fit", mode="r", encoding="utf8") as ff:
                 # Get the phase-folded mags data for the actual fit.
                 # Non-numeric values will be parsed as nan (loadtxt will throw ValueError)
-                fit = np.genfromtxt(ff, usecols=[1], comments="#", dtype=float)
-                fit_feats[ix] = fit[np.round(np.linspace(0, fit.shape[0]-1, 1001)).astype(int)]
+                fit = np.genfromtxt(ff, usecols=[0, 1], comments="#", unpack=True, dtype=float)
+                fit_feats[ix] = deb_example.create_mags_feature(fit[0], fit[1],
+                                                                num_bins=fit_feats.shape[1])
         except TimeoutExpired:
             print(f"\n*** The fitting of {targ} has been timed out after {FIT_TIMEOUT:,} s ***\n")
             fit_vals[ix].fill(np.nan)
@@ -634,7 +635,7 @@ def fit_target(lc: LightCurve,
 def generate_predicted_fit(input_params: np.ndarray[UFloat],
                            target_cfg: dict[str, any],
                            apply_fit_overrides: bool=True,
-                           bins: int=None) -> np.ndarray[float]:
+                           bins: int=deb_example.default_mags_bins) -> np.ndarray[float]:
     """
     Will generate a phase-folded model light curve for the passed params and any
     LD algo/coefficients in the target config.
@@ -642,8 +643,8 @@ def generate_predicted_fit(input_params: np.ndarray[UFloat],
     :input_params: the param set to use to generate the model LC
     :target_cfg: the full config for this target - allows access to fit_overrides
     :apply_fit_overrides: whether we should use or ignore the contents of fit_overrides
-    :bins: optionally indicate the number of bins to return
-    :returns: the model data as a numpy structured array of shape (#rows, ["phase", "delta_mag])
+    :bins: the number of bins to return
+    :returns: the model data as a numpy array of delta_mags of shape (#bins, ) from phase 0 to 1
     """
     # The fit_overrides are optional overrides to any derived value and should be applied last
     fit_overrides = copy.deepcopy(target_cfg.get("fit_overrides",{})) if apply_fit_overrides else {}
@@ -663,10 +664,7 @@ def generate_predicted_fit(input_params: np.ndarray[UFloat],
     }
 
     fit = jktebop.generate_model_light_curve("model-testing-pred-fit", **params)
-    length = fit.shape[0]
-    if bins is None or bins == length:
-        return fit
-    return fit[np.round(np.linspace(0, length-1, bins)).astype(int)]
+    return deb_example.create_mags_feature(fit["phase"], fit["delta_mag"], num_bins=bins)
 
 
 def pop_and_complete_ld_config(source_cfg: Dict[str, any],
