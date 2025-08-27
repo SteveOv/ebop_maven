@@ -895,7 +895,7 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
     # The third error type will be equivalent to |(val-pred)/pred| given how errors are calculated
     # These are params we don't divide for the above error calcs as they're centred on zero
     dont_div = ["ecosw", "esinw"]
-    err_labels = ["MAE", "MSE", "Error"]
+    err_labels = ["MAE", "MSE", r"% Error"]
     line_length = 12 + (11 * len(selected_param_names)) + (11 * len(err_labels))
     def horizontal_line(char):
         to.write(char*line_length + "\n")
@@ -937,7 +937,7 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
                 errs = [None, None, None]
                 if row_head == "Error": # on the error row we summarise the errors for this target
                     par_errs = [np.abs(np.divide(b_errs[k],
-                                                1 if k in dont_div else np.add(b_preds[k], 1e-30)))
+                                                1 if k in dont_div else np.add(b_lbls[k], 1e-30)))
                                                                     for k in selected_param_names]
                     errs = [np.mean(np.abs(vals)), np.mean(np.square(vals)), np.mean(par_errs)]
 
@@ -949,7 +949,7 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
         par_maes = [np.mean(np.abs(errors[k])) for k in selected_param_names]
         par_mses = [np.mean(np.square(errors[k])) for k in selected_param_names]
         par_errs = [np.mean(np.abs(np.divide(errors[k],
-                                            1 if k in dont_div else np.add(predictions[k], 1e-30))))
+                                            1 if k in dont_div else np.add(labels[k], 1e-30))))
                                                                     for k in selected_param_names]
 
         row(err_labels[0], np.concatenate([par_maes, [np.mean(par_maes), None, None]]))
