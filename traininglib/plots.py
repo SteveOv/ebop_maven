@@ -259,7 +259,7 @@ def plot_folded_lightcurves(main_mags_sets: np.ndarray[float],
     # Shared over all axes
     phase_start = mags_wrap_phase - 1
     minor_xticks = np.arange(phase_start, phase_start + (1.0 if phase_start < 0.0 else 1.1), 0.1)
-    maj_xticks, blank_maj_xticklabels = [0.0, 0.5], ["", ""]
+    major_xticks = [0.0, 0.5]
     ymin, ymax = 0, init_ymax
 
     for ax, main_mags, name, extra_mags1, extra_mags2 in \
@@ -273,17 +273,13 @@ def plot_folded_lightcurves(main_mags_sets: np.ndarray[float],
                 (extra_mags2,   PLOT_COLORS[3],     1.0,        extra_names[1]),
             ]):
                 if mags is not None and len(mags) > 0:
-                    num_points = len(mags)
-
                     # Infer the phases from index of the mags data and apply any wrap
-                    phases = np.linspace(0, 1, num_points + 1)[1:]
+                    phases = np.linspace(0, 1, len(mags)+1, endpoint=True)[:-1]
                     if 0 < mags_wrap_phase < 1:
                         phases[phases > mags_wrap_phase] -= 1.0
 
-                    alpha *= 0.33 if num_points > 4000 else 0.66 if num_points > 1001 else 1
-
                     # Plot the mags data against the phases
-                    ax.scatter(x=phases, y=mags + ix*extra_yshift, marker=".", s=0.25,
+                    ax.scatter(x=phases, y=mags + ix*extra_yshift, marker=",", s=0.25,
                                c=color, alpha=alpha, label=label)
 
                     # Find the widest y-range which covers all data across the instances
@@ -291,27 +287,27 @@ def plot_folded_lightcurves(main_mags_sets: np.ndarray[float],
                     ymin = min(ymin, min(ylim)) # pylint: disable=nested-min-max
                     ymax = max(ymax, max(ylim)) # pylint: disable=nested-min-max
 
-            ax.set_xticks(maj_xticks, minor=False)
-            ax.set_xticks(minor_xticks, minor=True)
-
             # We'll rely on the caller to config the output if it's an Axes
             format_axes(ax, legend_loc="lower center", **format_kwargs)
         else:
             # We've reached the end of the mags features, so removed the unsed axes
             ax.axis("off")
 
-    with catch_warnings(action="ignore", category=UserWarning): # whines about xtick labels
-        ymax += 0.1 # extend the y-axis so there is always space for the legend
-        for ax_ix, ax in enumerate(axes.flat):
-            # Now we have the maximum extent of the potentially vshifted mags
-            # go back through setting the common ylims and phase vlines.
-            if ax_ix < plot_count:
-                ax.set_ylim((ymax, ymin)) # Has side effect of inverting the y-axis
-                ax.vlines(maj_xticks, ymin, ymax, ls="--", color=REF_LINE_COLOR, lw=.5, zorder=-10)
+    ymax += 0.1 # extend the y-axis so there is always space for the legend
+    for ax_ix, ax in enumerate(axes.flat):
+        # Now we have the maximum extent of the potentially vshifted mags
+        # go back through setting the common ylims and phase vlines.
+        if ax_ix < plot_count:
+            ax.set_ylim((ymax, ymin)) # Has side effect of inverting the y-axis
+            ax.vlines(major_xticks, ymin, ymax, ls="--", color=REF_LINE_COLOR, lw=.5, zorder=-10)
 
             # Handle ragged bottom; xtick labels only on the last ax of each col. Use spaces for the
             # other axes so the gaps between rows are consistent. Depends on sharex="none".
-            ax.set_xticklabels(blank_maj_xticklabels if ax_ix < plot_count-cols else maj_xticks)
+            major_xtick_labels = [" "]*len(major_xticks) if ax_ix<plot_count-cols else major_xticks
+            ax.set_xticks(major_xticks, major_xtick_labels, minor=False)
+            ax.set_xticks(minor_xticks, minor=True)
+
+        ax.set_rasterization_zorder(0)
 
     # Common x- and y-axis labels
     fig.supxlabel("Orbital Phase")

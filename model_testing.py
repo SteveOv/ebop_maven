@@ -292,6 +292,8 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
     """
     # pylint: disable=too-many-statements, too-many-branches
     FIT_TIMEOUT = 1800 # seconds
+    TARG_EXTRA_PLOT_BINS = ["V436 Per", "V889 Aql", "AN Cam", "AI Phe", "V530 Ori", "CM Dra"]
+
     if not isinstance(estimator, Estimator):
         estimator = Estimator(estimator)
     mags_bins = estimator.mags_feature_bins
@@ -323,16 +325,19 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
     pred_vals = np.empty((targ_count, ), dtype=[(p, np.dtype(UFloat.dtype)) for p in super_params])
     fit_vals = np.empty((targ_count, ), dtype=[(p, np.dtype(UFloat.dtype)) for p in super_params])
 
-    # Pre-allocate the mags feature and equivalent LC from predicted and fitted parameters
-    mags_feats = np.empty((targ_count, mags_bins), dtype=float)
-    pred_feats = np.empty((targ_count, mags_bins), dtype=float)
-    fit_feats = np.empty((targ_count, mags_bins), dtype=float)
+    # Pre-allocate ragged arrays for mags feature and equivalent LC from predicted and fitted params
+    mags_feats = np.empty((targ_count), dtype=np.ndarray)
+    pred_feats = np.empty((targ_count), dtype=np.ndarray)
+    fit_feats = np.empty((targ_count), dtype=np.ndarray)
 
     # Finally, we have everything in place to fit our targets and report on the results
     for ix, targ in enumerate(targs):
         print(f"\n\nProcessing target {ix + 1} of {targ_count}: {targ}\n" + "-"*40)
         targ_config = targets_config[targ].copy()
         print(fill(targ_config.get("desc", "")) + "\n")
+
+        # For the LC data used for plotting; some targets need more/smaller bins for clear eclipses.
+        feats_plot_bins = 2048 if targ in TARG_EXTRA_PLOT_BINS else 1024
 
         # The basic lightcurve data read, rectified & extended with delta_mag and delta_mag_err cols
         (lc, _) = formal_testing.prepare_lightcurve_for_target(targ, targ_config, True)
@@ -349,7 +354,7 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
         print(f"Creating a folded & phase-normalized light curve about {pe.format} {pe} & {period}",
               f"wrapped beyond phase {wrap_phase}" if wrap_phase not in [0.0, 1.0] else "")
         fold_lc = lc.fold(period, pe, wrap_phase=u.Quantity(wrap_phase), normalize_phase=True)
-        _, mags = pipeline.get_binned_phase_mags_data(fold_lc, mags_bins, wrap_phase)
+        phases, mags = pipeline.get_binned_phase_mags_data(fold_lc, mags_bins, wrap_phase)
 
         if do_control_fit:
             pred_vals[ix] = copy.deepcopy(lbl_vals[ix])
@@ -365,11 +370,12 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
         print(f"\nThe {prediction_type} sourced input params for fitting {targ}")
         predictions_vs_labels_to_table(pred_vals[ix], lbl_vals[ix], [targ], fit_params)
 
-        # Get the phase-folded mags data for the mags feature and predicted fit. We
-        # need to undo the wrap of the mags_feature as the plot will apply its own fixed wrap.
-        mags_feats[ix] = np.roll(mags, -int((1-wrap_phase) * len(mags)), axis=0)
+        # Get the phase-folded data for the mags feature and a predicted fit and (re-)bin for
+        # plotting. Also undo the wrap of the mags_feature as the plots may apply their own wrap.
+        mags_feats[ix] = deb_example.create_mags_feature(phases, mags, None, feats_plot_bins)
+        mags_feats[ix] = np.roll(mags_feats[ix], -int((1-wrap_phase) * len(mags_feats[ix])), axis=0)
         pred_feats[ix] = generate_predicted_fit(pred_vals[ix], targ_config,
-                                                apply_fit_overrides, pred_feats.shape[1])
+                                                apply_fit_overrides, feats_plot_bins)
 
         try:
             # Perform the task3 fit taking the preds or control as input params and supplementing
@@ -386,9 +392,8 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
             with open(jktebop.get_jktebop_dir()/f"{fit_stem}.fit", mode="r", encoding="utf8") as ff:
                 # Get the phase-folded mags data for the actual fit.
                 # Non-numeric values will be parsed as nan (loadtxt will throw ValueError)
-                fit = np.genfromtxt(ff, usecols=[0, 1], comments="#", unpack=True, dtype=float)
-                fit_feats[ix] = deb_example.create_mags_feature(fit[0], fit[1],
-                                                                num_bins=fit_feats.shape[1])
+                ft = np.genfromtxt(ff, usecols=[0, 1], comments="#", unpack=True, dtype=float)
+                fit_feats[ix] = deb_example.create_mags_feature(ft[0], ft[1], None, feats_plot_bins)
         except TimeoutExpired:
             print(f"\n*** The fitting of {targ} has been timed out after {FIT_TIMEOUT:,} s ***\n")
             fit_vals[ix].fill(np.nan)
