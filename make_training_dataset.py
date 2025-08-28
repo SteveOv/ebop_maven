@@ -78,8 +78,10 @@ def generate_instances_from_distributions(label: str):
 
         J           = rng.uniform(low=0.001, high=1.0) / rng.uniform(low=0.001, high=1.0)
 
-        # Simple uniform dist for inc (JKTEBOP bottoms out at 50 deg)
-        inc         = 90 - rng.uniform(low=0., high=40.001) # deg
+        # Simple uniform dist for cos(inc) (JKTEBOP bottoms out at 50 deg)
+        cosi        = rng.uniform(high=0.643, low=0.) # uniform in cosi between ~50 & 90 deg
+        inc_rad     = np.arccos(cosi)
+        inc         = np.degrees(inc_rad)   # deg
 
         # We need a version of JKTEBOP which supports negative L3 input values
         # (not so for version <= 43) in order to train a model to predict L3.
@@ -98,7 +100,6 @@ def generate_instances_from_distributions(label: str):
 
         generated_counter += 1
         if 0 <= ecc < 1: # Skip inst if ecc invalid as it may break some downstream calculations
-            inc_rad     = np.radians(inc)
             omega_rad   = np.radians(omega)
             esinw       = ecc * np.sin(omega_rad)
             ecosw       = ecc * np.cos(omega_rad)
@@ -120,7 +121,7 @@ def generate_instances_from_distributions(label: str):
 
                 # Further params for potential use as labels/features
                 "sini":         np.sin(inc_rad),
-                "cosi":         np.cos(inc_rad),
+                "cosi":         cosi,
                 "rA":           rA,
                 "rB":           rB,
                 "ecc":          ecc,
@@ -209,7 +210,7 @@ if __name__ == "__main__":
                               file_prefix=FILE_PREFIX,
                               valid_ratio=0.1,
                               test_ratio=0.1,
-                              max_workers=5,
+                              max_workers=8,
                               save_param_csvs=True,
                               verbose=True,
                               simulate=False)
