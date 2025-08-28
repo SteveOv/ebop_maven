@@ -897,10 +897,10 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
     if print_it:
         to = StringIO()
 
-    # The third error type will be equivalent to |(val-pred)/pred| given how errors are calculated
-    # These are params we don't divide for the above error calcs as they're centred on zero
+    # The relative error type will be equivalent to |(lbl-pred)/lbl|. The dont_div params are those
+    # we don't divide by lbl in this calc, as they're centred on zero & range from 0 to +/-1.
     dont_div = ["ecosw", "esinw"]
-    err_labels = ["MAE", "MSE", r"% Error"]
+    err_labels = ["MAE", "MSE", "R'tive Err"]
     line_length = 12 + (11 * len(selected_param_names)) + (11 * len(err_labels))
     def horizontal_line(char):
         to.write(char*line_length + "\n")
