@@ -14,7 +14,8 @@ from contextlib import redirect_stdout
 from textwrap import fill
 import copy
 import argparse
-from datetime import datetime
+from datetime import timedelta, datetime
+from timeit import default_timer
 import warnings
 from subprocess import TimeoutExpired
 
@@ -121,6 +122,7 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
     pred_vals = np.empty((inst_count, ),
                          dtype=[(n, np.dtype(UFloat.dtype)) for n in estimator.label_names])
     force_seed_on_dropout_layers(estimator, DEFAULT_TESTING_SEED)
+    start_time = default_timer()
     for batch, ix in enumerate(np.arange(0, inst_count, max_batch_size), start=1):
         if max_batch_size < inst_count:
             print(f"Predicting batch {batch} of {int(np.ceil(inst_count / max_batch_size))}")
@@ -129,6 +131,7 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
                                iterations=mc_iterations,
                                unscale=not scaled)
         pred_vals[ix : ix+len(pv)] = pv
+    print(f"The {inst_count} {mc_type} predictions took {timedelta(0, default_timer()-start_time)}")
 
     if "inc" not in estimator.label_names:
         pred_vals = append_calculated_inc_predictions(pred_vals)
