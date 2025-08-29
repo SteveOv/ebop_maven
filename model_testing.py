@@ -1128,15 +1128,17 @@ if __name__ == "__main__":
     #formal_targs = np.array(["V436 Per", "CM Dra"])
 
     for file_counter, model_file in enumerate(args.model_files, 1):
-        print(f"\nModel file {file_counter} of {len(args.model_files)}: {model_file}\n")
-
-        # Set up the estimator and the reporting directory for this model
-        if model_file is None or model_file.parent.name == "estimator": # published with ebop_maven
+        # Locate the expected file and the reporting directory for this model
+        if model_file is None or model_file.parent.name == "estimator":# published with ebop_maven
             result_dir = Path("./drop/training/published/" + test_results_subdir)
             model_file = Path("./ebop_maven/data/estimator/default-model.keras")
+        elif Path.is_dir(model_file):
+            result_dir = model_file / test_results_subdir
+            model_file /= "default-model.keras"
         else:
             result_dir = model_file.parent / test_results_subdir
         result_dir.mkdir(parents=True, exist_ok=True)
+        print(f"\nModel file {file_counter} of {len(args.model_files)}: {model_file}\n")
 
         def warnings_to_stdout(message, category, filename, lineno, file=None, line=None):
             """ Will redirect any warning output to stdout where it can be picked up by Tee """
