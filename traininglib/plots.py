@@ -382,6 +382,7 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
                                ylabel_prefix: str="predicted",
                                hl_mask1: np.ndarray[bool]=None,
                                hl_mask2: np.ndarray[bool]=None,
+                               hl_mask3: np.ndarray[bool]=None,
                                fixed_viewport: bool=False) -> Figure:
     """
     Will create a plot figure with a grid of axes, one per label, showing the
@@ -398,6 +399,7 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
     :ylabel_prefix: the prefix text for the predictions/y-axis label
     :hl_mask1: optional mask for targets to be plotted with 1st alternative/highlight marker
     :hl_mask2: optional mask for targets to be plotted with 2nd alternative/highlight marker
+    :hl_mask3: optional mask for targets to be plotted with 3rd alternative/highlight marker
     :fixed_viewport: if True the plots for k, J & bP will have a fixed view to show detail
     :returns: the Figure
     """
@@ -417,6 +419,8 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
         hl_mask1 = np.zeros((inst_count), dtype=bool)
     if hl_mask2 is None:
         hl_mask2 = np.zeros((inst_count), dtype=bool)
+    if hl_mask3 is None:
+        hl_mask3 = np.zeros((inst_count), dtype=bool)
 
     # We plot the params common to the labels & preds, & optionally the input list
     # of names. Avoiding using set() as we want requested names or the labels to set order
@@ -436,15 +440,15 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
 
     # The markers, marker sizes and alpha values are different depending on small/large dataset
     if inst_count < 100:
-        fmt = ["o", "s", "D"]
-        c = [PLOT_COLORS[0], PLOT_COLORS[4], PLOT_COLORS[4]]
-        ms = [7.0, 10.5, 10.5]
-        alpha = [(0.66 if any(hl_mask1) or any(hl_mask2) else 1.0), 1.0, 1.0]
+        fmt = ["o", "s", "D", "p"]
+        c = [PLOT_COLORS[0], PLOT_COLORS[4], PLOT_COLORS[4], PLOT_COLORS[4]]
+        ms = [7.0, 10.5, 10.5, 10.5]
+        alpha = [(0.66 if any(hl_mask1) or any(hl_mask2) else 1.0), 1.0, 1.0, 1.0]
     else:
-        fmt = ["o", "o", "o"]
-        c = [PLOT_COLORS[0], PLOT_COLORS[1], PLOT_COLORS[4]]
-        ms = [3.0, 3.0, 3.0]
-        alpha = [0.25, 0.50, 0.75]
+        fmt = ["o", "o", "o", "o"]
+        c = [PLOT_COLORS[0], PLOT_COLORS[1], PLOT_COLORS[4], PLOT_COLORS[4]]
+        ms = [3.0, 3.0, 3.0, 3.0]
+        alpha = [0.25, 0.50, 0.75, 0.75]
 
     print(f"Plotting {ylabel_prefix}-v-{xlabel_prefix} figure for {inst_count} instances",
           f"on a {rows}x{cols} grid for:", ", ".join(params.keys()))
@@ -467,8 +471,10 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
                     vmax = 0.45
             else:
                 if param_name in ["k", "J", "bP"]:
+                    vmin = min(0, vmin)
                     vmax = max(1.5, vmax)
                 elif param_name in ["rA_plus_rB"]:
+                    vmin = min(0, vmin)
                     vmax = max(0.1, vmax)
             vpad = 0.075 * (vmax - vmin)
             vdiag = (vmin - vpad, vmax + vpad)
@@ -487,6 +493,8 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
                 (total_eclipse_mask & hl_mask1,     1,      True),
                 (~total_eclipse_mask & hl_mask2,    2,      False),
                 (total_eclipse_mask & hl_mask2,     2,      True),
+                (~total_eclipse_mask & hl_mask3,    3,      False),
+                (total_eclipse_mask & hl_mask3,     3,      True),
             ]:
                 if any(mask):
                     fs = "full" if filled else "none"

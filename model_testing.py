@@ -308,10 +308,11 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
     targs = np.array(targs) if not isinstance(targs, np.ndarray) else targs
     targ_count = len(targs)
     total_mask = np.array([targets_config.get(t, {}).get("total_eclipses", False) for t in targs])
-    hl_mask1 = np.array([targets_config.get(t, {}).get("hl_mask1", False) for t in targs])
-    hl_mask2 = np.array([targets_config.get(t, {}).get("hl_mask2", False) for t in targs])
+    hl_mask1 = np.array([targets_config.get(t, {}).get("hl_mask", None) == 1 for t in targs])
+    hl_mask2 = np.array([targets_config.get(t, {}).get("hl_mask", None) == 2 for t in targs])
+    hl_mask3 = np.array([targets_config.get(t, {}).get("hl_mask", None) == 3 for t in targs])
 
-    # To clarify: the estimator publishes a list of what it can predict via its label_names attrib
+    # To clarify: the estimator publishes a list of what it can predict via sits label_names attrib
     # and fit_params may differ; they are those params required for JKTEBOP fitting and reporting.
     # super_params is the set of both and is used, for example, to get the superset of label values
     fit_params = ["inc" if n == "bP" else n for n in estimator.label_names]
@@ -429,9 +430,9 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
                 for (source, pnames) in [("model", estimator.label_names), ("fitting", fit_params)]:
                     if len(pnames) % 2 == 0: # Move ecosw+esinw to the same row on plots 2 axes wide
                         pnames = [n for n in pnames if n not in ["ecosw","esinw"]]+["ecosw","esinw"]
-                    fig = plots.plot_predictions_vs_labels(pred_vals, comp_vals, total_mask,
-                                                           pnames, xlabel_prefix=comp_head,
-                                                           hl_mask1=hl_mask1, hl_mask2=hl_mask2)
+                    fig = plots.plot_predictions_vs_labels(pred_vals, comp_vals, total_mask, pnames,
+                                                        xlabel_prefix=comp_head, hl_mask1=hl_mask1,
+                                                        hl_mask2=hl_mask2, hl_mask3=hl_mask3)
                     fig.savefig(sub_dir / f"{preds_stem}-{source}.pdf")
                     plt.close(fig)
 
@@ -451,8 +452,8 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
             if len(pnames) % 2 == 0: # Move ecosw+esinw to the same row on plots 2 axes wide
                 pnames = [n for n in pnames if n not in ["ecosw", "esinw"]] + ["ecosw", "esinw"]
             fig = plots.plot_predictions_vs_labels(fit_vals, comp_vals, total_mask, pnames,
-                                                   xlabel_prefix=comp_head, ylabel_prefix="fitted",
-                                                   hl_mask1=hl_mask1, hl_mask2=hl_mask2)
+                                            xlabel_prefix=comp_head, ylabel_prefix="fitted",
+                                            hl_mask1=hl_mask1, hl_mask2=hl_mask2, hl_mask3=hl_mask3)
             fig.savefig(sub_dir / f"{results_stem}.pdf")
             plt.close(fig)
 
