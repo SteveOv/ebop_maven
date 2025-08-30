@@ -69,8 +69,9 @@ keras.utils.set_random_seed(SEED)
 # are fine. Even with this setting, GPUs are seen only if CUDA_VISIBLE_DEVICES isn't set to -1.
 #tf.config.experimental.enable_op_determinism()
 
-LR = optimizers.schedules.CosineDecay(initial_learning_rate=0.0, decay_steps=60000.0, alpha=0.01,
-                                      warmup_target=0.0008, warmup_steps=2000.0)
+# This gives 2 epochs warmup of LR from 0 to 0.0008 then decays over next 60 epochs to LR 0.000008
+LR = optimizers.schedules.CosineDecay(initial_learning_rate=0.0, decay_steps=60000, alpha=0.01,
+                                      warmup_target=0.0008, warmup_steps=2000)
 OPTIMIZER = optimizers.Adam(learning_rate=LR)
 LOSS = ["mae"]
 METRICS = ["mse"] #+ [MeanAbsoluteErrorForLabel(CHOSEN_LABELS.index(l), l) for l in CHOSEN_LABELS]
