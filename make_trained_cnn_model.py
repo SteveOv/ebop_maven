@@ -57,7 +57,7 @@ BATCH_FRACTION = 0.001          # larger -> quicker training per epoch but more 
 MAX_BUFFER_SIZE = 20000000      # Size of Dataset shuffle buffer (in instances)
 ES_PATIENCE = 5                 # Number of epochs w/o val_loss improvement before stopping
 ES_MIN_DELTA = 0.0001           # Minimum val_loss delta to be considered an improvment
-ES_START = 50                   # The epoch that the early stopping algorithm kicks in
+ES_START = 60                   # The epoch that the early stopping algorithm kicks in
 SEED = 42                       # Standard random seed ensures repeatable randomization
 
 # Sets the random seed on python, numpy and keras's backend library (in this case tensorflow)
