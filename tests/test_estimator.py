@@ -103,25 +103,88 @@ class TestEstimator(unittest.TestCase):
         self.assertRaises(TypeError, estimator.predict, "Hello", np.array([1.0, 0.5]))
         self.assertRaises(TypeError, estimator.predict, np.array([[0.5]*estimator.mags_feature_bins]), 0.5)
 
-    def test_predict_incorrect_sized_mags_feature(self):
-        """ Tests predict(incorrect size mags_feature NDArray) gives ValueError """
+    def test_predict_validate_mags_feature_shape(self):
+        """ Tests predict(different shape mags_feature NDArray) assert shape inference correct """
         estimator = Estimator(self._test_model_file)
-        ext_features = np.array([[1.0] * len(estimator.extra_feature_names)]) # valid
+        nbins = estimator.mags_feature_bins
+        nfeats = len(estimator.extra_feature_names)
 
-        mags_feature = np.array([0.5] * (estimator.mags_feature_bins))      # (#bins) no inst dimension
-        self.assertRaises(ValueError, estimator.predict, mags_feature, ext_features)
-        mags_feature = np.array([[0.5] * (estimator.mags_feature_bins + 2)]) # too wide
-        self.assertRaises(ValueError, estimator.predict, mags_feature, ext_features)
+        for (mags_feature,                      msg,                exp_ninsts, err_expected) in [
+            # Valid dims: position of nbins is key to getting the axes to shape (#insts, #bins, 1).
+            # #bins/nbins is expected to be axis 1 if insts are given or axis 0 if 1 implicit inst.
+            (np.array([[[0.5]]*nbins]*3),       "valid (3, nbins, 1)",      3,      False),
+            (np.array([[[0.5]]*nbins]*1),       "valid (1, nbins, 1)",      1,      False),
+            (np.array([[0.5]*nbins]*3),         "valid (3, nbins)",         3,      False),
+            (np.array([[0.5]*nbins]*1),         "valid (1, nbins)",         1,      False),
+            (np.array([[0.5]]*nbins),           "valid (nbins, 1)",         1,      False),
+            (np.array([0.5]*nbins),             "valid (nbins, )",          1,      False),
 
-    def test_predict_incorrect_sized_ext_features(self):
-        """ Tests predict(incorrect extra_features NDArray) gives ValueError """
+            # Valid: edge case where we just happen to have same number of insts as nbins
+            (np.array([[[0.5]]*nbins]*nbins),   "valid (nbins, nbins, 1)",  nbins,  False),
+
+            # Invalid: positions OK but incorrectly sized bins or final axis (expected depth 1)
+            (np.array([[[0.5]]*(nbins+1)]*3),   "invalid (3, nbins+1, 1)",  3,      True),
+            (np.array([[0.5]*(nbins+1)]*3),     "invalid (3, nbins+1)",     3,      True),
+            (np.array([0.5]*(nbins+1)),         "invalid (nbins+1, )",      1,      True),
+            (np.array([[0.5]*3]*nbins),         "invalid (nbins, 3)",       1,      True),
+
+            # Invalid: incorrectly ordered axes - too difficult to consistently interpret
+            (np.array([[[0.5]]*3]*nbins),       "invalid (nbins, 3, 1)",    3,      True),
+            (np.array([[[0.5]*3]]*nbins),       "invalid (nbins, 1, 3)",    3,      True),
+            (np.array([[[0.5]*3]*nbins]),       "invalid (1, nbins, 3)",    3,      True),
+            (np.array([[[0.5]*nbins]*1]*3),     "invalid (3, 1, nbins)",    3,      True),
+        ]:
+            with self.subTest(msg):
+                ext_features = np.array([[[1.0]] * nfeats] * exp_ninsts) # valid (#insts, #feats, 1)
+                if not err_expected:
+                    results = estimator.predict(mags_feature, ext_features)
+                    self.assertEqual(exp_ninsts, results.shape[0])
+                else:
+                    self.assertRaises(ValueError, estimator.predict, mags_feature, ext_features)
+
+    def test_predict_validate_ext_features_shape(self):
+        """ Tests predict(different extra_features NDArray) assert shape inference correct """
         estimator = Estimator(self._test_model_file)
-        mags_feature = np.array([[0.5] * (estimator.mags_feature_bins)])    # valid
+        nbins = estimator.mags_feature_bins
+        nfeats = len(estimator.extra_feature_names)
 
-        ext_features = np.array([1.0] * len(estimator.extra_feature_names)) # (#feats) no inst dimension
-        self.assertRaises(ValueError, estimator.predict, mags_feature, ext_features)
-        ext_features = np.array([[1.0] * (len(estimator.extra_feature_names)+1)]) # too wide
-        self.assertRaises(ValueError, estimator.predict, mags_feature, ext_features)
+        for (ext_features,                      msg,                exp_ninsts, err_expected) in [
+            # Valid dims: position of nbins is key to getting the axes to shape (#insts, #bins, 1).
+            # #bins/nbins is expected to be axis 1 if insts are given or axis 0 if 1 implicit inst.
+            (np.array([[[0.5]]*nfeats]*3),      "valid (3, nfeats, 1)",     3,      False),
+            (np.array([[[0.5]]*nfeats]*1),      "valid (1, nfeats, 1)",     1,      False),
+            (np.array([[0.5]*nfeats]*3),        "valid (3, nfeats)",        3,      False),
+            (np.array([[0.5]*nfeats]*1),        "valid (1, nfeats)",        1,      False),
+            (np.array([[0.5]]*nfeats),          "valid (nfeats, 1)",        1,      False),
+            (np.array([0.5]*nfeats),            "valid (nfeats, )",         1,      False),
+
+            # Invalid: #insts, actual or inferred, doesn't match the mags feature
+            (np.array([[[0.5]]*nfeats]*3),      "invalid (3, nfeats, 1)",   1,      True),
+            (np.array([[0.5]*nfeats]*3),        "invalid (3, nfeats)",      1,      True),
+            (np.array([[[0.5]]*nfeats]*1),      "invalid (1, nfeats, 1)",   3,      True),
+            (np.array([[0.5]]*nfeats),          "invalid (nfeats, 1)",      3,      True),
+            (np.array([0.5]*nfeats),            "invalid (nfeats, )",       3,      True),
+
+            # Invalid: positions OK but incorrectly sized feats or final axis (expected depth 1)
+            (np.array([[[0.5]]*(nfeats+1)]),    "invalid (1, nfeats+1, 1)", 1,      True),
+            (np.array([[0.5]*(nfeats+1)]),      "invalid (1, nfeats+1)",    1,      True),
+            (np.array([[0.5]*3]*nfeats),        "invalid (nfeats, 3)",      1,      True),
+
+            # Invalid: incorrectly ordered axes - too difficult to consistently interpret
+            (np.array([[[0.5]]*3]*nfeats),      "invalid (nfeats, 3, 1)",   3,      True),
+            (np.array([[[0.5]*3]]*nfeats),      "invalid (nfeats, 1, 3)",   3,      True),
+            (np.array([[[0.5]*3]*nfeats]),      "invalid (1, nfeats, 3)",   3,      True),
+            (np.array([[[0.5]*nfeats]*1]*3),    "invalid (3, 1, nfeats)",   3,      True),
+        ]:
+            # A valid mags feature. We need to get beyond the validation of the mags feature to get
+            # to the ext feature validation code, plus predict() infers #insts from mags feature.
+            mags_feature = np.array([[[0.5]] * nbins] * exp_ninsts) # shape == (#insts, #bins, 1)
+            with self.subTest(msg):
+                if not err_expected:
+                    results = estimator.predict(mags_feature, ext_features)
+                    self.assertEqual(exp_ninsts, results.shape[0])
+                else:
+                    self.assertRaises(ValueError, estimator.predict, mags_feature, ext_features)
 
     def test_predict_valid_assert_scaling(self):
         """ Tests predict() assert scaling correctly applied """
