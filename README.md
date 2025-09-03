@@ -36,7 +36,7 @@ CNN models are widely used in computer vision scenarios. They are often used for
 problems, for example in classifying Sloan Digital Sky Survey (SDSS) DR16 targets as stars, quasars
 or galaxies (Chaini et al. 2023), however here we are using one to address a regression problem.
 
-| ![cnn-ext-model](https://github.com/user-attachments/assets/210e53f2-901b-4a9b-b4c3-366c7dc57a40) |
+| ![cnn-ext-model](https://github.com/user-attachments/assets/7dc230f3-9f09-4064-8094-253f14250098) |
 | :-: |
 | _Figure 1. The EBOP MAVEN CNN model. Network visualized using a fork of PlotNeuralNet (Iqbal 2018)._  |
 
