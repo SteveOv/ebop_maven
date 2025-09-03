@@ -128,15 +128,24 @@ def create_mags_feature(phases: np.ndarray[float],
     if bin_mags.dtype == np.dtype(object): # UFloat
         bin_mags = unumpy.nominal_values(bin_mags)
 
-    # Fill any gaps by interpolation; we have a np.nan where there were no source data within a bin
-    if any(missing := np.isnan(bin_mags)):
-        def equiv_ix(ix):
-            return ix.nonzero()[0]
-        bin_mags[missing] = np.interp(equiv_ix(missing), equiv_ix(~missing), bin_mags[~missing])
+    # Fill any gaps
+    interpolate_nan_mags(bin_mags)
 
     if include_phases:
         return bin_phases, bin_mags
     return bin_mags
+
+
+def interpolate_nan_mags(mags: np.ndarray):
+    """
+    Replaces np.nan values in the passed 1-D mags array with values from 1-D linear interpolation.
+    Operates in place on a single 1-D set of mags values. Iterate over the call for multiple insts.
+
+    :bin_mags: the mags data, of shape (bins,) or (bins, 1), which is updated in place
+    """
+    if any(nan_mask := np.isnan(mags)):
+        mags[nan_mask] = np.interp(nan_mask.nonzero()[0], (~nan_mask).nonzero()[0], mags[~nan_mask])
+
 
 def serialize(identifier: str,
               labels: Dict[str, float],

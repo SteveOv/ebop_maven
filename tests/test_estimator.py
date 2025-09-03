@@ -290,6 +290,31 @@ class TestEstimator(unittest.TestCase):
             self.assertEqual(p1.nominal_value, p2.nominal_value, f"Index {ix} differs on nominals")
             self.assertEqual(p1.std_dev, p2.std_dev, f"Index {ix} differs on std_dev")
 
+    def test_predict_substitute_for_nans(self):
+        """ Tests predict() substitutes values for nans in mags_feature by linear interpolation. """
+        estimator = Estimator(self._test_model_file)
+
+        # Use a straight line for mags so the linear interpolation should replace very closely
+        mags_feature = np.linspace(0, 1, estimator.mags_feature_bins)
+        ext_features = np.array([1.0, 0.5])
+
+        results1 = estimator.predict(mags_feature, ext_features)
+
+        # Now insert some nans into the mags features.
+        mags_feature[10:20] = np.nan
+        mags_feature[800:810] = np.nan
+        mags_feature[1500:1510] = np.nan
+
+        results2 = estimator.predict(mags_feature, ext_features)
+
+        for param in results1.dtype.names:
+            # results2 will likely contain nans too if the interpolation misses any nans in the mags
+            # otherwise, if the interpolation is working well, the results should be very close.
+            self.assertAlmostEqual(results1[0][param].n, results2[0][param].n, 6, f"param: {param}")
+
+        # Ensure the source data is unchanged
+        self.assertTrue(np.isnan(mags_feature[15]))
+
     @classmethod
     def _force_reset_dropout_seed(cls, estimator: Estimator, seed_value: int):
         """

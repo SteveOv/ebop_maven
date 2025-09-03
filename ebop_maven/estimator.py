@@ -144,6 +144,10 @@ class Estimator(ABC):
             - #insts, inferred or actual, must match the equivalent value for the mags data
             - set to None if extra features are not required
 
+        Prior to making any predictions a check for nans will be made on the mags_feature bins. If
+        any are found, substitute values will be derived by simple 1-D linear interpolation. Those
+        wanting a custom nan strategy should implment it in client code before calling predict().
+
         The predictions are returned as a structured NDArray of shape (#insts, #labels), with the
         labels accessible by the names given in self.label_names. If iterations is 1, the NDArray
         will contain the predicted values as UFloats with uncertainty values of zero. If
@@ -187,6 +191,7 @@ class Estimator(ABC):
 
         # For the model we need the mags features in the expected shape of (#insts, #bins, 1).
         # We can infer the missing #insts & trailing dim so long as we can find the #bins axis.
+        # Not that expand_dims creates a view on the source array, so leaves it unchanged.
         nbins = self.mags_feature_bins
         if mags_feature.ndim == 3 and mags_feature.shape[1] == nbins and mags_feature.shape[2] == 1:
             ninsts = mags_feature.shape[0]
@@ -222,6 +227,13 @@ class Estimator(ABC):
         else:
             # No extra features required, and None supplied. Make sure we don't choke the model.
             extra_features = np.empty(shape=(ninsts, 0, 1), dtype=float)
+
+        # Replace any gaps (nan values) in the mags data with linearly interpolated values. If we
+        # need to fill gaps, do it on a copy so as not to surprise client code by changing its data.
+        if np.any(np.isnan(mags_feature)):
+            mags_feature = mags_feature.copy()
+            for inst in np.arange(ninsts):
+                deb_example.interpolate_nan_mags(mags_feature[inst])
 
         # If dropout, we make multiple predictions for each inst with training switched on so that
         # each prediction is with a statistically unique subset of the model's net: the MC Dropout
