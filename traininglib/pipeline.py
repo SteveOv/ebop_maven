@@ -452,9 +452,16 @@ def get_binned_phase_mags_data(flc: FoldedLightCurve,
     """
     if phase_pivot is not None and isinstance(phase_pivot, u.Quantity):
         phase_pivot = phase_pivot.value
-    return deb_example.create_mags_feature(flc.phase.value,
-                                           flc["delta_mag"].unmasked.value,
-                                           flc["delta_mag_err"].unmasked.value,
+
+    # usually these are masked columns but sometimes not (looking at you psi Cen)
+    if flc.has_masked_values:
+        mags = flc["delta_mag"].unmasked.value
+        mags_err = flc["delta_mag_err"].unmasked.value
+    else:
+        mags = flc["delta_mag"].value
+        mags_err = flc["delta_mag_err"].value
+
+    return deb_example.create_mags_feature(flc.phase.value, mags, mags_err,
                                            num_bins, phase_pivot, include_phases=True)
 
 
