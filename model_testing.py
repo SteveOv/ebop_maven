@@ -940,17 +940,17 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
                 in zip(block_headings, labels, predictions, errors, strict=True):
             header_block(block_head)
             horizontal_line("-")
-            for row_head, row_vals in zip([label_head, prediction_head, error_head],
-                                          [b_lbls, b_preds, b_errs]):
+            for row_ix, (row_head, row_vals) in enumerate(
+                    zip([label_head, prediction_head, error_head], [b_lbls, b_preds, b_errs]),
+                    start=1):
                 vals = row_vals[selected_param_names].tolist()
-                errs = [None, None, None]
-                if row_head == "Error": # on the error row we summarise the errors for this target
-                    par_errs = [np.abs(np.divide(b_errs[k],
+                mean_errs = [None, None, None]
+                if row_ix == 3: # on the "error" row we append error summaries
+                    rel_errs = [np.abs(np.divide(b_errs[k],
                                                 1 if k in dont_div else np.add(b_lbls[k], 1e-30)))
                                                                     for k in selected_param_names]
-                    errs = [np.mean(np.abs(vals)), np.mean(np.square(vals)), np.mean(par_errs)]
-
-                row(row_head, np.concatenate([vals, errs]))
+                    mean_errs = [np.mean(np.abs(vals)), np.mean(np.square(vals)), np.mean(rel_errs)]
+                row(row_head, np.concatenate([vals, mean_errs]))
 
     if summary_only or len(predictions) > 1:
         # Summary rows for aggregate stats over all of the rows
