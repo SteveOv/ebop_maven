@@ -35,42 +35,42 @@ input features in order to predict the input parameters for subsequent formal an
 CNN models are widely used in computer vision scenarios. They are often used for classification
 problems, for example in classifying Sloan Digital Sky Survey (SDSS) DR16 targets as stars, quasars
 or galaxies (Chaini et al. 2023), however here we are using one to address a regression problem.
+A model consists of one or more convolutional layers which during training "learn" convolution
+filters that isolate important features in the input data. The convolutional layers feed a
+deep neural network which learns to make predictions from the features extracted by the filters.
 
-| ![cnn-ext-model](https://github.com/user-attachments/assets/210e53f2-901b-4a9b-b4c3-366c7dc57a40) |
+| ![cnn-ext-model](https://github.com/user-attachments/assets/7dc230f3-9f09-4064-8094-253f14250098) |
 | :-: |
 | _Figure 1. The EBOP MAVEN CNN model. Network visualized using a fork of PlotNeuralNet (Iqbal 2018)._  |
 
-A CNN model consists of one or more convolutional layers which during training "learn" convolution
-kernels to isolate important features in the input data, followed by a neural network which learns
-to make predictions from the detected features. The EBOP MAVEN model is presented in Fig. 1.
-It shows the sets of 1-D convolutional layers which extract features from the input data consisting
-of a phase-folded and phase-normalized dEB light-curve with the fluxes converted to magnitudes
-relative to zero. As the input data is passed on from each convolutional layer its spatial extent
-halved, as is also the case with the MaxPooling layers after each pair of convolutional layers
-(they do nothing else). This process progressively reduces the spatial extent of the input data.
-Conversely the number of filters is steadily increased from 16 to 128 which extends the number
-of features the layers output, with these features covering progressively broader sections of the
-light curve. The final output from the convolutional layers are two sets of 128 features
-which are flattened to a single array of 256 and then passed into a deep neural network
-(DNN) which bases its predictions on the features.
+The EBOP MAVEN model is presented in Fig. 1. The input data is a 4096 bin phase-folded light curve
+with fluxes converted to relative magnitudes. Each convolutional layer extracts features from the
+light curve data via its trained filters. Following each pair of convolutional layers is a pooling
+layer which bins and reduces the size of the light curve data by a factor 4. This process progressively
+reduces the spatial extent of the input data as it passed through the layer. At the same time, the
+number of filters is increased from 8 to 256 for each successive pair of convolutional layers,
+extending the number of features extracted while allowing each a larger receptive field on to the
+light curve data. The final output from the convolutional layers are a set of 256 features. These
+are flattened to a single array of 256 and before being passed into a deep neural network (DNN)
+which learns to make its predictions on the features.
 
-Dropout layers are used after each of the two full DNN layers. These randomly deactivate, by
+Dropout layers are used after each of the two full dense layers. These randomly deactivate, by
 setting to zero, a proportion of the preceding layer's output on each training step. This
 is a common approach to combating overfitting of the training data by preventing neurons
 becoming overly dependent on all but the strongest few connections with its inputs.
 
-The model is trained with a Nadam optimizer using an exponentially decaying learning rate.
+The model is trained with an Adam optimizer using an cosine_decay learning rate schedule.
 The training loss function used is the mean average error (MAE) which is less affected by large
 losses than the often used mean square error (MSE) and consistently gives better results this case.
 The activation functions used are the ReLU function for convolutional layers and the LeakyReLU
 function for the the DNN layers (which leaks a small value when negative to mitigate the risk of
 dead neurons).
 
-Training is based on the formal-training-dataset which is made up of 250,000 fully synthetic
-instances split 80:20 between training and validation datasets. During training the dataset
-pipeline includes augmentations which randomly add Gaussian noise and a shift to each
-instance's mags feature. The augmentations supplement the Dropout layers in mitigating overfitting
-and expose the model to less than perfect data during training, improving its performance
+Training is based on the formal-training-dataset which is made up of 500,000 fully synthetic
+instances split 80:20 between training and validation datasets. During training the training
+dataset pipeline includes augmentations which randomly add Gaussian noise and a shift to each
+instance's mags feature. The augmentations supplement the Dropout layers in mitigating
+overfitting and expose the model to imperfect data during training, improving its performance
 with real data.
 
 ## Example usage
@@ -125,22 +125,20 @@ standard deviation over every iteration for each instance. With dropout enabled 
 for each iteration is effectively made with a weak predictor, however given sufficient iterations
 the resulting probability distribution represents a strong prediction through the wisdom of crowds.
 
-| ![ZZ Boo violin plot](https://github.com/user-attachments/assets/cc4ef9c7-9221-4881-abda-77aa514ad7d1) |
+| ![ZZ Boo violin plot](https://github.com/user-attachments/assets/caa019bd-682a-4c72-8504-2a24d47f8ac7) |
 | :-: |
 | _Figure 3. A violin plot of the full set of MC Dropout predictions for ZZ Boo with the horizontal bars showing the mean and standard deviation for each prediction._ |
 
 The final set of prediction nominal values and the label values used for testing are shown below.
 The model does not predict $inc$ directly so it has to be calculated from the other predicted values:
 ```text
----------------------------------------------------------------------------------------------------
-ZZ Boo | rA_plus_rB         k         J     ecosw     esinw        bP       inc       MAE       MSE
----------------------------------------------------------------------------------------------------
-Label  |   0.236690  1.069100  0.980030  0.000000  0.000000  0.208100 88.636100
-Pred   |   0.236385  1.067168  1.006427  0.000909  0.007463  0.272921 88.198103
-O-C    |   0.000305  0.001932 -0.026397 -0.000909 -0.007463 -0.064821  0.437997  0.077118  0.028114
-===================================================================================================
-MAE    |   0.000305  0.001932  0.026397  0.000909  0.007463  0.064821  0.437997  0.077118
-MSE    |   0.000000  0.000004  0.000697  0.000001  0.000056  0.004202  0.191842            0.028114
+------------------------------------------------------------------------------------------------------------------------
+ZZ Boo   | rA_plus_rB          k          J      ecosw      esinw         bP        inc        MAE        MSE        MRE
+------------------------------------------------------------------------------------------------------------------------
+Label    |   0.236690   1.069100   0.980030   0.000000   0.000000   0.208100  88.636100                                 
+Pred     |   0.239900   1.036610   0.970204  -0.001070  -0.000145   0.243401  88.357278                                 
+Residual |  -0.003210   0.032490   0.009826   0.001070   0.000145  -0.035301   0.278822   0.051552   0.011450   0.032567
+------------------------------------------------------------------------------------------------------------------------
 ```
  
 The predicted values for $r_{\rm A}+r_{\rm B}$, $k$, $J$, $e\cos{\omega}$ and $e\sin{\omega}$ and the derived
@@ -151,15 +149,13 @@ which we can parse to get the values of the parameters of interest.  Shown below
 of fitting the parameters previously predicted and how they compare to the labels derived from
 the reference analysis:
 ```
----------------------------------------------------------------------------------------------------
-ZZ Boo | rA_plus_rB         k         J     ecosw     esinw        bP       inc       MAE       MSE
----------------------------------------------------------------------------------------------------
-Label  |   0.236690  1.069100  0.980030  0.000000  0.000000  0.208100 88.636100
-Fitted |   0.236666  1.069237  0.978183 -0.000003  0.000061  0.207551 88.639682
-O-C    |   0.000024 -0.000137  0.001847  0.000003 -0.000061  0.000549 -0.003582  0.000886  0.000002
-===================================================================================================
-MAE    |   0.000024  0.000137  0.001847  0.000003  0.000061  0.000549  0.003582  0.000886
-MSE    |   0.000000  0.000000  0.000003  0.000000  0.000000  0.000000  0.000013            0.000002
+------------------------------------------------------------------------------------------------------------------------
+ZZ Boo   | rA_plus_rB          k          J      ecosw      esinw         bP        inc        MAE        MSE        MRE
+------------------------------------------------------------------------------------------------------------------------
+Label    |   0.236690   1.069100   0.980030   0.000000   0.000000   0.208100  88.636100                                 
+Fitted   |   0.236666   1.069227   0.978176  -0.000003   0.000060   0.207554  88.639661                                 
+Residual |   0.000024  -0.000127   0.001854   0.000003  -0.000060   0.000546  -0.003561   0.000882   0.000002   0.000692
+------------------------------------------------------------------------------------------------------------------------
 ```
 
 The result of the task 3 analysis can be plotted by parsing the .out file written, which contains
