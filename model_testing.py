@@ -550,7 +550,7 @@ def fit_target(lc: LightCurve,
 
         all_in_params = {
             "task": task,
-            "qphot": 0.,
+            "qphot": 1.0,
             "gravA": 0.,                "gravB": 0.,
             "L3": 0.,
 

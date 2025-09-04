@@ -76,7 +76,7 @@
         "components_similar": false,
         "shallow_eclipses": false,
         "hl_mask": null,
-        "notes": "bP label derived from rA, inc, e & esinw; qphot label from published masses; control fit of sector 13 SAP data with pow2 LD yields MRE 0.0034 (S39 worse);",
+        "notes": "bP label derived from rA, inc, e & esinw; qphot label from published masses; control fit of sector 13 SAP data with pow2 LD & qphot=0 yields MRE 0.0034 (S39 worse); fixing qphot in this way improves fit of J;",
         "primary_epoch": 1671.167003858,
         "period": 3.169080048,
         "ecc": 0.0555,              "ecc_err": 0.0011,
@@ -100,6 +100,7 @@
             }
         },
         "fit_overrides": {
+            "qphot": 0,
             "LDA": "pow2",
             "LDB": "pow2"
         }
@@ -128,7 +129,7 @@
         "components_similar": true,
         "shallow_eclipses": false,
         "hl_mask": null,
-        "notes": "bP derived from rA, inc, e & esinw; Southworth fits sectors individually, and we do likewise; control fit of sector 77 SAP flux, using published LD params, yields best MRE of ~0.0045;",
+        "notes": "bP derived from rA, inc, e & esinw; Southworth fits sectors individually, and we do likewise; control fit of sector 77 SAP flux, using published LD params, yields best MRE of ~0.0043;",
         "primary_epoch": 3400.1423,
         "period": 9.653,
         "ecc": 0.19197,             "ecc_err": 0.00011,
@@ -366,7 +367,7 @@
         "components_similar": false,
         "shallow_eclipses": false,
         "hl_mask": null,
-        "notes": "bP derived from rA & inc; control fit with SAP flux, pow2 LD law and hard quality filter (matching the published work) on sector 19 yields MRE 0.0023;",
+        "notes": "bP derived from rA & inc; control fit with SAP flux, pow2 LD law and hard quality filter (matching the published work) on sector 19 yields MRE 0.0021;",
         "primary_epoch": 1827.440864,
         "period": 4.13465,
         "labels": { 
@@ -412,7 +413,7 @@
         "components_similar": false,
         "shallow_eclipses": true,
         "hl_mask": 3,
-        "notes": "e=0.0 & ω=0.0 (fixed); bP derived from rA, inc, e & esinw; best fit using SAP photometry on sector 42 only and fixing the published lrat and LD params yields MRE 0.032",
+        "notes": "e=0.0 & ω=0.0 (fixed); bP derived from rA, inc, e & esinw; best fit using SAP photometry on sector 42 only and fixing the published lrat and LD params yields MRE 0.026",
         "primary_epoch": 2464.981943071,
         "period": 2.461126371,
         "labels": {
@@ -524,7 +525,7 @@
         "components_similar": true,
         "shallow_eclipses": false,
         "hl_mask": null,
-        "notes": "bP derived from rA, inc, e & esinw; best control fit with pow2 LD law on sector 34 SAP flux yields MRE 0.00075;",
+        "notes": "bP derived from rA, inc, e & esinw; best control fit with pow2 LD law on sector 34 SAP flux yields MRE 0.00076;",
         "primary_epoch": 2236.4944615,
         "period": 4.5961598,
         "ecc": 0.09680,         "ecc_err": 0.00019,
@@ -629,7 +630,7 @@
         "components_similar": false,
         "shallow_eclipses": false,
         "hl_mask": null,
-        "notes": "e=0.0 & ω=0.0 fixed; J from trial JKTEBOP fit; bP derived from rA, inc, e & esinw; control fit on SAP flux of 2nd half of S37 with L3 fixed at published value & quad LD (log & sqrt used) yields MRE 0.012",
+        "notes": "e=0.0 & ω=0.0 fixed; J from trial JKTEBOP fit; bP derived from rA, inc, e & esinw; control fit on SAP flux of 2nd half of S37 with L3 fixed at published value & quad LD (log & sqrt used) yields MRE 0.0064",
         "primary_epoch": 2323.949317858,
         "period": 4.966388646,
         "labels": { 
@@ -677,7 +678,7 @@
         "components_similar": false,
         "shallow_eclipses": false,
         "hl_mask": null,
-        "notes": "bP derived from rA, inc, e & esinw; control fit on sector 20 using published LD params and flattening between eclipses yields MRE 0.0014; predictions need to be very good, especially inc, as there is a nearby fit with inc~86 & J~1.3 which is attractive;",
+        "notes": "bP derived from rA, inc, e & esinw; control fit on sector 20 using published LD params, qphot=0 and flattening between eclipses yields MRE 0.0014; predictions need to be very good, especially inc, as there is a nearby fit with inc~86 & J~1.3 which is attractive;",
         "primary_epoch": 1851.926234608,
         "period": 9.945126564,
         "ecc": 0.078078,        "ecc_err": 0.000076,
@@ -701,6 +702,7 @@
             }
         },
         "fit_overrides":{
+            "qphot": 0,
             "LDA": "quad",
             "LDA1": 0.177,
             "LDA2": 0.25,
@@ -783,7 +785,7 @@
         "components_similar": false,
         "shallow_eclipses": false,
         "hl_mask": null,
-        "notes": "rA_plus_rB & k calculated from rA and rB; ecc, omega and Poincare elements set to zero as published; bP calculated from rA and inc (with ecc == zero); J approximated from Teff values; best control fit of sector 67 with pow2 LD yields MRE 0.029 but is unreliable (e.g. O-C for J is -0.14)",
+        "notes": "rA_plus_rB & k calculated from rA and rB; ecc, omega and Poincare elements set to zero as published; bP calculated from rA and inc (with ecc == zero); J approximated from Teff values; best control fit of sector 67 with pow2 LD yields MRE 0.025 but is unreliable (e.g. O-C for J is -0.14)",
         "primary_epoch": 3135.755972,
         "period": 1.61310394,
         "labels": { 
@@ -836,7 +838,7 @@
         "components_similar": true,
         "shallow_eclipses": false,
         "hl_mask": null,
-        "notes": "e=0 & ω=0 (fixed); bP derived from rA, inc, e & esinw; logLB=0.78(5) from from Bakis+ logLA and Van Reeth+ Light Ratio; control fit of sectors 14 and 15 with published LD params yields MRE 0.0069;",
+        "notes": "e=0 & ω=0 (fixed); bP derived from rA, inc, e & esinw; logLB=0.78(5) from from Bakis+ logLA and Van Reeth+ Light Ratio; control fit of sectors 14 and 15 with published LD params yields MRE 0.0086;",
         "primary_epoch": 1712.409315791,
         "period": 0.891193163,
         "labels": { 
@@ -939,7 +941,7 @@
         "components_similar": false,
         "shallow_eclipses": false,
         "hl_mask": null,
-        "notes": "e=0 & ω=0 (fixed); bP derived from rA, inc, e & esinw; control fit on S55, with masked range and LD params from source article and L3 fixed at zero yields MRE 0.0070;",
+        "notes": "e=0 & ω=0 (fixed); bP derived from rA, inc, e & esinw; control fit on S55, with masked range and LD params from source article and L3 fixed at zero yields MRE 0.0040;",
         "primary_epoch": 2813.984145622,
         "period": 2.9846559,
         "labels": { 
@@ -1051,7 +1053,7 @@
         "components_similar": true,
         "shallow_eclipses": false,
         "hl_mask": null,
-        "notes": "e=0 & ω=0 (fixed); bP derived from rA, inc, e & esinw; control fit uses quality flags and LD params from source article, with sector 50 giving an MRE 0.00037;",
+        "notes": "e=0 & ω=0 (fixed); bP derived from rA, inc, e & esinw; control fit uses quality flags and LD params from source article, with sector 50 giving an MRE 0.00016;",
         "primary_epoch": 2676.090124290,
         "period": 4.991767756,
         "labels": { 
@@ -1105,7 +1107,7 @@
         "components_similar": true,
         "shallow_eclipses": false,
         "hl_mask": null,
-        "notes": "bP derived from rA, inc, e & esinw; control fit uses quality flags, quality mask, power-2 LD law (with 'same' coefficients) from reference giving an MRE 0.0023; this general purpose pipeline and cannot replicate the 8x quadratic normalization functions of the reference analysis, but this is close enough without them;",
+        "notes": "bP derived from rA, inc, e & esinw; control fit uses quality flags, quality mask, power-2 LD law (with 'same' coefficients) from reference giving an MRE 0.0016; this general purpose pipeline and cannot replicate the 8x quadratic normalization functions of the reference analysis, but this is close enough without them;",
         "primary_epoch": 3096.389351,
         "period": 2.8320896,
         "labels": { 
@@ -1156,7 +1158,7 @@
         "components_similar": false,
         "shallow_eclipses": false,
         "hl_mask": null,
-        "notes": "e=0 & ω=0 & L3=0 (fixed); bP derived from rA, inc, e & esinw; control fit includes time masks, LD params, fixed L3 and lrat from source article and sector 18 to give an MRE 0.0048; predictions on S58 tend to be more accurate but the control fit of S18 is closer to published values;",
+        "notes": "e=0 & ω=0 & L3=0 (fixed); bP derived from rA, inc, e & esinw; control fit includes time masks, LD params, fixed L3 and lrat from source article and sector 18 to give an MRE 0.0048; unexpectedly, qphot = 0 gives best fit, especially for inc; predictions on S58 tend to be more accurate but the control fit of S18 is closer to published values;",
         "primary_epoch": 1808.957210950,
         "period": 1.900928407,
         "labels": { 
@@ -1179,6 +1181,7 @@
             }
         },
         "fit_overrides": {
+            "qphot": 0,
             "L3": 0,
             "L3_fit": 0,
             "LDA": "pow2",
@@ -1211,7 +1214,7 @@
         "components_similar": false,
         "shallow_eclipses": false,
         "hl_mask": null,
-        "notes": "L3=0 (fixed); bP derived from rA, inc, e & esinw; source article based sectors 19, 25 & 26 FFIs - we use sectors 52 & 53 @ 120 s cadence, giving coverage of most of the orbit, & published LD params to give MRE 0.0050;",
+        "notes": "L3=0 (fixed); bP derived from rA, inc, e & esinw; source article based sectors 19, 25 & 26 FFIs - we use sectors 52 & 53 @ 120 s cadence, giving coverage of most of the orbit, & published LD params to give MRE 0.0051;",
         "primary_epoch": 2726.954043296,
         "period": 20.999146855,
         "ecc": 0.4676,          "ecc_err": 0.0002,
@@ -1330,7 +1333,7 @@
         "components_similar": false,
         "shallow_eclipses": false,
         "hl_mask": null,
-        "notes": "bP derived from rA & inc; control fit of sector 84 SAP flux, with hard quality mask and power-2 LD law, gives MRE 0.0033;",
+        "notes": "bP derived from rA & inc; control fit of sector 84 SAP flux, with hard quality mask and power-2 LD law, gives MRE 0.0028;",
         "primary_epoch": 3590.203203,
         "period": 3.261303037,
         "labels": { 
@@ -1376,7 +1379,7 @@
         "components_similar": true,
         "shallow_eclipses": false,
         "hl_mask": null,
-        "notes": "bP derived from rA, inc, e & esinw; control fit on S20 with published LD params gives MRE 0.0015;",
+        "notes": "bP derived from rA, inc, e & esinw; control fit on S20 with published LD params gives MRE 0.0012;",
         "primary_epoch": 1847.487096393,
         "period": 3.145776615,
         "ecc": 0.00985,         "ecc_err": 0.00027,
@@ -1429,7 +1432,7 @@
         "components_similar": true,
         "shallow_eclipses": false,
         "hl_mask": null,
-        "notes": "e=0 & ω=0 & L3=0 (fixed); bP derived from rA, inc, e & esinw; control fit on S18, with published (fixed) L3 and LD params, gives MRE 0.0021;",
+        "notes": "e=0 & ω=0 & L3=0 (fixed); bP derived from rA, inc, e & esinw; control fit on S18, with published (fixed) L3 and LD params, gives MRE 0.0022;",
         "primary_epoch": 1806.960762116,
         "period": 4.222017264,
         "labels": { 
@@ -1482,7 +1485,7 @@
         "components_similar": false,
         "shallow_eclipses": false,
         "hl_mask": null,
-        "notes": "J calculated from T_effs and corroborated with JKTEBOP fit with fixed params from run K; bP derived from rA, inc, e & esinw; control fit using SAP flux, quad LD and fixed period (as in Maxted+ paper) yields MRE 0.0069; need good predictions (especially rA_plus_rB) for a statisfactory fit - there's a 2nd set of params nearby with J~0.85 which is very attractive;",
+        "notes": "J calculated from T_effs and corroborated with JKTEBOP fit with fixed params from run K; bP derived from rA, inc, e & esinw; control fit using SAP flux, quad LD and fixed period (as in Maxted+ paper) yields MRE 0.0070; need good predictions (especially rA_plus_rB) for a statisfactory fit - there's a 2nd set of params nearby with J~0.85 which is very attractive;",
         "primary_epoch": 1362.828326117,
         "period": 24.59240,
         "ecc": 0.1881,          "ecc_err": 0.0008,
@@ -1584,7 +1587,7 @@
         "components_similar": false,
         "shallow_eclipses": false,
         "hl_mask": null,
-        "notes": "e=0 & ω=0 & L3=0 (fixed); bP derived from rA, inc, e & esinw; best control fit with half of sector S21 (to minimise variability due to star spots) and published LD params (fixed), gives MRE 0.0057;",
+        "notes": "e=0 & ω=0 & L3=0 (fixed); bP derived from rA, inc, e & esinw; best control fit with half of sector S21 (to minimise variability due to star spots) and published LD params (fixed), gives MRE 0.0058;",
         "primary_epoch": 1891.200022448,
         "period": 2.299352788,
         "labels": { 
@@ -1640,7 +1643,7 @@
         "components_similar": true,
         "shallow_eclipses": false,
         "hl_mask": null,
-        "notes": "L3=0 (fixed); rA_plus_rB & k derived from rA & rB in table 8; J from trial JKTEBOP fit; bP derived from rA, inc, e & esinw; control fit with cleanest subset of S9 PDCSAP data (masked and flattened) gives MRE 0.0034; predictions need to be very good (especially rA_plus_rB) to get a satisfactory fit;",
+        "notes": "L3=0 (fixed); rA_plus_rB & k derived from rA & rB in table 8; J from trial JKTEBOP fit; bP derived from rA, inc, e & esinw; control fit with cleanest subset of S9 PDCSAP data (masked and flattened) gives MRE 0.0032; predictions need to be very good (especially rA_plus_rB) to get a satisfactory fit;",
         "primary_epoch": 1554.451758289,
         "period": 5.005804747,
         "ecc": 0.0001,          "ecc_err": 0.0001,
@@ -1871,7 +1874,7 @@
         "components_similar": true,
         "shallow_eclipses": false,
         "hl_mask": null,
-        "notes": "Martin values; L3=0 (fixed); just a single sector needed for a good fit, as the period is so short, and the quad LD algo (similar to published work, albeit different model & source of coeffs) yielding MRE 0.0071;",
+        "notes": "Martin values; L3=0 (fixed); just a single sector needed for a good fit, as the period is so short, and the quad LD algo (similar to published work, albeit different model & source of coeffs) yielding MRE 0.0069;",
         "primary_epoch": 2872.601497313,
         "period": 1.268388816,
         "ecc": 0.00527,         "ecc_err": 0.00021,
