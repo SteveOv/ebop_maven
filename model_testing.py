@@ -901,17 +901,25 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
     if print_it:
         to = StringIO()
 
-    # The final, relative error type (MRE) is the mean of |(lbl-pred)/lbl|. The dont_div params are
-    # those we don't divide by lbl in this calc, as they're centred on zero & range from 0 to +/-1.
+    # With the dont_div params we don't divide by lbl in RE as they centre on 0 & range [0, +/-1).
     dont_div = ["ecosw", "esinw"]
-    err_labels = ["MAE", "MSE", "MRE"]
-    line_length = 12 + (11 * len(selected_param_names)) + (11 * len(err_labels))
+    def custom_error(lbl, errs, pname):
+        """ 
+        Calculate a summary error for this parameter, which here is the relative error;
+        RE = | error / label | except for params in 'dont_div' where it's | error |
+        """
+        return np.abs(
+                np.divide(errs[pname],
+                          1 if pname in dont_div else np.add(lbl[pname], 1e-30)))
+
+    err_heads = ["MAE", "MSE", "MRE"]
+    line_length = 12 + (11 * len(selected_param_names)) + (11 * len(err_heads))
     def horizontal_line(char):
         to.write(char*line_length + "\n")
 
     def header_block(header):
         horizontal_line("-")
-        col_heads = np.concatenate([selected_param_names, err_labels])
+        col_heads = np.concatenate([selected_param_names, err_heads])
         to.write(f"{header:<10s} | " + " ".join(f"{h:>10s}" for h in col_heads) + "\n")
 
     num_fmt = f"{{:10.{format_dp:d}f}}"
@@ -946,9 +954,7 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
                 vals = row_vals[selected_param_names].tolist()
                 mean_errs = [None, None, None]
                 if row_ix == 3: # on the "error" row we append error summaries
-                    rel_errs = [np.abs(np.divide(b_errs[k],
-                                                1 if k in dont_div else np.add(b_lbls[k], 1e-30)))
-                                                                    for k in selected_param_names]
+                    rel_errs = [custom_error(b_lbls, b_errs, k) for k in selected_param_names]
                     mean_errs = [np.mean(np.abs(vals)), np.mean(np.square(vals)), np.mean(rel_errs)]
                 row(row_head, np.concatenate([vals, mean_errs]))
 
@@ -957,14 +963,11 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
         horizontal_line("=")
         par_maes = [np.mean(np.abs(errors[k])) for k in selected_param_names]
         par_mses = [np.mean(np.square(errors[k])) for k in selected_param_names]
-        par_errs = [np.mean(np.abs(np.divide(errors[k],
-                                            1 if k in dont_div else np.add(labels[k], 1e-30))))
-                                                                    for k in selected_param_names]
+        par_errs = [np.mean(custom_error(labels, errors, k)) for k in selected_param_names]
 
-        row(err_labels[0], np.concatenate([par_maes, [np.mean(par_maes), None, None]]))
-        row(err_labels[1], np.concatenate([par_mses, [None, np.mean(par_mses), None]]))
-        row(err_labels[2], np.concatenate([par_errs, [None, None, np.mean(par_errs)]]))
-
+        row(err_heads[0], np.concatenate([par_maes, [np.mean(par_maes), None, None]]))
+        row(err_heads[1], np.concatenate([par_mses, [None, np.mean(par_mses), None]]))
+        row(err_heads[2], np.concatenate([par_errs, [None, None, np.mean(par_errs)]]))
     else:
         horizontal_line("-")
 
