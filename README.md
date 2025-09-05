@@ -95,9 +95,9 @@ fixed set of curated targets which make up the formal test dataset. In this exam
 fitting the TESS timeseries photometry for one of these targets, ZZ Boo sector 50 (see Fig. 2).
 The reference analysis for this system is taken from Southworth (2023).
 
-| ![ZZ Boo light curve and phase folded mags feature](https://github.com/user-attachments/assets/22c381d5-3449-406b-b4bd-4c9f9b576ce7) |
+| ![ZZ Boo light curve and phase folded mags feature](https://github.com/user-attachments/assets/9ec718a1-1b39-418e-a15f-07f5bc67e174) |
 | :-: |
-| _Figure 2. The light curve for ZZ Boo sector 50 where the SAP fluxes have been converted to magnitudes then rectified to zero with the subtraction of a low order polynomial (left) and the equivalent phase-folded and phase-normalized light curve overlaid with the mags feature from which predictions are made (right)._  |
+| _Figure 2. The light curve for ZZ Boo sector 50 where the SAP fluxes have been converted to magnitudes then rectified to zero with the subtraction of a low order polynomial (left) and the equivalent phase-folded and phase-normalized light curve overlaid with the 4096 bin mags feature from which predictions are made (right)._  |
 
 The input feature for the Estimator's `predict()` function is a numpy array of shape (#instances,
 #mags_bins). For each instance it expects a row of size `mags_bins` sampled from the phase-folded
