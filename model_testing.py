@@ -171,6 +171,8 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
     if len(plot_params) % 2 == 0: # Move ecosw & esinw so they are on same row on plots 2 axes wide
         plot_params = [n for n in plot_params if n not in ["ecosw","esinw"]] + ["ecosw", "esinw"]
 
+    lbl_stds = std_dev(lbl_vals)
+
     # Skip some reports/plots if ds is formal-test-ds which is too small for them to be meaningful.
     show_error_bars = mc_iterations > 1
     table_ix = 0
@@ -211,14 +213,14 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
             if (("synth" in ds_name and synth_tbl) or ("formal" in ds_name and frml_tbl)):
                 table_ix += 1
                 print(f"Table {table_ix}: Summary of the estimator predictions for model params")
-                predictions_vs_labels_to_table(s_preds, s_lbls, summary_only=True,
+                predictions_vs_labels_to_table(s_preds, s_lbls, lbl_stds, summary_only=True,
                                                selected_param_names=estimator.label_names,
                                                error_bars=show_error_bars)
 
                 if set(fit_params) != set(estimator.label_names):
                     table_ix += 1
                     print(f"Table {table_ix}: ...and of the fitting input params derived from them")
-                    predictions_vs_labels_to_table(s_preds, s_lbls, summary_only=True,
+                    predictions_vs_labels_to_table(s_preds, s_lbls, lbl_stds, summary_only=True,
                                                    selected_param_names=fit_params,
                                                    error_bars=show_error_bars)
 
@@ -324,6 +326,7 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
     # For this "deep dive" test we report on labels with uncertainties, so we ignore the label
     # values in the dataset (nominals only) and go to the source config to get the full values.
     lbl_vals = formal_testing.get_labels_for_targets(targets_config, super_params, targs)
+    lbl_stds = std_dev(lbl_vals)
 
     # Pre-allocate a structured arrays to hold the predictions and equivalent fit results
     pred_vals = np.empty((targ_count, ), dtype=[(p, np.dtype(UFloat.dtype)) for p in super_params])
@@ -368,11 +371,11 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
             keras.utils.set_random_seed(DEFAULT_TESTING_SEED)
             force_seed_on_dropout_layers(estimator, DEFAULT_TESTING_SEED)
             pv = estimator.predict(np.array([mags]), None, mc_iterations)
-            predictions_vs_labels_to_table(pv, lbl_vals[ix], [targ])
+            predictions_vs_labels_to_table(pv, lbl_vals[ix], lbl_stds, [targ])
             pred_vals[ix] = pv if "inc" in pv.dtype.names else append_calculated_inc_predictions(pv)
 
         print(f"\nThe {prediction_type} sourced input params for fitting {targ}")
-        predictions_vs_labels_to_table(pred_vals[ix], lbl_vals[ix], [targ], fit_params)
+        predictions_vs_labels_to_table(pred_vals[ix], lbl_vals[ix], lbl_stds, [targ], fit_params)
 
         # Get the phase-folded data for the mags feature and a predicted fit and (re-)bin for
         # plotting. Also undo the wrap of the mags_feature as the plots may apply their own wrap.
@@ -390,7 +393,7 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
                                       timeout=FIT_TIMEOUT, retries=1)
 
             print(f"\nHave fitted {targ} resulting in the following fitted params")
-            predictions_vs_labels_to_table(fit_vals[ix], lbl_vals[ix], [targ], fit_params,
+            predictions_vs_labels_to_table(fit_vals[ix], lbl_vals[ix], lbl_stds, [targ], fit_params,
                                            prediction_head="Fitted")
 
             with open(jktebop.get_jktebop_dir()/f"{fit_stem}.fit", mode="r", encoding="utf8") as ff:
@@ -426,6 +429,7 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
             ("\nTargets with only partial eclipses",~total_mask,            fit_params)]
 
         for comp_type, comp_head, comp_vals in comparison_type:
+            comp_stds = std_dev(comp_vals)
             # Summarize this set of predictions as plots-vs-label|control and in text table
             # Control == fit from labels not preds, so no point producing these
             if not do_control_fit:
@@ -443,8 +447,8 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
                     for (sub_head, mask, rep_names) in sub_reports:
                         if any(mask):
                             predictions_vs_labels_to_table(pred_vals[mask], comp_vals[mask],
-                                                    targs[mask], rep_names, title=sub_head,
-                                                    error_bars=prediction_type == "mc", to=txtf)
+                                                comp_stds, targs[mask], rep_names, title=sub_head,
+                                                error_bars=prediction_type == "mc", to=txtf)
                     txtf.write(f"\n\nPrediction vs {comp_type} tabulars\n")
                     predictions_vs_labels_to_tabular(pred_vals, comp_vals, targs, super_params,
                                                      label_head=comp_head, to=txtf)
@@ -474,9 +478,9 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
             with open(sub_dir / f"{results_stem}.txt", "w", encoding="utf8") as txtf:
                 for (sub_head, mask, rep_names) in sub_reports:
                     if any(mask):
-                        predictions_vs_labels_to_table(fit_vals[mask], comp_vals[mask], targs[mask],
-                                        rep_names, title=sub_head, prediction_head="Fitted",
-                                        label_head=comp_head.capitalize(), error_bars=True, to=txtf)
+                        predictions_vs_labels_to_table(fit_vals[mask], comp_vals[mask], comp_stds,
+                                targs[mask], rep_names, title=sub_head, prediction_head="Fitted",
+                                label_head=comp_head.capitalize(), error_bars=True, to=txtf)
     return fit_vals
 
 
@@ -859,7 +863,8 @@ def save_predictions_to_csv(target_names: np.ndarray[str],
 
 
 def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
-                                   labels: np.ndarray[UFloat],
+                                   labels: np.ndarray[Union[UFloat, float]],
+                                   label_stds: np.ndarray[Union[UFloat, float]],
                                    block_headings: np.ndarray[str]=None,
                                    selected_param_names: np.ndarray[str]=None,
                                    prediction_head: str="Prediction",
@@ -876,6 +881,7 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
 
     :predictions: the predictions
     :labels: the labels or other comparison values
+    :label_stds: the standard deviation of the labels
     :block_headings: the heading for each block of preds-vs-labels
     :selected_param_names: a subset of the full list of labels/prediction names to render
     :prediction_head: the text of the prediction row headings (10 chars or less)
@@ -901,16 +907,16 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
     if print_it:
         to = StringIO()
 
-    # With the dont_div params we don't divide by lbl in RE as they centre on 0 & range [0, +/-1).
-    dont_div = ["ecosw", "esinw"]
-    def custom_error(lbl, errs, pname):
+    # For the div_by_std params we divide by std(lbl) in RE as their range is symmetrical about zero
+    div_by_std = ["ecosw", "esinw"]
+    def custom_error(lbl, errs, pname, lbl_stds=np.squeeze(label_stds)):
         """ 
         Calculate a summary error for this parameter, which here is the relative error;
-        RE = | error / label | except for params in 'dont_div' where it's | error |
+        RE = | error / label | except for params in 'div_by_std' where it's | error / std(label) |
         """
         return np.abs(
                 np.divide(errs[pname],
-                          1 if pname in dont_div else np.add(lbl[pname], 1e-30)))
+                          np.add(lbl_stds[pname] if pname in div_by_std else lbl[pname], 1e-30)))
 
     err_heads = ["MAE", "MSE", "MRE"]
     line_length = 12 + (11 * len(selected_param_names)) + (11 * len(err_heads))
@@ -1040,6 +1046,27 @@ def predictions_vs_labels_to_tabular(predictions: np.ndarray[UFloat],
 
     if print_it:
         print(to.getvalue())
+
+def std_dev(vals: np.ndarray[Union[float, UFloat]], sample_stddev: bool=False):
+    """
+    Work out the standard deviation of the passed population/samples. For each column, the
+    standard deviation is calculated with:
+
+    sigma^2 = 1/n * sum[ (v - mu)^2 ]
+
+    where n is the population size, or sample size-1 if sample_stddev == True.
+    
+    :vals: structured array of values
+    :sample_stddev: set to True if a sample standard deviation is required
+    :returns: structured array of the stddev with the same names and types as the input
+    """
+    n = len(vals)
+    if sample_stddev and n > 1:
+        n -= 1
+
+    return np.array(
+        [tuple( ( sum( (vals[k] - np.mean(vals[k]))**2 )/n )**0.5 for k in vals.dtype.names )],
+        dtype=[(k, vals[k].dtype) for k in vals.dtype.names])
 
 
 def get_common_param_names(predictions: np.ndarray[UFloat],
