@@ -166,6 +166,7 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
     bulge_k_mask = ~column_k_mask & (lbl_vals["k"] > 0.3) & (lbl_vals["k"] < 2.0) \
                 & (pred_vals["k"] > 0.3) & (pred_vals["k"] < 1.5) & (np.abs(error_vals["k"]) > 0.25)
     droop_sumr_mask = (lbl_vals["rA_plus_rB"] > 0.4) & (np.abs(error_vals["rA_plus_rB"]) > 0.01)
+    low_inc_mask = lbl_vals["inc"] < 80
 
     plot_params = estimator.label_names
     if len(plot_params) % 2 == 0: # Move ecosw & esinw so they are on same row on plots 2 axes wide
@@ -200,6 +201,7 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
         (" bulge k mod shallow",    bulge_k_mask & ~v_deep_mask,True,   True,       False,      False,      False,      False),
         (" column k preds",         column_k_mask,              False,  False,      True,       False,      False,      False),
         (" very low k preds",       very_low_k_mask,            False,  True,       False,      True,       False,      False),
+        (" low inclination",        low_inc_mask,               False,  True,       False,      False,      False,      False),
     ]:
         if any(s_mask):
             # Each subset's preds/labels is picked out with s_mask. We may further subdivide it with
