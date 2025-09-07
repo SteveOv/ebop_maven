@@ -73,10 +73,11 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
         estimator = Estimator(estimator)
     mc_type = "mc" if mc_iterations > 1 else "nonmc"
 
-    # The estimator publishes a list of what it predicts whereas fit_params are those required for
+    # The estimator publishes a list of params it predicts whereas fit_params are those required for
     # JKTEBOP fitting and reporting. We need to work with the superset of both for our reporting.
-    fit_params = ["inc" if n == "bP" else n for n in estimator.label_names]
-    super_params = estimator.label_names + [n for n in fit_params if n not in estimator.label_names]
+    model_params = estimator.label_names
+    fit_params = ["inc" if n == "bP" else n for n in model_params]
+    super_params = model_params + [n for n in fit_params if n not in model_params]
 
     print(f"\nLooking for the test dataset in '{test_dataset_dir}'...", end="")
     ds_name = test_dataset_dir.name
@@ -120,7 +121,7 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
     else:
         ext_feat_vals = np.empty(shape=(inst_count, 0), dtype=np.float32)
     pred_vals = np.empty((inst_count, ),
-                         dtype=[(n, np.dtype(UFloat.dtype)) for n in estimator.label_names])
+                         dtype=[(n, np.dtype(UFloat.dtype)) for n in model_params])
     force_seed_on_dropout_layers(estimator, DEFAULT_TESTING_SEED)
     start_time = default_timer()
     for batch, ix in enumerate(np.arange(0, inst_count, max_batch_size), start=1):
@@ -133,7 +134,7 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
         pred_vals[ix : ix+len(pv)] = pv
     print(f"The {inst_count} {mc_type} predictions took {timedelta(0, default_timer()-start_time)}")
 
-    if "inc" not in estimator.label_names:
+    if "inc" not in model_params:
         pred_vals = append_calculated_inc_predictions(pred_vals)
         if scaled: # Apply any scaling to inc consistent with having predicted it
             pred_vals["inc"] *= deb_example.labels_and_scales.get("inc", 1)
@@ -168,41 +169,43 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
     droop_sumr_mask = (lbl_vals["rA_plus_rB"] > 0.4) & (np.abs(error_vals["rA_plus_rB"]) > 0.01)
     low_inc_mask = lbl_vals["inc"] < 80
 
-    plot_params = estimator.label_names
-    if len(plot_params) % 2 == 0: # Move ecosw & esinw so they are on same row on plots 2 axes wide
-        plot_params = [n for n in plot_params if n not in ["ecosw","esinw"]] + ["ecosw", "esinw"]
-
     lbl_stds = std_dev(lbl_vals)
 
     # Skip some reports/plots if ds is formal-test-ds which is too small for them to be meaningful.
     show_error_bars = mc_iterations > 1
     table_ix = 0
     # pylint: disable=line-too-long
-    for (subset,                    s_mask,                 synth_tbl, synth_plt, synth_sample, synth_hist, frml_tbl, frml_plt) in [
-        ("",                        [True]*inst_count,          True,   True,       False,      True,       True,       True),
-        (" total eclipsing",        total_mask,                 True,   True,       False,      True,       True,       False),
-        (" partial eclipsing",      ~total_mask,                True,   True,       False,      True,       True,       False),
-        (" deep",                   ~shallow_mask,              True,   True,       False,      False,      False,      False),
-        (" deep total eclipsing",   ~shallow_mask & total_mask, True,   False,      False,      False,      False,      False),
-        (" deep partial eclipsing", ~shallow_mask & ~total_mask,True,   False,      False,      False,      False,      False),
-        (" shallow",                shallow_mask,               True,   True,       False,      False,      False,      False),
-        (" shallow total eclipsing",shallow_mask & total_mask,  True,   False,      False,      False,      False,      False),
-        (" shallow partial ecl'ing",shallow_mask & ~total_mask, True,   False,      False,      False,      False,      False),
+    for (subset,                    s_mask,                     plt_params,     synth_tbl, synth_plt, synth_sample, synth_hist, frml_tbl, frml_plt) in [
+        # All as both model and fit params (split for the plots as the tables are already one for each)
+        ("",                        [True]*inst_count,          model_params,   True,       True,       False,      True,       True,       True),
+        (" fit params",             [True]*inst_count,          fit_params,     False,      True,       False,      True,       False,      True),
+        # Subsets of interest: total/partial eclipsese, deep and shallow subsets
+        (" total eclipsing",        total_mask,                 model_params,   True,       True,       False,      True,       True,       False),
+        (" partial eclipsing",      ~total_mask,                model_params,   True,       True,       False,      True,       True,       False),
+        (" deep",                   ~shallow_mask,              model_params,   True,       True,       False,      False,      False,      False),
+        (" deep total eclipsing",   ~shallow_mask & total_mask, model_params,   True,       False,      False,      False,      False,      False),
+        (" deep partial eclipsing", ~shallow_mask & ~total_mask,model_params,   True,       False,      False,      False,      False,      False),
+        (" shallow",                shallow_mask,               model_params,   True,       True,       False,      False,      False,      False),
+        (" shallow total eclipsing",shallow_mask & total_mask,  model_params,   True,       False,      False,      False,      False,      False),
+        (" shallow partial ecl'ing",shallow_mask & ~total_mask, model_params,   True,       False,      False,      False,      False,      False),
         # Diagnostics: for specific regions or params of interest
-        (" highly eccentric",       high_ecc_mask,              True,   True,       False,      True,       False,      False),
-        (" similar eclipses",       sim_eclipse_mask,           True,   True,       False,      False,      False,      False),
-        (" very deep",              v_deep_mask,                True,   True,       False,      False,      False,      False),
-        (" esinw < zero",           esinw_neg_mask,             False,  False,      False,      True,       False,      False),
+        (" highly eccentric",       high_ecc_mask,              model_params,   True,       True,       False,      True,       False,      False),
+        (" similar eclipses",       sim_eclipse_mask,           model_params,   True,       True,       False,      False,      False,      False),
+        (" very deep",              v_deep_mask,                model_params,   True,       True,       False,      False,      False,      False),
+        (" esinw < zero",           esinw_neg_mask,             model_params,   False,      False,      False,      True,       False,      False),
         # Diagnostics: problem regions of poor predictions
-        (" droop rA plus rB",       droop_sumr_mask,            True,   False,      False,      True,       False,      False),
-        (" bulge k",                bulge_k_mask,               True,   True,       False,      True,       False,      False),
-        (" bulge k non-total",      bulge_k_mask & ~total_mask, False,  False,      False,      False,      False,      False),
-        (" bulge k shallow",        bulge_k_mask & shallow_mask,False,  True,       False,      False,      False,      False),
-        (" bulge k mod shallow",    bulge_k_mask & ~v_deep_mask,True,   True,       False,      False,      False,      False),
-        (" column k preds",         column_k_mask,              False,  False,      True,       False,      False,      False),
-        (" very low k preds",       very_low_k_mask,            False,  True,       False,      True,       False,      False),
-        (" low inclination",        low_inc_mask,               False,  True,       False,      False,      False,      False),
+        (" droop rA plus rB",       droop_sumr_mask,            model_params,   True,       False,      False,      True,       False,      False),
+        (" bulge k",                bulge_k_mask,               model_params,   True,       True,       False,      True,       False,      False),
+        (" bulge k non-total",      bulge_k_mask & ~total_mask, model_params,   False,      False,      False,      False,      False,      False),
+        (" bulge k shallow",        bulge_k_mask & shallow_mask,model_params,   False,      True,       False,      False,      False,      False),
+        (" bulge k mod shallow",    bulge_k_mask & ~v_deep_mask,model_params,   True,       True,       False,      False,      False,      False),
+        (" column k preds",         column_k_mask,              model_params,   False,      False,      True,       False,      False,      False),
+        (" very low k preds",       very_low_k_mask,            model_params,   False,      True,       False,      True,       False,      False),
+        (" low inclination",        low_inc_mask,               model_params,   False,      True,       False,      False,      False,      False),
     ]:
+        if len(plt_params) % 2 == 0: # Move ecosw & esinw so they are on same row on plots 2 axes wide
+            plt_params = [n for n in plt_params if n not in ["ecosw","esinw"]] + ["ecosw", "esinw"]
+
         if any(s_mask):
             # Each subset's preds/labels is picked out with s_mask. We may further subdivide it with
             # total eclipse and/or "feature" masks which also require masking with s_mask before use
@@ -216,10 +219,10 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
                 table_ix += 1
                 print(f"Table {table_ix}: Summary of the estimator predictions for model params")
                 predictions_vs_labels_to_table(s_preds, s_lbls, lbl_stds, summary_only=True,
-                                               selected_param_names=estimator.label_names,
+                                               selected_param_names=model_params,
                                                error_bars=show_error_bars)
 
-                if set(fit_params) != set(estimator.label_names):
+                if set(fit_params) != set(model_params):
                     table_ix += 1
                     print(f"Table {table_ix}: ...and of the fitting input params derived from them")
                     predictions_vs_labels_to_table(s_preds, s_lbls, lbl_stds, summary_only=True,
@@ -233,7 +236,7 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
                 save_predictions_to_csv(ids, s_total_mask, s_errs, r_dir / f"errors{suffix}.csv")
 
                 # Box plot of error distributions for each predicted params as deeper & shallow sets
-                errs_list = [s_errs[~s_shall_mask][plot_params], s_errs[s_shall_mask][plot_params]]
+                errs_list = [s_errs[~s_shall_mask][plt_params], s_errs[s_shall_mask][plt_params]]
                 fig = plots.plot_prediction_boxplot(errs_list, show_fliers="formal" in ds_name,
                                                     ylabel="Error")
                 fig.savefig(r_dir / f"predictions-{mc_type}-box{suffix}.pdf")
@@ -244,7 +247,7 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
                 sl = slice(0, None, int(np.ceil(s_count / 10000)))
                 fixed_viewport = not any(term in subset for term in ["droop", "column k", "low k"])
                 fig = plots.plot_predictions_vs_labels(s_preds[sl], s_lbls[sl], s_total_mask[sl],
-                                                       plot_params, show_errorbars=show_error_bars,
+                                                       plt_params, show_errorbars=show_error_bars,
                                                        hl_mask2=~s_shall_mask[sl],
                                                        fixed_viewport=fixed_viewport)
                 fig.savefig(r_dir / f"predictions-{mc_type}-vs-labels{suffix}.pdf")
@@ -322,8 +325,9 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
     # To clarify: the estimator publishes a list of what it can predict via sits label_names attrib
     # and fit_params may differ; they are those params required for JKTEBOP fitting and reporting.
     # super_params is the set of both and is used, for example, to get the superset of label values
-    fit_params = ["inc" if n == "bP" else n for n in estimator.label_names]
-    super_params = estimator.label_names + [n for n in fit_params if n not in estimator.label_names]
+    model_params = estimator.label_names
+    fit_params = ["inc" if n == "bP" else n for n in model_params]
+    super_params = model_params + [n for n in fit_params if n not in model_params]
 
     # For this "deep dive" test we report on labels with uncertainties, so we ignore the label
     # values in the dataset (nominals only) and go to the source config to get the full values.
@@ -423,9 +427,9 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
             save_predictions_to_csv(targs, total_mask, comparison_vals, sub_dir / "controls.csv")
 
         sub_reports = [
-            ("All targets (model labels)",          [True]*targ_count,      estimator.label_names),
-            ("\nTargets with total eclipses",       total_mask,             estimator.label_names),
-            ("\nTargets with only partial eclipses",~total_mask,            estimator.label_names),
+            ("All targets (model labels)",          [True]*targ_count,      model_params),
+            ("\nTargets with total eclipses",       total_mask,             model_params),
+            ("\nTargets with only partial eclipses",~total_mask,            model_params),
             ("\n\n\nAll targets (fitting params)",  [True]*targ_count,      fit_params),
             ("\nTargets with total eclipses",       total_mask,             fit_params),
             ("\nTargets with only partial eclipses",~total_mask,            fit_params)]
@@ -436,7 +440,7 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
             # Control == fit from labels not preds, so no point producing these
             if not do_control_fit:
                 preds_stem = f"predictions-{prediction_type}-vs-{comp_type}"
-                for (source, pnames) in [("model", estimator.label_names), ("fitting", fit_params)]:
+                for (source, pnames) in [("model", model_params), ("fitting", fit_params)]:
                     if len(pnames) % 2 == 0: # Move ecosw+esinw to the same row on plots 2 axes wide
                         pnames = [n for n in pnames if n not in ["ecosw","esinw"]]+["ecosw","esinw"]
                     fig = plots.plot_predictions_vs_labels(pred_vals, comp_vals, total_mask, pnames,
