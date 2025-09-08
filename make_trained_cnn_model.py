@@ -33,7 +33,7 @@ MAGS_BINS = 4096
 MAGS_WRAP_PHASE = None # None indicates wrap to centre on midpoint between eclipses
 CHOSEN_LABELS = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "bP"]
 OUTPUT_ACTIVATIONS = ["linear"]*6
-TRAINSET_SUFFIX = "500k"
+TRAINSET_SUFFIX = "1000k"
 
 MODEL_NAME = f"CNN-Rev1-Ext{len(CHOSEN_FEATURES)}-{'-'.join(CHOSEN_LABELS[5:])}-" \
                             + f"{MAGS_BINS}-{MAGS_WRAP_PHASE}-{TRAINSET_SUFFIX}"
