@@ -383,7 +383,8 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
                                hl_mask1: np.ndarray[bool]=None,
                                hl_mask2: np.ndarray[bool]=None,
                                hl_mask3: np.ndarray[bool]=None,
-                               fixed_viewport: bool=False) -> Figure:
+                               fixed_viewport: bool=False,
+                               big_markers: bool=None) -> Figure:
     """
     Will create a plot figure with a grid of axes, one per label, showing the
     predictions vs label values. It is up to calling code to show or save the figure.
@@ -401,6 +402,7 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
     :hl_mask2: optional mask for targets to be plotted with 2nd alternative/highlight marker
     :hl_mask3: optional mask for targets to be plotted with 3rd alternative/highlight marker
     :fixed_viewport: if True the plots for k, J & bP will have a fixed view to show detail
+    :big_markers: if True, or if not set and inst count < 100, then plot larger markers
     :returns: the Figure
     """
     if labels.shape[0] != predictions.shape[0]:
@@ -439,7 +441,7 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
     axes = axes.flatten()
 
     # The markers, marker sizes and alpha values are different depending on small/large dataset
-    if inst_count < 100:
+    if big_markers or (big_markers is None and inst_count < 100):
         fmt = ["o", "s", "D", "p"]
         c = [PLOT_COLORS[0], PLOT_COLORS[4], PLOT_COLORS[4], PLOT_COLORS[4]]
         ms = [7.0, 10.5, 10.5, 10.5]
