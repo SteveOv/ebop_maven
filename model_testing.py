@@ -155,13 +155,16 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
     shallow_mask = np.min([feat_vals["depthP"], feat_vals["depthS"]], axis=0) < 0.1
 
     # Masks for analysing predictions on specific types
-    high_ecc_mask = np.sqrt(lbl_vals["ecosw"]**2 + lbl_vals["esinw"]**2) > 0.75
+    high_ecc_mask = np.sqrt(lbl_vals["ecosw"]**2 + lbl_vals["esinw"]**2) > 0.5
     sim_ecl_mask = (np.abs(feat_vals["depthP"] - feat_vals["depthS"]) < 0.05) \
                         & (np.abs(1.0 - feat_vals["dS_over_dP"]) < 0.1)
     k_nr_1_mask = np.abs(1.0 - lbl_vals["k"]) < 0.05
     low_inc_mask = lbl_vals["inc"] < 80
     esinw_neg_mask = lbl_vals["esinw"] < 0
     v_deep_mask = np.min([feat_vals["depthP"], feat_vals["depthS"]], axis=0) >= 0.25
+
+    bp_re_over_1 = np.abs(error_vals["bP"] / lbl_vals["bP"]) > 1.0
+    bp_poor = bp_re_over_1 & (lbl_vals["bP"] > 0.1)
 
     # Specific problem areas
     column_k_mask = (lbl_vals["k"] < 0.9) & (pred_vals["k"] > 1.5) & ~shallow_mask
@@ -196,8 +199,12 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
         (" highly eccentric",       high_ecc_mask,              model_params,   False,      True,       False,      True,       False,      False),
         (" similar eclipses",       sim_ecl_mask,               model_params,   False,      True,       False,      False,      False,      False),
         (" k near 1",               k_nr_1_mask,                model_params,   False,      True,       False,      False,      False,      False),
-        (" low inc",                low_inc_mask,               model_params,   False,      True,       False,      False,      False,      False),
+        (" low inc",                low_inc_mask,               model_params,   True,       True,       False,      False,      False,      False),
         (" esinw < zero",           esinw_neg_mask,             model_params,   False,      False,      False,      False,      False,      False),
+        # Diagnostics: generally poor bP
+        (" bp re over 1",           bp_re_over_1,               model_params,   True,       True,       False,      True,       False,      False),
+        (" bp poor",                bp_poor,                    model_params,   True,       True,       False,      True,       False,      False),
+        (" bp poor not v deep",     bp_poor & ~v_deep_mask,     model_params,   False,      True,       False,      False,      False,      False),
         # Diagnostics: column of poor predictions @ label k~1s
         (" k1 poor",                k_1_poor_mask,              model_params,   False,      True,       False,      False,      False,      False),
         (" k1 poor not v deep",
