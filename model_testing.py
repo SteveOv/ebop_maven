@@ -156,54 +156,78 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
 
     # Masks for analysing predictions on specific types
     high_ecc_mask = np.sqrt(lbl_vals["ecosw"]**2 + lbl_vals["esinw"]**2) > 0.75
-    sim_eclipse_mask = (np.abs(feat_vals["depthP"] - feat_vals["depthS"]) < 0.05) \
+    sim_ecl_mask = (np.abs(feat_vals["depthP"] - feat_vals["depthS"]) < 0.05) \
                         & (np.abs(1.0 - feat_vals["dS_over_dP"]) < 0.1)
+    k_nr_1_mask = np.abs(1.0 - lbl_vals["k"]) < 0.05
+    low_inc_mask = lbl_vals["inc"] < 80
     esinw_neg_mask = lbl_vals["esinw"] < 0
     v_deep_mask = np.min([feat_vals["depthP"], feat_vals["depthS"]], axis=0) >= 0.25
 
     # Specific problem areas
-    column_k_mask = (lbl_vals["k"] < 0.8) & (pred_vals["k"] > 1.8)
-    very_low_k_mask = (lbl_vals["k"] > 2.5) & ((pred_vals["k"] < 2.0) | (error_vals["k"] > 1.5))
+    column_k_mask = (lbl_vals["k"] < 0.9) & (pred_vals["k"] > 1.5) & ~shallow_mask
     bulge_k_mask = ~column_k_mask & (lbl_vals["k"] > 0.3) & (lbl_vals["k"] < 2.0) \
                 & (pred_vals["k"] > 0.3) & (pred_vals["k"] < 1.5) & (np.abs(error_vals["k"]) > 0.25)
-    droop_sumr_mask = (lbl_vals["rA_plus_rB"] > 0.4) & (np.abs(error_vals["rA_plus_rB"]) > 0.01)
-    low_inc_mask = lbl_vals["inc"] < 80
+    k_1_poor_mask = k_nr_1_mask & (np.abs(error_vals["k"]) > 0.5)
+    v_low_k_pred_mask = (lbl_vals["k"] > 2.5) & (pred_vals["k"] < 3.0) & (error_vals["k"] > 0.5)
+    v_high_k_good_mask = (lbl_vals["k"] > 2.5) & (np.abs(error_vals["k"]) < 0.5)
+    droop_ecosw = (lbl_vals["ecosw"] > 0.4) & (error_vals["ecosw"] > 0.05)
 
+    # Need std dev of the labels over all insts for RE & MRE calcs in predictions_vs_labels_to_table
     lbl_stds = std_dev(lbl_vals)
 
-    # Skip some reports/plots if ds is formal-test-ds which is too small for them to be meaningful.
+    # Switchboard code for eval artifacts; everything listed will at least write a count to the log
     show_error_bars = mc_iterations > 1
     table_ix = 0
     # pylint: disable=line-too-long
     for (subset,                    s_mask,                     plt_params,     synth_tbl, synth_plt, synth_sample, synth_hist, frml_tbl, frml_plt) in [
-        # All as both model and fit params (split for the plots as the tables are already one for each)
-        ("",                        [True]*inst_count,          model_params,   True,       True,       False,      True,       True,       True),
-        (" fit params",             [True]*inst_count,          fit_params,     False,      True,       False,      True,       False,      True),
+        ("",                        [True]*inst_count,          model_params,   True,       True,       False,      False,      True,       True),
         # Subsets of interest: total/partial eclipsese, deep and shallow subsets
-        (" total eclipsing",        total_mask,                 model_params,   True,       True,       False,      True,       True,       False),
-        (" partial eclipsing",      ~total_mask,                model_params,   True,       True,       False,      True,       True,       False),
-        (" deep",                   ~shallow_mask,              model_params,   True,       True,       False,      False,      False,      False),
+        (" total eclipsing",        total_mask,                 model_params,   True,       True,       False,      False,      True,       False),
+        (" partial eclipsing",      ~total_mask,                model_params,   True,       True,       False,      False,      True,       False),
+        (" deep",                   ~shallow_mask,              model_params,   True,       False,      False,      False,      False,      False),
         (" deep total eclipsing",   ~shallow_mask & total_mask, model_params,   True,       False,      False,      False,      False,      False),
         (" deep partial eclipsing", ~shallow_mask & ~total_mask,model_params,   True,       False,      False,      False,      False,      False),
-        (" shallow",                shallow_mask,               model_params,   True,       True,       False,      False,      False,      False),
-        (" shallow total eclipsing",shallow_mask & total_mask,  model_params,   True,       False,      False,      False,      False,      False),
-        (" shallow partial ecl'ing",shallow_mask & ~total_mask, model_params,   True,       False,      False,      False,      False,      False),
-        # Diagnostics: for specific regions or params of interest
-        (" highly eccentric",       high_ecc_mask,              model_params,   True,       True,       False,      True,       False,      False),
-        (" similar eclipses",       sim_eclipse_mask,           model_params,   True,       True,       False,      False,      False,      False),
+        (" shallow",                shallow_mask,               model_params,   True,       False,      False,      False,      False,      False),
+        (" shallow total ecl",      shallow_mask & total_mask,  model_params,   True,       False,      False,      False,      False,      False),
+        (" shallow partial ecl",    shallow_mask & ~total_mask, model_params,   True,       False,      False,      False,      False,      False),
+        # Specific regions or params of interest
         (" very deep",              v_deep_mask,                model_params,   True,       True,       False,      False,      False,      False),
-        (" esinw < zero",           esinw_neg_mask,             model_params,   False,      False,      False,      True,       False,      False),
-        # Diagnostics: problem regions of poor predictions
-        (" droop rA plus rB",       droop_sumr_mask,            model_params,   True,       False,      False,      True,       False,      False),
-        (" bulge k",                bulge_k_mask,               model_params,   True,       True,       False,      True,       False,      False),
-        (" bulge k non-total",      bulge_k_mask & ~total_mask, model_params,   False,      False,      False,      False,      False,      False),
-        (" bulge k shallow",        bulge_k_mask & shallow_mask,model_params,   False,      True,       False,      False,      False,      False),
-        (" bulge k mod shallow",    bulge_k_mask & ~v_deep_mask,model_params,   True,       True,       False,      False,      False,      False),
-        (" column k preds",         column_k_mask,              model_params,   False,      False,      True,       False,      False,      False),
-        (" very low k preds",       very_low_k_mask,            model_params,   False,      True,       False,      True,       False,      False),
-        (" low inclination",        low_inc_mask,               model_params,   False,      True,       False,      False,      False,      False),
+        (" not very deep",          ~v_deep_mask,               model_params,   True,       True,       False,      False,      False,      False),
+        (" highly eccentric",       high_ecc_mask,              model_params,   False,      True,       False,      True,       False,      False),
+        (" similar eclipses",       sim_ecl_mask,               model_params,   False,      True,       False,      False,      False,      False),
+        (" k near 1",               k_nr_1_mask,                model_params,   False,      True,       False,      False,      False,      False),
+        (" low inc",                low_inc_mask,               model_params,   False,      True,       False,      False,      False,      False),
+        (" esinw < zero",           esinw_neg_mask,             model_params,   False,      False,      False,      False,      False,      False),
+        # Diagnostics: column of poor predictions @ label k~1s
+        (" k1 poor",                k_1_poor_mask,              model_params,   False,      True,       False,      False,      False,      False),
+        (" k1 poor not v deep",
+                    k_1_poor_mask & ~v_deep_mask & ~total_mask, model_params,   False,      True,       False,      False,      False,      False),
+        (" k1 poor sim partial ecl",
+                    k_1_poor_mask & sim_ecl_mask & ~total_mask, model_params,   False,      True,       False,      False,      False,      False),
+        # Diagnostics: broad bulge in k centred on k~1
+        (" bulge k",                bulge_k_mask,               model_params,   False,      True,       False,      True,       False,      False),
+        (" bulge k shallow",        bulge_k_mask & shallow_mask,model_params,   False,      False,      False,      False,      False,      False),
+        (" bulge k partial",        bulge_k_mask & ~total_mask, model_params,   False,      False,      False,      False,      False,      False),
+        (" bulge k not v deep",     bulge_k_mask & ~v_deep_mask,model_params,   False,      False,      False,      False,      False,      False),
+        (" bulge k partial or not v deep",
+                    bulge_k_mask & (~total_mask | ~v_deep_mask),model_params,   False,      True,       False,      False,      False,      False),
+        # Diagnostics: column of poor + high predictions @ label k<0.9 for deep set
+        (" column k preds",         column_k_mask,              model_params,   False,      True,       True,       False,      False,      False),
+        (" column k preds not v deep",
+                    column_k_mask & ~v_deep_mask,               model_params,   False,      True,       False,      False,      False,      False),
+        # Diagnostics: scatter in rA_plus_rb above diag, high label k, high label J, high label bP
+        (" very low k preds",       v_low_k_pred_mask,          model_params,   False,      True,       False,      True,       False,      False),
+        # Diagnostics: these have good predictions so what is different to ^these^ ?
+        (" very high k good preds", v_high_k_good_mask,         model_params,   False,      False,      False,      True,       False,      False),
+        # Diagnostics: droop/underprediction in ecosw > 0.4
+        (" droop ecosw",            droop_ecosw,                model_params,   False,      True,       False,      True,       False,      False),
+        # Extra plots with fit params (inc) rather than model params (bP)
+        (" fit params",             [True]*inst_count,          fit_params,     False,      True,       False,      False,      False,      True),
+        (" deep fit params",        ~shallow_mask,              fit_params,     False,      True,       False,      False,      False,      False),
+        (" shallow fit params",     shallow_mask,               fit_params,     False,      True,       False,      False,      False,      False),
     ]:
-        if len(plt_params) % 2 == 0: # Move ecosw & esinw so they are on same row on plots 2 axes wide
+        is_synth, is_frml = "synth" in ds_name, "formal" in ds_name
+        if len(plt_params) % 2 == 0: # Move ecosw & esinw so they're on same row of plots 2 ax wide
             plt_params = [n for n in plt_params if n not in ["ecosw","esinw"]] + ["ecosw", "esinw"]
 
         if any(s_mask):
@@ -215,7 +239,7 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
             s_count, suffix = len(s_ids), re.sub(r'[^\w\d]', '-', subset.lower())
             print(f"\nEvaluating {mc_type} predictions for {s_count}{subset} instance(s)")
 
-            if (("synth" in ds_name and synth_tbl) or ("formal" in ds_name and frml_tbl)):
+            if (is_synth and synth_tbl) or (is_frml and frml_tbl):
                 table_ix += 1
                 print(f"Table {table_ix}: Summary of the estimator predictions for model params")
                 predictions_vs_labels_to_table(s_preds, s_lbls, lbl_stds, summary_only=True,
@@ -230,18 +254,7 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
                                                    error_bars=show_error_bars)
 
             # Use pdf as usually smaller file size than eps and also supports transparency/alpha.
-            if r_dir and (("synth" in ds_name and synth_plt) or ("formal" in ds_name and frml_plt)):
-                save_predictions_to_csv(ids, s_total_mask, s_preds, r_dir / f"preds{suffix}.csv")
-                save_predictions_to_csv(ids, s_total_mask, s_lbls, r_dir / f"labels{suffix}.csv")
-                save_predictions_to_csv(ids, s_total_mask, s_errs, r_dir / f"errors{suffix}.csv")
-
-                # Box plot of error distributions for each predicted params as deeper & shallow sets
-                errs_list = [s_errs[~s_shall_mask][plt_params], s_errs[s_shall_mask][plt_params]]
-                fig = plots.plot_prediction_boxplot(errs_list, show_fliers="formal" in ds_name,
-                                                    ylabel="Error")
-                fig.savefig(r_dir / f"predictions-{mc_type}-box{suffix}.pdf")
-                plt.close(fig)
-
+            if r_dir and ((is_synth and synth_plt) or (is_frml and frml_plt)):
                 # If ds is v. large use a strategy of skipping datapoints as it's not worth plotting
                 # every one, as they become meaningless in small plot area. Helps reduce file size.
                 sl = slice(0, None, int(np.ceil(s_count / 10000)))
@@ -249,11 +262,21 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
                 fig = plots.plot_predictions_vs_labels(s_preds[sl], s_lbls[sl], s_total_mask[sl],
                                                        plt_params, show_errorbars=show_error_bars,
                                                        hl_mask2=~s_shall_mask[sl],
+                                                       big_markers=is_frml,
                                                        fixed_viewport=fixed_viewport)
                 fig.savefig(r_dir / f"predictions-{mc_type}-vs-labels{suffix}.pdf")
                 plt.close(fig)
 
-            if r_dir and ("synth" in ds_name and synth_sample):
+            if r_dir and all(s_mask):
+                # Box plot of error distributions for all instances,
+                # with each predicted params as deeper & shallow subsets
+                errs_list = [s_errs[~s_shall_mask][plt_params], s_errs[s_shall_mask][plt_params]]
+                fig = plots.plot_prediction_boxplot(errs_list, show_fliers="formal" in ds_name,
+                                                    ylabel="Error")
+                fig.savefig(r_dir / f"predictions-{mc_type}-box{suffix}.pdf")
+                plt.close(fig)
+
+            if r_dir and (is_synth and synth_sample):
                 names = [i + " (" + ("Sh" if s else "Dp") + (";Tr" if t else "") + ")"
                          for i, s, t in zip(s_ids[:50], s_shall_mask[:50], s_total_mask[:50])]
                 fig = plots.plot_folded_lightcurves(mags_vals[s_mask][:50], names,
@@ -261,13 +284,18 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
                 fig.savefig(r_dir / f"samples-{mc_type}-vs-labels{suffix}.pdf")
                 plt.close(fig)
 
-            if r_dir and ("synth" in ds_name and synth_hist) and ds_csv_files:
+            if r_dir and (is_synth and synth_hist) and ds_csv_files:
                 prms = [p for p in plots.all_histogram_params if p not in ["MA", "MB", "RA", "RB"]]
                 fig = plots.plot_dataset_histograms(ds_csv_files, prms, cols=5,
                                                     yscale="log" if s_count > 1000 else "linear",
                                                     ids=None if s_count == inst_count else s_ids)
                 fig.savefig(r_dir / f"histogram-{mc_type}-vs-labels{suffix}.pdf")
                 plt.close(fig)
+
+            if r_dir and all(s_mask):
+                save_predictions_to_csv(ids, s_total_mask, s_preds, r_dir / f"preds{suffix}.csv")
+                save_predictions_to_csv(ids, s_total_mask, s_lbls, r_dir / f"labels{suffix}.csv")
+                save_predictions_to_csv(ids, s_total_mask, s_errs, r_dir / f"errors{suffix}.csv")
 
 
 def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
