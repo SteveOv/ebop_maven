@@ -126,11 +126,14 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
     start_time = default_timer()
     for batch, ix in enumerate(np.arange(0, inst_count, max_batch_size), start=1):
         if max_batch_size < inst_count:
-            print(f"Predicting batch {batch} of {int(np.ceil(inst_count / max_batch_size))}")
+            print(f"Predicting batch {batch} of {int(np.ceil(inst_count/max_batch_size))}", end="")
+            batch_start = default_timer()
         pv = estimator.predict(mags_feature=mags_vals[ix : ix+max_batch_size],
                                extra_features=ext_feat_vals[ix : ix+max_batch_size],
                                iterations=mc_iterations,
                                unscale=not scaled)
+        if max_batch_size < inst_count:
+            print(f" took {default_timer()-batch_start:.3f} s")
         pred_vals[ix : ix+len(pv)] = pv
     print(f"The {inst_count} {mc_type} predictions took {timedelta(0, default_timer()-start_time)}")
 
@@ -411,7 +414,9 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
                   f"with {mc_iterations} MC Dropout iterations" if prediction_type == "mc" else "")
             keras.utils.set_random_seed(DEFAULT_TESTING_SEED)
             force_seed_on_dropout_layers(estimator, DEFAULT_TESTING_SEED)
+            start_time = default_timer()
             pv = estimator.predict(np.array([mags]), None, mc_iterations)
+            print(f"The predictions took {default_timer() - start_time:.3f} s")
             predictions_vs_labels_to_table(pv, lbl_vals[ix], lbl_stds, [targ])
             pred_vals[ix] = pv if "inc" in pv.dtype.names else append_calculated_inc_predictions(pv)
 
