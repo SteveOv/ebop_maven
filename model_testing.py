@@ -18,6 +18,7 @@ from datetime import timedelta, datetime
 from timeit import default_timer
 import warnings
 from subprocess import TimeoutExpired
+from functools import lru_cache
 
 import matplotlib.pylab as plt
 
@@ -179,7 +180,7 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
     droop_ecosw = (lbl_vals["ecosw"] > 0.4) & (error_vals["ecosw"] > 0.05)
 
     # Need std dev of the labels over all insts for RE & MRE calcs in predictions_vs_labels_to_table
-    lbl_stds = std_dev(lbl_vals)
+    lbl_stds = get_test_set_labels_std_dev(test_dataset_dir, scaled)
 
     # Switchboard code for eval artifacts; everything listed will at least write a count to the log
     show_error_bars = mc_iterations > 1
@@ -919,6 +920,7 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
                                    title: str=None,
                                    summary_only: bool=False,
                                    error_bars: bool=False,
+                                   relative_errors: bool=False,
                                    format_dp: int=6,
                                    to: TextIOBase=None):
     """
@@ -935,7 +937,8 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
     :error_head: the text of the error/loss row headings (10 chars or less)
     :title: optional title text to write above the table
     :summary_only: omit the body and just report the summary
-    :error_bars: include error bars in output
+    :error_bars: include error bars in outputs
+    :relative_errors: whether the error row of each item reports actual or relative error values
     :format_dp: the number of decimal places in numeric output. Set <= 6 to maintain column widths
     :to: the output to write the table to. Defaults to printing.
     """
@@ -1008,6 +1011,8 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
                 if row_ix == 3: # on the "error" row we append error summaries
                     rel_errs = [custom_error(b_lbls, b_errs, k) for k in selected_param_names]
                     mean_errs = [np.mean(np.abs(vals)), np.mean(np.square(vals)), np.mean(rel_errs)]
+                    if relative_errors:
+                        vals = rel_errs
                 row(row_head, np.concatenate([vals, mean_errs]))
 
     if summary_only or len(predictions) > 1:
@@ -1114,6 +1119,23 @@ def std_dev(vals: np.ndarray[Union[float, UFloat]], sample_stddev: bool=False):
         [tuple( ( sum( (vals[k] - np.mean(vals[k]))**2 )/n )**0.5 for k in vals.dtype.names )],
         dtype=[(k, vals[k].dtype) for k in vals.dtype.names])
 
+@lru_cache
+def get_test_set_labels_std_dev(test_dataset_dir: Path=FORMAL_TEST_DATASET_DIR,
+                                scale_labels: bool=False):
+    """
+    Will calculate the one standard deviation values of the labels within the passsed test dataset.
+    The values will be cached for subsequent requests.
+
+    :test_dataset_dir: the test dataset to calculate the values from
+    :returns: structured array of the 1-sigma values
+    """
+    tfrecord_files = sorted(test_dataset_dir.glob("**/*.tfrecord"))
+    if len(tfrecord_files) == 0:
+        raise ValueError(f"No tfrecord files under {test_dataset_dir}. Please make this dataset.")
+    print(f"Calculating label std devs for {len(tfrecord_files)} {test_dataset_dir.name} file(s).")
+
+    _, _, _, label_vals = datasets.read_dataset(tfrecord_files, scale_labels=scale_labels)
+    return std_dev(label_vals)
 
 def get_common_param_names(predictions: np.ndarray[UFloat],
                            labels: np.ndarray[UFloat],
@@ -1127,7 +1149,6 @@ def get_common_param_names(predictions: np.ndarray[UFloat],
             selected_param_names = [selected_param_names]
         selected_param_names = [n for n in selected_param_names if n in labels.dtype.names]
     return np.array([n for n in selected_param_names if n in predictions.dtype.names])
-
 
 def get_nom(value):
     """ Get the nominal value if the passed value is a UFloat other return value as is """
