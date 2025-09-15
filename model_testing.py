@@ -42,6 +42,7 @@ from traininglib import datasets, formal_testing, jktebop, pipeline, plots
 from traininglib.tee import Tee
 
 FORMAL_TEST_DATASET_DIR = Path("./datasets/formal-test-dataset/")
+DEFAULT_SYNTH_TEST_DATASET_DIR = Path("./datasets/synthetic-mist-tess-dataset/")
 
 DEFAULT_TESTING_SEED = 42
 
@@ -911,7 +912,7 @@ def save_predictions_to_csv(target_names: np.ndarray[str],
 
 def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
                                    labels: np.ndarray[Union[UFloat, float]],
-                                   label_stds: np.ndarray[Union[UFloat, float]],
+                                   label_stds: np.ndarray[Union[UFloat, float]]=None,
                                    block_headings: np.ndarray[str]=None,
                                    selected_param_names: np.ndarray[str]=None,
                                    prediction_head: str="Prediction",
@@ -929,7 +930,7 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
 
     :predictions: the predictions
     :labels: the labels or other comparison values
-    :label_stds: the standard deviation of the labels
+    :label_stds: the standard deviation of the labels or if none will be calculated from synth ds
     :block_headings: the heading for each block of preds-vs-labels
     :selected_param_names: a subset of the full list of labels/prediction names to render
     :prediction_head: the text of the prediction row headings (10 chars or less)
@@ -957,6 +958,8 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
         to = StringIO()
 
     # For the div_by_std params we divide by std(lbl) in RE as their range is symmetrical about zero
+    if label_stds is None:
+        label_stds = get_test_set_labels_std_dev(DEFAULT_SYNTH_TEST_DATASET_DIR)
     div_by_std = ["ecosw", "esinw"]
     def custom_error(lbl, errs, pname, lbl_stds=np.squeeze(label_stds)):
         """ 
@@ -1219,8 +1222,12 @@ if __name__ == "__main__":
     # Ensure we don't use CUDA devices for full testing otherwise the results may not be repeatable
     os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
-    synth_test_ds_dir = Path(f"./datasets/synthetic-mist-tess-dataset{args.synth_suffix}/")
-    test_results_subdir = f"testing{args.synth_suffix}"
+    synth_test_ds_dir = DEFAULT_SYNTH_TEST_DATASET_DIR
+    results_dir_name = "testing"
+    if len(args.synth_suffix) > 0:
+        suffix = args.synth_suffix.removeprefix("-")
+        synth_test_ds_dir = synth_test_ds_dir.parent / f"{synth_test_ds_dir.name}-{suffix}"
+        results_dir_name += f"-{suffix}"
 
     # This will get the config, labels and published params for formal targets not excluded
     targets_config_file = Path("./config/formal-test-dataset.json")
@@ -1231,13 +1238,13 @@ if __name__ == "__main__":
     for file_counter, model_file in enumerate(args.model_files, 1):
         # Locate the expected file and the reporting directory for this model
         if model_file is None or model_file.parent.name == "estimator":# published with ebop_maven
-            result_dir = Path("./drop/training/published/" + test_results_subdir)
+            result_dir = Path("./drop/training/published/" + results_dir_name)
             model_file = Path("./ebop_maven/data/estimator/default-model.keras")
         elif Path.is_dir(model_file):
-            result_dir = model_file / test_results_subdir
+            result_dir = model_file / results_dir_name
             model_file /= "default-model.keras"
         else:
-            result_dir = model_file.parent / test_results_subdir
+            result_dir = model_file.parent / results_dir_name
         result_dir.mkdir(parents=True, exist_ok=True)
         print(f"\nModel file {file_counter} of {len(args.model_files)}: {model_file}\n")
 
