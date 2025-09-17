@@ -80,6 +80,7 @@ scope.define(optimizers.Nadam)
 cnn_strides_pchoices = [(0.75, None), (0.125, 2), (0.125, 4)]
 cnn_strides_fraction_kwargs = { "low": 0.25, "high": 1, "q": 0.25 }
 cnn_pooling_type_choices = [layers.AvgPool1D, layers.MaxPool1D, None]
+cnn_kernel_size_choices = [5, 7, 8, 9, 11, 13]
 cnn_padding_choices = ["same", "valid"]
 cnn_activation_choices = ["relu"]
 dnn_initializer_choices = ["he_uniform", "he_normal", "glorot_uniform"]
@@ -119,6 +120,7 @@ trials_pspace = hp.pchoice("train_and_test_model", [
             "mags_wrap_phase":          MAGS_WRAP_PHASE,
             "chosen_labels":            CHOSEN_LABELS,
             "trainset_name":            TRAINSET_NAME,
+            "cnn_kernel_size":          hp.choice("best_cnn_kernel_size", cnn_kernel_size_choices),
             "cnn_activation":           hp.choice("best_cnn_activation", cnn_activation_choices),
             "cnn_pooling":              hp.choice("best_cnn_pooling", [layers.AvgPool1D, layers.MaxPool1D]),
             "cnn_pool_size":            hp.choice("best_cnn_pool_size", [4, 5, 6]),
