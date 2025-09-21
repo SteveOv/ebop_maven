@@ -71,9 +71,10 @@ keras.utils.set_random_seed(SEED)
 # are fine. Even with this setting, GPUs are seen only if CUDA_VISIBLE_DEVICES isn't set to -1.
 #tf.config.experimental.enable_op_determinism()
 
-# This schedule is effectively init_rate * 0.94^epoch (so is reduced by ~10 in 37 epochs)
-LR = optimizers.schedules.ExponentialDecay(1e-3, decay_steps=1000, decay_rate=0.94)
-OPTIMIZER = optimizers.Nadam(learning_rate=LR)
+# This gives 2 epochs warmup of LR from 0 to 0.0008 then decays over next 60 epochs to LR 0.000008
+LR = optimizers.schedules.CosineDecay(initial_learning_rate=0.0, decay_steps=60000, alpha=0.01,
+                                      warmup_target=0.0008, warmup_steps=2000)
+OPTIMIZER = optimizers.Adam(learning_rate=LR)
 LOSS = ["mae"]
 METRICS = ["mse"] #+ [MeanAbsoluteErrorForLabel(CHOSEN_LABELS.index(l), l) for l in CHOSEN_LABELS]
 
@@ -85,14 +86,14 @@ CLASS_WEIGHTS = { CHOSEN_LABELS.index(l): 1 for l in CHOSEN_LABELS } # Currently
 # LeakyReLU addresses issue of dead neurons & PReLU similar but trains alpha param
 CNN_PADDING = "same"
 CNN_ACTIVATE = "relu"
-CNN_POOLING_TYPE = layers.MaxPool1D # pylint: disable=invalid-name
+CNN_POOLING_TYPE = layers.AvgPool1D # pylint: disable=invalid-name
 
 # For the dense layers: "glorot_uniform" (def) "he_normal", "he_uniform" (he_ goes well with ReLU)
-DNN_INITIALIZER = "he_uniform"
+DNN_INITIALIZER = "he_normal"
 DNN_ACTIVATE = "leaky_relu"
 DNN_NUM_UNITS = 384
 DNN_NUM_FULL_LAYERS = 2
-DNN_DROPOUT_RATE = 0.5
+DNN_DROPOUT_RATE = 0.3
 DNN_NUM_TAPER_UNITS = 64
 
 # Control dataset pipeline augmentations applied to each mags_feature
@@ -153,36 +154,81 @@ def make_best_model(chosen_features: list[str]=CHOSEN_FEATURES,
         "trainset_name": trainset_name,
         "created_timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
+
+    cnn_strides = 1
+    cnn_full_kernel_size = 5
+    cnn_ecl_kernel_size = 5
+    pool_size, pool_strides, pool_padding = 5, 4, "same"
+
     best_model = modelling.build_tri_view_model(
         full_fold_input=modelling.mags_input_layer(shape=(mags_bins[0], 1), name="Full-Input", verbose=verbose),
         full_fold_layers=[
-            modelling.conv1d_layers(2, 16, 32, 2, cnn_padding, cnn_activation, "Full-Conv-1-", verbose),
-            modelling.pooling_layer(cnn_pooling, 2, 2, cnn_padding, "Full-Pool-1", verbose),
-            modelling.conv1d_layers(2, 32, 16, 2, cnn_padding, cnn_activation, "Full-Conv-2-", verbose),
-            modelling.pooling_layer(cnn_pooling, 2, 2, cnn_padding, "Full-Pool-2", verbose),
-            modelling.conv1d_layers(2, 64, 8, 2, cnn_padding, cnn_activation, "Full-Conv-3-", verbose),
-            modelling.pooling_layer(cnn_pooling, 2, 2, cnn_padding, "Full-Pool-3", verbose),
-            modelling.conv1d_layers(1, 128, 4, 2, cnn_padding, cnn_activation, "Full-Conv-4-", verbose),
+            modelling.conv1d_layers(2, 8, cnn_full_kernel_size, cnn_strides, cnn_padding,
+                                    cnn_activation, "Full-Conv-1-", verbose),
+            modelling.pooling_layer(cnn_pooling, pool_size, pool_strides, pool_padding,
+                                    "Full-Pool-1", verbose),
+            modelling.conv1d_layers(2, 16, cnn_full_kernel_size, cnn_strides, cnn_padding,
+                                    cnn_activation, "Full-Conv-2-", verbose),
+            modelling.pooling_layer(cnn_pooling, pool_size, pool_strides, pool_padding,
+                                    "Full-Pool-2", verbose),
+            modelling.conv1d_layers(2, 32, cnn_full_kernel_size, cnn_strides, cnn_padding,
+                                    cnn_activation, "Full-Conv-3-", verbose),
+            modelling.pooling_layer(cnn_pooling, pool_size, pool_strides, pool_padding,
+                                    "Full-Pool-3", verbose),
+            modelling.conv1d_layers(2, 64, cnn_full_kernel_size, cnn_strides, cnn_padding,
+                                    cnn_activation, "Full-Conv-4-", verbose),
+            modelling.pooling_layer(cnn_pooling, pool_size, pool_strides, pool_padding,
+                                    "Full-Pool-4", verbose),
+            modelling.conv1d_layers(2, 128, cnn_full_kernel_size, cnn_strides, cnn_padding,
+                                    cnn_activation, "Full-Conv-5-", verbose),
+            modelling.pooling_layer(cnn_pooling, pool_size, pool_strides, pool_padding,
+                                    "Full-Pool-6", verbose),
         ],
         prim_ecl_input=modelling.mags_input_layer(shape=(mags_bins[1], 1), name="Prim-Input", verbose=True),
         prim_ecl_layers=[
-            modelling.conv1d_layers(2, 16, 32, 2, cnn_padding, cnn_activation, "Prim-Conv-1-", verbose),
-            modelling.pooling_layer(cnn_pooling, 2, 2, cnn_padding, "Prim-Pool-1", verbose),
-            modelling.conv1d_layers(2, 32, 16, 2, cnn_padding, cnn_activation, "Prim-Conv-2-", verbose),
-            modelling.pooling_layer(cnn_pooling, 2, 2, cnn_padding, "Prim-Pool-2", verbose),
-            modelling.conv1d_layers(2, 64, 8, 2, cnn_padding, cnn_activation, "Prim-Conv-3-", verbose),
-            modelling.pooling_layer(cnn_pooling, 2, 2, cnn_padding, "Prim-Pool-3", verbose),
-            modelling.conv1d_layers(1, 128, 4, 2, cnn_padding, cnn_activation, "Prim-Conv-4-", verbose),
+            modelling.conv1d_layers(2, 8, cnn_ecl_kernel_size, cnn_strides, cnn_padding,
+                                    cnn_activation, "Prim-Conv-1-", verbose),
+            modelling.pooling_layer(cnn_pooling, pool_size, pool_strides, pool_padding,
+                                    "Prim-Pool-1", verbose),
+            modelling.conv1d_layers(2, 16, cnn_ecl_kernel_size, cnn_strides, cnn_padding,
+                                    cnn_activation, "Prim-Conv-2-", verbose),
+            modelling.pooling_layer(cnn_pooling, pool_size, pool_strides, pool_padding,
+                                    "Prim-Pool-2", verbose),
+            modelling.conv1d_layers(2, 24, cnn_ecl_kernel_size, cnn_strides, cnn_padding,
+                                    cnn_activation, "Prim-Conv-3-", verbose),
+            modelling.pooling_layer(cnn_pooling, pool_size, pool_strides, pool_padding,
+                                    "Prim-Pool-3", verbose),
+            modelling.conv1d_layers(2, 32, cnn_ecl_kernel_size, cnn_strides, cnn_padding,
+                                    cnn_activation, "Prim-Conv-4-", verbose),
+            modelling.pooling_layer(cnn_pooling, pool_size, pool_strides, pool_padding,
+                                    "Prim-Pool-4", verbose),
+            modelling.conv1d_layers(2, 40, cnn_ecl_kernel_size, cnn_strides, cnn_padding,
+                                    cnn_activation, "Prim-Conv-5-", verbose),
+            modelling.pooling_layer(cnn_pooling, pool_size, pool_strides, pool_padding,
+                                    "Prim-Pool-6", verbose),
         ],
         sec_ecl_input=modelling.mags_input_layer(shape=(mags_bins[2], 1), name="Sec-Input", verbose=True),
         sec_ecl_layers=[
-            modelling.conv1d_layers(2, 16, 32, 2, cnn_padding, cnn_activation, "Sec-Conv-1-", verbose),
-            modelling.pooling_layer(cnn_pooling, 2, 2, cnn_padding, "Sec-Pool-1", verbose),
-            modelling.conv1d_layers(2, 32, 16, 2, cnn_padding, cnn_activation, "Sec-Conv-2-", verbose),
-            modelling.pooling_layer(cnn_pooling, 2, 2, cnn_padding, "Sec-Pool-2", verbose),
-            modelling.conv1d_layers(2, 64, 8, 2, cnn_padding, cnn_activation, "Sec-Conv-3-", verbose),
-            modelling.pooling_layer(cnn_pooling, 2, 2, cnn_padding, "Sec-Pool-3", verbose),
-            modelling.conv1d_layers(1, 128, 4, 2, cnn_padding, cnn_activation, "Sec-Conv-4-", verbose),
+            modelling.conv1d_layers(2, 8, cnn_ecl_kernel_size, cnn_strides, cnn_padding,
+                                    cnn_activation, "Sec-Conv-1-", verbose),
+            modelling.pooling_layer(cnn_pooling, pool_size, pool_strides, pool_padding,
+                                    "Sec-Pool-1", verbose),
+            modelling.conv1d_layers(2, 16, cnn_ecl_kernel_size, cnn_strides, cnn_padding,
+                                    cnn_activation, "Sec-Conv-2-", verbose),
+            modelling.pooling_layer(cnn_pooling, pool_size, pool_strides, pool_padding,
+                                    "Sec-Pool-2", verbose),
+            modelling.conv1d_layers(2, 24, cnn_ecl_kernel_size, cnn_strides, cnn_padding,
+                                    cnn_activation, "Sec-Conv-3-", verbose),
+            modelling.pooling_layer(cnn_pooling, pool_size, pool_strides, pool_padding,
+                                    "Sec-Pool-3", verbose),
+            modelling.conv1d_layers(2, 32, cnn_ecl_kernel_size, cnn_strides, cnn_padding,
+                                    cnn_activation, "Sec-Conv-4-", verbose),
+            modelling.pooling_layer(cnn_pooling, pool_size, pool_strides, pool_padding,
+                                    "Sec-Pool-4", verbose),
+            modelling.conv1d_layers(2, 40, cnn_ecl_kernel_size, cnn_strides, cnn_padding,
+                                    cnn_activation, "Sec-Conv-5-", verbose),
+            modelling.pooling_layer(cnn_pooling, pool_size, pool_strides, pool_padding,
+                                    "Sec-Pool-6", verbose),
         ],
         ext_input=modelling.ext_input_layer(shape=(len(chosen_features), 1), verbose=verbose),
         dnn_layers=[

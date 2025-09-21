@@ -12,6 +12,7 @@ stored_mags_features = {
     # "mags_1024": 1024,
     # "mags_2048": 2048,
     "mags_4096": 4096,
+    #"mags_6144": 6144,
 }
 default_mags_key = "mags_4096"                                  # pylint: disable=invalid-name
 default_mags_bins = stored_mags_features[default_mags_key]      # pylint: disable=invalid-name
