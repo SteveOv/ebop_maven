@@ -543,59 +543,81 @@ def plot_predictions_vs_labels(predictions: np.ndarray[UFloat],
     return fig
 
 
-def plot_binned_mae_vs_labels(residuals: np.rec.recarray[UFloat],
-                              labels: np.rec.recarray[UFloat],
+def plot_binned_mae_vs_labels(errors: np.ndarray[UFloat],
+                              labels: np.ndarray[UFloat],
                               selected_params: List[str]=None,
                               num_bins: float=100,
                               indicate_bin_counts: bool=False,
-                              xlabel: str="label value",
-                              ylabel: str="mean absolute error",
+                              show_mre: bool=True,
+                              xlabel_prefix: str="label",
+                              ylabel: str="binned error",
+                              yscale: str="linear",
                               **format_kwargs) -> Figure:
     """
     Will create a plot figure with a single set of axes, with the MAE vs label values
     for one or more labels broken down into equal sized bins. It is intended to show
     how the prediction accuracy varies over the range of the labels.
 
-    :residuals: the residual values
+    If show_mre is true a second set of points will be plotted for the mean of the
+    relative error, given by |error/label|, for each bin. 
+
+    :errors: the error/residual values
     :labels: the label values
     :selected_params: a subset of the full list of prediction/label params to render
     :num_bins: the number of equal sized bins to apply to the data
     :indicate_bin_counts: give an indication of each bin's count by its marker size
-    :xlabel: the label to give the x-axis
+    :show_mre: whether to also plot the mre, where re is |error/label|, per bin
+    :xlabel_prefix: the prefix to give the x-axis label which will be '{prefix} {param}'
     :ylabel: the label to give the y-axis
+    :yscale: the scale of the y-axis: linear or log
     :format_kwargs: kwargs to be passed on to format_axes()
     :returns: the figure
     """
     if selected_params is None:
-        selected_params = [n for n in labels.dtype.names if n in residuals.dtype.names]
+        selected_params = [n for n in labels.dtype.names if n in errors.dtype.names]
     elif isinstance(selected_params, str):
         selected_params = [selected_params]
     params = { n: all_param_captions[n] for n in selected_params }
 
     print("Plotting binned MAE vs label values for:", ", ".join(params))
-    fig, ax = plt.subplots(figsize=(2 * COL_WIDTH, 2 * ROW_HEIGHT_6_4), constrained_layout=True)
+    cols = 2
+    rows = math.ceil(len(params) / cols)
+    fig, axes = plt.subplots(rows, cols, sharey="all", constrained_layout=True,
+                             figsize=(cols * COL_WIDTH, rows * ROW_HEIGHT_SQUARE))
 
-    # We need to know the extent of all the data beforehand, so we can apply equivalent bins to all
-    lbl_vals = unumpy.nominal_values(labels[selected_params].tolist())
-    bins = np.linspace(lbl_vals.min(), lbl_vals.max(), num_bins+1)
-    for ix, param_name in enumerate(params):
-        abs_resids = np.abs(unumpy.nominal_values(residuals[param_name]))
+    for ix, (ax, param_name) in enumerate(zip_longest(axes.flat, selected_params)):
+        if param_name:
+            # Use nominals for this diagnostics plot to avoid errors with calls not ufloat friendly
+            label_noms = unumpy.nominal_values(labels[param_name])
+            error_noms = unumpy.nominal_values(errors[param_name])
+            maes, bin_edges, _ = binned_statistic(label_noms, np.abs(error_noms), "mean", num_bins)
 
-        means, bin_edges, _ = binned_statistic(lbl_vals[:, ix], abs_resids, "mean", bins)
-        bin_width = bin_edges[1] - bin_edges[0]
-        bin_centres = bin_edges[1:] - bin_width / 2
+            bin_centres = bin_edges[1:] - (bin_edges[1] - bin_edges[0]) / 2
 
-        if indicate_bin_counts:
-            counts, _, _ = binned_statistic(lbl_vals[:, ix], abs_resids, "count", bins)
-            ms = 1.0 * (counts/10)
-            alpha = 0.5 # more likely to overlap
+            if indicate_bin_counts:
+                # Use the marker size to give an indication of the number of items in the bin
+                counts, _, _ = binned_statistic(label_noms, error_noms, "count", num_bins)
+                ms = np.clip(counts / 10, 1.0, None)
+            else:
+                ms = 5.0
+            alpha = 0.5 if indicate_bin_counts or show_mre else 0.75
+
+            ax.scatter(bin_centres, maes, ms, c=PLOT_COLORS[0], alpha=alpha, label="MAE")
+
+            if show_mre:
+                # This will warn about div0 for some labels
+                res = np.abs(error_noms / label_noms)
+                mres, _, _ = binned_statistic(label_noms, res, "mean", num_bins)
+                ax.scatter(bin_centres, mres, ms, c=PLOT_COLORS[1], alpha=alpha, label="MRE")
+
+            format_axes(ax,
+                        xlabel=f"{xlabel_prefix} {all_param_captions[param_name]}",
+                        ylabel=ylabel if ix % cols == 0 else None,
+                        legend_loc="best" if ix == 0 else None,
+                        **format_kwargs)
+            ax.set_yscale(yscale)
         else:
-            ms = 5.0
-            alpha = 0.75
-
-        ax.scatter(bin_centres, means, ms, c=PLOT_COLORS[0], alpha=alpha, label=params[param_name])
-
-    format_axes(ax, xlabel=xlabel, ylabel=ylabel, legend_loc="best", **format_kwargs)
+            ax.axis("off") # remove the unused ax
     return fig
 
 

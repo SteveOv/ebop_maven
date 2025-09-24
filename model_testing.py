@@ -280,6 +280,13 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
                 plt.close(fig)
 
             if r_dir and all(s_mask):
+                # MAE vs MRE plot as overall MRE may be reported as very high (>1)
+                fig = plots.plot_binned_mae_vs_labels(s_errs, s_lbls, plt_params,
+                                                      num_bins=1000, show_mre=True, yscale="log")
+                fig.savefig(r_dir / f"binned-mae-mre-{mc_type}-vs-labels{suffix}.pdf")
+                plt.close(fig)
+
+            if r_dir and all(s_mask):
                 # Box plot of error distributions for all instances,
                 # with each predicted params as deeper & shallow subsets
                 errs_list = [s_errs[~s_shall_mask][plt_params], s_errs[s_shall_mask][plt_params]]
