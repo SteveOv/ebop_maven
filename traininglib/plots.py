@@ -592,7 +592,7 @@ def plot_binned_mae_vs_labels(errors: np.ndarray[UFloat],
             error_noms = unumpy.nominal_values(errors[param_name])
             maes, bin_edges, _ = binned_statistic(label_noms, np.abs(error_noms), "mean", num_bins)
 
-            bin_centres = bin_edges[1:] - (bin_edges[1] - bin_edges[0]) / 2
+            bin_mids = bin_edges[1:] - (bin_edges[1] - bin_edges[0]) / 2
 
             if indicate_bin_counts:
                 # Use the marker size to give an indication of the number of items in the bin
@@ -600,15 +600,15 @@ def plot_binned_mae_vs_labels(errors: np.ndarray[UFloat],
                 ms = np.clip(counts / 10, 1.0, None)
             else:
                 ms = 5.0
-            alpha = 0.5 if indicate_bin_counts or show_mre else 0.75
+            alpha = 0.25 if indicate_bin_counts or show_mre else 0.75
 
-            ax.scatter(bin_centres, maes, ms, c=PLOT_COLORS[0], alpha=alpha, label="MAE")
+            ax.scatter(bin_mids, maes, ms, c=PLOT_COLORS[0], alpha=alpha, label="|error|")
 
             if show_mre:
-                # This will warn about div0 for some labels
-                res = np.abs(error_noms / label_noms)
-                mres, _, _ = binned_statistic(label_noms, res, "mean", num_bins)
-                ax.scatter(bin_centres, mres, ms, c=PLOT_COLORS[1], alpha=alpha, label="MRE")
+                label_non_zero = label_noms != 0.0 # Avoid div0 errors by excluding zero label
+                res = np.abs(error_noms[label_non_zero] / label_noms[label_non_zero])
+                mres, _, _ = binned_statistic(label_noms[label_non_zero], res, "mean", num_bins)
+                ax.scatter(bin_mids, mres, ms, c=PLOT_COLORS[1], alpha=alpha, label="|error/label|")
 
             format_axes(ax,
                         xlabel=f"{xlabel_prefix} {all_param_captions[param_name]}",
