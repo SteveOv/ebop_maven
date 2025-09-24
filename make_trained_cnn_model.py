@@ -81,7 +81,7 @@ CLASS_WEIGHTS = { CHOSEN_LABELS.index(l): 1 for l in CHOSEN_LABELS } # Currently
 
 # ReLU is widely used default for CNN/DNNs.
 # LeakyReLU addresses issue of dead neurons & PReLU similar but trains alpha param
-CNN_KERNEL_SIZE = 8
+CNN_KERNEL_SIZE = 9
 CNN_STRIDES = 1
 CNN_PADDING = "same"
 CNN_ACTIVATE = "relu"
