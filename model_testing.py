@@ -55,6 +55,7 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
                                    mc_iterations: int=1,
                                    include_ids: List[str]=None,
                                    test_dataset_dir: Path=FORMAL_TEST_DATASET_DIR,
+                                   std_dev_dataset_dir: Path=None,
                                    report_dir: Path=None,
                                    scaled: bool=False):
     """
@@ -66,6 +67,8 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
     :mc_iterations: the number of MC Dropout iterations
     :include_ids: list of target ids to predict, or all if not set
     :test_dataset_dir: the location of the formal test dataset
+    :std_dev_dataset_dir: the location of the test dataset from which we calc the label std devs, or
+    use test_dataset_dir if not set
     :report_dir: optional directory into which to save reports, reports not saved if this is None
     :scaled: whether labels and predictions are scaled (raw model predictions) or not
     """
@@ -180,8 +183,9 @@ def evaluate_model_against_dataset(estimator: Union[Path, Model, Estimator],
     v_high_k_good_mask = (lbl_vals["k"] > 2.5) & (np.abs(error_vals["k"]) < 0.5)
     droop_ecosw = (lbl_vals["ecosw"] > 0.4) & (error_vals["ecosw"] > 0.05)
 
-    # Need std dev of the labels over all insts for RE & MRE calcs in predictions_vs_labels_to_table
-    lbl_stds = get_test_set_labels_std_dev(test_dataset_dir, scaled)
+    # Need std dev of the labels for RE & MRE calcs in predictions_vs_labels_to_table
+    lbl_stds = get_test_set_labels_std_dev(std_dev_dataset_dir or test_dataset_dir, scaled)
+    print("Label std devs:", ", ".join(f"{p} = {lbl_stds[p][0]:.3f}" for p in super_params))
 
     # Switchboard code for eval artifacts; everything listed will at least write a count to the log
     show_error_bars = mc_iterations > 1
@@ -324,6 +328,7 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
                             apply_fit_overrides: bool=True,
                             do_control_fit: bool=False,
                             comparison_vals: np.ndarray[UFloat]=None,
+                            std_dev_dataset_dir: Path=None,
                             report_dir: Path=None) -> np.ndarray[UFloat]:
     """
     Will fit members of the formal test dataset, as configured in targets_config, based on
@@ -344,6 +349,8 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
     :apply_fit_overrides: apply any fit_overrides from each target's config
     :do_control_fit: when True labels, rather than predictions, will be the input params for fitting
     :comparison_vals: optional recarray[UFloat] to compare to fitting results, alternative to labels
+    :std_dev_dataset_dir: the location of the test dataset from which we calc the label std devs,
+    or calculate from targets_config if not set
     :report_dir: optional directory into which to save reports, reports not saved if this is None
     :returns: a structured NDArray[UFloat] containing the fitted parameters for each target
     """
@@ -379,7 +386,10 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
     # For this "deep dive" test we report on labels with uncertainties, so we ignore the label
     # values in the dataset (nominals only) and go to the source config to get the full values.
     lbl_vals = formal_testing.get_labels_for_targets(targets_config, super_params, targs)
-    lbl_stds = std_dev(lbl_vals)
+    if std_dev_dataset_dir:
+        lbl_stds = get_test_set_labels_std_dev(std_dev_dataset_dir)
+    else:
+        lbl_stds = std_dev(lbl_vals)
 
     # Pre-allocate a structured arrays to hold the predictions and equivalent fit results
     pred_vals = np.empty((targ_count, ), dtype=[(p, np.dtype(UFloat.dtype)) for p in super_params])
@@ -426,7 +436,7 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
             start_time = default_timer()
             pv = estimator.predict(np.array([mags]), None, mc_iterations)
             print(f"The predictions took {default_timer() - start_time:.3f} s")
-            predictions_vs_labels_to_table(pv, lbl_vals[ix], lbl_stds, [targ])
+            predictions_vs_labels_to_table(pv, lbl_vals[ix], lbl_stds, [targ], model_params)
             pred_vals[ix] = pv if "inc" in pv.dtype.names else append_calculated_inc_predictions(pv)
 
         print(f"\nThe {prediction_type} sourced input params for fitting {targ}")
@@ -484,7 +494,7 @@ def fit_formal_test_dataset(estimator: Union[Path, Model, Estimator],
             ("\nTargets with only partial eclipses",~total_mask,            fit_params)]
 
         for comp_type, comp_head, comp_vals in comparison_type:
-            comp_stds = std_dev(comp_vals)
+            comp_stds = lbl_stds
             # Summarize this set of predictions as plots-vs-label|control and in text table
             # Control == fit from labels not preds, so no point producing these
             if not do_control_fit:
@@ -928,7 +938,6 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
                                    title: str=None,
                                    summary_only: bool=False,
                                    error_bars: bool=False,
-                                   relative_errors: bool=False,
                                    format_dp: int=6,
                                    to: TextIOBase=None):
     """
@@ -946,7 +955,6 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
     :title: optional title text to write above the table
     :summary_only: omit the body and just report the summary
     :error_bars: include error bars in outputs
-    :relative_errors: whether the error row of each item reports actual or relative error values
     :format_dp: the number of decimal places in numeric output. Set <= 6 to maintain column widths
     :to: the output to write the table to. Defaults to printing.
     """
@@ -964,18 +972,18 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
     if print_it:
         to = StringIO()
 
-    # For the div_by_std params we divide by std(lbl) in RE as their range is symmetrical about zero
+    # For the div_by_std params we divide by std(lbl) in RE
     if label_stds is None:
         label_stds = get_test_set_labels_std_dev(DEFAULT_SYNTH_TEST_DATASET_DIR)
-    div_by_std = ["ecosw", "esinw"]
-    def custom_error(lbl, errs, pname, lbl_stds=np.squeeze(label_stds)):
+    div_by_std = label_stds.dtype.names  # All
+    def relative_error(lbls, errs, pname, lbl_stds=np.squeeze(label_stds)):
         """ 
         Calculate a summary error for this parameter, which here is the relative error;
         RE = | error / label | except for params in 'div_by_std' where it's | error / std(label) |
         """
         return np.abs(
                 np.divide(errs[pname],
-                          np.add(lbl_stds[pname] if pname in div_by_std else lbl[pname], 1e-30)))
+                          lbl_stds[pname] if pname in div_by_std else np.add(lbls[pname], 1e-30)))
 
     err_heads = ["MAE", "MSE", "MRE"]
     line_length = 12 + (11 * len(selected_param_names)) + (11 * len(err_heads))
@@ -1008,7 +1016,7 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
         elif isinstance(block_headings, str):
             block_headings = [block_headings]
 
-        # A sub table for each block/instance with heads & 3 rows; labels|controls, preds and errs
+        # Sub table for each block/inst with heads & 4 rows; labels|controls, preds, errs & rel errs
         for block_head, b_lbls, b_preds, b_errs \
                 in zip(block_headings, labels, predictions, errors, strict=True):
             header_block(block_head)
@@ -1016,21 +1024,22 @@ def predictions_vs_labels_to_table(predictions: np.ndarray[UFloat],
             for row_ix, (row_head, row_vals) in enumerate(
                     zip([label_head, prediction_head, error_head], [b_lbls, b_preds, b_errs]),
                     start=1):
-                vals = row_vals[selected_param_names].tolist()
-                mean_errs = [None, None, None]
-                if row_ix == 3: # on the "error" row we append error summaries
-                    rel_errs = [custom_error(b_lbls, b_errs, k) for k in selected_param_names]
-                    mean_errs = [np.mean(np.abs(vals)), np.mean(np.square(vals)), np.mean(rel_errs)]
-                    if relative_errors:
-                        vals = rel_errs
-                row(row_head, np.concatenate([vals, mean_errs]))
+                v = row_vals[selected_param_names].tolist()
+                if row_ix < 3:
+                    row(row_head, np.concatenate([v, [None, None, None]]))
+                else: # on the "error" rows we append error summaries
+                    rel_errs = [relative_error(b_lbls, b_errs, k) for k in selected_param_names]
+                    row(row_head,
+                        np.concatenate([v, [np.mean(np.abs(v)), np.mean(np.square(v)), None]]))
+                    row(f"Rel. {row_head}",
+                        np.concatenate([rel_errs, [None, None, np.mean(rel_errs)]]))
 
     if summary_only or len(predictions) > 1:
         # Summary rows for aggregate stats over all of the rows
         horizontal_line("=")
         par_maes = [np.mean(np.abs(errors[k])) for k in selected_param_names]
         par_mses = [np.mean(np.square(errors[k])) for k in selected_param_names]
-        par_errs = [np.mean(custom_error(labels, errors, k)) for k in selected_param_names]
+        par_errs = [np.mean(relative_error(labels, errors, k)) for k in selected_param_names]
 
         row(err_heads[0], np.concatenate([par_maes, [np.mean(par_maes), None, None]]))
         row(err_heads[1], np.concatenate([par_mses, [None, np.mean(par_mses), None]]))
@@ -1277,13 +1286,14 @@ if __name__ == "__main__":
                     ("mc",      1000,   FORMAL_TEST_DATASET_DIR,    formal_targs),
             ]
             if args.do_mc_synth:
-                # Resource hog & non-essential; predictions take ~0.5 h on CPU & may not fit in GPU
+                # Resource hog & non-essential; predictions take ~1.0 h on CPU & may not fit in GPU
                 eval_reports.insert(1, ("mc", 1000, synth_test_ds_dir, None))
             for pred_type, iters, dataset_dir, targs in eval_reports:
                 print(f"\nEvaluating the model's {pred_type} estimates (iters={iters})",
                       f"on {dataset_dir.name}\n" + "="*80)
-                evaluate_model_against_dataset(model_file, iters, targs,
-                                               dataset_dir, result_dir / "eval")
+                # Use the std dev from the synth ds in calculations of relative errors/MRE
+                evaluate_model_against_dataset(model_file, iters, targs, dataset_dir,
+                                               synth_test_ds_dir, result_dir / "eval")
 
             if args.do_fit:
                 # In depth report on fitting the formal-test-dataset based on estimator predictions.
@@ -1303,6 +1313,7 @@ if __name__ == "__main__":
                                                         True,
                                                         is_ctrl_fit,
                                                         None if is_ctrl_fit else ctrl_fit_vals,
+                                                        synth_test_ds_dir, # RE use std of synth ds
                                                         result_dir / "fit")
                     if is_ctrl_fit:
                         ctrl_fit_vals = fitted_vals
