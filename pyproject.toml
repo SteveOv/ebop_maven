@@ -1,6 +1,6 @@
 [project]
 name = "ebopmaven"
-version = "0.2.2"
+version = "1.0.0"
 description = "EBOP Model Analysis input Value Estimation Neural network"
 readme = "README.md"
 requires-python = ">=3.9"
