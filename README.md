@@ -7,7 +7,8 @@ and training a model can be found [here in the wiki](https://github.com/SteveOv/
 
 ## Branches
 **A paper titled "EBOP MAVEN: A machine learning model to estimate the input parameters for
-analytic fitting of detached eclipsing binary light curves" is being edited for publication.
+analytic fitting of detached eclipsing binary light curves" is has been accepted for publication in
+[RAS Techniques and Instruments](https://ras.ac.uk/journal/ras-techniques-instruments-rasti).
 The [v1.0 branch](https://github.com/SteveOv/ebop_maven/tree/v1.0) supports this.**
 
 An earlier release of this code and model was presented at the
