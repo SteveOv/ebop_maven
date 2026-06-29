@@ -5,9 +5,11 @@ formal analysis with [JKTEBOP](https://www.astro.keele.ac.uk/jkt/codes/jktebop.h
 Detailed instructions on setting up the runtime environment, training & testing datasets,
 and training a model can be found [here in the wiki](https://github.com/SteveOv/ebop_maven/wiki/setup-instructions)
 
+If you use this code, please cite our paper [2025RASTI...4af051O](https://ui.adsabs.harvard.edu/abs/2025RASTI...4af051O/abstract)
+
 ## Branches
 **A paper titled "EBOP MAVEN: A machine learning model to estimate the input parameters for
-analytic fitting of detached eclipsing binary light curves" is has been accepted for publication in
+analytic fitting of detached eclipsing binary light curves" has now been published in
 [RAS Techniques and Instruments](https://ras.ac.uk/journal/ras-techniques-instruments-rasti).
 The [v1.0 branch](https://github.com/SteveOv/ebop_maven/tree/v1.0) supports this.**
 
